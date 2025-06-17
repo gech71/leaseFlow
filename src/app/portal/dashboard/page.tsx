@@ -58,7 +58,6 @@ const mockTenantBills: Bill[] = [
 export default function CustomerDashboardPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [isMounted, setIsMounted] = useState(false);
-  const tenantName = "Alice Wonderland"; // Mock logged-in tenant
 
   useEffect(() => {
     setIsMounted(true);
@@ -76,7 +75,7 @@ export default function CustomerDashboardPage() {
       case 'Overdue': return { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-50' };
       default: return { icon: Info, color: 'text-gray-500', bgColor: 'bg-gray-50' };
     }
-  }
+  };
 
   if (!isMounted) {
      return <div className="flex justify-center items-center h-[calc(100vh-10rem)]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
@@ -85,7 +84,7 @@ export default function CustomerDashboardPage() {
   return (
     <div className="animate-fadeIn">
       <PageHeader
-        title={`Welcome, ${tenantName}!`}
+        title="Welcome to Your Dashboard!"
         icon={DollarSign}
         description="Here's an overview of your payments and lease details."
       />
