@@ -11,6 +11,7 @@ import type { Agreement } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { addMonths, format, isBefore, startOfDay } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock data for agreements
 const initialAgreements: Agreement[] = [
@@ -20,7 +21,7 @@ const initialAgreements: Agreement[] = [
     tenantName: 'Alice Wonderland',
     spaceId: 'space1',
     spaceDescription: 'Unit 101, Sunrise Tower',
-    agreementText: 'This is a sample agreement text for Alice Wonderland...',
+    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Alice Wonderland (Tenant) for the lease of Unit 101, Sunrise Tower.\n\nTerm: 12 months\nRent: $2500/month\nInitial Payment: 1 month\nUtilities: Tenant responsible for 100% of utilities.\n\nAdditional Clauses:\n- No pets allowed.\n- Quiet hours after 10 PM.\n\nSigned:____________________',
     startDate: new Date(2023, 0, 15).toISOString(),
     monthlyRentalPrice: 2500,
     utilityRate: 1.0,
@@ -35,7 +36,7 @@ const initialAgreements: Agreement[] = [
     tenantName: 'Bob The Builder',
     spaceId: 'space3',
     spaceDescription: 'Office 5B, Downtown Hub',
-    agreementText: 'This is another sample agreement text for Bob The Builder...',
+    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Bob The Builder (Tenant) for the lease of Office 5B, Downtown Hub.\n\nTerm: 6 months\nRent: $3200/month\nInitial Payment: 1 month\nUtilities: Tenant responsible for 100% of utilities.\n\nAdditional Clauses:\n- Parking spot #12 included.\n\nSigned:____________________',
     startDate: new Date(2024, 4, 1).toISOString(), // May 1, 2024
     monthlyRentalPrice: 3200,
     utilityRate: 1.0,
@@ -50,7 +51,7 @@ const initialAgreements: Agreement[] = [
     tenantName: 'Carol Danvers',
     spaceId: 'space4',
     spaceDescription: 'Penthouse Suite, Galaxy Tower',
-    agreementText: 'Premium lease terms for Carol Danvers...',
+    agreementText: 'PREMIUM RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Carol Danvers (Tenant) for the lease of Penthouse Suite, Galaxy Tower.\n\nTerm: 24 months\nRent: $5000/month\nInitial Payment: 3 months\nUtilities: Tenant responsible for 100% of utilities.\n\nAdditional Clauses:\n- Access to rooftop pool included.\n- Weekly cleaning service provided.\n\nSigned:____________________',
     startDate: new Date(2024, 6, 1).toISOString(), // July 1, 2024
     monthlyRentalPrice: 5000,
     utilityRate: 1.0,
@@ -61,16 +62,34 @@ const initialAgreements: Agreement[] = [
   },
 ];
 
+// Function to store and retrieve agreements (can be replaced with API calls later)
+export const getMockAgreements = (): Agreement[] => {
+  if (typeof window !== 'undefined') {
+    const storedAgreements = localStorage.getItem('mockAgreements');
+    if (storedAgreements) {
+      return JSON.parse(storedAgreements);
+    }
+    localStorage.setItem('mockAgreements', JSON.stringify(initialAgreements));
+  }
+  return initialAgreements;
+};
+
+export const getMockAgreementById = (id: string): Agreement | undefined => {
+  const agreements = getMockAgreements();
+  return agreements.find(agreement => agreement.id === id);
+};
+
+
 export default function AgreementsListPage() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsMounted(true);
-    setAgreements(initialAgreements);
-    // Update today's date when component mounts, in case user keeps tab open for long
+    setAgreements(getMockAgreements());
     setToday(startOfDay(new Date())); 
   }, []);
   
@@ -85,6 +104,14 @@ export default function AgreementsListPage() {
     return isBefore(nextPaymentDate, today) && isBefore(today, leaseEndDate);
   };
 
+  const handleDownloadPdf = (agreementId: string) => {
+    toast({
+      title: "Download PDF",
+      description: "PDF download functionality is coming soon!",
+    });
+    // Placeholder: In a real app, you'd generate and download a PDF here.
+    // console.log("Download PDF for agreement:", agreementId);
+  };
 
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
@@ -164,10 +191,12 @@ export default function AgreementsListPage() {
                   <p className="text-xs text-muted-foreground pt-1">Generated: {format(new Date(agreement.createdAt), 'PP')}</p>
                 </CardContent>
                 <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                  <Button variant="outline" size="sm">
-                    <Eye className="mr-1 h-4 w-4" /> View
-                  </Button>
-                  <Button variant="outline" size="sm">
+                  <Link href={`/admin/agreements/${agreement.id}`} passHref>
+                    <Button variant="outline" size="sm">
+                      <Eye className="mr-1 h-4 w-4" /> View
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(agreement.id)}>
                     <Download className="mr-1 h-4 w-4" /> Download PDF
                   </Button>
                 </CardFooter>

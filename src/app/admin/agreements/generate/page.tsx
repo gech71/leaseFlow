@@ -21,6 +21,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { addMonths, format } from 'date-fns';
+import { getMockAgreements } from '../page'; // Import helper
 
 // Mock available spaces (in a real app, fetch this)
 const mockAvailableSpaces: Space[] = [
@@ -63,6 +64,9 @@ export default function GenerateAgreementPage() {
 
   useEffect(() => {
     setIsMounted(true);
+    // In a real app, you would fetch spaces and filter out occupied ones
+    // For now, we use mock data and assume they are already filtered if needed
+    // or update their isOccupied status if one is selected for an agreement.
     setAvailableSpaces(mockAvailableSpaces.filter(s => !s.isOccupied));
   }, []);
 
@@ -71,7 +75,7 @@ export default function GenerateAgreementPage() {
     setError(null);
     setGeneratedAgreement(null);
 
-    const selectedSpace = availableSpaces.find(s => s.id === data.selectedSpaceId);
+    const selectedSpace = mockAvailableSpaces.find(s => s.id === data.selectedSpaceId);
     if (!selectedSpace) {
       toast({ title: "Error", description: "Selected space not found.", variant: "destructive" });
       setIsLoading(false);
@@ -102,7 +106,7 @@ export default function GenerateAgreementPage() {
 
       const newAgreement: Agreement = {
         id: `agreement-${Date.now()}`,
-        tenantId: `tenant-${Date.now()}`, 
+        tenantId: `tenant-${Date.now()}`, // Mock tenant ID
         tenantName: data.tenantName,
         spaceId: selectedSpace.id,
         spaceDescription: `${selectedSpace.spaceIdName}, ${selectedSpace.buildingName}`,
@@ -117,13 +121,39 @@ export default function GenerateAgreementPage() {
         createdAt: new Date().toISOString(),
       };
       setGeneratedAgreement(newAgreement);
-      toast({ title: "Agreement Generated Successfully!", description: "Review the agreement below." });
+      toast({ title: "Agreement Generated Successfully!", description: "Review the agreement below. Saving it will make it active." });
+      
+      // Here you would typically save the newAgreement to your backend/localStorage
+      // For this demo, let's update localStorage if used on the agreements list page
+      if (typeof window !== 'undefined') {
+        const existingAgreements = getMockAgreements();
+        const updatedAgreements = [...existingAgreements, newAgreement];
+        localStorage.setItem('mockAgreements', JSON.stringify(updatedAgreements));
+
+        // Also mark the space as occupied in mock data (if this page managed that state)
+        // This part is tricky if mockAvailableSpaces is not the same source of truth as the one on the Spaces page
+        // For simplicity, this example focuses on agreement generation. Space occupancy update would be handled
+        // more robustly with a shared state management or API.
+      }
+
     } else {
         setError("Received an empty or invalid response from the AI.");
         toast({ title: "Agreement Generation Failed", description: "Received an empty or invalid response from the AI.", variant: "destructive" });
     }
     setIsLoading(false);
   };
+
+  const handleFinalizeAndSave = () => {
+    if (!generatedAgreement) return;
+    // In a real app, this would involve a final save to the database
+    // and potentially navigating away or resetting the form.
+    // For now, just a toast.
+    toast({ title: "Agreement Saved (Simulated)", description: "The agreement has been notionally saved."});
+    // Potentially redirect or clear form
+    // router.push("/admin/agreements");
+    setGeneratedAgreement(null);
+    form.reset();
+  }
 
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
@@ -238,7 +268,7 @@ export default function GenerateAgreementPage() {
                   )}
                 />
                 
-                <Button type="submit" disabled={isLoading || availableSpaces.length === 0} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button type="submit" disabled={isLoading || availableSpaces.length === 0 || !form.formState.isValid} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...
@@ -295,7 +325,7 @@ export default function GenerateAgreementPage() {
                     <Link href="/admin/agreements" passHref>
                         <Button variant="outline"><Eye className="mr-2 h-4 w-4" /> View All Agreements</Button>
                     </Link>
-                    <Button onClick={() => toast({ title: "Action Required", description: "Finalize & Save functionality pending."})}>Finalize & Save Agreement</Button>
+                    <Button onClick={handleFinalizeAndSave}>Finalize & Save Agreement</Button>
                 </div>
               </div>
             )}
