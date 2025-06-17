@@ -16,7 +16,8 @@ const AnalyzeBillInputSchema = z.object({
     .string()
     .describe(
       'Bill data, including details such as charges, dates, and tenant information.'
-    ),\n  agreementDetails: z
+    ),
+  agreementDetails: z
     .string()
     .describe('Details of the rental agreement, including rates and terms.'),
   previousBills: z.string().describe('Details from the previous bills.'),
@@ -67,3 +68,4 @@ const analyzeBillFlow = ai.defineFlow(
     return output!;
   }
 );
+
