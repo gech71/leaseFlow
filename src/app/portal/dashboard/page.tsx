@@ -7,7 +7,6 @@ import { DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, FileText } 
 import type { Bill } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
-// Added Card components
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 
 // Mock data for a logged-in tenant's bills
@@ -39,7 +38,7 @@ const mockTenantBills: Bill[] = [
     totalAmount: 2625,
     status: 'Pending'
   },
-   {
+  {
     id: 'bill4',
     agreementId: 'agreement1',
     tenantId: 'tenant1',
@@ -76,7 +75,7 @@ export default function CustomerDashboardPage() {
       case 'Overdue': return { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-50' };
       default: return { icon: Info, color: 'text-gray-500', bgColor: 'bg-gray-50' };
     }
-  };
+  }; // Explicitly adding semicolon here
 
   if (!isMounted) {
      return <div className="flex justify-center items-center h-[calc(100vh-10rem)]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
