@@ -27,7 +27,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  // AlertDialogTrigger, // No longer needed here for the delete button's direct wrapping
 } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,10 +39,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 // Mock data for spaces - needed to show what space a tenant occupies and to update occupancy
 const initialMockSpaces: Space[] = [
-  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityRate: 1.0, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
-  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityRate: 1.0, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
-  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityRate: 1.0, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
-  { id: 'space4', buildingName: 'Tech Park One', spaceIdName: 'Lab 3', area: 2000, floor: '1st', utilityRate: 1.0, monthlyRentalPrice: 4500, isOccupied: false, createdAt: new Date().toISOString() },
+  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.4, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
+  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
+  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
+  { id: 'space4', buildingName: 'Tech Park One', spaceIdName: 'Lab 3', area: 2000, floor: '1st', utilityProrationShare: 0.5, monthlyRentalPrice: 4500, isOccupied: false, createdAt: new Date().toISOString() },
 
 ];
 
@@ -90,11 +90,12 @@ export default function TenantsPage() {
     return space ? `${space.spaceIdName}, ${space.buildingName}` : "Unknown Space";
   };
   
-  const availableSpacesForAssignment = spaces.filter(s => !s.isOccupied || (formMode === 'edit' && s.id === currentTenant?.rentedSpaceId));
+  const availableSpacesForAssignment = spaces.filter(s => !s.isOccupied || (formMode === 'edit' && currentTenant?.rentedSpaceId && s.id === currentTenant.rentedSpaceId));
+
 
   const handleOpenAddForm = () => {
     setFormMode('add');
-    setCurrentTenant(null); // Or an empty tenant object
+    setCurrentTenant(null); 
     form.reset({ name: "", email: "", rentedSpaceId: null });
     setIsFormOpen(true);
   };
@@ -111,12 +112,14 @@ export default function TenantsPage() {
   };
 
   const handleFormSubmit = (values: TenantFormValues) => {
-    const newRentedSpaceId = values.rentedSpaceId || null;
+    const newRentedSpaceId = values.rentedSpaceId === "null" ? null : values.rentedSpaceId || null;
     let oldRentedSpaceIdOfCurrentTenant: string | null | undefined = null;
+    let tenantIdForSpaceUpdate: string | undefined;
 
     if (formMode === 'add') {
+      tenantIdForSpaceUpdate = `tenant-${Date.now()}`;
       const newTenant: Tenant = {
-        id: `tenant-${Date.now()}`,
+        id: tenantIdForSpaceUpdate,
         ...values,
         rentedSpaceId: newRentedSpaceId,
         createdAt: new Date().toISOString(),
@@ -124,21 +127,22 @@ export default function TenantsPage() {
       setTenants(prev => [newTenant, ...prev]);
       toast({ title: "Tenant Added", description: `${newTenant.name} has been added.` });
     } else if (currentTenant && currentTenant.id) {
-      oldRentedSpaceIdOfCurrentTenant = currentTenant.rentedSpaceId;
+      tenantIdForSpaceUpdate = currentTenant.id;
+      oldRentedSpaceIdOfCurrentTenant = tenants.find(t => t.id === currentTenant.id)?.rentedSpaceId;
       setTenants(prev => prev.map(t => t.id === currentTenant.id ? { ...t, ...values, rentedSpaceId: newRentedSpaceId } : t));
       toast({ title: "Tenant Updated", description: `${values.name} has been updated.` });
     }
 
-    // Update space occupancy
+
     setSpaces(prevSpaces => {
       return prevSpaces.map(space => {
-        // If the space was previously assigned to this tenant and now it's not (or assigned to a different space)
+        // If this space was previously assigned to the tenant but now isn't (or tenant is assigned a different space)
         if (oldRentedSpaceIdOfCurrentTenant && space.id === oldRentedSpaceIdOfCurrentTenant && space.id !== newRentedSpaceId) {
           return { ...space, isOccupied: false, tenantId: undefined };
         }
         // If this space is newly assigned to the tenant
         if (newRentedSpaceId && space.id === newRentedSpaceId) {
-          return { ...space, isOccupied: true, tenantId: currentTenant?.id || `tenant-${Date.now()}` }; // Use existing tenant ID or new one
+          return { ...space, isOccupied: true, tenantId: tenantIdForSpaceUpdate };
         }
         return space;
       });
@@ -146,6 +150,7 @@ export default function TenantsPage() {
 
     setIsFormOpen(false);
     setCurrentTenant(null);
+    form.reset({ name: "", email: "", rentedSpaceId: null });
   };
 
   const handleDeleteTenant = () => {
@@ -166,7 +171,7 @@ export default function TenantsPage() {
     }
     
     toast({ title: "Tenant Removed", description: `${tenantToDelete.name} has been removed.`, variant: "destructive" });
-    setTenantToDelete(null); // Close dialog
+    setTenantToDelete(null); 
   };
 
 
@@ -190,7 +195,7 @@ export default function TenantsPage() {
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
           if (!isOpen) {
-            form.reset();
+            form.reset({ name: "", email: "", rentedSpaceId: null });
             setCurrentTenant(null);
           }
       }}>
@@ -235,23 +240,37 @@ export default function TenantsPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assign Space (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined} value={field.value || undefined}>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value === "null" ? null : value)} 
+                      value={field.value ?? "null"}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a space to assign" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="null">No space assigned</SelectItem>
+                        <SelectItem value="null">No space assigned / Vacate</SelectItem>
                         {availableSpacesForAssignment.map(space => (
                           <SelectItem key={space.id} value={space.id}>
-                            {space.spaceIdName} ({space.buildingName}) - ${space.monthlyRentalPrice}/month
+                            {space.spaceIdName} ({space.buildingName}) - ${space.monthlyRentalPrice.toLocaleString()}/month
                           </SelectItem>
                         ))}
+                         {/* If editing and tenant currently has a space not in availableSpaces (e.g. occupied by them), show it */}
+                        {formMode === 'edit' && currentTenant?.rentedSpaceId && !availableSpacesForAssignment.find(s => s.id === currentTenant.rentedSpaceId) &&
+                          (() => {
+                            const currentOccupiedSpace = spaces.find(s => s.id === currentTenant.rentedSpaceId);
+                            return currentOccupiedSpace ? (
+                              <SelectItem key={currentOccupiedSpace.id} value={currentOccupiedSpace.id}>
+                                {currentOccupiedSpace.spaceIdName} ({currentOccupiedSpace.buildingName}) - Current
+                              </SelectItem>
+                            ) : null;
+                          })()
+                        }
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Select an available space to assign to this tenant.
+                      Select an available space or 'No space assigned' to vacate.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -270,7 +289,7 @@ export default function TenantsPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!tenantToDelete} onOpenChange={() => setTenantToDelete(null)}>
+      <AlertDialog open={!!tenantToDelete} onOpenChange={(open) => { if(!open) setTenantToDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Are you absolutely sure?</AlertDialogTitle>
@@ -331,11 +350,10 @@ export default function TenantsPage() {
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
                         <Edit3 className="h-4 w-4 text-blue-600" />
                     </Button>
-                    <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                    </AlertDialogTrigger>
+                    {/* This Button now directly sets state to open the AlertDialog */}
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                 </div>
               </CardFooter>
             </Card>
@@ -345,6 +363,3 @@ export default function TenantsPage() {
     </div>
   );
 }
-
-
-    
