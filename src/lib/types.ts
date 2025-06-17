@@ -63,7 +63,10 @@ export interface Bill {
   totalAmount: number; // rentAmount + sum of utilityBreakdown amounts
   status: 'Pending' | 'Paid' | 'Overdue';
   paymentDate?: string; // ISO date string
+  paymentMethod?: string;
+  paymentReference?: string;
   analysisResult?: string; // From analyzeBill flow
   isAnomalous?: boolean; // From analyzeBill flow
   recommendations?: string; // From analyzeBill flow
 }
+
