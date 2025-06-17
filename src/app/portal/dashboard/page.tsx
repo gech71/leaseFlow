@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, FileText } from 'lucide-react';
 import type { Bill } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns'; // Import parseISO
 
 // Mock data for a logged-in tenant's bills
 const mockTenantBills: Bill[] = [
@@ -63,7 +63,7 @@ export default function CustomerDashboardPage() {
   useEffect(() => {
     setIsMounted(true);
     // In a real app, fetch bills for the logged-in tenant
-    setBills(mockTenantBills.sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime()));
+    setBills(mockTenantBills.sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime()));
   }, []);
   
   const upcomingPayment = bills.find(b => b.status === 'Pending' || b.status === 'Overdue');
@@ -110,7 +110,7 @@ export default function CustomerDashboardPage() {
                 <div>
                     <p className="text-sm font-medium">Total Due</p>
                     <p className="text-3xl font-bold">${upcomingPayment.totalAmount.toFixed(2)}</p>
-                    <p className="text-sm font-medium mt-1">Due Date: {format(new Date(upcomingPayment.dueDate), 'PP')}</p>
+                    <p className="text-sm font-medium mt-1">Due Date: {format(parseISO(upcomingPayment.dueDate), 'PP')}</p>
                 </div>
                 <div className="space-y-1">
                     <p className="text-sm font-medium">Rent: <span className="font-semibold">${upcomingPayment.rentAmount.toFixed(2)}</span></p>
@@ -160,7 +160,7 @@ export default function CustomerDashboardPage() {
                   <CardHeader className="pb-3">
                      <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle className="font-headline text-md">Bill for {format(new Date(bill.billDate), 'PP')}</CardTitle>
+                            <CardTitle className="font-headline text-md">Bill for {format(parseISO(bill.billDate), 'PP')}</CardTitle>
                             <CardDescription className="text-xs">{bill.spaceDescription}</CardDescription>
                         </div>
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusInfo.color} ${statusInfo.bgColor}`}>
@@ -176,11 +176,11 @@ export default function CustomerDashboardPage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Bill Date</p>
-                      <p className="text-foreground">{format(new Date(bill.billDate), 'PP')}</p>
+                      <p className="text-foreground">{format(parseISO(bill.billDate), 'PP')}</p>
                     </div>
                      <div>
                       <p className="text-xs text-muted-foreground">Payment Date</p>
-                      <p className="text-foreground">{bill.paymentDate ? format(new Date(bill.paymentDate), 'PP') : 'N/A'}</p>
+                      <p className="text-foreground">{bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}</p>
                     </div>
                      <div className="col-span-2 sm:col-span-3 md:col-span-1">
                       <p className="text-xs text-muted-foreground">Utilities</p>
