@@ -29,12 +29,25 @@ export interface Agreement {
   agreementText: string;
   startDate: string; // ISO date string
   monthlyRentalPrice: number;
-  // utilityRate: number; // Removed: Utility cost is now derived via Space and Building total
   additionalTerms?: string;
   createdAt: string; // ISO date string
   paymentTermMonths: number; // Total term of the agreement in months
   initialPaymentMonths: number; // How many months paid upfront
   nextPaymentDueDate: string; // ISO date string for the next payment
+}
+
+export interface BuildingUtilityItem {
+  name: string; // e.g., "Electricity", "Water"
+  totalCost: number;
+}
+
+export interface BuildingMonthlyUtilities {
+  id: string; // Unique ID, e.g., "buildingName-YYYY-MM"
+  buildingName: string;
+  year: number;
+  month: number; // 0-11 (for Date object compatibility: 0 for Jan, 1 for Feb, etc.)
+  utilities: BuildingUtilityItem[];
+  createdAt: string; // ISO date string
 }
 
 export interface Bill {
@@ -46,8 +59,8 @@ export interface Bill {
   billDate: string; // ISO date string
   dueDate: string; // ISO date string
   rentAmount: number;
-  utilityAmount: number;
-  totalAmount: number;
+  utilityBreakdown: Array<{ name: string; amount: number }>; // Stores prorated amounts for each utility type
+  totalAmount: number; // rentAmount + sum of utilityBreakdown amounts
   status: 'Pending' | 'Paid' | 'Overdue';
   paymentDate?: string; // ISO date string
   analysisResult?: string; // From analyzeBill flow

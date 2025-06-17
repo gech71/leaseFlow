@@ -24,7 +24,6 @@ const initialAgreements: Agreement[] = [
     agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Alice Wonderland (Tenant) for the lease of Unit 101, Sunrise Tower.\n\nTerm: 12 months\nRent: $2500/month\nInitial Payment: 1 month\n\nAdditional Clauses:\n- No pets allowed.\n- Quiet hours after 10 PM.\n\nSigned:____________________',
     startDate: new Date(2023, 0, 15).toISOString(),
     monthlyRentalPrice: 2500,
-    // utilityRate: 1.0, // Removed
     createdAt: new Date(2023,0,10).toISOString(),
     paymentTermMonths: 12,
     initialPaymentMonths: 1,
@@ -39,7 +38,6 @@ const initialAgreements: Agreement[] = [
     agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Bob The Builder (Tenant) for the lease of Office 5B, Downtown Hub.\n\nTerm: 6 months\nRent: $3200/month\nInitial Payment: 1 month\n\nAdditional Clauses:\n- Parking spot #12 included.\n\nSigned:____________________',
     startDate: new Date(2024, 4, 1).toISOString(), 
     monthlyRentalPrice: 3200,
-    // utilityRate: 1.0, // Removed
     createdAt: new Date(2024,4,1).toISOString(),
     paymentTermMonths: 6,
     initialPaymentMonths: 1,
@@ -54,7 +52,6 @@ const initialAgreements: Agreement[] = [
     agreementText: 'PREMIUM RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Carol Danvers (Tenant) for the lease of Penthouse Suite, Galaxy Tower.\n\nTerm: 24 months\nRent: $5000/month\nInitial Payment: 3 months\n\nAdditional Clauses:\n- Access to rooftop pool included.\n- Weekly cleaning service provided.\n\nSigned:____________________',
     startDate: new Date(2024, 6, 1).toISOString(), 
     monthlyRentalPrice: 5000,
-    // utilityRate: 1.0, // Removed
     createdAt: new Date(2024,6,1).toISOString(),
     paymentTermMonths: 24,
     initialPaymentMonths: 3,
@@ -66,12 +63,27 @@ export const getMockAgreements = (): Agreement[] => {
   if (typeof window !== 'undefined') {
     const storedAgreements = localStorage.getItem('mockAgreements');
     if (storedAgreements) {
-      return JSON.parse(storedAgreements);
+      try {
+        const parsedAgreements = JSON.parse(storedAgreements);
+        // Basic validation to ensure it's an array and items have an ID
+        if (Array.isArray(parsedAgreements) && parsedAgreements.every(item => typeof item.id === 'string')) {
+          return parsedAgreements;
+        } else {
+           console.warn("Stored mockAgreements data is invalid. Falling back to initial data.");
+           localStorage.setItem('mockAgreements', JSON.stringify(initialAgreements));
+           return initialAgreements;
+        }
+      } catch (error) {
+        console.error("Error parsing mockAgreements from localStorage:", error);
+        localStorage.setItem('mockAgreements', JSON.stringify(initialAgreements));
+        return initialAgreements;
+      }
     }
     localStorage.setItem('mockAgreements', JSON.stringify(initialAgreements));
   }
   return initialAgreements;
 };
+
 
 export const getMockAgreementById = (id: string): Agreement | undefined => {
   const agreements = getMockAgreements();

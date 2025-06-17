@@ -25,6 +25,7 @@ import {
   LogOut,
   Settings,
   UserCircle,
+  Wrench, // Icon for Building Utilities
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -41,6 +42,7 @@ const navItems = [
   { href: '/admin/spaces', label: 'Spaces', icon: Building2 },
   { href: '/admin/tenants', label: 'Tenants', icon: Users },
   { href: '/admin/agreements', label: 'Agreements', icon: FileText },
+  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign },
 ];
 
