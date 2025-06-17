@@ -1,3 +1,4 @@
+
 export interface Space {
   id: string;
   buildingName: string;
@@ -27,11 +28,13 @@ export interface Agreement {
   spaceDescription: string; // Denormalized e.g. "Building A, Unit 101, 500 sqft"
   agreementText: string;
   startDate: string; // ISO date string
-  // endDate?: string; // ISO date string
   monthlyRentalPrice: number;
   utilityRate: number;
   additionalTerms?: string;
   createdAt: string; // ISO date string
+  paymentTermMonths: number; // Total term of the agreement in months
+  initialPaymentMonths: number; // How many months paid upfront
+  nextPaymentDueDate: string; // ISO date string for the next payment
 }
 
 export interface Bill {

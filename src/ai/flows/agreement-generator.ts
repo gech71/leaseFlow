@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -23,6 +24,8 @@ const AgreementInputSchema = z.object({
       'The utility rate, as a percentage, charged to the tenant (e.g., 1.0 for 100%).'
     ),
   monthlyRentalPrice: z.number().describe('The monthly rental price of the space.'),
+  paymentTermMonths: z.number().int().positive().describe('The total term of the agreement in months.'),
+  initialPaymentMonths: z.number().int().positive().describe('The number of months for which rent is paid upfront.'),
   additionalTerms: z.string().optional().describe('Any additional terms to include in the agreement.'),
 });
 export type AgreementInput = z.infer<typeof AgreementInputSchema>;
@@ -51,12 +54,16 @@ const agreementPrompt = ai.definePrompt({
   Floor: {{{floor}}}
   Utility Rate: {{{utilityRate}}}
   Monthly Rental Price: {{{monthlyRentalPrice}}}
+  Payment Term: {{{paymentTermMonths}}} months
+  Initial Payment: Rent for {{{initialPaymentMonths}}} month(s) paid upfront.
+
   {{#if additionalTerms}}
   Additional Terms: {{{additionalTerms}}}
   {{/if}}
 
-  The rental agreement should include standard clauses and any provided additional terms.
+  The rental agreement should include standard clauses, the payment terms specified, and any provided additional terms.
   Ensure the agreement is legally sound and protects the interests of both the landlord and tenant.
+  The agreement should clearly state the monthly rent, the total term, and how many months are paid initially.
   `,
 });
 

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye } from 'lucide-react';
+import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye, CalendarClock, Sigma } from 'lucide-react';
 import type { Space, Agreement } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { generateAgreementAction } from '@/app/actions';
@@ -19,6 +20,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
+import { addMonths, format } from 'date-fns';
 
 // Mock available spaces (in a real app, fetch this)
 const mockAvailableSpaces: Space[] = [
@@ -29,7 +31,12 @@ const mockAvailableSpaces: Space[] = [
 const agreementFormSchema = z.object({
   tenantName: z.string().min(2, { message: "Tenant name must be at least 2 characters." }),
   selectedSpaceId: z.string().min(1, { message: "Please select a space." }),
+  paymentTermMonths: z.coerce.number().int().positive({ message: "Payment term must be a positive number of months." }).min(1, {message: "Term must be at least 1 month."}),
+  initialPaymentMonths: z.coerce.number().int().positive({ message: "Initial payment must be a positive number of months." }).min(1, {message: "Initial payment must be at least 1 month."}),
   additionalTerms: z.string().optional(),
+}).refine(data => data.initialPaymentMonths <= data.paymentTermMonths, {
+  message: "Initial payment months cannot exceed total payment term months.",
+  path: ["initialPaymentMonths"],
 });
 
 type AgreementFormValues = z.infer<typeof agreementFormSchema>;
@@ -48,6 +55,8 @@ export default function GenerateAgreementPage() {
     defaultValues: {
       tenantName: "",
       selectedSpaceId: "",
+      paymentTermMonths: 12,
+      initialPaymentMonths: 1,
       additionalTerms: "",
     },
   });
@@ -77,6 +86,8 @@ export default function GenerateAgreementPage() {
       floor: selectedSpace.floor,
       utilityRate: selectedSpace.utilityRate,
       monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
+      paymentTermMonths: data.paymentTermMonths,
+      initialPaymentMonths: data.initialPaymentMonths,
       additionalTerms: data.additionalTerms || "",
     };
 
@@ -86,23 +97,27 @@ export default function GenerateAgreementPage() {
       setError(result.error);
       toast({ title: "Agreement Generation Failed", description: result.error, variant: "destructive" });
     } else if (result.agreementText) {
+      const startDate = new Date();
+      const nextPaymentDueDateObj = addMonths(startDate, data.initialPaymentMonths);
+
       const newAgreement: Agreement = {
         id: `agreement-${Date.now()}`,
-        tenantId: `tenant-${Date.now()}`, // Placeholder, would come from tenant creation
+        tenantId: `tenant-${Date.now()}`, 
         tenantName: data.tenantName,
         spaceId: selectedSpace.id,
         spaceDescription: `${selectedSpace.spaceIdName}, ${selectedSpace.buildingName}`,
         agreementText: result.agreementText,
-        startDate: new Date().toISOString(),
+        startDate: startDate.toISOString(),
         monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
         utilityRate: selectedSpace.utilityRate,
+        paymentTermMonths: data.paymentTermMonths,
+        initialPaymentMonths: data.initialPaymentMonths,
+        nextPaymentDueDate: nextPaymentDueDateObj.toISOString(),
         additionalTerms: data.additionalTerms,
         createdAt: new Date().toISOString(),
       };
       setGeneratedAgreement(newAgreement);
       toast({ title: "Agreement Generated Successfully!", description: "Review the agreement below." });
-      // In a real app, you'd save this agreement and update space to occupied
-      // For now, we just display it.
     } else {
         setError("Received an empty or invalid response from the AI.");
         toast({ title: "Agreement Generation Failed", description: "Received an empty or invalid response from the AI.", variant: "destructive" });
@@ -172,6 +187,35 @@ export default function GenerateAgreementPage() {
                   )}
                 />
                 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                    control={form.control}
+                    name="paymentTermMonths"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary" />Payment Term (Months)</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="e.g., 12" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="initialPaymentMonths"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" />Initial Payment (Months)</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="e.g., 1" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
+                
                 <FormField
                   control={form.control}
                   name="additionalTerms"
@@ -236,7 +280,13 @@ export default function GenerateAgreementPage() {
                 </div>
                 <h3 className="text-lg font-semibold font-headline">Lease Agreement for {generatedAgreement.tenantName}</h3>
                 <p className="text-sm text-muted-foreground">Space: {generatedAgreement.spaceDescription}</p>
-                <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-secondary/30">
+                <div className="text-sm space-y-1">
+                    <p><strong>Start Date:</strong> {format(new Date(generatedAgreement.startDate), 'PP')}</p>
+                    <p><strong>Payment Term:</strong> {generatedAgreement.paymentTermMonths} months</p>
+                    <p><strong>Initial Payment:</strong> {generatedAgreement.initialPaymentMonths} month(s) rent</p>
+                    <p><strong>Next Payment Due:</strong> {format(new Date(generatedAgreement.nextPaymentDueDate), 'PP')}</p>
+                </div>
+                <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-secondary/30">
                   <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
                     {generatedAgreement.agreementText}
                   </pre>
