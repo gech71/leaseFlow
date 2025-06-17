@@ -6,9 +6,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer } from 'lucide-react';
+import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer, Download } from 'lucide-react';
 import type { Agreement } from '@/lib/types';
 import { getMockAgreementById } from '../page'; // Assuming mock data access from list page
 import { format } from 'date-fns';
@@ -151,3 +151,4 @@ const DollarSign = ({ className }: { className?: string }) => (
     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
   </svg>
 );
+
