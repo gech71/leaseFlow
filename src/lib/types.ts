@@ -16,6 +16,11 @@ export interface Tenant {
   id: string;
   name: string;
   email: string; // For login/portal access
+  phone?: string;
+  alternativePhone?: string;
+  nationalId?: string;
+  representativeName?: string;
+  representativePhone?: string;
   rentedSpaceId: string | null;
   createdAt: string; // ISO date string
 }
@@ -66,5 +71,4 @@ export interface Bill {
   paymentMethod?: string;
   paymentReference?: string;
   bankOrWalletName?: string; // New field for Bank or Wallet Name
-  // analysisResult, isAnomalous, recommendations fields removed
 }

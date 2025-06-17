@@ -5,14 +5,14 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, FileText, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle } from 'lucide-react';
+import { Users, PlusCircle, FileText, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact } from 'lucide-react';
 import type { Tenant, Space } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
-  DialogDescription as DialogPrimitiveDescription, // Renamed to avoid conflict if FormDescription was named DialogDescription
+  DialogDescription as DialogPrimitiveDescription, 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -23,7 +23,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogPrimitiveDescription, // Renamed
+  AlertDialogDescription as AlertDialogPrimitiveDescription, 
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -36,7 +36,6 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// Mock data for spaces - needed to show what space a tenant occupies and to update occupancy
 const initialMockSpaces: Space[] = [
   { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.4, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
   { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
@@ -46,14 +45,19 @@ const initialMockSpaces: Space[] = [
 ];
 
 const initialTenants: Tenant[] = [
-  { id: 'tenant1', name: 'Alice Wonderland', email: 'alice@example.com', rentedSpaceId: 'space1', createdAt: new Date().toISOString() },
-  { id: 'tenant2', name: 'Bob The Builder', email: 'bob@example.com', rentedSpaceId: 'space3', createdAt: new Date().toISOString() },
-  { id: 'tenant3', name: 'Charlie Brown', email: 'charlie@example.com', rentedSpaceId: null, createdAt: new Date().toISOString() }, // Prospective tenant
+  { id: 'tenant1', name: 'Alice Wonderland', email: 'alice@example.com', phone: '555-0101', nationalId: 'AB123456', representativeName: 'Mad Hatter', representativePhone: '555-0199', rentedSpaceId: 'space1', createdAt: new Date().toISOString() },
+  { id: 'tenant2', name: 'Bob The Builder', email: 'bob@example.com', phone: '555-0202', rentedSpaceId: 'space3', createdAt: new Date().toISOString() },
+  { id: 'tenant3', name: 'Charlie Brown', email: 'charlie@example.com', phone: '555-0303', alternativePhone: '555-0333', nationalId: 'XY789012', rentedSpaceId: null, createdAt: new Date().toISOString() },
 ];
 
 const tenantFormSchema = z.object({
   name: z.string().min(2, { message: "Tenant name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
+  phone: z.string().optional(),
+  alternativePhone: z.string().optional(),
+  nationalId: z.string().optional(),
+  representativeName: z.string().optional(),
+  representativePhone: z.string().optional(),
   rentedSpaceId: z.string().nullable().optional(),
 });
 type TenantFormValues = z.infer<typeof tenantFormSchema>;
@@ -75,6 +79,11 @@ export default function TenantsPage() {
     defaultValues: {
       name: "",
       email: "",
+      phone: "",
+      alternativePhone: "",
+      nationalId: "",
+      representativeName: "",
+      representativePhone: "",
       rentedSpaceId: null,
     },
   });
@@ -95,7 +104,10 @@ export default function TenantsPage() {
   const handleOpenAddForm = () => {
     setFormMode('add');
     setCurrentTenant(null); 
-    form.reset({ name: "", email: "", rentedSpaceId: null });
+    form.reset({ 
+      name: "", email: "", phone: "", alternativePhone: "", nationalId: "", 
+      representativeName: "", representativePhone: "", rentedSpaceId: null 
+    });
     setIsFormOpen(true);
   };
 
@@ -105,6 +117,11 @@ export default function TenantsPage() {
     form.reset({
       name: tenant.name,
       email: tenant.email,
+      phone: tenant.phone || "",
+      alternativePhone: tenant.alternativePhone || "",
+      nationalId: tenant.nationalId || "",
+      representativeName: tenant.representativeName || "",
+      representativePhone: tenant.representativePhone || "",
       rentedSpaceId: tenant.rentedSpaceId,
     });
     setIsFormOpen(true);
@@ -115,12 +132,22 @@ export default function TenantsPage() {
     let oldRentedSpaceIdOfCurrentTenant: string | null | undefined = null;
     let tenantIdForSpaceUpdate: string | undefined;
 
+    const tenantData = {
+      name: values.name,
+      email: values.email,
+      phone: values.phone || undefined,
+      alternativePhone: values.alternativePhone || undefined,
+      nationalId: values.nationalId || undefined,
+      representativeName: values.representativeName || undefined,
+      representativePhone: values.representativePhone || undefined,
+      rentedSpaceId: newRentedSpaceId,
+    };
+
     if (formMode === 'add') {
       tenantIdForSpaceUpdate = `tenant-${Date.now()}`;
       const newTenant: Tenant = {
         id: tenantIdForSpaceUpdate,
-        ...values,
-        rentedSpaceId: newRentedSpaceId,
+        ...tenantData,
         createdAt: new Date().toISOString(),
       };
       setTenants(prev => [newTenant, ...prev]);
@@ -128,18 +155,16 @@ export default function TenantsPage() {
     } else if (currentTenant && currentTenant.id) {
       tenantIdForSpaceUpdate = currentTenant.id;
       oldRentedSpaceIdOfCurrentTenant = tenants.find(t => t.id === currentTenant.id)?.rentedSpaceId;
-      setTenants(prev => prev.map(t => t.id === currentTenant.id ? { ...t, ...values, rentedSpaceId: newRentedSpaceId } : t));
+      setTenants(prev => prev.map(t => t.id === currentTenant.id ? { ...t, ...tenantData } : t));
       toast({ title: "Tenant Updated", description: `${values.name} has been updated.` });
     }
 
 
     setSpaces(prevSpaces => {
       return prevSpaces.map(space => {
-        // If this space was previously assigned to the tenant but now isn't (or tenant is assigned a different space)
         if (oldRentedSpaceIdOfCurrentTenant && space.id === oldRentedSpaceIdOfCurrentTenant && space.id !== newRentedSpaceId) {
           return { ...space, isOccupied: false, tenantId: undefined };
         }
-        // If this space is newly assigned to the tenant
         if (newRentedSpaceId && space.id === newRentedSpaceId) {
           return { ...space, isOccupied: true, tenantId: tenantIdForSpaceUpdate };
         }
@@ -149,7 +174,10 @@ export default function TenantsPage() {
 
     setIsFormOpen(false);
     setCurrentTenant(null);
-    form.reset({ name: "", email: "", rentedSpaceId: null });
+    form.reset({ 
+        name: "", email: "", phone: "", alternativePhone: "", nationalId: "",
+        representativeName: "", representativePhone: "", rentedSpaceId: null 
+    });
   };
 
   const handleDeleteTenant = () => {
@@ -194,11 +222,14 @@ export default function TenantsPage() {
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
           if (!isOpen) {
-            form.reset({ name: "", email: "", rentedSpaceId: null });
+            form.reset({ 
+                name: "", email: "", phone: "", alternativePhone: "", nationalId: "",
+                representativeName: "", representativePhone: "", rentedSpaceId: null 
+            });
             setCurrentTenant(null);
           }
       }}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Tenant' : 'Edit Tenant'}</DialogTitle>
             <DialogPrimitiveDescription>
@@ -206,13 +237,13 @@ export default function TenantsPage() {
             </DialogPrimitiveDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 py-4">
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-2">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel className="flex items-center"><UserSquare className="mr-2 h-4 w-4 text-primary" />Name</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., John Doe" {...field} />
                     </FormControl>
@@ -225,9 +256,74 @@ export default function TenantsPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" />Email</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="e.g., john.doe@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 555-123-4567" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="alternativePhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><PhoneIncoming className="mr-2 h-4 w-4 text-primary" />Alternative Phone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 555-987-6543" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nationalId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., AB1234567" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="representativeName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" />Representative Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Jane Smith (Spouse, Agent)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="representativePhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Representative Phone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 555- representative phone" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -238,7 +334,7 @@ export default function TenantsPage() {
                 name="rentedSpaceId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Assign Space (Optional)</FormLabel>
+                    <FormLabel className="flex items-center"><BedDouble className="mr-2 h-4 w-4 text-primary" />Assign Space (Optional)</FormLabel>
                     <Select 
                       onValueChange={(value) => field.onChange(value === "null" ? null : value)} 
                       value={field.value ?? "null"}
@@ -255,7 +351,6 @@ export default function TenantsPage() {
                             {space.spaceIdName} ({space.buildingName}) - ${space.monthlyRentalPrice.toLocaleString()}/month
                           </SelectItem>
                         ))}
-                         {/* If editing and tenant currently has a space not in availableSpaces (e.g. occupied by them), show it */}
                         {formMode === 'edit' && currentTenant?.rentedSpaceId && !availableSpacesForAssignment.find(s => s.id === currentTenant.rentedSpaceId) &&
                           (() => {
                             const currentOccupiedSpace = spaces.find(s => s.id === currentTenant.rentedSpaceId);
@@ -275,7 +370,7 @@ export default function TenantsPage() {
                   </FormItem>
                 )}
               />
-              <DialogFooter>
+              <DialogFooter className="pt-4">
                 <DialogClose asChild>
                   <Button type="button" variant="outline">Cancel</Button>
                 </DialogClose>
@@ -332,12 +427,14 @@ export default function TenantsPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 text-sm flex-grow">
+                {tenant.phone && (
+                  <div className="flex items-center text-muted-foreground">
+                    <Phone className="mr-2 h-4 w-4 text-primary" /> Phone: {tenant.phone}
+                  </div>
+                )}
                 <div className="flex items-center">
                   <BedDouble className="mr-2 h-4 w-4 text-primary" /> 
                   Rented Space: {getSpaceDetails(tenant.rentedSpaceId)}
-                </div>
-                <div className="flex items-center text-muted-foreground">
-                  <Phone className="mr-2 h-4 w-4 text-primary" /> Phone: (555) 123-4567
                 </div>
                  <p className="text-xs text-muted-foreground pt-2">Joined: {new Date(tenant.createdAt).toLocaleDateString()}</p>
               </CardContent>
@@ -361,4 +458,3 @@ export default function TenantsPage() {
     </div>
   );
 }
-
