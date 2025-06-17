@@ -66,7 +66,5 @@ export interface Bill {
   paymentMethod?: string;
   paymentReference?: string;
   bankOrWalletName?: string; // New field for Bank or Wallet Name
-  analysisResult?: string; // From analyzeBill flow
-  isAnomalous?: boolean; // From analyzeBill flow
-  recommendations?: string; // From analyzeBill flow
+  // analysisResult, isAnomalous, recommendations fields removed
 }

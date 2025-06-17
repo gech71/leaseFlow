@@ -5,10 +5,10 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Microscope, Zap, CreditCard, CalendarIcon, InfoIcon } from 'lucide-react';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon } from 'lucide-react'; // Microscope removed
 import type { Bill, Agreement, Space, BuildingMonthlyUtilities } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { analyzeBillAction } from '@/app/actions';
+// analyzeBillAction removed
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
-  DialogTrigger,
+  // DialogTrigger, // Not used anymore for analysis
 } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -90,10 +90,11 @@ export default function BillingPage() {
   const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces);
   const [allBuildingUtilities, setAllBuildingUtilities] = useState<BuildingMonthlyUtilities[]>([]);
   
-  const [selectedBillForAnalysis, setSelectedBillForAnalysis] = useState<Bill | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<{ result: string; isAnomalous?: boolean; recommendations?: string } | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  // State related to bill analysis removed
+  // const [selectedBillForAnalysis, setSelectedBillForAnalysis] = useState<Bill | null>(null);
+  // const [analysisResult, setAnalysisResult] = useState<{ result: string; isAnomalous?: boolean; recommendations?: string } | null>(null);
+  // const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<Bill | null>(null);
@@ -280,53 +281,7 @@ export default function BillingPage() {
     toast({ title: "Bulk Bill Generation Complete", description: `${generatedCount} bills generated. ${skippedCount} agreements skipped (not due, expired, or pending bill exists).` });
   };
 
-  const handleAnalyzeBill = async (bill: Bill) => {
-    setSelectedBillForAnalysis(bill);
-    setIsAnalyzing(true);
-    setAnalysisResult(null);
-    setAnalysisError(null);
-
-    const agreement = agreements.find(ag => ag.id === bill.agreementId);
-    if (!agreement) {
-      setAnalysisError("Associated agreement not found for this bill.");
-      setIsAnalyzing(false);
-      toast({ title: "Error", description: "Associated agreement not found.", variant: "destructive" });
-      return;
-    }
-    
-    const space = spaces.find(s => s.id === agreement.spaceId);
-
-    const previousBillsData = bills
-      .filter(b => b.tenantId === bill.tenantId && new Date(b.billDate) < new Date(bill.billDate))
-      .slice(0, 3) 
-      .map(b => {
-        const utilityDetail = b.utilityBreakdown.map(ub => `${ub.name}: $${ub.amount.toFixed(2)}`).join(', ');
-        return `Date: ${format(new Date(b.billDate), 'PP')}, Total: $${b.totalAmount.toFixed(2)}, Rent: $${b.rentAmount.toFixed(2)}, Utilities: (${utilityDetail || 'N/A'}), Status: ${b.status}`;
-      })
-      .join('\n');
-
-    const agreementDetailsString = `Agreement for ${agreement.tenantName}:\nRent: $${agreement.monthlyRentalPrice.toFixed(2)}\nStart Date: ${format(new Date(agreement.startDate), 'PP')}\nTerm: ${agreement.paymentTermMonths} months\nInitial Pmt: ${agreement.initialPaymentMonths} month(s)\nNext Official Due: ${format(new Date(agreement.nextPaymentDueDate), 'PP')}\nSpace: ${space?.spaceIdName}, ${space?.buildingName}\nProration Share: ${space ? (space.utilityProrationShare * 100).toFixed(2) + '%' : 'N/A'}\n${agreement.additionalTerms ? 'Additional Terms: ' + agreement.additionalTerms : ''}`;
-    
-    const currentBillUtilityDetail = bill.utilityBreakdown.map(ub => `  - ${ub.name}: $${ub.amount.toFixed(2)}`).join('\n');
-    const billDataString = `Current Bill for ${bill.tenantName} (${bill.spaceDescription}):\nDate: ${format(new Date(bill.billDate), 'PP')}\nDue Date: ${format(new Date(bill.dueDate), 'PP')}\nRent: $${bill.rentAmount.toFixed(2)}\nUtilities:\n${currentBillUtilityDetail || '  - (No utility charges)'}\nTotal: $${bill.totalAmount.toFixed(2)}\nStatus: ${bill.status}`;
-
-    const input = {
-      billData: billDataString,
-      agreementDetails: agreementDetailsString,
-      previousBills: previousBillsData || "No previous bills available for comparison.",
-    };
-
-    const result = await analyzeBillAction(input);
-    setIsAnalyzing(false);
-    if ('error' in result) {
-      setAnalysisError(result.error);
-      toast({ title: "Bill Analysis Failed", description: result.error, variant: "destructive" });
-    } else {
-      setAnalysisResult({ result: result.analysisResult, isAnomalous: result.isAnomalous, recommendations: result.recommendations });
-      setBills(prevBills => prevBills.map(b => b.id === bill.id ? {...b, analysisResult: result.analysisResult, isAnomalous: result.isAnomalous, recommendations: result.recommendations } : b));
-      toast({ title: "Bill Analysis Complete", description: "Check the analysis details." });
-    }
-  };
+  // handleAnalyzeBill function removed
 
   const handleOpenPaymentDialog = (bill: Bill) => {
     setBillForPayment(bill);
@@ -385,7 +340,7 @@ export default function BillingPage() {
       <PageHeader
         title="Billing Management"
         icon={DollarSign}
-        description="Generate and analyze rental and utility bills. Ensure building utility costs are entered via 'Building Utilities' page before generation."
+        description="Generate and manage rental and utility bills. Ensure building utility costs are entered via 'Building Utilities' page before generation."
       />
 
       <Card className="mb-6 shadow-sm">
@@ -437,66 +392,7 @@ export default function BillingPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={!!selectedBillForAnalysis && (!!analysisResult || isAnalyzing || !!analysisError)} onOpenChange={() => {setSelectedBillForAnalysis(null); setAnalysisResult(null); setAnalysisError(null); if(isAnalyzing) setIsAnalyzing(false);}}>
-        <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-                <DialogTitle className="font-headline text-xl">Bill Analysis Result</DialogTitle>
-                <DialogDescription>
-                    AI-powered analysis for bill of {selectedBillForAnalysis?.tenantName} ({selectedBillForAnalysis?.spaceDescription}).
-                </DialogDescription>
-            </DialogHeader>
-            {isAnalyzing && (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary mb-3" />
-                    <p className="font-semibold">Analyzing bill...</p>
-                    <p className="text-sm text-muted-foreground">This may take a few moments.</p>
-                </div>
-            )}
-            {analysisError && !isAnalyzing && (
-                 <div className="p-4 rounded-md bg-destructive text-destructive-foreground my-4">
-                    <div className="flex items-center font-semibold mb-1">
-                        <AlertTriangle className="h-5 w-5 mr-2"/> Analysis Error
-                    </div>
-                    <p className="text-sm">{analysisError}</p>
-                </div>
-            )}
-            {analysisResult && !isAnalyzing && (
-                <ScrollArea className="max-h-[60vh] p-1 pr-3 my-4">
-                    <div className="space-y-4 text-sm py-2">
-                        {analysisResult.isAnomalous && (
-                             <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700">
-                                <div className="flex items-center font-semibold">
-                                    <AlertTriangle className="h-5 w-5 mr-2"/> Anomaly Detected!
-                                </div>
-                            </div>
-                        )}
-                        {!analysisResult.isAnomalous && typeof analysisResult.isAnomalous === 'boolean' && (
-                             <div className="p-3 rounded-md bg-green-50 border border-green-200 text-green-700">
-                                <div className="flex items-center font-semibold">
-                                    <CheckCircle className="h-5 w-5 mr-2"/> No Anomalies Detected.
-                                </div>
-                            </div>
-                        )}
-                        <div>
-                            <h4 className="font-semibold text-foreground mb-1 mt-2">Analysis Details:</h4>
-                            <p className="text-muted-foreground whitespace-pre-wrap">{analysisResult.result}</p>
-                        </div>
-                         {analysisResult.recommendations && (
-                            <div>
-                                <h4 className="font-semibold text-foreground mb-1 mt-3">Recommendations:</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap">{analysisResult.recommendations}</p>
-                            </div>
-                        )}
-                    </div>
-                </ScrollArea>
-            )}
-            <DialogFooter>
-                <DialogClose asChild>
-                    <Button type="button" variant="outline">Close</Button>
-                </DialogClose>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Analysis Dialog Removed */}
 
       <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => {
           setIsPaymentDialogOpen(isOpen);
@@ -679,18 +575,11 @@ export default function BillingPage() {
                     </div>
                 )}
 
-                {bill.analysisResult && (
-                    <p className={`text-xs italic mt-2 p-2 rounded-md ${bill.isAnomalous ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                        {bill.isAnomalous ? <AlertTriangle className="inline h-4 w-4 mr-1"/> : <CheckCircle className="inline h-4 w-4 mr-1"/>}
-                        AI Analysis: {bill.analysisResult.substring(0,50)}... (Click Analyze for full details)
-                    </p>
-                )}
+                {/* Analysis result display removed */}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between items-center">
-                 <Button variant="outline" size="sm" onClick={() => handleAnalyzeBill(bill)} disabled={isAnalyzing && selectedBillForAnalysis?.id === bill.id}>
-                  {isAnalyzing && selectedBillForAnalysis?.id === bill.id ? <Loader2 className="mr-1 h-4 w-4 animate-spin"/> : <Microscope className="mr-1 h-4 w-4" />}
-                  Analyze
-                </Button>
+                 {/* Analyze Button Removed */}
+                 <div></div> {/* Placeholder for spacing if analyze button was on left */}
                 <div className="flex gap-2 items-center">
                     <Button 
                         variant={bill.status === 'Paid' ? "secondary" : "default"} 
