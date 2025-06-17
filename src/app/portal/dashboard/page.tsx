@@ -9,7 +9,8 @@ import type { Bill } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
 
-// Mock data for a logged-in tenant's bills
+// Mock data for a logged-in tenant's bills - COMMENTED OUT
+/*
 const mockTenantBills: Bill[] = [
   {
     id: 'bill1',
@@ -53,30 +54,30 @@ const mockTenantBills: Bill[] = [
     paymentDate: new Date(2024, 4, 12).toISOString()
   },
 ];
-
+*/
 
 export default function CustomerDashboardPage() {
-  const [bills, setBills] = useState<Bill[]>([]);
+  // const [bills, setBills] = useState<Bill[]>([]); // COMMENTED OUT
   const [isMounted, setIsMounted] = useState(false);
   const tenantName = "Alice Wonderland"; // Mock logged-in tenant
 
   useEffect(() => {
     setIsMounted(true);
     // In a real app, fetch bills for the logged-in tenant
-    setBills(mockTenantBills.sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime()));
+    // setBills(mockTenantBills.sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime())); // COMMENTED OUT
   }, []);
 
-  const upcomingPayment = bills.find(b => b.status === 'Pending' || b.status === 'Overdue');
-  const paymentHistory = bills.filter(b => b.status === 'Paid');
+  // const upcomingPayment = bills.find(b => b.status === 'Pending' || b.status === 'Overdue'); // COMMENTED OUT
+  // const paymentHistory = bills.filter(b => b.status === 'Paid'); // COMMENTED OUT
 
-  const getStatusInfo = (status: Bill['status']) => {
-    switch (status) {
-      case 'Paid': return { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-50' };
-      case 'Pending': return { icon: Info, color: 'text-yellow-500', bgColor: 'bg-yellow-50' };
-      case 'Overdue': return { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-50' };
-      default: return { icon: Info, color: 'text-gray-500', bgColor: 'bg-gray-50' };
-    }
-  }
+  // const getStatusInfo = (status: Bill['status']) => { // COMMENTED OUT
+  //   switch (status) {
+  //     case 'Paid': return { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-50' };
+  //     case 'Pending': return { icon: Info, color: 'text-yellow-500', bgColor: 'bg-yellow-50' };
+  //     case 'Overdue': return { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-50' };
+  //     default: return { icon: Info, color: 'text-gray-500', bgColor: 'bg-gray-50' };
+  //   }
+  // }
 
   if (!isMounted) {
      return <div className="flex justify-center items-center h-[calc(100vh-10rem)]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
@@ -90,6 +91,8 @@ export default function CustomerDashboardPage() {
         description="Here's an overview of your payments and lease details."
       />
 
+      {/* Upcoming Payment Section - COMMENTED OUT */}
+      {/*
       {upcomingPayment && (
         <Card className="mb-8 shadow-lg bg-primary/10 border-primary/30 transform hover:scale-[1.01] transition-transform duration-300">
           <CardHeader>
@@ -131,9 +134,19 @@ export default function CustomerDashboardPage() {
           </CardFooter>
         </Card>
       )}
+      */}
 
       <div className="mt-8">
         <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Payment History</h2>
+        {/* Payment History Section - COMMENTED OUT */}
+        <Card className="text-center py-12 shadow-sm">
+            <CardContent>
+                <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2 font-headline">Content Temporarily Removed</h3>
+                <p className="text-muted-foreground">Bill display is temporarily disabled to isolate an error.</p>
+            </CardContent>
+        </Card>
+        {/*
         {paymentHistory.length === 0 && !upcomingPayment ? (
             <Card className="text-center py-12 shadow-sm">
                 <CardContent>
@@ -202,6 +215,7 @@ export default function CustomerDashboardPage() {
             })}
           </div>
         )}
+        */}
       </div>
     </div>
   );
