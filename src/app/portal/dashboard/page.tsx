@@ -3,11 +3,12 @@
 
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, FileText } from 'lucide-react';
 import type { Bill } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
+// Added Card components
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 
 // Mock data for a logged-in tenant's bills
 const mockTenantBills: Bill[] = [
@@ -51,8 +52,9 @@ const mockTenantBills: Bill[] = [
     totalAmount: 2620,
     status: 'Paid',
     paymentDate: new Date(2024, 4, 12).toISOString()
-  } // Removed trailing comma here
+  }
 ];
+
 
 export default function CustomerDashboardPage() {
   const [bills, setBills] = useState<Bill[]>([]);
