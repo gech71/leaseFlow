@@ -3,23 +3,22 @@
 
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'; // Kept for structure, not used in simplified JSX
-import { DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, FileText } from 'lucide-react'; // DollarSign used in PageHeader
-import type { Bill } from '@/lib/types'; // Bill type not used in this minimal version
-import { Button } from '@/components/ui/button'; // Kept for structure, not used in simplified JSX
-import { format, parseISO } from 'date-fns'; // Kept for structure, not used in simplified logic
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, FileText } from 'lucide-react';
+import type { Bill } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { format, parseISO } from 'date-fns';
 
-// Mock data for a logged-in tenant's bills - COMMENTED OUT
-/*
+// Mock data for a logged-in tenant's bills
 const mockTenantBills: Bill[] = [
   {
     id: 'bill1',
     agreementId: 'agreement1',
     tenantId: 'tenant1',
-    tenantName: 'Alice Wonderland', 
+    tenantName: 'Alice Wonderland',
     spaceDescription: 'Unit 101, Sunrise Tower',
-    billDate: new Date(2024, 5, 1).toISOString(), 
-    dueDate: new Date(2024, 5, 15).toISOString(), 
+    billDate: new Date(2024, 5, 1).toISOString(),
+    dueDate: new Date(2024, 5, 15).toISOString(),
     rentAmount: 2500,
     utilityBreakdown: [{ name: "Electricity", amount: 100 }, { name: "Water", amount: 25 }],
     totalAmount: 2625,
@@ -32,8 +31,8 @@ const mockTenantBills: Bill[] = [
     tenantId: 'tenant1',
     tenantName: 'Alice Wonderland',
     spaceDescription: 'Unit 101, Sunrise Tower',
-    billDate: new Date(2024, 6, 1).toISOString(), 
-    dueDate: new Date(2024, 6, 15).toISOString(), 
+    billDate: new Date(2024, 6, 1).toISOString(),
+    dueDate: new Date(2024, 6, 15).toISOString(),
     rentAmount: 2500,
     utilityBreakdown: [{ name: "Electricity", amount: 105 }, { name: "Water", amount: 20 }],
     totalAmount: 2625,
@@ -45,38 +44,37 @@ const mockTenantBills: Bill[] = [
     tenantId: 'tenant1',
     tenantName: 'Alice Wonderland',
     spaceDescription: 'Unit 101, Sunrise Tower',
-    billDate: new Date(2024, 4, 1).toISOString(), 
-    dueDate: new Date(2024, 4, 15).toISOString(), 
+    billDate: new Date(2024, 4, 1).toISOString(),
+    dueDate: new Date(2024, 4, 15).toISOString(),
     rentAmount: 2500,
     utilityBreakdown: [{ name: "Electricity", amount: 95 }, {name: "Trash", amount: 25}],
     totalAmount: 2620,
     status: 'Paid',
     paymentDate: new Date(2024, 4, 12).toISOString()
-  },
+  } // Removed trailing comma here
 ];
-*/
 
 export default function CustomerDashboardPage() {
-  // const [bills, setBills] = useState<Bill[]>([]); // COMMENTED OUT
+  const [bills, setBills] = useState<Bill[]>([]);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
     // In a real app, fetch bills for the logged-in tenant
-    // setBills(mockTenantBills.sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime())); // COMMENTED OUT
+    setBills(mockTenantBills.sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime()));
   }, []);
 
-  // const upcomingPayment = bills.find(b => b.status === 'Pending' || b.status === 'Overdue'); // COMMENTED OUT
-  // const paymentHistory = bills.filter(b => b.status === 'Paid'); // COMMENTED OUT
+  const upcomingPayment = bills.find(b => b.status === 'Pending' || b.status === 'Overdue');
+  const paymentHistory = bills.filter(b => b.status === 'Paid');
 
-  // const getStatusInfo = (status: Bill['status']) => { // COMMENTED OUT
-  //   switch (status) {
-  //     case 'Paid': return { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-50' };
-  //     case 'Pending': return { icon: Info, color: 'text-yellow-500', bgColor: 'bg-yellow-50' };
-  //     case 'Overdue': return { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-50' };
-  //     default: return { icon: Info, color: 'text-gray-500', bgColor: 'bg-gray-50' };
-  //   }
-  // };
+  const getStatusInfo = (status: Bill['status']) => {
+    switch (status) {
+      case 'Paid': return { icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-50' };
+      case 'Pending': return { icon: Info, color: 'text-yellow-500', bgColor: 'bg-yellow-50' };
+      case 'Overdue': return { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-50' };
+      default: return { icon: Info, color: 'text-gray-500', bgColor: 'bg-gray-50' };
+    }
+  };
 
   if (!isMounted) {
      return <div className="flex justify-center items-center h-[calc(100vh-10rem)]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
@@ -90,17 +88,6 @@ export default function CustomerDashboardPage() {
         description="Here's an overview of your payments and lease details."
       />
 
-      <Card className="mt-8 shadow-lg">
-        <CardHeader>
-            <CardTitle>Billing Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <p>Your billing details will appear here once the issue is resolved.</p>
-        </CardContent>
-      </Card>
-
-      {/* Upcoming Payment Section - COMMENTED OUT ENTIRELY */}
-      {/*
       {upcomingPayment && (
         <Card className="mb-8 shadow-lg bg-primary/10 border-primary/30 transform hover:scale-[1.01] transition-transform duration-300">
           <CardHeader>
@@ -142,10 +129,7 @@ export default function CustomerDashboardPage() {
           </CardFooter>
         </Card>
       )}
-      */}
 
-      {/* Payment History Section - COMMENTED OUT ENTIRELY */}
-      {/*
       <div className="mt-8">
         <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Payment History</h2>
         {paymentHistory.length === 0 && !upcomingPayment ? (
@@ -217,9 +201,6 @@ export default function CustomerDashboardPage() {
           </div>
         )}
       </div>
-      */}
     </div>
   );
 }
-
-    
