@@ -20,48 +20,19 @@ const getStatusInfo = (status: Bill['status']) => {
   }
 };
 
-// Mock data for a logged-in tenant's bills
+// Simplified Mock data for a logged-in tenant's bills
 const mockTenantBills: Bill[] = [
   {
-    id: 'bill1',
-    agreementId: 'agreement1',
-    tenantId: 'tenant1',
-    // tenantName: 'Alice Wonderland', // Removed as per type
-    spaceDescription: 'Unit 101, Sunrise Tower',
-    billDate: new Date(2024, 5, 1).toISOString(),
-    dueDate: new Date(2024, 5, 15).toISOString(),
-    rentAmount: 2500,
-    utilityBreakdown: [{ name: "Electricity", amount: 100 }, { name: "Water", amount: 25 }],
-    totalAmount: 2625,
-    status: 'Paid',
-    paymentDate: new Date(2024, 5, 10).toISOString()
-  },
-  {
-    id: 'bill3',
-    agreementId: 'agreement1',
-    tenantId: 'tenant1',
-    // tenantName: 'Alice Wonderland', // Removed as per type
-    spaceDescription: 'Unit 101, Sunrise Tower',
-    billDate: new Date(2024, 6, 1).toISOString(),
-    dueDate: new Date(2024, 6, 15).toISOString(),
-    rentAmount: 2500,
-    utilityBreakdown: [{ name: "Electricity", amount: 105 }, { name: "Water", amount: 20 }],
-    totalAmount: 2625,
+    id: 'bill-minimal-1',
+    agreementId: 'agreement-minimal-1',
+    tenantId: 'tenant-minimal-1',
+    spaceDescription: 'Minimal Space, Example Building',
+    billDate: new Date(2024, 6, 1).toISOString(), // Example: July 1, 2024
+    dueDate: new Date(2024, 6, 15).toISOString(), // Example: July 15, 2024
+    rentAmount: 100,
+    utilityBreakdown: [{ name: "Basic Utility", amount: 10 }],
+    totalAmount: 110,
     status: 'Pending'
-  },
-  {
-    id: 'bill4',
-    agreementId: 'agreement1',
-    tenantId: 'tenant1',
-    // tenantName: 'Alice Wonderland', // Removed as per type
-    spaceDescription: 'Unit 101, Sunrise Tower',
-    billDate: new Date(2024, 4, 1).toISOString(),
-    dueDate: new Date(2024, 4, 15).toISOString(),
-    rentAmount: 2500,
-    utilityBreakdown: [{ name: "Electricity", amount: 95 }, {name: "Trash", amount: 25}],
-    totalAmount: 2620,
-    status: 'Paid',
-    paymentDate: new Date(2024, 4, 12).toISOString()
   }
 ];
 
