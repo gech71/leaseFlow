@@ -28,6 +28,7 @@ import {
   Wrench, 
   ClipboardList, 
   Building, // Icon for Buildings
+  ExternalLink, // Icon for the new link
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -41,13 +42,14 @@ import {
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/buildings', label: 'Buildings', icon: Building }, // New item
+  { href: '/admin/buildings', label: 'Buildings', icon: Building },
   { href: '/admin/spaces', label: 'Spaces', icon: Building2 },
   { href: '/admin/tenants', label: 'Tenants', icon: Users },
   { href: '/admin/agreements', label: 'Agreements', icon: FileText },
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList },
+  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink }, // New temporary link
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -68,9 +70,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href}>
+                <Link href={item.href} target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined} rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}>
                   <SidebarMenuButton
-                    isActive={pathname === item.href || (item.href !== '/admin/dashboard' && pathname.startsWith(item.href))}
+                    isActive={pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href))}
                     tooltip={{children: item.label, side: "right", className: "font-headline"}}
                   >
                     <item.icon />
