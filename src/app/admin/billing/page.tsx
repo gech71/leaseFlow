@@ -54,6 +54,8 @@ const initialMockSpaces: Space[] = [
 const initialBills: Bill[] = [
   { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 80}, {name: "Water", amount: 20}], totalAmount: 2600, status: 'Paid', paymentDate: new Date(2024,5,10).toISOString(), paymentMethod: "Card", paymentReference: "TXN12345" },
   { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', tenantName: 'Bob The Builder', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "General Utility", amount: 175}], totalAmount: 3375, status: 'Pending' },
+  { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,4,1).toISOString(), dueDate: new Date(2024,4,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Paid', paymentDate: new Date(2024,4,10).toISOString(), paymentMethod: "Bank Transfer", paymentReference: "REF9876", bankOrWalletName: "City Bank" },
+
 ];
 
 const getStoredBuildingUtilities = (): BuildingMonthlyUtilities[] => {
@@ -68,7 +70,17 @@ const paymentFormSchema = z.object({
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentMethod: z.string().min(1, { message: "Payment method is required." }),
   paymentReference: z.string().optional(),
+  bankOrWalletName: z.string().optional(),
+}).refine(data => {
+  if ((data.paymentMethod === "Bank Transfer" || data.paymentMethod === "Wallet") && (!data.bankOrWalletName || data.bankOrWalletName.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Bank/Wallet name is required for this payment method.",
+  path: ["bankOrWalletName"],
 });
+
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
 
@@ -95,8 +107,11 @@ export default function BillingPage() {
       paymentDate: new Date(),
       paymentMethod: "",
       paymentReference: "",
+      bankOrWalletName: "",
     }
   });
+  const paymentMethodWatcher = paymentForm.watch("paymentMethod");
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -109,6 +124,7 @@ export default function BillingPage() {
         paymentDate: billForPayment.paymentDate ? parseISO(billForPayment.paymentDate) : new Date(),
         paymentMethod: billForPayment.paymentMethod || "",
         paymentReference: billForPayment.paymentReference || "",
+        bankOrWalletName: billForPayment.bankOrWalletName || "",
       });
     }
   }, [billForPayment, paymentForm]);
@@ -314,6 +330,12 @@ export default function BillingPage() {
 
   const handleOpenPaymentDialog = (bill: Bill) => {
     setBillForPayment(bill);
+    paymentForm.reset({
+        paymentDate: bill.paymentDate ? parseISO(bill.paymentDate) : new Date(),
+        paymentMethod: bill.paymentMethod || "",
+        paymentReference: bill.paymentReference || "",
+        bankOrWalletName: bill.bankOrWalletName || "",
+      });
     setIsPaymentDialogOpen(true);
   };
   
@@ -328,7 +350,8 @@ export default function BillingPage() {
             status: 'Paid', 
             paymentDate: values.paymentDate.toISOString(),
             paymentMethod: values.paymentMethod,
-            paymentReference: values.paymentReference 
+            paymentReference: values.paymentReference,
+            bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined,
           } 
         : b
       )
@@ -336,7 +359,12 @@ export default function BillingPage() {
     toast({ title: "Payment Recorded", description: `Payment for bill ${billForPayment.id} has been successfully recorded.` });
     setIsPaymentDialogOpen(false);
     setBillForPayment(null);
-    paymentForm.reset();
+    paymentForm.reset({
+      paymentDate: new Date(),
+      paymentMethod: "",
+      paymentReference: "",
+      bankOrWalletName: "",
+    });
   };
   
   const getStatusColor = (status: Bill['status']) => {
@@ -474,7 +502,12 @@ export default function BillingPage() {
           setIsPaymentDialogOpen(isOpen);
           if (!isOpen) {
             setBillForPayment(null);
-            paymentForm.reset();
+            paymentForm.reset({
+              paymentDate: new Date(),
+              paymentMethod: "",
+              paymentReference: "",
+              bankOrWalletName: "",
+            });
           }
       }}>
           <DialogContent className="sm:max-w-md">
@@ -542,6 +575,7 @@ export default function BillingPage() {
                                           <SelectItem value="Card">Card</SelectItem>
                                           <SelectItem value="Cash">Cash</SelectItem>
                                           <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                          <SelectItem value="Wallet">Wallet</SelectItem>
                                           <SelectItem value="Check">Check</SelectItem>
                                           <SelectItem value="Other">Other</SelectItem>
                                       </SelectContent>
@@ -550,6 +584,21 @@ export default function BillingPage() {
                               </FormItem>
                           )}
                       />
+                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && (
+                        <FormField
+                          control={paymentForm.control}
+                          name="bankOrWalletName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel>
+                              <FormControl>
+                                <Input placeholder={`Enter ${paymentMethodWatcher === "Bank Transfer" ? "Bank" : "Wallet"} Name`} {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                       <FormField
                           control={paymentForm.control}
                           name="paymentReference"
@@ -625,6 +674,7 @@ export default function BillingPage() {
                         <p className="font-medium text-foreground">Payment Details:</p>
                         <p>Paid on: {format(parseISO(bill.paymentDate), 'PP')}</p>
                         {bill.paymentMethod && <p>Method: {bill.paymentMethod}</p>}
+                        {bill.bankOrWalletName && <p>{bill.paymentMethod === "Bank Transfer" ? "Bank" : "Wallet"}: {bill.bankOrWalletName}</p>}
                         {bill.paymentReference && <p>Reference: {bill.paymentReference}</p>}
                     </div>
                 )}
@@ -662,4 +712,3 @@ export default function BillingPage() {
     </div>
   );
 }
-

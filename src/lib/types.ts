@@ -65,8 +65,8 @@ export interface Bill {
   paymentDate?: string; // ISO date string
   paymentMethod?: string;
   paymentReference?: string;
+  bankOrWalletName?: string; // New field for Bank or Wallet Name
   analysisResult?: string; // From analyzeBill flow
   isAnomalous?: boolean; // From analyzeBill flow
   recommendations?: string; // From analyzeBill flow
 }
-
