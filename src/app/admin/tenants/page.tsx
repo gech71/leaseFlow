@@ -12,7 +12,7 @@ import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+  DialogDescription as DialogPrimitiveDescription, // Renamed to avoid conflict if FormDescription was named DialogDescription
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -23,18 +23,17 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDialogPrimitiveDescription, // Renamed
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  // AlertDialogTrigger, // No longer needed here for the delete button's direct wrapping
 } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Mock data for spaces - needed to show what space a tenant occupies and to update occupancy
@@ -202,9 +201,9 @@ export default function TenantsPage() {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Tenant' : 'Edit Tenant'}</DialogTitle>
-            <DialogDescription>
+            <DialogPrimitiveDescription>
               {formMode === 'add' ? "Enter the details for the new tenant." : "Update the tenant's details."}
-            </DialogDescription>
+            </DialogPrimitiveDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 py-4">
@@ -293,10 +292,10 @@ export default function TenantsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogPrimitiveDescription>
               This action cannot be undone. This will permanently delete the tenant "{tenantToDelete?.name}"
               {tenantToDelete?.rentedSpaceId ? ` and mark their space (${getSpaceDetails(tenantToDelete.rentedSpaceId)}) as vacant.` : '.'}
-            </AlertDialogDescription>
+            </AlertDialogPrimitiveDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTenantToDelete(null)}>Cancel</AlertDialogCancel>
@@ -350,7 +349,6 @@ export default function TenantsPage() {
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
                         <Edit3 className="h-4 w-4 text-blue-600" />
                     </Button>
-                    {/* This Button now directly sets state to open the AlertDialog */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -363,3 +361,4 @@ export default function TenantsPage() {
     </div>
   );
 }
+
