@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3 } from 'lucide-react';
-import type { Space } from '@/lib/types';
+import type { Space, Building } from '@/lib/types'; // Added Building
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -28,62 +28,108 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
 
-const initialSpaces: Space[] = [
-  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.40, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
-  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
-  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
-  { id: 'space5', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, createdAt: new Date().toISOString() },
-];
+const getStoredSpaces = (): Space[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('spaces');
+    return stored ? JSON.parse(stored) : [];
+  }
+  return [];
+};
+
+const storeSpaces = (spaces: Space[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('spaces', JSON.stringify(spaces));
+  }
+};
+
+const getStoredBuildings = (): Building[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('buildings');
+    return stored ? JSON.parse(stored) : [];
+  }
+  return [];
+};
+
 
 export default function SpacesPage() {
   const [spaces, setSpaces] = useState<Space[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]); // State for buildings
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
-  // Form state for adding/editing a space
   const [currentSpace, setCurrentSpace] = useState<Partial<Space>>({});
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
+  const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
 
 
   useEffect(() => {
     setIsMounted(true);
-    // In a real app, fetch spaces from an API
-    setSpaces(initialSpaces);
+    setSpaces(getStoredSpaces());
+    setBuildings(getStoredBuildings());
   }, []);
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!currentSpace.buildingName) {
+      toast({ title: "Error", description: "Please select a building.", variant: "destructive" });
+      return;
+    }
+    if (!currentSpace.spaceIdName?.trim()) {
+      toast({ title: "Error", description: "Space ID/Name is required.", variant: "destructive" });
+      return;
+    }
+     if (currentSpace.area === undefined || currentSpace.area <= 0) {
+      toast({ title: "Error", description: "Area must be a positive number.", variant: "destructive" });
+      return;
+    }
+    if (currentSpace.utilityProrationShare === undefined || currentSpace.utilityProrationShare < 0 || currentSpace.utilityProrationShare > 1) {
+      toast({ title: "Error", description: "Proration share must be between 0% and 100%.", variant: "destructive" });
+      return;
+    }
+     if (currentSpace.monthlyRentalPrice === undefined || currentSpace.monthlyRentalPrice <= 0) {
+      toast({ title: "Error", description: "Monthly rent must be a positive number.", variant: "destructive" });
+      return;
+    }
+
+
     const newSpaceData: Space = {
       id: formMode === 'add' ? `space-${Date.now()}` : currentSpace.id!,
-      buildingName: currentSpace.buildingName || 'Default Building',
-      spaceIdName: currentSpace.spaceIdName || 'Default Space ID',
-      area: Number(currentSpace.area) || 0,
+      buildingName: currentSpace.buildingName,
+      spaceIdName: currentSpace.spaceIdName.trim(),
+      area: Number(currentSpace.area),
       floor: currentSpace.floor || 'N/A',
-      utilityProrationShare: Number(currentSpace.utilityProrationShare) || 0, // ensure it's a number
-      monthlyRentalPrice: Number(currentSpace.monthlyRentalPrice) || 0,
+      utilityProrationShare: Number(currentSpace.utilityProrationShare),
+      monthlyRentalPrice: Number(currentSpace.monthlyRentalPrice),
       isOccupied: currentSpace.isOccupied || false,
       tenantId: currentSpace.tenantId,
       createdAt: currentSpace.createdAt || new Date().toISOString(),
     };
 
+    let updatedSpaces;
     if (formMode === 'add') {
-      setSpaces(prev => [newSpaceData, ...prev]);
+      updatedSpaces = [newSpaceData, ...spaces];
       toast({ title: "Space Added", description: `${newSpaceData.spaceIdName} in ${newSpaceData.buildingName} has been added.` });
     } else {
-      setSpaces(prev => prev.map(s => s.id === newSpaceData.id ? newSpaceData : s));
+      updatedSpaces = spaces.map(s => s.id === newSpaceData.id ? newSpaceData : s);
       toast({ title: "Space Updated", description: `${newSpaceData.spaceIdName} has been updated.` });
     }
+    setSpaces(updatedSpaces);
+    storeSpaces(updatedSpaces);
     setIsFormOpen(false);
     setCurrentSpace({});
   };
   
   const openAddForm = () => {
+    if (buildings.length === 0) {
+      toast({ title: "No Buildings Found", description: "Please add a building first before adding spaces.", variant: "destructive"});
+      return;
+    }
     setFormMode('add');
-    setCurrentSpace({ utilityProrationShare: 0.1 }); // Default proration share e.g. 10%
+    setCurrentSpace({ utilityProrationShare: 0.1, buildingName: buildings[0]?.name || "" }); 
     setIsFormOpen(true);
   };
 
@@ -93,9 +139,13 @@ export default function SpacesPage() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteSpace = (spaceId: string) => {
-    setSpaces(prev => prev.filter(s => s.id !== spaceId));
+  const handleDeleteSpace = () => {
+    if (!spaceToDelete) return;
+    const updatedSpaces = spaces.filter(s => s.id !== spaceToDelete.id);
+    setSpaces(updatedSpaces);
+    storeSpaces(updatedSpaces);
     toast({ title: "Space Deleted", description: "The space has been removed.", variant: "destructive" });
+    setSpaceToDelete(null);
   };
 
 
@@ -110,13 +160,26 @@ export default function SpacesPage() {
         icon={Building2}
         description="Add, view, and manage rental spaces."
         actions={
-          <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={buildings.length === 0}>
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Space
           </Button>
         }
       />
+       {buildings.length === 0 && (
+        <Card className="mb-6 bg-yellow-50 border-yellow-300">
+          <CardHeader>
+            <CardTitle className="text-yellow-700">No Buildings Found</CardTitle>
+            <CardDescription className="text-yellow-600">
+              You need to add buildings before you can add spaces. Please go to the "Buildings" page to register a building.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+        setIsFormOpen(isOpen);
+        if (!isOpen) setCurrentSpace({});
+      }}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Space' : 'Edit Space'}</DialogTitle>
@@ -128,7 +191,22 @@ export default function SpacesPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="buildingName" className="text-right">Building</Label>
-                <Input id="buildingName" value={currentSpace.buildingName || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, buildingName: e.target.value}))} className="col-span-3" placeholder="e.g., Sunrise Tower" required />
+                <Select 
+                  value={currentSpace.buildingName || ""}
+                  onValueChange={(value) => setCurrentSpace(prev => ({...prev, buildingName: value}))}
+                  required
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select a building" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {buildings.map(building => (
+                      <SelectItem key={building.id} value={building.name}>
+                        {building.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="spaceIdName" className="text-right">Space ID/Name</Label>
@@ -140,7 +218,7 @@ export default function SpacesPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="floor" className="text-right">Floor</Label>
-                <Input id="floor" value={currentSpace.floor || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, floor: e.target.value}))} className="col-span-3" placeholder="e.g., 10th, Ground" required />
+                <Input id="floor" value={currentSpace.floor || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, floor: e.target.value}))} className="col-span-3" placeholder="e.g., 10th, Ground" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="utilityProrationShare" className="text-right">Proration Share (%)</Label>
@@ -161,15 +239,37 @@ export default function SpacesPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={!!spaceToDelete} onOpenChange={(open) => { if (!open) setSpaceToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the space "{spaceToDelete?.spaceIdName}".
+              You can only delete vacant spaces. If this space is occupied, please vacate it first.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSpaceToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSpace} className="bg-destructive hover:bg-destructive/90">
+              Delete Space
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {spaces.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Building2 className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2 font-headline">No Spaces Yet</h3>
-            <p className="text-muted-foreground mb-4">Get started by adding your first rental space.</p>
-            <Button onClick={openAddForm}>
-              <PlusCircle className="mr-2 h-5 w-5" /> Add Space
-            </Button>
+            <p className="text-muted-foreground mb-4">
+              {buildings.length > 0 ? "Get started by adding your first rental space." : "Please add buildings first."}
+            </p>
+            {buildings.length > 0 && (
+                <Button onClick={openAddForm}>
+                    <PlusCircle className="mr-2 h-5 w-5" /> Add Space
+                </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -197,28 +297,9 @@ export default function SpacesPage() {
                 <Button variant="outline" size="sm" onClick={() => openEditForm(space)}>
                   <Edit3 className="mr-1 h-4 w-4" /> Edit
                 </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" disabled={space.isOccupied}>
-                      <Trash2 className="mr-1 h-4 w-4" /> Delete
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the space "{space.spaceIdName}".
-                        You can only delete vacant spaces.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDeleteSpace(space.id)} className="bg-destructive hover:bg-destructive/90">
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied}>
+                  <Trash2 className="mr-1 h-4 w-4" /> Delete
+                </Button>
               </CardFooter>
             </Card>
           ))}

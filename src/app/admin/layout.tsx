@@ -26,7 +26,8 @@ import {
   Settings,
   UserCircle,
   Wrench, 
-  ClipboardList, // Icon for Payments Overview
+  ClipboardList, 
+  Building, // Icon for Buildings
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -40,12 +41,13 @@ import {
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/buildings', label: 'Buildings', icon: Building }, // New item
   { href: '/admin/spaces', label: 'Spaces', icon: Building2 },
   { href: '/admin/tenants', label: 'Tenants', icon: Users },
   { href: '/admin/agreements', label: 'Agreements', icon: FileText },
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign },
-  { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList }, // New item
+  { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

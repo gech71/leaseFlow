@@ -1,7 +1,14 @@
 
+export interface Building {
+  id: string;
+  name: string;
+  address?: string;
+  createdAt: string; // ISO date string
+}
+
 export interface Space {
   id: string;
-  buildingName: string;
+  buildingName: string; // This will now come from a registered Building
   spaceIdName: string;
   area: number; // sq ft
   floor: string;
@@ -70,5 +77,5 @@ export interface Bill {
   paymentDate?: string; // ISO date string
   paymentMethod?: string;
   paymentReference?: string;
-  bankOrWalletName?: string; // New field for Bank or Wallet Name
+  bankOrWalletName?: string; 
 }

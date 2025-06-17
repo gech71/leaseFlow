@@ -8,18 +8,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wrench, PlusCircle, Trash2, Building, CalendarIcon, DollarSign as DollarSignIcon } from 'lucide-react';
-import type { BuildingMonthlyUtilities, BuildingUtilityItem, Space } from '@/lib/types';
+import { Wrench, PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon } from 'lucide-react'; // Renamed Building to BuildingIconLucide
+import type { BuildingMonthlyUtilities, BuildingUtilityItem, Building } from '@/lib/types'; // Added Building
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth } from 'date-fns';
 
-// Mock spaces data to derive building names (in a real app, fetch this)
-const mockSpacesForBuildingNames: Space[] = [
-  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.4, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
-  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
-  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
-];
-
+const getStoredBuildings = (): Building[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('buildings');
+    return stored ? JSON.parse(stored) : [];
+  }
+  return [];
+};
 
 const getStoredBuildingUtilities = (): BuildingMonthlyUtilities[] => {
   if (typeof window !== 'undefined') {
@@ -37,6 +37,7 @@ const storeBuildingUtilities = (utilities: BuildingMonthlyUtilities[]) => {
 
 export default function BuildingUtilitiesPage() {
   const [allUtilities, setAllUtilities] = useState<BuildingMonthlyUtilities[]>([]);
+  const [registeredBuildings, setRegisteredBuildings] = useState<Building[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
@@ -45,13 +46,10 @@ export default function BuildingUtilitiesPage() {
   const [selectedMonth, setSelectedMonth] = useState<number>(getMonth(new Date())); // 0-11
   const [currentUtilityItems, setCurrentUtilityItems] = useState<BuildingUtilityItem[]>([]);
 
-  const uniqueBuildingNames = useMemo(() => {
-    return Array.from(new Set(mockSpacesForBuildingNames.map(space => space.buildingName)));
-  }, []);
-
   useEffect(() => {
     setIsMounted(true);
     setAllUtilities(getStoredBuildingUtilities());
+    setRegisteredBuildings(getStoredBuildings());
   }, []);
 
   useEffect(() => {
@@ -136,6 +134,17 @@ export default function BuildingUtilitiesPage() {
         description="Enter monthly utility costs for each building. This data will be used for prorating tenant bills."
       />
 
+      {registeredBuildings.length === 0 && (
+         <Card className="mb-6 bg-yellow-50 border-yellow-300">
+          <CardHeader>
+            <CardTitle className="text-yellow-700">No Buildings Registered</CardTitle>
+            <CardDescription className="text-yellow-600">
+              Please register buildings on the "Buildings" page before managing their utilities.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
@@ -144,21 +153,21 @@ export default function BuildingUtilitiesPage() {
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div>
-              <Label htmlFor="buildingName" className="flex items-center mb-1"><Building className="mr-2 h-4 w-4 text-primary" />Building</Label>
-              <Select value={selectedBuilding} onValueChange={setSelectedBuilding}>
+              <Label htmlFor="buildingName" className="flex items-center mb-1"><BuildingIconLucide className="mr-2 h-4 w-4 text-primary" />Building</Label>
+              <Select value={selectedBuilding} onValueChange={setSelectedBuilding} disabled={registeredBuildings.length === 0}>
                 <SelectTrigger id="buildingName">
                   <SelectValue placeholder="Select a building" />
                 </SelectTrigger>
                 <SelectContent>
-                  {uniqueBuildingNames.map(name => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  {registeredBuildings.map(building => (
+                    <SelectItem key={building.id} value={building.name}>{building.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="year" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Year</Label>
-              <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
+              <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))} disabled={registeredBuildings.length === 0}>
                 <SelectTrigger id="year">
                   <SelectValue />
                 </SelectTrigger>
@@ -171,7 +180,7 @@ export default function BuildingUtilitiesPage() {
             </div>
             <div>
               <Label htmlFor="month" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Month</Label>
-              <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
+              <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))} disabled={registeredBuildings.length === 0}>
                 <SelectTrigger id="month">
                   <SelectValue />
                 </SelectTrigger>
@@ -226,7 +235,7 @@ export default function BuildingUtilitiesPage() {
           )}
         </CardContent>
         <CardFooter className="border-t pt-6">
-          <Button onClick={handleSaveUtilities} disabled={!selectedBuilding || currentUtilityItems.length === 0} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button onClick={handleSaveUtilities} disabled={!selectedBuilding || currentUtilityItems.length === 0 || registeredBuildings.length === 0} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
             Save Monthly Utilities
           </Button>
         </CardFooter>
