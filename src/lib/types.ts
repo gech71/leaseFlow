@@ -1,0 +1,53 @@
+export interface Space {
+  id: string;
+  buildingName: string;
+  spaceIdName: string;
+  area: number; // sq ft
+  floor: string;
+  utilityRate: number; // e.g., 1.0 for 100%
+  monthlyRentalPrice: number;
+  isOccupied: boolean;
+  tenantId?: string;
+  createdAt: string; // ISO date string
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  email: string; // For login/portal access
+  rentedSpaceId: string | null;
+  createdAt: string; // ISO date string
+}
+
+export interface Agreement {
+  id:string;
+  tenantId: string;
+  tenantName: string; // Denormalized for easier display
+  spaceId: string;
+  spaceDescription: string; // Denormalized e.g. "Building A, Unit 101, 500 sqft"
+  agreementText: string;
+  startDate: string; // ISO date string
+  // endDate?: string; // ISO date string
+  monthlyRentalPrice: number;
+  utilityRate: number;
+  additionalTerms?: string;
+  createdAt: string; // ISO date string
+}
+
+export interface Bill {
+  id: string;
+  agreementId: string;
+  tenantId: string;
+  tenantName: string; // Denormalized
+  spaceDescription: string; // Denormalized
+  billDate: string; // ISO date string
+  dueDate: string; // ISO date string
+  rentAmount: number;
+  utilityAmount: number;
+  totalAmount: number;
+  status: 'Pending' | 'Paid' | 'Overdue';
+  paymentDate?: string; // ISO date string
+  analysisResult?: string; // From analyzeBill flow
+  isAnomalous?: boolean; // From analyzeBill flow
+  recommendations?: string; // From analyzeBill flow
+}
