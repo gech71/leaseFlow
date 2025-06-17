@@ -7,48 +7,48 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, FileText } from 'lucide-react';
 import type { Bill } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { format, parseISO } from 'date-fns'; // Import parseISO
+import { format, parseISO } from 'date-fns';
 
 // Mock data for a logged-in tenant's bills
 const mockTenantBills: Bill[] = [
-  { 
-    id: 'bill1', 
-    agreementId: 'agreement1', 
-    tenantId: 'tenant1', 
+  {
+    id: 'bill1',
+    agreementId: 'agreement1',
+    tenantId: 'tenant1',
     tenantName: 'Alice Wonderland', // This would be the logged-in user
-    spaceDescription: 'Unit 101, Sunrise Tower', 
+    spaceDescription: 'Unit 101, Sunrise Tower',
     billDate: new Date(2024, 5, 1).toISOString(), // June 1, 2024
     dueDate: new Date(2024, 5, 15).toISOString(), // June 15, 2024
-    rentAmount: 2500, 
-    utilityBreakdown: [{ name: "Electricity", amount: 100 }, { name: "Water", amount: 25 }], 
-    totalAmount: 2625, 
-    status: 'Paid', 
-    paymentDate: new Date(2024, 5, 10).toISOString() 
+    rentAmount: 2500,
+    utilityBreakdown: [{ name: "Electricity", amount: 100 }, { name: "Water", amount: 25 }],
+    totalAmount: 2625,
+    status: 'Paid',
+    paymentDate: new Date(2024, 5, 10).toISOString()
   },
-  { 
-    id: 'bill3', 
-    agreementId: 'agreement1', 
-    tenantId: 'tenant1', 
+  {
+    id: 'bill3',
+    agreementId: 'agreement1',
+    tenantId: 'tenant1',
     tenantName: 'Alice Wonderland',
-    spaceDescription: 'Unit 101, Sunrise Tower', 
+    spaceDescription: 'Unit 101, Sunrise Tower',
     billDate: new Date(2024, 6, 1).toISOString(), // July 1, 2024
     dueDate: new Date(2024, 6, 15).toISOString(), // July 15, 2024
-    rentAmount: 2500, 
-    utilityBreakdown: [{ name: "Electricity", amount: 105 }, { name: "Water", amount: 20 }], 
-    totalAmount: 2625, 
-    status: 'Pending' 
+    rentAmount: 2500,
+    utilityBreakdown: [{ name: "Electricity", amount: 105 }, { name: "Water", amount: 20 }],
+    totalAmount: 2625,
+    status: 'Pending'
   },
-   { 
-    id: 'bill4', 
-    agreementId: 'agreement1', 
-    tenantId: 'tenant1', 
+   {
+    id: 'bill4',
+    agreementId: 'agreement1',
+    tenantId: 'tenant1',
     tenantName: 'Alice Wonderland',
-    spaceDescription: 'Unit 101, Sunrise Tower', 
+    spaceDescription: 'Unit 101, Sunrise Tower',
     billDate: new Date(2024, 4, 1).toISOString(), // May 1, 2024
     dueDate: new Date(2024, 4, 15).toISOString(), // May 15, 2024
-    rentAmount: 2500, 
+    rentAmount: 2500,
     utilityBreakdown: [{ name: "Electricity", amount: 95 }, {name: "Trash", amount: 25}],
-    totalAmount: 2620, 
+    totalAmount: 2620,
     status: 'Paid',
     paymentDate: new Date(2024, 4, 12).toISOString()
   },
@@ -65,7 +65,7 @@ export default function CustomerDashboardPage() {
     // In a real app, fetch bills for the logged-in tenant
     setBills(mockTenantBills.sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime()));
   }, []);
-  
+
   const upcomingPayment = bills.find(b => b.status === 'Pending' || b.status === 'Overdue');
   const paymentHistory = bills.filter(b => b.status === 'Paid');
 
@@ -76,8 +76,7 @@ export default function CustomerDashboardPage() {
       case 'Overdue': return { icon: AlertTriangle, color: 'text-red-500', bgColor: 'bg-red-50' };
       default: return { icon: Info, color: 'text-gray-500', bgColor: 'bg-gray-50' };
     }
-  };
-
+  }
 
   if (!isMounted) {
      return <div className="flex justify-center items-center h-[calc(100vh-10rem)]"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
