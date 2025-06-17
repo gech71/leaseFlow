@@ -87,10 +87,10 @@ export default function PaymentsOverviewPage() {
             <span className="text-muted-foreground">Total Amount:</span>
             <span className="font-semibold text-lg text-primary">${bill.totalAmount.toFixed(2)}</span>
         </div>
-         <div className="text-xs space-y-0.5">
+         <div className="text-xs space-y-1 pt-1"> {/* Adjusted spacing here */}
             <p><span className="text-muted-foreground">Rent:</span> ${bill.rentAmount.toFixed(2)}</p>
             {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 && (
-                <div>
+                <div className="mt-0.5"> {/* Added small margin-top for the utilities block */}
                     <span className="text-muted-foreground">Utilities:</span>
                     <ul className="list-disc list-inside ml-3">
                     {bill.utilityBreakdown.map(util => (
@@ -183,3 +183,4 @@ export default function PaymentsOverviewPage() {
     </div>
   );
 }
+
