@@ -25,8 +25,8 @@ import { getMockAgreements } from '../page'; // Import helper
 
 // Mock available spaces (in a real app, fetch this)
 const mockAvailableSpaces: Space[] = [
-  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityRate: 1.0, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
-  { id: 'space4', buildingName: 'Tech Park One', spaceIdName: 'Lab 3', area: 2000, floor: '1st', utilityRate: 1.0, monthlyRentalPrice: 4500, isOccupied: false, createdAt: new Date().toISOString() },
+  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.20, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
+  { id: 'space4', buildingName: 'Tech Park One', spaceIdName: 'Lab 3', area: 2000, floor: '1st', utilityProrationShare: 0.50, monthlyRentalPrice: 4500, isOccupied: false, createdAt: new Date().toISOString() },
 ];
 
 const agreementFormSchema = z.object({
@@ -64,9 +64,6 @@ export default function GenerateAgreementPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // In a real app, you would fetch spaces and filter out occupied ones
-    // For now, we use mock data and assume they are already filtered if needed
-    // or update their isOccupied status if one is selected for an agreement.
     setAvailableSpaces(mockAvailableSpaces.filter(s => !s.isOccupied));
   }, []);
 
@@ -88,7 +85,7 @@ export default function GenerateAgreementPage() {
       spaceId: selectedSpace.spaceIdName,
       spaceArea: selectedSpace.area,
       floor: selectedSpace.floor,
-      utilityRate: selectedSpace.utilityRate,
+      // utilityRate is removed from input, it's space-dependent now
       monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
       paymentTermMonths: data.paymentTermMonths,
       initialPaymentMonths: data.initialPaymentMonths,
@@ -106,14 +103,14 @@ export default function GenerateAgreementPage() {
 
       const newAgreement: Agreement = {
         id: `agreement-${Date.now()}`,
-        tenantId: `tenant-${Date.now()}`, // Mock tenant ID
+        tenantId: `tenant-${Date.now()}`, 
         tenantName: data.tenantName,
         spaceId: selectedSpace.id,
         spaceDescription: `${selectedSpace.spaceIdName}, ${selectedSpace.buildingName}`,
         agreementText: result.agreementText,
         startDate: startDate.toISOString(),
         monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
-        utilityRate: selectedSpace.utilityRate,
+        // utilityRate removed from Agreement type
         paymentTermMonths: data.paymentTermMonths,
         initialPaymentMonths: data.initialPaymentMonths,
         nextPaymentDueDate: nextPaymentDueDateObj.toISOString(),
@@ -123,17 +120,10 @@ export default function GenerateAgreementPage() {
       setGeneratedAgreement(newAgreement);
       toast({ title: "Agreement Generated Successfully!", description: "Review the agreement below. Saving it will make it active." });
       
-      // Here you would typically save the newAgreement to your backend/localStorage
-      // For this demo, let's update localStorage if used on the agreements list page
       if (typeof window !== 'undefined') {
         const existingAgreements = getMockAgreements();
         const updatedAgreements = [...existingAgreements, newAgreement];
         localStorage.setItem('mockAgreements', JSON.stringify(updatedAgreements));
-
-        // Also mark the space as occupied in mock data (if this page managed that state)
-        // This part is tricky if mockAvailableSpaces is not the same source of truth as the one on the Spaces page
-        // For simplicity, this example focuses on agreement generation. Space occupancy update would be handled
-        // more robustly with a shared state management or API.
       }
 
     } else {
@@ -145,12 +135,7 @@ export default function GenerateAgreementPage() {
 
   const handleFinalizeAndSave = () => {
     if (!generatedAgreement) return;
-    // In a real app, this would involve a final save to the database
-    // and potentially navigating away or resetting the form.
-    // For now, just a toast.
     toast({ title: "Agreement Saved (Simulated)", description: "The agreement has been notionally saved."});
-    // Potentially redirect or clear form
-    // router.push("/admin/agreements");
     setGeneratedAgreement(null);
     form.reset();
   }

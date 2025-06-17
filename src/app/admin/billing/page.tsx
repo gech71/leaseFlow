@@ -5,7 +5,9 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Microscope, Zap } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Microscope, Zap, Building } from 'lucide-react';
 import type { Bill, Agreement, Space } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { analyzeBillAction } from '@/app/actions';
@@ -19,9 +21,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, startOfMonth } from 'date-fns';
+import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay } from 'date-fns';
 
-// Initial Mock Data (will be loaded into state)
 const initialMockAgreements: Agreement[] = [
   {
     id: 'agreement1',
@@ -30,13 +31,12 @@ const initialMockAgreements: Agreement[] = [
     spaceId: 'space1',
     spaceDescription: 'Unit 101, Sunrise Tower',
     agreementText: 'RENTAL AGREEMENT...',
-    startDate: new Date(2023, 0, 15).toISOString(), // Jan 15, 2023
+    startDate: new Date(2023, 0, 15).toISOString(),
     monthlyRentalPrice: 2500,
-    utilityRate: 0.05, // Example: 5% of rent for utilities
     createdAt: new Date(2023, 0, 10).toISOString(),
     paymentTermMonths: 12,
     initialPaymentMonths: 1,
-    nextPaymentDueDate: addMonths(new Date(2023, 0, 15), 1).toISOString(), // Due Feb 15, 2023
+    nextPaymentDueDate: addMonths(new Date(2023, 0, 15), 1).toISOString(),
   },
   {
     id: 'agreement2',
@@ -45,13 +45,12 @@ const initialMockAgreements: Agreement[] = [
     spaceId: 'space3',
     spaceDescription: 'Office 5B, Downtown Hub',
     agreementText: 'RENTAL AGREEMENT...',
-    startDate: new Date(2024, 4, 1).toISOString(), // May 1, 2024
+    startDate: new Date(2024, 4, 1).toISOString(),
     monthlyRentalPrice: 3200,
-    utilityRate: 0.05,
     createdAt: new Date(2024, 4, 1).toISOString(),
     paymentTermMonths: 6,
     initialPaymentMonths: 1,
-    nextPaymentDueDate: addMonths(new Date(2024, 4, 1), 1).toISOString(), // Due June 1, 2024
+    nextPaymentDueDate: addMonths(new Date(2024, 4, 1), 1).toISOString(),
   },
   {
     id: 'agreement3',
@@ -60,31 +59,32 @@ const initialMockAgreements: Agreement[] = [
     spaceId: 'space4', 
     spaceDescription: 'Penthouse Suite, Galaxy Tower',
     agreementText: 'PREMIUM RENTAL AGREEMENT...',
-    startDate: new Date(2024, 6, 1).toISOString(), // July 1, 2024
+    startDate: new Date(2024, 6, 1).toISOString(),
     monthlyRentalPrice: 5000,
-    utilityRate: 0.05,
     createdAt: new Date(2024, 6, 1).toISOString(),
     paymentTermMonths: 24,
     initialPaymentMonths: 3,
-    nextPaymentDueDate: addMonths(new Date(2024, 6, 1), 3).toISOString(), // Due Oct 1, 2024
+    nextPaymentDueDate: addMonths(new Date(2024, 6, 1), 3).toISOString(),
   },
 ];
 
 const initialMockSpaces: Space[] = [
- { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityRate: 0.05, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
- { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityRate: 0.05, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
- { id: 'space4', buildingName: 'Galaxy Tower', spaceIdName: 'Penthouse Suite', area: 3000, floor: 'Top', utilityRate: 0.05, monthlyRentalPrice: 5000, isOccupied: true, tenantId: 'tenant3', createdAt: new Date().toISOString() },
+ { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.40, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
+ { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
+ { id: 'space4', buildingName: 'Galaxy Tower', spaceIdName: 'Penthouse Suite', area: 3000, floor: 'Top', utilityProrationShare: 0.60, monthlyRentalPrice: 5000, isOccupied: true, tenantId: 'tenant3', createdAt: new Date().toISOString() },
+ { id: 'space5', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, tenantId: undefined, createdAt: new Date().toISOString()},
 ];
 
 const initialBills: Bill[] = [
-  { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 2500, utilityAmount: 2500 * 0.05, totalAmount: 2500 + (2500 * 0.05), status: 'Paid', paymentDate: new Date(2024,5,10).toISOString() },
-  { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', tenantName: 'Bob The Builder', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 3200, utilityAmount: 3200 * 0.05, totalAmount: 3200 + (3200 * 0.05), status: 'Pending' },
+  { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 2500, utilityAmount: 200, totalAmount: 2700, status: 'Paid', paymentDate: new Date(2024,5,10).toISOString() }, // Assuming $500 building utility * 0.4 share
+  { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', tenantName: 'Bob The Builder', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 3200, utilityAmount: 175, totalAmount: 3375, status: 'Pending' }, // Assuming $500 building utility * 0.35 share
 ];
 
 export default function BillingPage() {
   const [bills, setBills] = useState<Bill[]>(initialBills);
   const [agreements, setAgreements] = useState<Agreement[]>(initialMockAgreements);
-  const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces); // Though not modified in this flow, good practice if it could be
+  const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces);
+  const [buildingTotalUtilityCosts, setBuildingTotalUtilityCosts] = useState<Record<string, string>>({}); // buildingName: costString
   
   const [selectedBillForAnalysis, setSelectedBillForAnalysis] = useState<Bill | null>(null);
   const [analysisResult, setAnalysisResult] = useState<{ result: string; isAnomalous?: boolean; recommendations?: string } | null>(null);
@@ -101,14 +101,25 @@ export default function BillingPage() {
     const space = spaces.find(sp => sp.id === agreement.spaceId);
     if (!space) {
       console.error(`Space not found for agreement ${agreement.id}`);
+      toast({ title: "Error", description: `Space details for ${agreement.spaceDescription} not found.`, variant: "destructive" });
       return null;
     }
 
     const rentAmount = agreement.monthlyRentalPrice;
-    // Utility rate from agreement is used if present and valid, otherwise space's rate.
-    // Assuming utilityRate on agreement/space is a percentage (e.g., 0.05 for 5%).
-    const utilityRateToUse = typeof agreement.utilityRate === 'number' ? agreement.utilityRate : space.utilityRate;
-    const utilityAmount = rentAmount * utilityRateToUse;
+    let utilityAmount = 0;
+    
+    const totalBuildingCostStr = buildingTotalUtilityCosts[space.buildingName];
+    const totalBuildingCost = parseFloat(totalBuildingCostStr);
+
+    if (!isNaN(totalBuildingCost) && totalBuildingCost > 0 && space.utilityProrationShare > 0) {
+      utilityAmount = totalBuildingCost * space.utilityProrationShare;
+    } else if (space.utilityProrationShare > 0) {
+      toast({
+        title: "Warning: Missing Building Utility Cost",
+        description: `Total utility cost for ${space.buildingName} is not set or invalid. Utility amount for ${agreement.tenantName} will be $0.`,
+        variant: "default"
+      });
+    }
 
     return {
       id: `bill-${Date.now()}-${agreement.id}`,
@@ -116,7 +127,7 @@ export default function BillingPage() {
       tenantId: agreement.tenantId,
       tenantName: agreement.tenantName,
       spaceDescription: agreement.spaceDescription,
-      billDate: targetDueDate.toISOString(), // Bill date is the due date for simplicity
+      billDate: targetDueDate.toISOString(),
       dueDate: targetDueDate.toISOString(),
       rentAmount,
       utilityAmount,
@@ -143,7 +154,6 @@ export default function BillingPage() {
     
     const nextDueDate = startOfDay(new Date(agreement.nextPaymentDueDate));
 
-    // Check if a pending bill already exists for this specific due date
     const existingPendingBill = bills.find(b => 
       b.agreementId === agreement.id && 
       b.status === 'Pending' &&
@@ -156,13 +166,9 @@ export default function BillingPage() {
     }
 
     const newBill = createBillForAgreement(agreement, nextDueDate);
-    if (!newBill) {
-      toast({ title: "Error", description: "Could not create bill due to missing space information.", variant: "destructive" });
-      return;
-    }
+    if (!newBill) return; // Error handled in createBillForAgreement
 
-    setBills(prev => [newBill, ...prev]);
-    // Advance nextPaymentDueDate for this agreement
+    setBills(prev => [newBill, ...prev].sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime()));
     setAgreements(prevAgreements => 
       prevAgreements.map(ag => 
         ag.id === agreementId 
@@ -170,31 +176,28 @@ export default function BillingPage() {
           : ag
       )
     );
-    toast({ title: "Bill Generated", description: `New bill for ${agreement.tenantName} (Due: ${format(nextDueDate, 'PP')}) created.` });
+    toast({ title: "Bill Generated", description: `New bill for ${agreement.tenantName} (Due: ${format(nextDueDate, 'PP')}) created. Total: $${newBill.totalAmount.toFixed(2)}` });
   };
-
 
   const handleGenerateAllDueBills = () => {
     const today = startOfDay(new Date());
     let generatedCount = 0;
     let skippedCount = 0;
-    const newBills: Bill[] = [];
-    const updatedAgreementsData = [...agreements]; // Work on a copy
+    const newBillsBuffer: Bill[] = [];
+    const updatedAgreementsData = [...agreements]; 
 
     agreements.forEach(agreement => {
       const agreementStartDate = startOfDay(new Date(agreement.startDate));
       const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
 
       if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) {
-        skippedCount++; // Agreement not active or expired
+        skippedCount++; 
         return;
       }
 
       const nextDueDate = startOfDay(new Date(agreement.nextPaymentDueDate));
 
       if (isAfter(nextDueDate, today)) {
-         // Only generate if due today or in the past.
-         // For "due in X days", this logic would change.
         skippedCount++; 
         return;
       }
@@ -212,7 +215,7 @@ export default function BillingPage() {
 
       const newBill = createBillForAgreement(agreement, nextDueDate);
       if (newBill) {
-        newBills.push(newBill);
+        newBillsBuffer.push(newBill);
         const currentAgreementIndex = updatedAgreementsData.findIndex(a => a.id === agreement.id);
         if (currentAgreementIndex > -1) {
           updatedAgreementsData[currentAgreementIndex] = {
@@ -222,17 +225,16 @@ export default function BillingPage() {
         }
         generatedCount++;
       } else {
-        skippedCount++; // Could not create bill (e.g. space not found)
+        skippedCount++; 
       }
     });
 
-    if (newBills.length > 0) {
-      setBills(prev => [...newBills, ...prev].sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime()));
+    if (newBillsBuffer.length > 0) {
+      setBills(prev => [...newBillsBuffer, ...prev].sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime()));
     }
     setAgreements(updatedAgreementsData);
     toast({ title: "Bulk Bill Generation Complete", description: `${generatedCount} bills generated. ${skippedCount} agreements skipped.` });
   };
-
 
   const handleAnalyzeBill = async (bill: Bill) => {
     setSelectedBillForAnalysis(bill);
@@ -247,16 +249,20 @@ export default function BillingPage() {
       toast({ title: "Error", description: "Associated agreement not found.", variant: "destructive" });
       return;
     }
+    
+    const space = spaces.find(s => s.id === agreement.spaceId);
 
     const previousBillsData = bills
       .filter(b => b.tenantId === bill.tenantId && new Date(b.billDate) < new Date(bill.billDate))
       .slice(0, 3) 
-      .map(b => `Date: ${format(new Date(b.billDate), 'PP')}, Total: $${b.totalAmount.toFixed(2)}, Status: ${b.status}`)
+      .map(b => `Date: ${format(new Date(b.billDate), 'PP')}, Total: $${b.totalAmount.toFixed(2)}, Rent: $${b.rentAmount.toFixed(2)}, Utilities: $${b.utilityAmount.toFixed(2)}, Status: ${b.status}`)
       .join('\n');
+
+    const agreementDetailsString = `Agreement for ${agreement.tenantName}:\nRent: $${agreement.monthlyRentalPrice.toFixed(2)}\nStart Date: ${format(new Date(agreement.startDate), 'PP')}\nTerm: ${agreement.paymentTermMonths} months\nInitial Pmt: ${agreement.initialPaymentMonths} month(s)\nNext Official Due: ${format(new Date(agreement.nextPaymentDueDate), 'PP')}\nSpace: ${space?.spaceIdName}, ${space?.buildingName}\nProration Share: ${space ? (space.utilityProrationShare * 100).toFixed(2) + '%' : 'N/A'}\n${agreement.additionalTerms ? 'Additional Terms: ' + agreement.additionalTerms : ''}`;
 
     const input = {
       billData: `Current Bill for ${bill.tenantName} (${bill.spaceDescription}):\nDate: ${format(new Date(bill.billDate), 'PP')}\nDue Date: ${format(new Date(bill.dueDate), 'PP')}\nRent: $${bill.rentAmount.toFixed(2)}\nUtilities: $${bill.utilityAmount.toFixed(2)}\nTotal: $${bill.totalAmount.toFixed(2)}\nStatus: ${bill.status}`,
-      agreementDetails: `Agreement for ${agreement.tenantName}:\nRent: $${agreement.monthlyRentalPrice.toFixed(2)}\nUtility Rate: ${agreement.utilityRate * 100}%\nStart Date: ${format(new Date(agreement.startDate), 'PP')}\nTerm: ${agreement.paymentTermMonths} months\nInitial Pmt: ${agreement.initialPaymentMonths} month(s)\nNext Official Due: ${format(new Date(agreement.nextPaymentDueDate), 'PP')}\n${agreement.additionalTerms ? 'Additional Terms: ' + agreement.additionalTerms : ''}`,
+      agreementDetails: agreementDetailsString,
       previousBills: previousBillsData || "No previous bills available for comparison.",
     };
 
@@ -281,6 +287,19 @@ export default function BillingPage() {
     }
   };
 
+  const uniqueBuildingNamesWithActiveTenants = Array.from(
+    new Set(
+      agreements
+        .filter(ag => {
+            const today = startOfDay(new Date());
+            const agStartDate = startOfDay(new Date(ag.startDate));
+            const agEndDate = addMonths(agStartDate, ag.paymentTermMonths);
+            return !isBefore(today, agStartDate) && !isAfter(today, agEndDate); // Active agreements
+        })
+        .map(ag => spaces.find(s => s.id === ag.spaceId)?.buildingName)
+        .filter((name): name is string => !!name)
+    )
+  );
 
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
@@ -293,6 +312,31 @@ export default function BillingPage() {
         icon={DollarSign}
         description="Generate and analyze rental and utility bills."
       />
+
+      <Card className="mb-6 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline">Building Utility Costs (Monthly Total)</CardTitle>
+          <CardDescription>Enter the total utility cost for each building for the current billing period before generating bills.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {uniqueBuildingNamesWithActiveTenants.length > 0 ? uniqueBuildingNamesWithActiveTenants.map(buildingName => (
+            <div key={buildingName} className="grid grid-cols-1 md:grid-cols-3 items-center gap-2 md:gap-4">
+              <Label htmlFor={`building-utility-${buildingName}`} className="md:col-span-1 md:text-right font-medium flex items-center">
+                <Building className="h-4 w-4 mr-2 text-primary"/>
+                {buildingName}:
+              </Label>
+              <Input
+                id={`building-utility-${buildingName}`}
+                type="number"
+                placeholder="e.g., 5000.00"
+                value={buildingTotalUtilityCosts[buildingName] || ''}
+                onChange={(e) => setBuildingTotalUtilityCosts(prev => ({ ...prev, [buildingName]: e.target.value }))}
+                className="md:col-span-2"
+              />
+            </div>
+          )) : <p className="text-muted-foreground">No buildings with active agreements found to set utility costs.</p>}
+        </CardContent>
+      </Card>
 
       <Card className="mb-6 shadow-sm">
         <CardHeader>
@@ -404,7 +448,6 @@ export default function BillingPage() {
         </DialogContent>
       </Dialog>
 
-
       {bills.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
           <CardContent>
@@ -452,7 +495,6 @@ export default function BillingPage() {
                   Analyze
                 </Button>
                 <div className="flex gap-2">
-                    {/* Placeholder for Edit/Delete Bill. For now, they do nothing. */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({title: "Edit Bill", description:"Functionality coming soon."})}><Edit className="h-4 w-4"/></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => toast({title: "Delete Bill", description:"Functionality coming soon.", variant: "destructive"})}><Trash2 className="h-4 w-4"/></Button>
                 </div>
@@ -465,5 +507,3 @@ export default function BillingPage() {
     </div>
   );
 }
-
-

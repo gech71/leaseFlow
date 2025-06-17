@@ -5,7 +5,7 @@ export interface Space {
   spaceIdName: string;
   area: number; // sq ft
   floor: string;
-  utilityRate: number; // e.g., 1.0 for 100%
+  utilityProrationShare: number; // Space's share of total building utilities (e.g., 0.1 for 10%)
   monthlyRentalPrice: number;
   isOccupied: boolean;
   tenantId?: string;
@@ -29,7 +29,7 @@ export interface Agreement {
   agreementText: string;
   startDate: string; // ISO date string
   monthlyRentalPrice: number;
-  utilityRate: number;
+  // utilityRate: number; // Removed: Utility cost is now derived via Space and Building total
   additionalTerms?: string;
   createdAt: string; // ISO date string
   paymentTermMonths: number; // Total term of the agreement in months

@@ -8,9 +8,9 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer, Download } from 'lucide-react';
+import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer, Download, DollarSign as DollarSignIcon } from 'lucide-react'; // Renamed DollarSign to avoid conflict
 import type { Agreement } from '@/lib/types';
-import { getMockAgreementById } from '../page'; // Assuming mock data access from list page
+import { getMockAgreementById } from '../page'; 
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,7 +30,6 @@ export default function ViewAgreementPage() {
       if (foundAgreement) {
         setAgreement(foundAgreement);
       } else {
-        // Handle not found, maybe redirect or show error
         toast({ title: "Error", description: "Agreement not found.", variant: "destructive" });
         router.push('/admin/agreements');
       }
@@ -49,7 +48,6 @@ export default function ViewAgreementPage() {
   }
 
   if (!agreement) {
-    // This case should ideally be handled by the redirect in useEffect, but as a fallback:
     return (
       <div className="animate-fadeIn">
         <PageHeader title="Agreement Not Found" icon={FileText} />
@@ -111,7 +109,7 @@ export default function ViewAgreementPage() {
               <strong>Next Payment Due:</strong> <span className="ml-2">{format(new Date(agreement.nextPaymentDueDate), 'PP')}</span>
             </div>
             <div className="flex items-center">
-               <DollarSign className="mr-2 h-4 w-4 text-primary" />
+               <DollarSignIcon className="mr-2 h-4 w-4 text-primary" />
                <strong>Monthly Rent:</strong> <span className="ml-2">${agreement.monthlyRentalPrice.toLocaleString()}</span>
             </div>
              <div className="flex items-center">
@@ -144,11 +142,4 @@ export default function ViewAgreementPage() {
   );
 }
 
-// Helper icon, assuming lucide-react is used consistently
-const DollarSign = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <line x1="12" y1="1" x2="12" y2="23"></line>
-    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-  </svg>
-);
-
+// Note: DollarSign component removed as lucide-react provides DollarSignIcon

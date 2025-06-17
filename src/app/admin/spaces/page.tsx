@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, Tag, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3 } from 'lucide-react';
+import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3 } from 'lucide-react';
 import type { Space } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -16,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -32,9 +32,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const initialSpaces: Space[] = [
-  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityRate: 1.0, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
-  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityRate: 1.0, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
-  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityRate: 1.0, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
+  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.4, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
+  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
+  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
+  { id: 'space5', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.3, monthlyRentalPrice: 2200, isOccupied: false, createdAt: new Date().toISOString() },
 ];
 
 export default function SpacesPage() {
@@ -56,13 +57,13 @@ export default function SpacesPage() {
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const newSpace: Space = {
+    const newSpaceData: Space = {
       id: formMode === 'add' ? `space-${Date.now()}` : currentSpace.id!,
       buildingName: currentSpace.buildingName || 'Default Building',
       spaceIdName: currentSpace.spaceIdName || 'Default Space ID',
       area: Number(currentSpace.area) || 0,
       floor: currentSpace.floor || 'N/A',
-      utilityRate: Number(currentSpace.utilityRate) || 1.0,
+      utilityProrationShare: Number(currentSpace.utilityProrationShare) || 0, // ensure it's a number
       monthlyRentalPrice: Number(currentSpace.monthlyRentalPrice) || 0,
       isOccupied: currentSpace.isOccupied || false,
       tenantId: currentSpace.tenantId,
@@ -70,11 +71,11 @@ export default function SpacesPage() {
     };
 
     if (formMode === 'add') {
-      setSpaces(prev => [newSpace, ...prev]);
-      toast({ title: "Space Added", description: `${newSpace.spaceIdName} in ${newSpace.buildingName} has been added.` });
+      setSpaces(prev => [newSpaceData, ...prev]);
+      toast({ title: "Space Added", description: `${newSpaceData.spaceIdName} in ${newSpaceData.buildingName} has been added.` });
     } else {
-      setSpaces(prev => prev.map(s => s.id === newSpace.id ? newSpace : s));
-      toast({ title: "Space Updated", description: `${newSpace.spaceIdName} has been updated.` });
+      setSpaces(prev => prev.map(s => s.id === newSpaceData.id ? newSpaceData : s));
+      toast({ title: "Space Updated", description: `${newSpaceData.spaceIdName} has been updated.` });
     }
     setIsFormOpen(false);
     setCurrentSpace({});
@@ -82,7 +83,7 @@ export default function SpacesPage() {
   
   const openAddForm = () => {
     setFormMode('add');
-    setCurrentSpace({ utilityRate: 1.0 }); // Default utility rate
+    setCurrentSpace({ utilityProrationShare: 0.1 }); // Default proration share e.g. 10%
     setIsFormOpen(true);
   };
 
@@ -99,7 +100,7 @@ export default function SpacesPage() {
 
 
   if (!isMounted) {
-    return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>; // Or a skeleton loader
+    return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
   }
 
   return (
@@ -142,8 +143,8 @@ export default function SpacesPage() {
                 <Input id="floor" value={currentSpace.floor || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, floor: e.target.value}))} className="col-span-3" placeholder="e.g., 10th, Ground" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="utilityRate" className="text-right">Utility Rate (%)</Label>
-                <Input id="utilityRate" type="number" step="0.01" value={currentSpace.utilityRate !== undefined ? currentSpace.utilityRate * 100 : ''} onChange={(e) => setCurrentSpace(prev => ({...prev, utilityRate: parseFloat(e.target.value) / 100 }))} className="col-span-3" placeholder="e.g., 100 for 100%" required />
+                <Label htmlFor="utilityProrationShare" className="text-right">Proration Share (%)</Label>
+                <Input id="utilityProrationShare" type="number" step="0.01" value={currentSpace.utilityProrationShare !== undefined ? currentSpace.utilityProrationShare * 100 : ''} onChange={(e) => setCurrentSpace(prev => ({...prev, utilityProrationShare: parseFloat(e.target.value) / 100 }))} className="col-span-3" placeholder="e.g., 10 for 10%" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="monthlyRentalPrice" className="text-right">Monthly Rent</Label>
@@ -189,7 +190,7 @@ export default function SpacesPage() {
               <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> Floor: {space.floor}</div>
                 <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} sq ft</div>
-                <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Utility Rate: {(space.utilityRate * 100).toFixed(0)}%</div>
+                <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(space.utilityProrationShare * 100).toFixed(2)}%</div>
                 <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${space.monthlyRentalPrice.toLocaleString()}/month</div>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">

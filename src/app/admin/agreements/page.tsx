@@ -21,10 +21,10 @@ const initialAgreements: Agreement[] = [
     tenantName: 'Alice Wonderland',
     spaceId: 'space1',
     spaceDescription: 'Unit 101, Sunrise Tower',
-    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Alice Wonderland (Tenant) for the lease of Unit 101, Sunrise Tower.\n\nTerm: 12 months\nRent: $2500/month\nInitial Payment: 1 month\nUtilities: Tenant responsible for 100% of utilities.\n\nAdditional Clauses:\n- No pets allowed.\n- Quiet hours after 10 PM.\n\nSigned:____________________',
+    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Alice Wonderland (Tenant) for the lease of Unit 101, Sunrise Tower.\n\nTerm: 12 months\nRent: $2500/month\nInitial Payment: 1 month\n\nAdditional Clauses:\n- No pets allowed.\n- Quiet hours after 10 PM.\n\nSigned:____________________',
     startDate: new Date(2023, 0, 15).toISOString(),
     monthlyRentalPrice: 2500,
-    utilityRate: 1.0,
+    // utilityRate: 1.0, // Removed
     createdAt: new Date(2023,0,10).toISOString(),
     paymentTermMonths: 12,
     initialPaymentMonths: 1,
@@ -36,14 +36,14 @@ const initialAgreements: Agreement[] = [
     tenantName: 'Bob The Builder',
     spaceId: 'space3',
     spaceDescription: 'Office 5B, Downtown Hub',
-    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Bob The Builder (Tenant) for the lease of Office 5B, Downtown Hub.\n\nTerm: 6 months\nRent: $3200/month\nInitial Payment: 1 month\nUtilities: Tenant responsible for 100% of utilities.\n\nAdditional Clauses:\n- Parking spot #12 included.\n\nSigned:____________________',
-    startDate: new Date(2024, 4, 1).toISOString(), // May 1, 2024
+    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Bob The Builder (Tenant) for the lease of Office 5B, Downtown Hub.\n\nTerm: 6 months\nRent: $3200/month\nInitial Payment: 1 month\n\nAdditional Clauses:\n- Parking spot #12 included.\n\nSigned:____________________',
+    startDate: new Date(2024, 4, 1).toISOString(), 
     monthlyRentalPrice: 3200,
-    utilityRate: 1.0,
+    // utilityRate: 1.0, // Removed
     createdAt: new Date(2024,4,1).toISOString(),
     paymentTermMonths: 6,
     initialPaymentMonths: 1,
-    nextPaymentDueDate: addMonths(new Date(2024, 4, 1), 1).toISOString(), // Due June 1, 2024 (overdue if today is past this)
+    nextPaymentDueDate: addMonths(new Date(2024, 4, 1), 1).toISOString(), 
   },
   {
     id: 'agreement3',
@@ -51,18 +51,17 @@ const initialAgreements: Agreement[] = [
     tenantName: 'Carol Danvers',
     spaceId: 'space4',
     spaceDescription: 'Penthouse Suite, Galaxy Tower',
-    agreementText: 'PREMIUM RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Carol Danvers (Tenant) for the lease of Penthouse Suite, Galaxy Tower.\n\nTerm: 24 months\nRent: $5000/month\nInitial Payment: 3 months\nUtilities: Tenant responsible for 100% of utilities.\n\nAdditional Clauses:\n- Access to rooftop pool included.\n- Weekly cleaning service provided.\n\nSigned:____________________',
-    startDate: new Date(2024, 6, 1).toISOString(), // July 1, 2024
+    agreementText: 'PREMIUM RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Carol Danvers (Tenant) for the lease of Penthouse Suite, Galaxy Tower.\n\nTerm: 24 months\nRent: $5000/month\nInitial Payment: 3 months\n\nAdditional Clauses:\n- Access to rooftop pool included.\n- Weekly cleaning service provided.\n\nSigned:____________________',
+    startDate: new Date(2024, 6, 1).toISOString(), 
     monthlyRentalPrice: 5000,
-    utilityRate: 1.0,
+    // utilityRate: 1.0, // Removed
     createdAt: new Date(2024,6,1).toISOString(),
     paymentTermMonths: 24,
     initialPaymentMonths: 3,
-    nextPaymentDueDate: addMonths(new Date(2024, 6, 1), 3).toISOString(), // Due Oct 1, 2024
+    nextPaymentDueDate: addMonths(new Date(2024, 6, 1), 3).toISOString(), 
   },
 ];
 
-// Function to store and retrieve agreements (can be replaced with API calls later)
 export const getMockAgreements = (): Agreement[] => {
   if (typeof window !== 'undefined') {
     const storedAgreements = localStorage.getItem('mockAgreements');
@@ -109,8 +108,6 @@ export default function AgreementsListPage() {
       title: "Download PDF",
       description: "PDF download functionality is coming soon!",
     });
-    // Placeholder: In a real app, you'd generate and download a PDF here.
-    // console.log("Download PDF for agreement:", agreementId);
   };
 
   if (!isMounted) {

@@ -18,11 +18,7 @@ const AgreementInputSchema = z.object({
   spaceId: z.string().describe('The ID or name of the rented space.'),
   spaceArea: z.number().describe('The area of the rented space in square feet.'),
   floor: z.string().describe('The floor where the space is located.'),
-  utilityRate: z
-    .number()
-    .describe(
-      'The utility rate, as a percentage, charged to the tenant (e.g., 1.0 for 100%).'
-    ),
+  // utilityRate removed as it's now handled by Space.utilityProrationShare and building total
   monthlyRentalPrice: z.number().describe('The monthly rental price of the space.'),
   paymentTermMonths: z.number().int().positive().describe('The total term of the agreement in months.'),
   initialPaymentMonths: z.number().int().positive().describe('The number of months for which rent is paid upfront.'),
@@ -52,10 +48,11 @@ const agreementPrompt = ai.definePrompt({
   Space ID: {{{spaceId}}}
   Space Area: {{{spaceArea}}} sq ft
   Floor: {{{floor}}}
-  Utility Rate: {{{utilityRate}}}
   Monthly Rental Price: {{{monthlyRentalPrice}}}
   Payment Term: {{{paymentTermMonths}}} months
   Initial Payment: Rent for {{{initialPaymentMonths}}} month(s) paid upfront.
+
+  Utility terms will be based on the building's policies and the space's prorated share, to be detailed separately or as an addendum.
 
   {{#if additionalTerms}}
   Additional Terms: {{{additionalTerms}}}
