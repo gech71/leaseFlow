@@ -21,7 +21,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
 
-// Enhanced Mock data for demonstration
 const mockSpacesData: Space[] = [
   { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.4, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
   { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
@@ -70,7 +69,6 @@ const mockBillsData: Bill[] = [
   { id: 'bill6', agreementId: 'agree-tenant1-current', tenantId: 'tenant-portal-user', spaceDescription: 'Unit P1, Portal View Residences', billDate: new Date(lastMonthYear, lastMonth, 5).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 20).toISOString(), rentAmount: 1200, utilityBreakdown: [{name: "Internet", amount: 50}], totalAmount: 1250, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 18).toISOString(), paymentMethod: "Wallet", bankOrWalletName: "PayZap", paymentReference: "WLTREF789" },
   { id: 'bill7', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 75}, {name: "Water", amount: 22}], totalAmount: 2597, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN67890" },
   { id: 'bill8-verify', agreementId: 'agree-tenant1-current', tenantId: 'tenant-portal-user', spaceDescription: 'Unit P1, Portal View Residences', billDate: new Date(currentYear, currentMonth -1, 5).toISOString(), dueDate: new Date(currentYear, currentMonth -1, 20).toISOString(), rentAmount: 1200, utilityBreakdown: [{name: "Gas", amount: 30}], totalAmount: 1230, status: 'Pending Verification', paymentProofUrl: 'gas_bill_proof.jpg', tenantPaymentNotes: "Paid via app." },
-
 ];
 
 const getStoredSpaces = (): Space[] => {
@@ -104,7 +102,7 @@ const getStoredBuildings = (): BuildingType[] => {
 
 const getStoredAgreements = (): Agreement[] => {
   if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('mockAgreements'); // Assuming this is the key used elsewhere
+    const stored = localStorage.getItem('mockAgreements'); 
     return stored ? JSON.parse(stored) : mockAgreementsData;
   }
   return mockAgreementsData;
@@ -278,7 +276,7 @@ export default function PaymentsOverviewPage() {
         description="View upcoming, pending, and paid transactions. Analyze potential and collected revenue. Penalties are applied based on building policies."
       />
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-8">
         <Card className="shadow-sm bg-secondary/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Upcoming/Awaiting</CardTitle>
@@ -312,11 +310,11 @@ export default function PaymentsOverviewPage() {
       </div>
 
       <section className="mb-10">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
           <h2 className="text-2xl font-headline font-semibold text-foreground">Upcoming, Overdue & Pending Verification</h2>
           {upcomingAndPendingBills.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => exportToExcel(upcomingAndPendingBills, 'Upcoming_Overdue_Verification_Payments')}>
-              <Download className="mr-2 h-4 w-4" /> Export to Excel
+              <Download className="mr-2 h-4 w-4" /> Export
             </Button>
           )}
         </div>
@@ -337,7 +335,7 @@ export default function PaymentsOverviewPage() {
                     <TableHead>Tenant</TableHead>
                     <TableHead className="hidden md:table-cell">Space</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead className="hidden sm:table-cell">Penalty</TableHead>
+                    <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead> {/* Hidden on smaller screens */}
                     <TableHead className="text-right">Amount Due</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                   </TableRow>
@@ -350,7 +348,7 @@ export default function PaymentsOverviewPage() {
                       <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
                         {format(parseISO(bill.dueDate), 'PP')}
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell text-xs text-destructive">
+                      <TableCell className="hidden xl:table-cell text-xs text-destructive text-right"> {/* Hidden on smaller screens */}
                         {bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : ''}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
@@ -371,38 +369,36 @@ export default function PaymentsOverviewPage() {
       <section>
         <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
             <h2 className="text-2xl font-headline font-semibold text-foreground">Payment History (Paid & Verified)</h2>
-            <div className="flex gap-2 items-center flex-wrap">
-                <div className="flex gap-2 items-end">
-                    <div>
-                        <Label htmlFor="month-select" className="text-xs text-muted-foreground">Month</Label>
-                        <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
-                            <SelectTrigger id="month-select" className="w-full md:w-[150px] h-9">
-                                <SelectValue placeholder="Select Month" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {monthsForFilter.map(month => (
-                                <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div>
-                        <Label htmlFor="year-select" className="text-xs text-muted-foreground">Year</Label>
-                        <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
-                            <SelectTrigger id="year-select" className="w-full md:w-[120px] h-9">
-                            <SelectValue placeholder="Select Year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {yearsForFilter.map(year => (
-                                <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                            ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end w-full sm:w-auto"> {/* Responsive filter layout */}
+                <div className="flex-grow sm:flex-grow-0">
+                    <Label htmlFor="month-select" className="text-xs text-muted-foreground">Month</Label>
+                    <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
+                        <SelectTrigger id="month-select" className="w-full sm:w-[150px] h-9 mt-1">
+                            <SelectValue placeholder="Select Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {monthsForFilter.map(month => (
+                            <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="flex-grow sm:flex-grow-0">
+                    <Label htmlFor="year-select" className="text-xs text-muted-foreground">Year</Label>
+                    <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+                        <SelectTrigger id="year-select" className="w-full sm:w-[120px] h-9 mt-1">
+                        <SelectValue placeholder="Select Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {yearsForFilter.map(year => (
+                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                 {paidBillsInSelectedPeriod.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => exportToExcel(paidBillsInSelectedPeriod, `Payment_History_${monthsForFilter.find(m=>m.value===selectedMonth)?.label}_${selectedYear}`)} className="self-end h-9">
-                    <Download className="mr-2 h-4 w-4" /> Export to Excel
+                  <Button variant="outline" size="sm" onClick={() => exportToExcel(paidBillsInSelectedPeriod, `Payment_History_${monthsForFilter.find(m=>m.value===selectedMonth)?.label}_${selectedYear}`)} className="self-stretch sm:self-end h-9 w-full sm:w-auto">
+                    <Download className="mr-2 h-4 w-4" /> Export
                   </Button>
                 )}
             </div>
@@ -425,7 +421,7 @@ export default function PaymentsOverviewPage() {
                     <TableHead>Tenant</TableHead>
                     <TableHead className="hidden md:table-cell">Space</TableHead>
                     <TableHead>Payment Date</TableHead>
-                    <TableHead className="hidden sm:table-cell">Method</TableHead>
+                    <TableHead className="hidden lg:table-cell">Method</TableHead> {/* Hidden on smaller screens */}
                     <TableHead className="text-right">Amount Paid</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -435,7 +431,7 @@ export default function PaymentsOverviewPage() {
                       <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
                       <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
                       <TableCell>{bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}</TableCell>
-                      <TableCell className="hidden sm:table-cell text-xs">
+                      <TableCell className="hidden lg:table-cell text-xs"> {/* Hidden on smaller screens */}
                         {bill.paymentMethod || 'N/A'}
                         {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
                         {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
@@ -452,6 +448,3 @@ export default function PaymentsOverviewPage() {
     </div>
   );
 }
-
-
-    

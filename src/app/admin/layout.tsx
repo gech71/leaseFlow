@@ -27,8 +27,8 @@ import {
   UserCircle,
   Wrench, 
   ClipboardList, 
-  Building, // Icon for Buildings
-  ExternalLink, // Icon for the new link
+  Building,
+  ExternalLink,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -49,7 +49,7 @@ const navItems = [
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList },
-  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink }, // New temporary link
+  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -118,6 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
+        {/* Added responsive padding to main content area */}
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="hidden md:flex items-center justify-start mb-6 h-[3.7rem]"> {/* Matches SidebarHeader height for alignment */}
             <SidebarTrigger />

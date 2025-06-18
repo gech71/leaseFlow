@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3 } from 'lucide-react';
-import type { Space, Building } from '@/lib/types'; // Added Building
+import type { Space, Building } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const getStoredSpaces = (): Space[] => {
   if (typeof window !== 'undefined') {
@@ -56,7 +56,7 @@ const getStoredBuildings = (): Building[] => {
 
 export default function SpacesPage() {
   const [spaces, setSpaces] = useState<Space[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]); // State for buildings
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
@@ -180,7 +180,7 @@ export default function SpacesPage() {
         setIsFormOpen(isOpen);
         if (!isOpen) setCurrentSpace({});
       }}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="sm:max-w-lg"> {/* Increased max-width slightly for better spacing */}
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Space' : 'Edit Space'}</DialogTitle>
             <DialogDescription>
@@ -188,15 +188,16 @@ export default function SpacesPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="buildingName" className="text-right">Building</Label>
+            {/* Changed grid to simple stacking for responsiveness */}
+            <div className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="buildingName">Building</Label>
                 <Select 
                   value={currentSpace.buildingName || ""}
                   onValueChange={(value) => setCurrentSpace(prev => ({...prev, buildingName: value}))}
                   required
                 >
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger id="buildingName" className="mt-1">
                     <SelectValue placeholder="Select a building" />
                   </SelectTrigger>
                   <SelectContent>
@@ -208,25 +209,25 @@ export default function SpacesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="spaceIdName" className="text-right">Space ID/Name</Label>
-                <Input id="spaceIdName" value={currentSpace.spaceIdName || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, spaceIdName: e.target.value}))} className="col-span-3" placeholder="e.g., Unit 10A, Suite 200" required />
+              <div>
+                <Label htmlFor="spaceIdName">Space ID/Name</Label>
+                <Input id="spaceIdName" value={currentSpace.spaceIdName || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="area" className="text-right">Area (sq ft)</Label>
-                <Input id="area" type="number" value={currentSpace.area || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, area: parseFloat(e.target.value)}))} className="col-span-3" placeholder="e.g., 1200" required />
+              <div>
+                <Label htmlFor="area">Area (sq ft)</Label>
+                <Input id="area" type="number" value={currentSpace.area || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="floor" className="text-right">Floor</Label>
-                <Input id="floor" value={currentSpace.floor || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, floor: e.target.value}))} className="col-span-3" placeholder="e.g., 10th, Ground" />
+              <div>
+                <Label htmlFor="floor">Floor</Label>
+                <Input id="floor" value={currentSpace.floor || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="utilityProrationShare" className="text-right">Proration Share (%)</Label>
-                <Input id="utilityProrationShare" type="number" step="0.01" value={currentSpace.utilityProrationShare !== undefined ? currentSpace.utilityProrationShare * 100 : ''} onChange={(e) => setCurrentSpace(prev => ({...prev, utilityProrationShare: parseFloat(e.target.value) / 100 }))} className="col-span-3" placeholder="e.g., 10 for 10%" required />
+              <div>
+                <Label htmlFor="utilityProrationShare">Proration Share (%)</Label>
+                <Input id="utilityProrationShare" type="number" step="0.01" value={currentSpace.utilityProrationShare !== undefined ? currentSpace.utilityProrationShare * 100 : ''} onChange={(e) => setCurrentSpace(prev => ({...prev, utilityProrationShare: parseFloat(e.target.value) / 100 }))} className="mt-1" placeholder="e.g., 10 for 10%" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="monthlyRentalPrice" className="text-right">Monthly Rent</Label>
-                <Input id="monthlyRentalPrice" type="number" value={currentSpace.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="col-span-3" placeholder="e.g., 2500" required />
+              <div>
+                <Label htmlFor="monthlyRentalPrice">Monthly Rent</Label>
+                <Input id="monthlyRentalPrice" type="number" value={currentSpace.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 2500" required />
               </div>
             </div>
             <DialogFooter>
@@ -277,12 +278,12 @@ export default function SpacesPage() {
           {spaces.map((space) => (
             <Card key={space.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
               <CardHeader>
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-2"> {/* Adjusted for stacking on small screens */}
                   <div>
                     <CardTitle className="font-headline text-xl mb-1">{space.spaceIdName}</CardTitle>
                     <CardDescription className="text-sm">{space.buildingName}</CardDescription>
                   </div>
-                  <span className={`px-2 py-1 text-xs rounded-full ${space.isOccupied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                  <span className={`px-2 py-1 text-xs rounded-full self-start sm:self-center ${space.isOccupied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                     {space.isOccupied ? 'Occupied' : 'Vacant'}
                   </span>
                 </div>
@@ -293,11 +294,11 @@ export default function SpacesPage() {
                 <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(space.utilityProrationShare * 100).toFixed(2)}%</div>
                 <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${space.monthlyRentalPrice.toLocaleString()}/month</div>
               </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openEditForm(space)}>
+              <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2"> {/* Stack buttons on small screens */}
+                <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto">
                   <Edit3 className="mr-1 h-4 w-4" /> Edit
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied}>
+                <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied} className="w-full sm:w-auto">
                   <Trash2 className="mr-1 h-4 w-4" /> Delete
                 </Button>
               </CardFooter>

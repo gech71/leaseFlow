@@ -141,7 +141,6 @@ export default function GenerateAgreementPage() {
         nextPaymentDueDate: nextPaymentDueDateObj.toISOString(),
         additionalTerms: data.additionalTerms,
         createdAt: new Date().toISOString(),
-        // New payment fields
         initialPaymentAmount: initialPaymentAmt,
         initialPaymentMethod: data.paymentMethod,
         initialPaymentReference: data.paymentReference,
@@ -183,7 +182,7 @@ export default function GenerateAgreementPage() {
         description="Enter tenant and space details to generate a new agreement and record initial payment."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline text-xl">Agreement & Payment Details</CardTitle>
@@ -418,11 +417,11 @@ export default function GenerateAgreementPage() {
                     {generatedAgreement.agreementText}
                   </pre>
                 </ScrollArea>
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
                     <Link href="/admin/agreements" passHref>
-                        <Button variant="outline"><Eye className="mr-2 h-4 w-4" /> View All Agreements</Button>
+                        <Button variant="outline" className="w-full sm:w-auto"><Eye className="mr-2 h-4 w-4" /> View All Agreements</Button>
                     </Link>
-                    <Button onClick={handleFinalizeAndSave}>Finalize & Save Agreement</Button>
+                    <Button onClick={handleFinalizeAndSave} className="w-full sm:w-auto">Finalize & Save Agreement</Button>
                 </div>
               </div>
             )}

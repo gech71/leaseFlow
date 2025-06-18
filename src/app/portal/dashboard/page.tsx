@@ -36,8 +36,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
-
-// --- Mock Data ---
 const mockTenantAgreement: Agreement = {
   id: 'agree-tenant1-current',
   tenantId: 'tenant-portal-user',
@@ -45,7 +43,7 @@ const mockTenantAgreement: Agreement = {
   spaceId: 'space-portal-unit',
   spaceDescription: 'Unit P1, Portal View Residences',
   agreementText: 'STANDARD LEASE AGREEMENT...\n\nThis agreement, made on [Start Date], between Landlord and Portal User Tenant for the premises located at Unit P1, Portal View Residences.\n\n1. Term: The term of this lease shall be for 12 months, commencing on [Start Date].\n2. Rent: Tenant shall pay Landlord monthly rent of $1500.00, due on the 1st day of each month.\n3. Security Deposit: A security deposit of $1500.00 has been paid.\n...',
-  startDate: new Date(2024, 0, 15).toISOString(), // Jan 15, 2024
+  startDate: new Date(2024, 0, 15).toISOString(), 
   monthlyRentalPrice: 1500,
   paymentTermMonths: 12,
   initialPaymentMonths: 1,
@@ -61,7 +59,7 @@ const mockPortalBuilding: BuildingType = {
   penaltyPolicyTiers: [
     { scope: 'Building', fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 25 },
     { scope: 'Building', fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 50 },
-    { scope: 'SpecificSpaces', applicableSpaceIdNames: ['Unit P1'], fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 } // 1.5% of rent
+    { scope: 'SpecificSpaces', applicableSpaceIdNames: ['Unit P1'], fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 } 
   ],
   createdAt: new Date().toISOString(),
 };
@@ -89,7 +87,7 @@ const initialMockTenantBills: Bill[] = [
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
     billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString(), 
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 5).toISOString(), // Overdue
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 5).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, {name: 'Water Service', amount: 30}],
     totalAmount: 1605,
@@ -101,7 +99,7 @@ const initialMockTenantBills: Bill[] = [
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
     billDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(), 
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString(), // Slightly Overdue or Pending
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, { name: 'Trash Removal', amount: 25}],
     totalAmount: 1600,
@@ -113,14 +111,13 @@ const initialMockTenantBills: Bill[] = [
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
     billDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(), 
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 15).toISOString(), // Future Pending
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 15).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Internet Fee', amount: 50 }],
     totalAmount: 1550,
     status: 'Pending',
   },
 ];
-// --- End Mock Data ---
 
 
 export default function CustomerDashboardPage() {
@@ -332,7 +329,7 @@ export default function CustomerDashboardPage() {
             <CardTitle className="font-headline text-xl flex items-center"><FileSignature className="mr-2 h-6 w-6 text-primary" />Lease Details</CardTitle>
             <CardDescription>Your current rental agreement information.</CardDescription>
           </CardHeader>
-          <CardContent className="grid md:grid-cols-2 gap-4 text-sm">
+          <CardContent className="grid md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
             <div><strong className="text-muted-foreground">Property:</strong> {agreement.spaceDescription}</div>
             <div><strong className="text-muted-foreground">Lease Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</div>
             <div><strong className="text-muted-foreground">Lease Term:</strong> {agreement.paymentTermMonths} months</div>
@@ -432,33 +429,33 @@ export default function CustomerDashboardPage() {
                   <TableRow>
                     <TableHead>Bill Date</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead className="hidden md:table-cell">Rent</TableHead>
-                    <TableHead className="hidden md:table-cell">Utilities</TableHead>
-                    <TableHead className="hidden md:table-cell">Penalty</TableHead>
+                    <TableHead className="hidden sm:table-cell text-right">Rent</TableHead>
+                    <TableHead className="hidden md:table-cell text-right">Utilities</TableHead>
+                    <TableHead className="hidden lg:table-cell text-right">Penalty</TableHead>
                     <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead className="text-center px-1 sm:px-2">Status</TableHead>
+                    <TableHead className="text-right px-1 sm:px-2">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {processedBills.map(bill => (
                     <TableRow key={bill.id}>
-                      <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-xs sm:text-sm">{format(parseISO(bill.billDate), 'PP')}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">
                         <span className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
                           {format(parseISO(bill.dueDate), 'PP')}
                         </span>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">${bill.rentAmount.toFixed(2)}</TableCell>
-                      <TableCell className="hidden md:table-cell">
+                      <TableCell className="hidden sm:table-cell text-right text-xs sm:text-sm">${bill.rentAmount.toFixed(2)}</TableCell>
+                      <TableCell className="hidden md:table-cell text-right text-xs sm:text-sm">
                         {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 ? (
                           <Popover>
                             <PopoverTrigger asChild>
-                              <Button variant="link" className="p-0 h-auto font-normal text-primary hover:underline">
+                              <Button variant="link" className="p-0 h-auto font-normal text-primary hover:underline text-xs sm:text-sm">
                                 ${bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0).toFixed(2)}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto text-sm p-2">
+                            <PopoverContent className="w-auto text-xs p-2">
                               <ul className="space-y-1">
                                 {bill.utilityBreakdown.map(util => (
                                   <li key={util.name} className="flex justify-between">
@@ -473,20 +470,20 @@ export default function CustomerDashboardPage() {
                             '$0.00'
                         )}
                       </TableCell>
-                      <TableCell className="hidden md:table-cell text-destructive">
+                      <TableCell className="hidden lg:table-cell text-right text-destructive text-xs sm:text-sm">
                         {bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}
                       </TableCell>
-                      <TableCell className="text-right font-semibold">${bill.totalAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-col sm:flex-row gap-1 justify-end items-center">
+                      <TableCell className="text-right font-semibold text-xs sm:text-sm">${bill.totalAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-center px-1 sm:px-2">{getStatusBadge(bill.status)}</TableCell>
+                      <TableCell className="text-right px-1 sm:px-2">
+                        <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">
                             {(bill.status === 'Pending' || bill.status === 'Overdue') && (
                             <>
-                                <Button onClick={() => handlePayBill(bill.id)} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
-                                    <CreditCard className="mr-0 md:mr-2 h-4 w-4"/><span className="hidden md:inline">Pay Now</span><span className="md:hidden">Pay</span>
+                                <Button onClick={() => handlePayBill(bill.id)} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto text-xs sm:text-sm">
+                                    <CreditCard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/><span className="hidden sm:inline">Pay Now</span><span className="sm:hidden">Pay</span>
                                 </Button>
-                                <Button onClick={() => handleOpenProofDialog(bill)} variant="outline" size="sm" className="w-full sm:w-auto">
-                                    <UploadCloud className="mr-0 md:mr-2 h-4 w-4"/><span className="hidden md:inline">Submit Proof</span><span className="md:hidden">Proof</span>
+                                <Button onClick={() => handleOpenProofDialog(bill)} variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                                    <UploadCloud className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/><span className="hidden sm:inline">Submit Proof</span><span className="sm:hidden">Proof</span>
                                 </Button>
                             </>
                             )}
@@ -494,7 +491,7 @@ export default function CustomerDashboardPage() {
                                 <span className="text-xs text-blue-600 whitespace-nowrap">Verification Pending</span>
                             )}
                             {bill.status === 'Paid' && bill.paymentDate && (
-                                <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                <div className="text-xs text-muted-foreground whitespace-nowrap text-right sm:text-left">
                                     Paid: {format(parseISO(bill.paymentDate), 'PP')}
                                 </div>
                             )}
@@ -508,10 +505,6 @@ export default function CustomerDashboardPage() {
           </Card>
         )}
       </section>
-
     </div>
   );
 }
-
-
-    

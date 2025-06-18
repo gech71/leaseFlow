@@ -118,7 +118,7 @@ const getStoredBuildings = (): Building[] => {
         return initialMockBuildings;
       }
     }
-    localStorage.setItem('buildings', JSON.stringify(initialMockBuildings)); // Initialize if not present
+    localStorage.setItem('buildings', JSON.stringify(initialMockBuildings)); 
     return initialMockBuildings;
   }
   return initialMockBuildings;
@@ -179,7 +179,6 @@ export default function BillingPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Load spaces from localStorage
     const storedSpacesData = localStorage.getItem('spaces');
     if (storedSpacesData) {
       try {
@@ -191,7 +190,6 @@ export default function BillingPage() {
     } else {
       setSpaces(initialMockSpaces);
     }
-    // Load agreements from localStorage
     const storedAgreementsData = localStorage.getItem('mockAgreements');
      if (storedAgreementsData) {
       try {
@@ -296,7 +294,7 @@ export default function BillingPage() {
         bankOrWalletName: processedBill?.bankOrWalletName || "",
         adminVerificationNotes: processedBill?.adminVerificationNotes || "",
       });
-      setAdminSelectedProofFile(null); // Clear previous file
+      setAdminSelectedProofFile(null); 
       if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
     }
     if (isVerificationDialogOpen && billForVerification) {
@@ -447,7 +445,7 @@ export default function BillingPage() {
         paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, 
         bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, 
         adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes, penaltyAmount: processedBill.penaltyAmount,
-        paymentProofUrl: proofUrl, // Keep or update proof
+        paymentProofUrl: proofUrl,
       } : b));
       toast({ title: "Payment Verified", description: `Payment for bill ${billForVerification.id} confirmed.` });
     } else { 
@@ -456,7 +454,6 @@ export default function BillingPage() {
         status: isBefore(parseISO(processedBill.dueDate), today) ? 'Overdue' : 'Pending', 
         adminVerifiedPayment: false, adminVerificationNotes: values.adminVerificationNotes,
         paymentDate: undefined, paymentMethod: undefined, paymentReference: undefined, bankOrWalletName: undefined,
-        // paymentProofUrl: proofUrl, // Keep or update proof if admin re-uploads on rejection, or clear it
       } : b));
       toast({ title: "Payment Rejected", description: `Payment proof for bill ${billForVerification.id} rejected. Status reverted.`, variant: "destructive" });
     }
@@ -514,7 +511,7 @@ export default function BillingPage() {
           <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle>
           <CardDescription>Select an active agreement to generate its next due bill.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"> {/* Responsive grid */}
           {agreements.map(agreement => {
             const isAgreementActive = !isBefore(today, startOfDay(new Date(agreement.startDate))) && !isAfter(today, addMonths(startOfDay(new Date(agreement.startDate)), agreement.paymentTermMonths));
             const nextDueDate = startOfDay(new Date(agreement.nextPaymentDueDate));
@@ -542,7 +539,7 @@ export default function BillingPage() {
       </Card>
       
       <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md"> {/* Dialogs are generally responsive by shadcn defaults */}
               <DialogHeader>
                   <DialogTitle className="font-headline text-xl">{billForPayment?.status === 'Paid' ? 'Update Payment Details' : 'Record Payment'}</DialogTitle>
                   {billForPayment && <DialogDescription>For {processedBills.find(pb => pb.id === billForPayment.id)?.spaceDescription.split(',')[0]} - Total: ${processedBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)}</DialogDescription>}
@@ -619,7 +616,7 @@ export default function BillingPage() {
                       
                       <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
                           <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'reject'))()}><ShieldX className="mr-2 h-4 w-4"/>Reject Payment</Button>
-                          <div className="flex-grow"></div>
+                          <div className="flex-grow"></div> {/* Spacer for mobile stacking */}
                           <DialogClose asChild><Button type="button" variant="outline" className="w-full sm:w-auto">Cancel</Button></DialogClose>
                           <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirm'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"><ShieldCheck className="mr-2 h-4 w-4"/>Confirm Payment</Button>
                       </DialogFooter>
@@ -637,8 +634,20 @@ export default function BillingPage() {
         <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
         <Card className="shadow-md">
           <CardContent className="p-0">
+            {/* Responsive Table: hides columns on smaller screens */}
             <Table>
-              <TableHeader><TableRow><TableHead>Tenant</TableHead><TableHead className="hidden md:table-cell">Space</TableHead><TableHead>Bill Date</TableHead><TableHead>Due Date</TableHead><TableHead className="hidden sm:table-cell text-right">Rent</TableHead><TableHead className="hidden sm:table-cell text-right">Utilities</TableHead><TableHead className="hidden sm:table-cell text-right">Penalty</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow>
+                <TableHead>Tenant</TableHead>
+                <TableHead className="hidden md:table-cell">Space</TableHead>
+                <TableHead>Bill Date</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead className="hidden lg:table-cell text-right">Rent</TableHead>
+                <TableHead className="hidden lg:table-cell text-right">Utilities</TableHead>
+                <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right pr-2 sm:pr-4">Actions</TableHead>
+              </TableRow></TableHeader>
               <TableBody>
                 {processedBills.map((bill) => (
                   <TableRow key={bill.id} className={`${bill.status === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.status === 'Pending Verification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
@@ -646,23 +655,23 @@ export default function BillingPage() {
                     <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
                     <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
                     <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-right">${bill.rentAmount.toFixed(2)}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-right">
+                    <TableCell className="hidden lg:table-cell text-right">${bill.rentAmount.toFixed(2)}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-right">
                       {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">${u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('$0.00')}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-right text-destructive">{bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}</TableCell>
+                    <TableCell className="hidden xl:table-cell text-right text-destructive">{bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}</TableCell>
                     <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize text-xs ${bill.status === 'Pending Verification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification', '')}</span></Badge></TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
+                    <TableCell className="text-right pr-2 sm:pr-4"> {/* Adjusted padding for actions column */}
+                      <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center"> {/* Stack buttons on mobile, row on sm+ */}
                         {bill.status === 'Pending Verification' && (
-                          <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white"><ShieldCheck className="mr-1 h-3.5 w-3.5"/> Verify</Button>
+                          <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button>
                         )}
                         {(bill.status === 'Pending' || bill.status === 'Overdue') && (
-                          <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white"><CreditCard className="mr-1 h-3.5 w-3.5" /> Record Pymt</Button>
+                          <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button>
                         )}
-                         {bill.status === 'Paid' && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)}><Edit className="mr-1 h-3.5 w-3.5"/> View/Edit</Button> )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => toast({title: "Delete Bill", description:"Functionality coming soon.", variant: "destructive"})}><Trash2 className="h-4 w-4"/></Button>
+                         {bill.status === 'Paid' && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto"><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View/Edit</span><span className="sm:hidden">Edit</span></Button> )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 self-center sm:self-auto" onClick={() => toast({title: "Delete Bill", description:"Functionality coming soon.", variant: "destructive"})}><Trash2 className="h-4 w-4"/></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -676,6 +685,3 @@ export default function BillingPage() {
     </div>
   );
 }
-
-
-    

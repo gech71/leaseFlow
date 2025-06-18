@@ -1,6 +1,19 @@
 
 import Link from 'next/link';
-import { Home, UserCircle, LogOut } from 'lucide-react';
+import { Home, UserCircle, LogOut, Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetClose,
+} from "@/components/ui/sheet";
+
+const navLinks = [
+  { href: "/portal/dashboard", label: "Dashboard", icon: Home },
+  { href: "#", label: "My Account", icon: UserCircle },
+  { href: "/portal/login", label: "Logout", icon: LogOut },
+];
 
 export default function PortalLayout({
   children,
@@ -9,26 +22,47 @@ export default function PortalLayout({
 }) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="bg-primary text-primary-foreground shadow-md">
+      <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/portal/dashboard" className="flex items-center gap-2">
             <Home className="h-7 w-7" />
             <h1 className="text-xl font-headline font-semibold">LeaseFlow Portal</h1>
           </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/portal/dashboard" className="text-sm font-medium hover:underline">
-              Dashboard
-            </Link>
-             <Link href="#" className="text-sm font-medium hover:underline flex items-center gap-1">
-              <UserCircle size={18} /> My Account
-            </Link>
-             <Link href="/portal/login" className="text-sm font-medium hover:underline flex items-center gap-1">
-              <LogOut size={18} /> Logout
-            </Link>
+          
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-4">
+            {navLinks.map(link => (
+              <Link key={link.label} href={link.href} className="text-sm font-medium hover:underline flex items-center gap-1">
+                <link.icon size={18} /> {link.label}
+              </Link>
+            ))}
           </nav>
+
+          {/* Mobile Navigation Trigger */}
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Open menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[240px] bg-primary text-primary-foreground p-4">
+                <nav className="flex flex-col space-y-4 mt-8">
+                  {navLinks.map(link => (
+                    <SheetClose asChild key={link.label}>
+                      <Link href={link.href} className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80">
+                        <link.icon size={20} /> {link.label}
+                      </Link>
+                    </SheetClose>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
-      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {children}
       </main>
       <footer className="bg-muted text-muted-foreground py-4 text-center text-sm">

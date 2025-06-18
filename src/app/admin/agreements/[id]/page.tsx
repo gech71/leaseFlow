@@ -13,6 +13,7 @@ import type { Agreement } from '@/lib/types';
 import { getMockAgreementById } from '../page'; 
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import React from 'react'; // Ensure React is imported for React.createElement
 
 export default function ViewAgreementPage() {
   const params = useParams();
@@ -82,7 +83,7 @@ export default function ViewAgreementPage() {
         description={`Details for agreement ID: ${agreement.id}`}
         actions={
           <Link href="/admin/agreements" passHref>
-            <Button variant="outline">
+            <Button variant="outline" className="w-full sm:w-auto"> {/* Responsive width */}
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Agreements
             </Button>
           </Link>
@@ -92,7 +93,7 @@ export default function ViewAgreementPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Agreement Details</CardTitle>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 mt-2 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-3 mt-2 text-sm"> {/* Responsive grid */}
             <div className="flex items-center">
               <User className="mr-2 h-4 w-4 text-primary" /> 
               <strong>Tenant:</strong> <span className="ml-2">{agreement.tenantName}</span>
@@ -131,7 +132,7 @@ export default function ViewAgreementPage() {
           {agreement.initialPaymentAmount !== undefined && (
             <>
               <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Initial Payment Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm p-4 border rounded-md bg-secondary/30">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-2 text-sm p-4 border rounded-md bg-secondary/30"> {/* Responsive grid */}
                 <div className="flex items-center">
                     <DollarSignIcon className="mr-2 h-4 w-4 text-primary" /> 
                     <strong>Amount Paid:</strong> <span className="ml-2">${agreement.initialPaymentAmount.toLocaleString()}</span>
@@ -165,7 +166,7 @@ export default function ViewAgreementPage() {
           )}
 
           <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Full Agreement Text</h3>
-          <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-secondary/30">
+          <ScrollArea className="h-[300px] sm:h-[400px] w-full rounded-md border p-4 bg-secondary/30"> {/* Responsive height */}
             <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
               {agreement.agreementText}
             </pre>
@@ -178,7 +179,7 @@ export default function ViewAgreementPage() {
           )}
         </CardContent>
         <CardFooter className="border-t pt-4 flex justify-end">
-           <Button onClick={handleDownloadPdf}>
+           <Button onClick={handleDownloadPdf} className="w-full sm:w-auto"> {/* Responsive width */}
             <Download className="mr-2 h-4 w-4" /> Download PDF
           </Button>
         </CardFooter>
