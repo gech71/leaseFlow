@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark } from 'lucide-react';
+import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download } from 'lucide-react';
 import type { Bill, Space } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth } from 'date-fns';
@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button'; // Added for potential future actions
+import { Button } from '@/components/ui/button';
+import * as XLSX from 'xlsx';
 
 // Enhanced Mock data for demonstration
 const mockSpacesData: Space[] = [
@@ -102,6 +103,28 @@ export default function PaymentsOverviewPage() {
     }
   };
 
+  const exportToExcel = (data: Bill[], fileNamePrefix: string) => {
+    const worksheetData = data.map(bill => ({
+      'Tenant Name': bill.tenantName,
+      'Space Description': bill.spaceDescription,
+      'Bill Date': format(parseISO(bill.billDate), 'PP'),
+      'Due Date': format(parseISO(bill.dueDate), 'PP'),
+      'Rent Amount': bill.rentAmount,
+      'Utilities Amount': bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0),
+      'Total Amount': bill.totalAmount,
+      'Status': bill.status,
+      'Payment Date': bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A',
+      'Payment Method': bill.paymentMethod || 'N/A',
+      'Bank/Wallet': bill.bankOrWalletName || 'N/A',
+      'Reference': bill.paymentReference || 'N/A',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Payments");
+    XLSX.writeFile(workbook, `${fileNamePrefix}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
   }
@@ -148,7 +171,14 @@ export default function PaymentsOverviewPage() {
       </div>
 
       <section className="mb-10">
-        <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Upcoming & Overdue Payments</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-headline font-semibold text-foreground">Upcoming & Overdue Payments</h2>
+          {upcomingAndPendingBills.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(upcomingAndPendingBills, 'Upcoming_Overdue_Payments')}>
+              <Download className="mr-2 h-4 w-4" /> Export to Excel
+            </Button>
+          )}
+        </div>
         {upcomingAndPendingBills.length === 0 ? (
           <Card className="text-center py-10 shadow-sm">
             <CardContent>
@@ -198,33 +228,40 @@ export default function PaymentsOverviewPage() {
       <section>
         <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
             <h2 className="text-2xl font-headline font-semibold text-foreground">Payment History</h2>
-            <div className="flex gap-2 items-end">
-                <div>
-                    <Label htmlFor="month-select" className="text-xs text-muted-foreground">Month</Label>
-                    <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
-                        <SelectTrigger id="month-select" className="w-full md:w-[150px] h-9">
-                            <SelectValue placeholder="Select Month" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        {monthsForFilter.map(month => (
-                            <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
+            <div className="flex gap-2 items-center flex-wrap">
+                <div className="flex gap-2 items-end">
+                    <div>
+                        <Label htmlFor="month-select" className="text-xs text-muted-foreground">Month</Label>
+                        <Select value={String(selectedMonth)} onValueChange={(value) => setSelectedMonth(Number(value))}>
+                            <SelectTrigger id="month-select" className="w-full md:w-[150px] h-9">
+                                <SelectValue placeholder="Select Month" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            {monthsForFilter.map(month => (
+                                <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label htmlFor="year-select" className="text-xs text-muted-foreground">Year</Label>
+                        <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
+                            <SelectTrigger id="year-select" className="w-full md:w-[120px] h-9">
+                            <SelectValue placeholder="Select Year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            {yearsForFilter.map(year => (
+                                <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
-                <div>
-                    <Label htmlFor="year-select" className="text-xs text-muted-foreground">Year</Label>
-                    <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
-                        <SelectTrigger id="year-select" className="w-full md:w-[120px] h-9">
-                        <SelectValue placeholder="Select Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                        {yearsForFilter.map(year => (
-                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                </div>
+                {paidBillsInSelectedPeriod.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => exportToExcel(paidBillsInSelectedPeriod, `Payment_History_${monthsForFilter.find(m=>m.value===selectedMonth)?.label}_${selectedYear}`)} className="self-end h-9">
+                    <Download className="mr-2 h-4 w-4" /> Export to Excel
+                  </Button>
+                )}
             </div>
         </div>
 
