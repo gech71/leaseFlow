@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer, Download, DollarSign as DollarSignIcon } from 'lucide-react'; // Renamed DollarSign to avoid conflict
+import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer, Download, DollarSign as DollarSignIcon, CreditCard, Landmark, Wallet, Coins, HelpCircle } from 'lucide-react';
 import type { Agreement } from '@/lib/types';
 import { getMockAgreementById } from '../page'; 
 import { format } from 'date-fns';
@@ -42,6 +42,15 @@ export default function ViewAgreementPage() {
       description: "PDF download functionality is coming soon!",
     });
   };
+
+  const getPaymentMethodIcon = (method?: string) => {
+    if (!method) return HelpCircle;
+    if (method.toLowerCase().includes('card')) return CreditCard;
+    if (method.toLowerCase().includes('bank')) return Landmark;
+    if (method.toLowerCase().includes('wallet')) return Wallet;
+    if (method.toLowerCase().includes('cash')) return Coins;
+    return HelpCircle;
+  }
   
   if (!isMounted || !agreementId) {
     return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
@@ -83,7 +92,7 @@ export default function ViewAgreementPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Agreement Details</CardTitle>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mt-2 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 mt-2 text-sm">
             <div className="flex items-center">
               <User className="mr-2 h-4 w-4 text-primary" /> 
               <strong>Tenant:</strong> <span className="ml-2">{agreement.tenantName}</span>
@@ -100,17 +109,17 @@ export default function ViewAgreementPage() {
               <CalendarDays className="mr-2 h-4 w-4 text-primary" /> 
               <strong>Term:</strong> <span className="ml-2">{agreement.paymentTermMonths} months</span>
             </div>
+             <div className="flex items-center">
+               <DollarSignIcon className="mr-2 h-4 w-4 text-primary" />
+               <strong>Monthly Rent:</strong> <span className="ml-2">${agreement.monthlyRentalPrice.toLocaleString()}</span>
+            </div>
             <div className="flex items-center">
               <Sigma className="mr-2 h-4 w-4 text-primary" /> 
-              <strong>Initial Payment:</strong> <span className="ml-2">{agreement.initialPaymentMonths} month(s)</span>
+              <strong>Initial Payment:</strong> <span className="ml-2">{agreement.initialPaymentMonths} month(s) upfront</span>
             </div>
             <div className="flex items-center">
               <CalendarDays className="mr-2 h-4 w-4 text-primary" /> 
-              <strong>Next Payment Due:</strong> <span className="ml-2">{format(new Date(agreement.nextPaymentDueDate), 'PP')}</span>
-            </div>
-            <div className="flex items-center">
-               <DollarSignIcon className="mr-2 h-4 w-4 text-primary" />
-               <strong>Monthly Rent:</strong> <span className="ml-2">${agreement.monthlyRentalPrice.toLocaleString()}</span>
+              <strong>Next Payment Due (Lease):</strong> <span className="ml-2">{format(new Date(agreement.nextPaymentDueDate), 'PP')}</span>
             </div>
              <div className="flex items-center">
                <Printer className="mr-2 h-4 w-4 text-primary" />
@@ -119,6 +128,42 @@ export default function ViewAgreementPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {agreement.initialPaymentAmount !== undefined && (
+            <>
+              <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Initial Payment Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm p-4 border rounded-md bg-secondary/30">
+                <div className="flex items-center">
+                    <DollarSignIcon className="mr-2 h-4 w-4 text-primary" /> 
+                    <strong>Amount Paid:</strong> <span className="ml-2">${agreement.initialPaymentAmount.toLocaleString()}</span>
+                </div>
+                {agreement.initialPaymentMethod && (
+                    <div className="flex items-center">
+                        {React.createElement(getPaymentMethodIcon(agreement.initialPaymentMethod), { className: "mr-2 h-4 w-4 text-primary" })}
+                        <strong>Method:</strong> <span className="ml-2">{agreement.initialPaymentMethod}</span>
+                    </div>
+                )}
+                {agreement.initialPaymentBankOrWalletName && (
+                    <div className="flex items-center">
+                        <Landmark className="mr-2 h-4 w-4 text-primary" /> 
+                        <strong>Bank/Wallet:</strong> <span className="ml-2">{agreement.initialPaymentBankOrWalletName}</span>
+                    </div>
+                )}
+                {agreement.initialPaymentReference && (
+                    <div className="flex items-center">
+                        <Sigma className="mr-2 h-4 w-4 text-primary" /> {/* Using Sigma as a generic ref icon */}
+                        <strong>Reference:</strong> <span className="ml-2">{agreement.initialPaymentReference}</span>
+                    </div>
+                )}
+                 {agreement.initialPaymentDate && (
+                    <div className="flex items-center">
+                        <CalendarDays className="mr-2 h-4 w-4 text-primary" /> 
+                        <strong>Payment Date:</strong> <span className="ml-2">{format(new Date(agreement.initialPaymentDate), 'PPp')}</span>
+                    </div>
+                )}
+              </div>
+            </>
+          )}
+
           <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Full Agreement Text</h3>
           <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-secondary/30">
             <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
@@ -141,5 +186,3 @@ export default function ViewAgreementPage() {
     </div>
   );
 }
-
-// Note: DollarSign component removed as lucide-react provides DollarSignIcon

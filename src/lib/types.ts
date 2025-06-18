@@ -46,6 +46,13 @@ export interface Agreement {
   paymentTermMonths: number; // Total term of the agreement in months
   initialPaymentMonths: number; // How many months paid upfront
   nextPaymentDueDate: string; // ISO date string for the next payment
+
+  // New fields for initial payment details
+  initialPaymentAmount?: number;
+  initialPaymentMethod?: string;
+  initialPaymentReference?: string;
+  initialPaymentBankOrWalletName?: string;
+  initialPaymentDate?: string; // ISO date string
 }
 
 export interface BuildingUtilityItem {
@@ -66,7 +73,7 @@ export interface Bill {
   id: string;
   agreementId: string;
   tenantId: string;
-  tenantName: string; // Denormalized
+  // tenantName: string; // Denormalized
   spaceDescription: string; // Denormalized
   billDate: string; // ISO date string
   dueDate: string; // ISO date string
