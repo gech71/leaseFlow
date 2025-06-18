@@ -170,7 +170,7 @@ export default function BuildingsPage() {
 
     try {
         for (const scopeKey in groupedUIRules) {
-          const rulesInScope = groupedUIRules[scopeKey];
+          const rulesInScope = groupedUIRules[scopeKey].sort((a,b) => (a.durationDays ?? Infinity) - (b.durationDays ?? Infinity)); // Sort for processing, not strictly necessary if UI order is trusted
           let cumulativeStartDay = 1;
 
           for (let i = 0; i < rulesInScope.length; i++) {
@@ -184,13 +184,10 @@ export default function BuildingsPage() {
             const fromDay = cumulativeStartDay;
             let toDay: number | null = null;
 
-            if (i === rulesInScope.length - 1) { 
+            // If it's the last rule for this scope OR if its duration is undefined/null/0, it's indefinite
+            if (i === rulesInScope.length - 1 || uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) {
               toDay = null; 
             } else {
-              if (uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) {
-                toast({ title: "Error", description: `A rule for scope '${scopeKey.replace("_Floor_", ": Floor ").replace("_Spaces_", ": Spaces ")}' (not the last rule for this scope) needs a positive duration.`, variant: "destructive" });
-                return;
-              }
               toDay = fromDay + uiRule.durationDays - 1;
             }
 
@@ -207,11 +204,12 @@ export default function BuildingsPage() {
             if (toDay !== null) {
               cumulativeStartDay = toDay + 1;
             } else {
-              break; 
+              break; // This was the last (indefinite) rule for this scope group
             }
           }
         }
     } catch (error: any) {
+        // Error toast is already shown
         return;
     }
     
@@ -256,18 +254,20 @@ export default function BuildingsPage() {
   const openEditForm = (building: Building) => {
     setFormMode('edit');
     const loadedUIPenaltyRules: UIPenaltyRule[] = [];
-    const tiersByScope: Record<string, PenaltyTier[]> = {};
+    const tiersByScopeAndSequence: Record<string, PenaltyTier[]> = {};
 
+    // Group tiers by their effective scope string
     (building.penaltyPolicyTiers || []).forEach(tier => {
         let scopeKey = tier.scope;
         if (tier.scope === 'Floor' && tier.applicableFloor) scopeKey += `_Floor_${tier.applicableFloor}`;
-        else if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) scopeKey += `_Spaces_${tier.applicableSpaceIdNames.join(',')}`;
+        else if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) scopeKey += `_Spaces_${tier.applicableSpaceIdNames.sort().join(',')}`;
         
-        if (!tiersByScope[scopeKey]) tiersByScope[scopeKey] = [];
-        tiersByScope[scopeKey].push(tier);
+        if (!tiersByScopeAndSequence[scopeKey]) tiersByScopeAndSequence[scopeKey] = [];
+        tiersByScopeAndSequence[scopeKey].push(tier);
     });
 
-    Object.values(tiersByScope).forEach(scopeGroup => {
+    // For each scope group, sort by fromDay and convert to UIPenaltyRule
+    Object.values(tiersByScopeAndSequence).forEach(scopeGroup => {
         scopeGroup.sort((a,b) => a.fromDay - b.fromDay).forEach((tier, index) => {
             let duration: number | undefined;
             if (tier.toDay !== null && tier.toDay !== undefined) {
@@ -332,8 +332,8 @@ export default function BuildingsPage() {
               Fill in building details. Add penalty rules: for each rule, set its duration, fee, and scope. Rules are processed sequentially within their defined scope.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleFormSubmit} className="flex-grow flex flex-col overflow-hidden">
-            <ScrollArea className="flex-grow pr-3"> 
+          <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col min-h-0">
+            <ScrollArea className="flex-1 pr-3"> 
               <div className="space-y-4 py-4">
                 <div>
                   <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
@@ -391,7 +391,7 @@ export default function BuildingsPage() {
                                         value={uiRule.durationDays ?? ''} 
                                         onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)} 
                                         className="mt-1 text-xs h-8"/>
-                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank IF this is the LAST rule for its specific scope (to make it indefinite).</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank for the LAST rule in this scope sequence to make it indefinite.</p>
                             </div>
                             <div>
                                 <Label htmlFor={`ruleFeeType-${uiRule.id}`}>Fee Type</Label>
@@ -442,7 +442,7 @@ export default function BuildingsPage() {
                 </div>
               </div>
             </ScrollArea>
-            <DialogFooter className="mt-auto pt-4 border-t flex-shrink-0">
+            <DialogFooter className="pt-4 border-t flex-shrink-0">
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
