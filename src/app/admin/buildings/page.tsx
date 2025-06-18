@@ -62,8 +62,9 @@ const storeBuildings = (buildings: Building[]) => {
   }
 };
 
+// UI representation of a penalty rule before it's processed into a PenaltyTier
 interface UIPenaltyRule {
-  id: string; 
+  id: string; // For React key
   durationDays?: number; 
   feeType?: 'Fixed' | 'Percentage';
   feeValue?: number;
@@ -96,18 +97,16 @@ export default function BuildingsPage() {
   }, []);
 
   const handleAddUIPenaltyRule = () => {
+    const newRule: UIPenaltyRule = { 
+      id: `uiRule-${Date.now()}-${Math.random()}`, 
+      scope: 'Building', 
+      feeType: 'Fixed',
+      durationDays: 7, 
+      feeValue: 10,
+    };
     setCurrentBuildingForm(prev => ({
       ...prev,
-      uiPenaltyRules: [
-        ...prev.uiPenaltyRules,
-        { 
-          id: `uiRule-${Date.now()}`, 
-          scope: 'Building', 
-          feeType: 'Fixed',
-          durationDays: 5, 
-          feeValue: 0,
-        }
-      ]
+      uiPenaltyRules: [...prev.uiPenaltyRules, newRule],
     }));
   };
 
@@ -121,14 +120,30 @@ export default function BuildingsPage() {
   const handleUIPenaltyRuleChange = (ruleId: string, field: keyof UIPenaltyRule, value: any) => {
     setCurrentBuildingForm(prev => ({
       ...prev,
-      uiPenaltyRules: prev.uiPenaltyRules.map(rule =>
-        rule.id === ruleId
-          ? { ...rule, [field]: (field === 'durationDays' || field === 'feeValue') ? (value ? Number(value) : undefined) : value,
-              applicableFloor: field === 'scope' && value !== 'Floor' ? undefined : rule.applicableFloor,
-              applicableSpaceIdNamesStr: field === 'scope' && value !== 'SpecificSpaces' ? undefined : rule.applicableSpaceIdNamesStr,
-            }
-          : rule
-      )
+      uiPenaltyRules: prev.uiPenaltyRules.map(rule => {
+        if (rule.id !== ruleId) return rule;
+
+        let updatedRule = { ...rule, [field]: value };
+
+        if (field === 'durationDays' || field === 'feeValue') {
+          updatedRule[field] = (value === '' || value === null || isNaN(Number(value))) ? undefined : Number(value);
+        }
+        
+        if (field === 'scope') {
+          updatedRule.scope = value as UIPenaltyRule['scope']; // Ensure type
+          if (updatedRule.scope === 'Floor') {
+            updatedRule.applicableFloor = rule.scope === 'Floor' ? rule.applicableFloor : ''; 
+            updatedRule.applicableSpaceIdNamesStr = undefined;
+          } else if (updatedRule.scope === 'SpecificSpaces') {
+            updatedRule.applicableFloor = undefined;
+            updatedRule.applicableSpaceIdNamesStr = rule.scope === 'SpecificSpaces' ? rule.applicableSpaceIdNamesStr : '';
+          } else { // Building scope
+            updatedRule.applicableFloor = undefined;
+            updatedRule.applicableSpaceIdNamesStr = undefined;
+          }
+        }
+        return updatedRule;
+      })
     }));
   };
   
@@ -140,13 +155,22 @@ export default function BuildingsPage() {
     }
 
     const finalPenaltyTiers: PenaltyTier[] = [];
-    const groupedUIRules: Record<string, UIPenaltyRule[]> = {};
+    // Group UI rules by their effective scope (Building, Floor X, Spaces Y,Z)
+    const groupedUIRules: Record<string, UIPenaltyRule[]> = {}; 
 
     currentBuildingForm.uiPenaltyRules.forEach(uiRule => {
       let scopeKey = uiRule.scope;
-      if (uiRule.scope === 'Floor' && uiRule.applicableFloor?.trim()) {
+      if (uiRule.scope === 'Floor') {
+        if (!uiRule.applicableFloor?.trim()) {
+            toast({ title: "Error", description: `Floor name is required for floor-scoped rule. Problem in rule with intended duration ${uiRule.durationDays || 'N/A'} days.`, variant: "destructive" });
+            throw new Error("Invalid floor rule"); // Stop processing
+        }
         scopeKey += `_Floor_${uiRule.applicableFloor.trim()}`;
-      } else if (uiRule.scope === 'SpecificSpaces' && uiRule.applicableSpaceIdNamesStr?.trim()) {
+      } else if (uiRule.scope === 'SpecificSpaces') {
+         if (!uiRule.applicableSpaceIdNamesStr?.trim()) {
+            toast({ title: "Error", description: `Space ID(s) are required for space-scoped rule. Problem in rule with intended duration ${uiRule.durationDays || 'N/A'} days.`, variant: "destructive" });
+            throw new Error("Invalid space rule");
+        }
         const sortedSpaceIds = uiRule.applicableSpaceIdNamesStr.split(',').map(s => s.trim()).filter(s => s).sort().join(',');
         scopeKey += `_Spaces_${sortedSpaceIds}`;
       }
@@ -157,55 +181,56 @@ export default function BuildingsPage() {
       groupedUIRules[scopeKey].push(uiRule);
     });
 
-    for (const scopeKey in groupedUIRules) {
-      const rulesInScope = groupedUIRules[scopeKey];
-      let cumulativeStartDay = 1;
+    try {
+        for (const scopeKey in groupedUIRules) {
+          const rulesInScope = groupedUIRules[scopeKey]; // These are already ordered as per UI
+          let cumulativeStartDay = 1;
 
-      for (let i = 0; i < rulesInScope.length; i++) {
-        const uiRule = rulesInScope[i];
+          for (let i = 0; i < rulesInScope.length; i++) {
+            const uiRule = rulesInScope[i];
 
-        if (!uiRule.feeType || uiRule.feeValue === undefined || uiRule.feeValue < 0) {
-          toast({ title: "Error", description: `A rule in scope '${scopeKey.replace("_Floor_", " Floor: ").replace("_Spaces_", " Spaces: ")}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
-          return;
-        }
-        if (i < rulesInScope.length - 1 && (!uiRule.durationDays || uiRule.durationDays <= 0)) {
-             toast({ title: "Error", description: `A rule in scope '${scopeKey.replace("_Floor_", " Floor: ").replace("_Spaces_", " Spaces: ")}' needs a positive duration. Only the last rule for a scope can have an indefinite duration (blank duration).`, variant: "destructive" });
-            return;
-        }
-         if (uiRule.scope === 'Floor' && !uiRule.applicableFloor?.trim()) {
-            toast({ title: "Error", description: `Floor name is required for floor-scoped rule.`, variant: "destructive" });
-            return;
-        }
-        if (uiRule.scope === 'SpecificSpaces' && !uiRule.applicableSpaceIdNamesStr?.trim()) {
-            toast({ title: "Error", description: `Space ID(s) are required for space-scoped rule.`, variant: "destructive" });
-            return;
-        }
+            if (!uiRule.feeType || uiRule.feeValue === undefined || uiRule.feeValue < 0) {
+              toast({ title: "Error", description: `A rule for scope '${scopeKey.replace("_Floor_", " Floor: ").replace("_Spaces_", " Spaces: ")}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
+              return; // Stop submission
+            }
+            
+            const fromDay = cumulativeStartDay;
+            let toDay: number | null = null;
 
-        const fromDay = cumulativeStartDay;
-        let toDay: number | null = null;
+            if (i === rulesInScope.length - 1) { // Last rule for this scope is indefinite
+              toDay = null; 
+              if (uiRule.durationDays !== undefined && uiRule.durationDays !== null) {
+                // User might have put a duration for the last rule, respect it unless it's clearly meant to be indefinite
+                 // For now, we'll make the last rule indefinite regardless of durationDays to simplify UI
+              }
+            } else {
+              if (!uiRule.durationDays || uiRule.durationDays <= 0) {
+                toast({ title: "Error", description: `A rule for scope '${scopeKey.replace("_Floor_", " Floor: ").replace("_Spaces_", " Spaces: ")}' (not the last rule) needs a positive duration.`, variant: "destructive" });
+                return; // Stop submission
+              }
+              toDay = fromDay + uiRule.durationDays - 1;
+            }
 
-        if (i === rulesInScope.length - 1) { 
-          toDay = null; 
-        } else {
-          toDay = fromDay + (uiRule.durationDays || 1) - 1;
+            finalPenaltyTiers.push({
+              fromDay: fromDay,
+              toDay: toDay,
+              feeType: uiRule.feeType,
+              feeValue: Number(uiRule.feeValue),
+              scope: uiRule.scope,
+              applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
+              applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : undefined,
+            });
+            
+            if (toDay !== null) {
+              cumulativeStartDay = toDay + 1;
+            } else {
+              break; // Reached the indefinite rule for this scope.
+            }
+          }
         }
-
-        finalPenaltyTiers.push({
-          fromDay: fromDay,
-          toDay: toDay,
-          feeType: uiRule.feeType,
-          feeValue: Number(uiRule.feeValue),
-          scope: uiRule.scope,
-          applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
-          applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : undefined,
-        });
-        
-        if (toDay !== null) {
-          cumulativeStartDay = toDay + 1;
-        } else {
-          break; 
-        }
-      }
+    } catch (error: any) {
+        // Errors are toasted inside the loop, just return
+        return;
     }
     
     const buildingData: Building = {
@@ -227,7 +252,7 @@ export default function BuildingsPage() {
     setBuildings(updatedBuildings);
     storeBuildings(updatedBuildings);
     setIsFormOpen(false);
-    setCurrentBuildingForm({ uiPenaltyRules: [] });
+    setCurrentBuildingForm({ uiPenaltyRules: [] }); // Reset form state
   };
 
   const openAddForm = () => {
@@ -236,7 +261,7 @@ export default function BuildingsPage() {
       name: '', 
       address: '', 
       uiPenaltyRules: [{ 
-        id: `uiRule-${Date.now()}`, 
+        id: `uiRule-${Date.now()}-${Math.random()}`, 
         scope: 'Building', 
         durationDays: 7, 
         feeType: 'Fixed',
@@ -249,36 +274,21 @@ export default function BuildingsPage() {
   const openEditForm = (building: Building) => {
     setFormMode('edit');
     
-    const loadedUIPenaltyRules: UIPenaltyRule[] = [];
-    const tiersGroupedByScopeKey: Record<string, PenaltyTier[]> = {};
+    const loadedUIPenaltyRules: UIPenaltyRule[] = (building.penaltyPolicyTiers || []).map((tier, index) => {
+      let duration: number | undefined;
+      if (tier.toDay !== null && tier.toDay !== undefined) {
+          duration = tier.toDay - tier.fromDay + 1;
+      } // else duration is undefined for indefinite (last) tier UI
 
-    (building.penaltyPolicyTiers || []).forEach(tier => {
-      let scopeKey = tier.scope;
-      if (tier.scope === 'Floor' && tier.applicableFloor) scopeKey += `_Floor_${tier.applicableFloor}`;
-      if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) scopeKey += `_Spaces_${tier.applicableSpaceIdNames.sort().join(',')}`;
-      
-      if (!tiersGroupedByScopeKey[scopeKey]) tiersGroupedByScopeKey[scopeKey] = [];
-      tiersGroupedByScopeKey[scopeKey].push(tier);
-    });
-
-    Object.values(tiersGroupedByScopeKey).forEach(scopeTiers => {
-        scopeTiers.sort((a,b) => a.fromDay - b.fromDay).forEach((tier) => {
-            let duration: number | undefined;
-            if (tier.toDay !== null && tier.toDay !== undefined) {
-                duration = tier.toDay - tier.fromDay + 1;
-            } else {
-                duration = undefined; 
-            }
-            loadedUIPenaltyRules.push({
-                id: `uiRule-edit-${tier.scope}-${tier.fromDay}-${Math.random()}`,
-                durationDays: duration,
-                feeType: tier.feeType,
-                feeValue: tier.feeValue,
-                scope: tier.scope,
-                applicableFloor: tier.applicableFloor,
-                applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', '),
-            });
-        });
+      return {
+          id: `uiRule-edit-${index}-${tier.fromDay}-${Math.random()}`,
+          durationDays: duration,
+          feeType: tier.feeType,
+          feeValue: tier.feeValue,
+          scope: tier.scope,
+          applicableFloor: tier.applicableFloor,
+          applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', '),
+      };
     });
     
     setCurrentBuildingForm({ 
@@ -286,7 +296,7 @@ export default function BuildingsPage() {
       name: building.name,
       address: building.address,
       createdAt: building.createdAt,
-      uiPenaltyRules: loadedUIPenaltyRules.length > 0 ? loadedUIPenaltyRules : [{ id: `uiRule-empty-${Date.now()}`, scope: 'Building', feeType: 'Fixed', durationDays: 7, feeValue: 0 }],
+      uiPenaltyRules: loadedUIPenaltyRules.length > 0 ? loadedUIPenaltyRules : [{ id: `uiRule-empty-${Date.now()}-${Math.random()}`, scope: 'Building', feeType: 'Fixed', durationDays: 7, feeValue: 0 }],
     });
     setIsFormOpen(true);
   };
@@ -309,7 +319,7 @@ export default function BuildingsPage() {
       <PageHeader
         title="Manage Buildings"
         icon={BuildingIcon}
-        description="Add, view, and manage buildings. Define late fee policies by adding sequential rules, each specifying its duration, fee, and scope (Building, Floor, or Specific Spaces). The last rule for each scope applies indefinitely."
+        description="Add, view, and manage buildings. Define late fee policies by adding sequential rules. For each rule, specify its duration, fee, and scope (Building, Floor, or Specific Spaces). The last rule for each scope applies indefinitely."
         actions={
           <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground">
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Building
@@ -319,7 +329,7 @@ export default function BuildingsPage() {
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
         setIsFormOpen(isOpen);
-        if (!isOpen) setCurrentBuildingForm({ uiPenaltyRules: [] });
+        if (!isOpen) setCurrentBuildingForm({ uiPenaltyRules: [] }); // Reset on close
       }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -329,7 +339,7 @@ export default function BuildingsPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <ScrollArea className="max-h-[70vh] pr-3">
+            <ScrollArea className="max-h-[calc(80vh-180px)] pr-3"> {/* Adjusted max-h and ensured DialogFooter is outside */}
               <div className="space-y-4 py-4">
                 <div>
                   <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
@@ -387,11 +397,11 @@ export default function BuildingsPage() {
                                         value={uiRule.durationDays ?? ''} 
                                         onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)} 
                                         className="mt-1 text-xs h-8"/>
-                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank if last rule for its scope (indefinite).</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank IF this is the LAST rule for its specific scope (to make it indefinite).</p>
                             </div>
                             <div>
                                 <Label htmlFor={`ruleFeeType-${uiRule.id}`}>Fee Type</Label>
-                                <Select value={uiRule.feeType || 'Fixed'} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as any)}>
+                                <Select value={uiRule.feeType || 'Fixed'} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as UIPenaltyRule['feeType'])}>
                                     <SelectTrigger id={`ruleFeeType-${uiRule.id}`} className="mt-1 text-xs h-8"><SelectValue /></SelectTrigger>
                                     <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
                                 </Select>
@@ -482,11 +492,13 @@ export default function BuildingsPage() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {buildings.map((building) => {
+            // Group tiers by their effective scope for display
             const policiesByScopeGroup: Record<string, PenaltyTier[]> = {};
             (building.penaltyPolicyTiers || []).forEach(tier => {
               let key = tier.scope;
               if (tier.scope === 'Floor' && tier.applicableFloor) key += `: ${tier.applicableFloor}`;
               if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) key += `: ${tier.applicableSpaceIdNames.join(', ')}`;
+              
               if (!policiesByScopeGroup[key]) policiesByScopeGroup[key] = [];
               policiesByScopeGroup[key].push(tier);
             });
