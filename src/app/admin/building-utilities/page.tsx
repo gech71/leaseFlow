@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wrench, PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon } from 'lucide-react'; // Renamed Building to BuildingIconLucide
-import type { BuildingMonthlyUtilities, BuildingUtilityItem, Building } from '@/lib/types'; // Added Building
+import { Wrench, PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon } from 'lucide-react';
+import type { BuildingMonthlyUtilities, BuildingUtilityItem, Building } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
 
 const getStoredBuildings = (): Building[] => {
   if (typeof window !== 'undefined') {
@@ -24,7 +25,22 @@ const getStoredBuildings = (): Building[] => {
 const getStoredBuildingUtilities = (): BuildingMonthlyUtilities[] => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('buildingMonthlyUtilities');
-    return stored ? JSON.parse(stored) : [];
+    if (stored) {
+        try {
+            const parsed = JSON.parse(stored) as BuildingMonthlyUtilities[];
+            // Ensure default scope for older data
+            return parsed.map(entry => ({
+                ...entry,
+                utilities: entry.utilities.map(util => ({
+                    ...util,
+                    appliesToScope: util.appliesToScope || 'Building',
+                }))
+            }));
+        } catch (e) {
+            console.error("Error parsing building utilities from localStorage", e);
+            return [];
+        }
+    }
   }
   return [];
 };
@@ -44,7 +60,10 @@ export default function BuildingUtilitiesPage() {
   const [selectedBuilding, setSelectedBuilding] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<number>(getYear(new Date()));
   const [selectedMonth, setSelectedMonth] = useState<number>(getMonth(new Date())); // 0-11
-  const [currentUtilityItems, setCurrentUtilityItems] = useState<BuildingUtilityItem[]>([]);
+  
+  // State for utility items being edited/added for the selected building/month/year
+  const [currentUtilityItems, setCurrentUtilityItems] = useState<Array<Omit<BuildingUtilityItem, 'applicableSpaceIdNames'> & { applicableSpaceIdNamesStr?: string }>>([]);
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -60,14 +79,22 @@ export default function BuildingUtilitiesPage() {
           entry.year === selectedYear &&
           entry.month === selectedMonth
       );
-      setCurrentUtilityItems(existingEntry ? [...existingEntry.utilities] : [{ name: '', totalCost: 0 }]);
+      if (existingEntry) {
+        setCurrentUtilityItems(existingEntry.utilities.map(u => ({
+            ...u,
+            appliesToScope: u.appliesToScope || 'Building', // Default if not present
+            applicableSpaceIdNamesStr: u.applicableSpaceIdNames?.join(', ') || ''
+        })));
+      } else {
+         setCurrentUtilityItems([{ name: '', totalCost: 0, appliesToScope: 'Building', applicableSpaceIdNamesStr: '' }]);
+      }
     } else {
-      setCurrentUtilityItems([{ name: '', totalCost: 0 }]);
+      setCurrentUtilityItems([{ name: '', totalCost: 0, appliesToScope: 'Building', applicableSpaceIdNamesStr: '' }]);
     }
   }, [selectedBuilding, selectedYear, selectedMonth, allUtilities, isMounted]);
 
   const handleAddUtilityItem = () => {
-    setCurrentUtilityItems([...currentUtilityItems, { name: '', totalCost: 0 }]);
+    setCurrentUtilityItems([...currentUtilityItems, { name: '', totalCost: 0, appliesToScope: 'Building', applicableSpaceIdNamesStr: '' }]);
   };
 
   const handleRemoveUtilityItem = (index: number) => {
@@ -76,13 +103,25 @@ export default function BuildingUtilitiesPage() {
     setCurrentUtilityItems(newItems);
   };
 
-  const handleUtilityItemChange = (index: number, field: keyof BuildingUtilityItem, value: string | number) => {
+  const handleUtilityItemChange = (index: number, field: keyof (typeof currentUtilityItems[0]), value: string | number) => {
     const newItems = [...currentUtilityItems];
+    const itemToUpdate = { ...newItems[index] };
+
     if (field === 'totalCost' && typeof value === 'string') {
-      newItems[index][field] = parseFloat(value) || 0;
+        itemToUpdate[field] = parseFloat(value) || 0;
     } else if (field === 'name' && typeof value === 'string') {
-      newItems[index][field] = value;
+        itemToUpdate[field] = value;
+    } else if (field === 'appliesToScope' && typeof value === 'string') {
+        itemToUpdate[field] = value as 'Building' | 'Floor' | 'SpecificSpaces';
+        // Reset dependent fields when scope changes
+        itemToUpdate.applicableFloor = '';
+        itemToUpdate.applicableSpaceIdNamesStr = '';
+    } else if (field === 'applicableFloor' && typeof value === 'string') {
+        itemToUpdate[field] = value;
+    } else if (field === 'applicableSpaceIdNamesStr' && typeof value === 'string') {
+        itemToUpdate[field] = value;
     }
+    newItems[index] = itemToUpdate;
     setCurrentUtilityItems(newItems);
   };
 
@@ -91,10 +130,36 @@ export default function BuildingUtilitiesPage() {
       toast({ title: 'Error', description: 'Please select a building.', variant: 'destructive' });
       return;
     }
-    if (currentUtilityItems.some(item => !item.name.trim() || item.totalCost <= 0)) {
-      toast({ title: 'Error', description: 'Please ensure all utility items have a name and a positive cost.', variant: 'destructive' });
+
+    const finalUtilityItems: BuildingUtilityItem[] = currentUtilityItems.map(item => {
+        if (!item.name.trim() || item.totalCost <= 0) {
+            throw new Error('Please ensure all utility items have a name and a positive cost.');
+        }
+        if (item.appliesToScope === 'Floor' && !item.applicableFloor?.trim()) {
+            throw new Error('Applicable floor is required for floor-scoped utilities.');
+        }
+        if (item.appliesToScope === 'SpecificSpaces' && !item.applicableSpaceIdNamesStr?.trim()) {
+            throw new Error('Applicable Space IDs are required for space-scoped utilities.');
+        }
+        
+        const { applicableSpaceIdNamesStr, ...rest } = item;
+        return {
+            ...rest,
+            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' 
+                ? applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) 
+                : undefined,
+        };
+    });
+
+
+    if (finalUtilityItems.some(item => !item.name.trim() || item.totalCost <= 0 || 
+        (item.appliesToScope === 'Floor' && !item.applicableFloor?.trim()) ||
+        (item.appliesToScope === 'SpecificSpaces' && (!item.applicableSpaceIdNames || item.applicableSpaceIdNames.length === 0))
+    )) {
+      toast({ title: 'Error', description: 'Please ensure all utility items are correctly filled based on their scope.', variant: 'destructive' });
       return;
     }
+
 
     const utilityEntryId = `${selectedBuilding}-${selectedYear}-${selectedMonth}`;
     const newEntry: BuildingMonthlyUtilities = {
@@ -102,7 +167,7 @@ export default function BuildingUtilitiesPage() {
       buildingName: selectedBuilding,
       year: selectedYear,
       month: selectedMonth,
-      utilities: currentUtilityItems,
+      utilities: finalUtilityItems,
       createdAt: new Date().toISOString(),
     };
 
@@ -131,7 +196,7 @@ export default function BuildingUtilitiesPage() {
       <PageHeader
         title="Manage Building Utilities"
         icon={Wrench}
-        description="Enter monthly utility costs for each building. This data will be used for prorating tenant bills."
+        description="Enter monthly utility costs for each building. Costs can apply to the entire building, specific floors, or specific spaces."
       />
 
       {registeredBuildings.length === 0 && (
@@ -148,7 +213,7 @@ export default function BuildingUtilitiesPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
-          <CardDescription>Select a building, month, and year, then input the total costs for each utility type.</CardDescription>
+          <CardDescription>Select a building, month, and year, then input the total costs for each utility type and define its scope.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -195,48 +260,95 @@ export default function BuildingUtilitiesPage() {
 
           {selectedBuilding && (
             <div className="space-y-4 pt-4 border-t">
-              <h3 className="font-semibold text-lg text-foreground">
-                Utility Items for {selectedBuilding} - {format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}
-              </h3>
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-lg text-foreground">
+                  Utility Items for {selectedBuilding} - {format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}
+                </h3>
+                <Button variant="outline" onClick={handleAddUtilityItem} size="sm">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Utility Item
+                </Button>
+              </div>
               {currentUtilityItems.map((item, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-3 border rounded-md bg-secondary/30">
-                  <div className="md:col-span-1">
-                    <Label htmlFor={`utilityName-${index}`}>Utility Type</Label>
-                    <Input
-                      id={`utilityName-${index}`}
-                      placeholder="e.g., Electricity, Water"
-                      value={item.name}
-                      onChange={(e) => handleUtilityItemChange(index, 'name', e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-1">
-                    <Label htmlFor={`utilityCost-${index}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
-                    <Input
-                      id={`utilityCost-${index}`}
-                      type="number"
-                      placeholder="e.g., 500.00"
-                      value={item.totalCost}
-                      onChange={(e) => handleUtilityItemChange(index, 'totalCost', e.target.value)}
-                    />
-                  </div>
-                  <div className="md:col-span-1 flex justify-end pt-5">
-                    {currentUtilityItems.length > 1 && (
-                      <Button variant="ghost" size="icon" onClick={() => handleRemoveUtilityItem(index)} className="text-destructive hover:bg-destructive/10">
-                        <Trash2 className="h-5 w-5" />
-                      </Button>
+                <Card key={index} className="p-4 bg-secondary/30 shadow-sm">
+                  <CardContent className="p-0 space-y-3">
+                    <div className="flex justify-between items-start">
+                        <Label className="text-base font-medium text-foreground">Utility Item {index + 1}</Label>
+                        {currentUtilityItems.length > 1 && (
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveUtilityItem(index)} className="text-destructive hover:bg-destructive/10 h-7 w-7">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor={`utilityName-${index}`}>Utility Type</Label>
+                            <Input
+                            id={`utilityName-${index}`}
+                            placeholder="e.g., Electricity, Water, Floor Maintenance"
+                            value={item.name}
+                            onChange={(e) => handleUtilityItemChange(index, 'name', e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor={`utilityCost-${index}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost for Scope</Label>
+                            <Input
+                            id={`utilityCost-${index}`}
+                            type="number"
+                            placeholder="e.g., 500.00"
+                            value={item.totalCost}
+                            onChange={(e) => handleUtilityItemChange(index, 'totalCost', e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <Label htmlFor={`utilityScope-${index}`} className="flex items-center mb-1"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
+                        <Select 
+                            value={item.appliesToScope} 
+                            onValueChange={(value) => handleUtilityItemChange(index, 'appliesToScope', value)}
+                        >
+                            <SelectTrigger id={`utilityScope-${index}`}>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Building">Entire Building</SelectItem>
+                                <SelectItem value="Floor">Specific Floor</SelectItem>
+                                <SelectItem value="SpecificSpaces">Specific Spaces</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {item.appliesToScope === 'Floor' && (
+                        <div>
+                            <Label htmlFor={`applicableFloor-${index}`}>Applicable Floor</Label>
+                            <Input
+                            id={`applicableFloor-${index}`}
+                            placeholder="e.g., 1st Floor, Ground, Penthouse"
+                            value={item.applicableFloor || ''}
+                            onChange={(e) => handleUtilityItemChange(index, 'applicableFloor', e.target.value)}
+                            />
+                        </div>
                     )}
-                  </div>
-                </div>
+                    {item.appliesToScope === 'SpecificSpaces' && (
+                        <div>
+                            <Label htmlFor={`applicableSpaces-${index}`} className="flex items-center"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Applicable Space IDs (comma-separated)</Label>
+                            <Textarea
+                            id={`applicableSpaces-${index}`}
+                            placeholder="e.g., Unit 10A, Office 201, Suite 3B"
+                            value={item.applicableSpaceIdNamesStr || ''}
+                            onChange={(e) => handleUtilityItemChange(index, 'applicableSpaceIdNamesStr', e.target.value)}
+                            rows={2}
+                            />
+                             <p className="text-xs text-muted-foreground mt-1">Enter the exact 'Space ID/Name' as registered on the Spaces page.</p>
+                        </div>
+                    )}
+                  </CardContent>
+                </Card>
               ))}
-              <Button variant="outline" onClick={handleAddUtilityItem} className="mt-2">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Another Utility Item
-              </Button>
             </div>
           )}
         </CardContent>
         <CardFooter className="border-t pt-6">
           <Button onClick={handleSaveUtilities} disabled={!selectedBuilding || currentUtilityItems.length === 0 || registeredBuildings.length === 0} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-            Save Monthly Utilities
+            Save Monthly Utilities for {selectedBuilding ? `${selectedBuilding} - ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}` : ''}
           </Button>
         </CardFooter>
       </Card>
@@ -244,23 +356,47 @@ export default function BuildingUtilitiesPage() {
       <Card className="mt-8 shadow-lg">
         <CardHeader>
             <CardTitle className="font-headline text-xl">Saved Utility Records</CardTitle>
-            <CardDescription>Overview of previously entered utility costs.</CardDescription>
+            <CardDescription>Overview of previously entered utility costs. Click to edit.</CardDescription>
         </CardHeader>
         <CardContent>
             {allUtilities.length === 0 ? (
                 <p className="text-muted-foreground">No utility records saved yet.</p>
             ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {allUtilities.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(entry => (
-                        <div key={entry.id} className="p-4 border rounded-md">
-                            <h4 className="font-semibold">{entry.buildingName} - {format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</h4>
-                            <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
-                                {entry.utilities.map(util => (
-                                    <li key={util.name}>{util.name}: ${util.totalCost.toFixed(2)}</li>
-                                ))}
-                            </ul>
-                            <p className="text-xs text-muted-foreground/70 mt-1">Saved: {format(new Date(entry.createdAt), 'Pp')}</p>
-                        </div>
+                    {allUtilities.sort((a,b) => {
+                        if (b.year !== a.year) return b.year - a.year;
+                        if (b.month !== a.month) return b.month - a.month;
+                        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                    }).map(entry => (
+                        <Button 
+                            key={entry.id} 
+                            variant="outline" 
+                            className="w-full justify-start h-auto p-4 text-left"
+                            onClick={() => {
+                                setSelectedBuilding(entry.buildingName);
+                                setSelectedYear(entry.year);
+                                setSelectedMonth(entry.month);
+                                // useEffect will populate currentUtilityItems
+                            }}
+                        >
+                            <div className="w-full">
+                                <h4 className="font-semibold">{entry.buildingName} - {format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</h4>
+                                <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
+                                    {entry.utilities.map((util, idx) => (
+                                        <li key={idx}>
+                                            {util.name}: ${util.totalCost.toFixed(2)}
+                                            <span className="text-xs italic ml-1">
+                                                (Scope: {util.appliesToScope}
+                                                {util.appliesToScope === 'Floor' && util.applicableFloor ? ` - Floor: ${util.applicableFloor}` : ''}
+                                                {util.appliesToScope === 'SpecificSpaces' && util.applicableSpaceIdNames && util.applicableSpaceIdNames.length > 0 ? ` - Spaces: ${util.applicableSpaceIdNames.join(', ')}` : ''}
+                                                )
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p className="text-xs text-muted-foreground/70 mt-1">Last Saved: {format(new Date(entry.createdAt), 'Pp')}</p>
+                            </div>
+                        </Button>
                     ))}
                 </div>
             )}

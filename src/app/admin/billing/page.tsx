@@ -52,11 +52,12 @@ const initialMockAgreements: Agreement[] = [
   },
 ];
 
+// IMPORTANT: Ensure spaceIdName and floor are accurate for testing scoped utilities
 const initialMockSpaces: Space[] = [
  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.40, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
+ { id: 'space1b', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, tenantId: undefined, createdAt: new Date().toISOString()},
  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
  { id: 'space4', buildingName: 'Galaxy Tower', spaceIdName: 'Penthouse Suite', area: 3000, floor: 'Top', utilityProrationShare: 0.60, monthlyRentalPrice: 5000, isOccupied: true, tenantId: 'tenant3', createdAt: new Date().toISOString() },
- { id: 'space5', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, tenantId: undefined, createdAt: new Date().toISOString()},
 ];
 
 const initialMockBuildings: Building[] = [
@@ -76,7 +77,18 @@ const initialBills: Bill[] = [
 const getStoredBuildingUtilities = (): BuildingMonthlyUtilities[] => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('buildingMonthlyUtilities');
-    return stored ? JSON.parse(stored) : [];
+    if (stored) {
+        try {
+            const parsed = JSON.parse(stored) as BuildingMonthlyUtilities[];
+            return parsed.map(entry => ({
+                ...entry,
+                utilities: entry.utilities.map(util => ({
+                    ...util,
+                    appliesToScope: util.appliesToScope || 'Building',
+                }))
+            }));
+        } catch(e) { return []; }
+    }
   }
   return [];
 };
@@ -123,7 +135,7 @@ type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 export default function BillingPage() {
   const [bills, setBills] = useState<Bill[]>(initialBills);
   const [agreements, setAgreements] = useState<Agreement[]>(initialMockAgreements);
-  const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces);
+  const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces); // Using initialMockSpaces as fallback
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [allBuildingUtilities, setAllBuildingUtilities] = useState<BuildingMonthlyUtilities[]>([]);
   
@@ -148,6 +160,18 @@ export default function BillingPage() {
 
   useEffect(() => {
     setIsMounted(true);
+    // In a real app, spaces would be fetched or come from a central store
+    const storedSpaces = localStorage.getItem('spaces');
+    if (storedSpaces) {
+      try {
+        setSpaces(JSON.parse(storedSpaces));
+      } catch (e) {
+        console.error("Error parsing spaces from localStorage", e);
+        setSpaces(initialMockSpaces); // Fallback
+      }
+    } else {
+      setSpaces(initialMockSpaces); // Fallback
+    }
     setAllBuildingUtilities(getStoredBuildingUtilities());
     setBuildings(getStoredBuildings());
     setToday(startOfDay(new Date())); 
@@ -169,17 +193,18 @@ export default function BillingPage() {
     if (daysOverdue <= 0) return 0;
 
     const sortedTiers = [...building.penaltyPolicyTiers].sort((a, b) => a.fromDay - b.fromDay);
-
+    let calculatedPenalty = 0;
     for (const tier of sortedTiers) {
       if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
         if (tier.feeType === 'Fixed') {
-          return tier.feeValue;
+          calculatedPenalty = tier.feeValue;
         } else if (tier.feeType === 'Percentage') {
-          return bill.rentAmount * (tier.feeValue / 100);
+          calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
         }
+        break; 
       }
     }
-    return 0;
+    return parseFloat(calculatedPenalty.toFixed(2));
   }, [agreements, spaces, buildings, today]);
 
   const processedBills = useMemo(() => {
@@ -217,7 +242,7 @@ export default function BillingPage() {
     }
   }, [billForPayment, paymentForm, processedBills]);
 
-  const createBillForAgreement = (agreement: Agreement, targetDueDate: Date): Bill | null => {
+ const createBillForAgreement = (agreement: Agreement, targetDueDate: Date): Bill | null => {
     const space = spaces.find(sp => sp.id === agreement.spaceId);
     if (!space) {
       console.error(`Space not found for agreement ${agreement.id}`);
@@ -226,11 +251,11 @@ export default function BillingPage() {
     }
 
     const rentAmount = agreement.monthlyRentalPrice;
-    const utilityBreakdown: Array<{ name: string; amount: number }> = [];
+    const utilityBreakdownItems: Array<{ name: string; amount: number }> = [];
     let totalUtilityCostForBill = 0;
 
     const billYear = getYear(targetDueDate);
-    const billMonth = getMonth(targetDueDate); 
+    const billMonth = getMonth(targetDueDate);
 
     const monthlyBuildingUtilityData = allBuildingUtilities.find(
       entry => entry.buildingName === space.buildingName && entry.year === billYear && entry.month === billMonth
@@ -238,11 +263,35 @@ export default function BillingPage() {
 
     if (monthlyBuildingUtilityData && monthlyBuildingUtilityData.utilities.length > 0) {
       monthlyBuildingUtilityData.utilities.forEach(utilItem => {
-        const proratedAmount = utilItem.totalCost * space.utilityProrationShare;
-        utilityBreakdown.push({ name: utilItem.name, amount: parseFloat(proratedAmount.toFixed(2)) });
-        totalUtilityCostForBill += proratedAmount;
+        let costForThisUtility = 0;
+        switch (utilItem.appliesToScope) {
+          case 'Building':
+            costForThisUtility = utilItem.totalCost * space.utilityProrationShare;
+            break;
+          case 'Floor':
+            if (utilItem.applicableFloor && space.floor === utilItem.applicableFloor) {
+              const spacesOnFloor = spaces.filter(s => s.buildingName === space.buildingName && s.floor === utilItem.applicableFloor);
+              if (spacesOnFloor.length > 0) {
+                costForThisUtility = utilItem.totalCost / spacesOnFloor.length;
+              }
+            }
+            break;
+          case 'SpecificSpaces':
+            if (utilItem.applicableSpaceIdNames && utilItem.applicableSpaceIdNames.includes(space.spaceIdName)) {
+              if (utilItem.applicableSpaceIdNames.length > 0) {
+                costForThisUtility = utilItem.totalCost / utilItem.applicableSpaceIdNames.length;
+              }
+            }
+            break;
+          default: // Should not happen if data is clean
+            costForThisUtility = utilItem.totalCost * space.utilityProrationShare;
+        }
+        if (costForThisUtility > 0) {
+            utilityBreakdownItems.push({ name: utilItem.name, amount: parseFloat(costForThisUtility.toFixed(2)) });
+            totalUtilityCostForBill += costForThisUtility;
+        }
       });
-    } else if (space.utilityProrationShare > 0) {
+    } else if (spaces.some(s => s.buildingName === space.buildingName && s.utilityProrationShare > 0)) { // Only warn if some spaces in building expect utilities
        toast({
         title: "Warning: Missing Utility Data",
         description: `No utility costs found for ${space.buildingName} for ${format(targetDueDate, 'MMMM yyyy')}. Utility charges will be $0 for ${agreement.tenantName}. Visit 'Building Utilities' to add them.`,
@@ -261,7 +310,7 @@ export default function BillingPage() {
       billDate: targetDueDate.toISOString(),
       dueDate: targetDueDate.toISOString(),
       rentAmount,
-      utilityBreakdown,
+      utilityBreakdown: utilityBreakdownItems,
       penaltyAmount: 0,
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       status: 'Pending',
@@ -702,4 +751,3 @@ export default function BillingPage() {
     </div>
   );
 }
-

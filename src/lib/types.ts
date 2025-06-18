@@ -1,7 +1,7 @@
 
 export interface PenaltyTier {
-  fromDay: number;       // Inclusive start day of this penalty (e.g., 1 means penalty starts from 1st day overdue)
-  toDay?: number | null;  // Inclusive end day of this penalty. null/undefined means this is the final/ongoing tier.
+  fromDay: number;
+  toDay?: number | null;
   feeType: 'Fixed' | 'Percentage';
   feeValue: number;
 }
@@ -10,17 +10,17 @@ export interface Building {
   id: string;
   name: string;
   address?: string;
-  penaltyPolicyTiers?: PenaltyTier[]; // Changed from penaltyPolicy to support multiple tiers
+  penaltyPolicyTiers?: PenaltyTier[];
   createdAt: string; // ISO date string
 }
 
 export interface Space {
   id: string;
-  buildingName: string; // This will now come from a registered Building
-  spaceIdName: string;
+  buildingName: string;
+  spaceIdName: string; // Unique identifier for the space within the building, e.g., "Unit 10A", "Office 201"
   area: number; // sq ft
-  floor: string;
-  utilityProrationShare: number; // Space's share of total building utilities (e.g., 0.1 for 10%)
+  floor: string; // e.g., "1st", "Ground", "10"
+  utilityProrationShare: number; // Space's share of *building-wide* utilities (e.g., 0.1 for 10%)
   monthlyRentalPrice: number;
   isOccupied: boolean;
   tenantId?: string;
@@ -30,7 +30,7 @@ export interface Space {
 export interface Tenant {
   id: string;
   name: string;
-  email: string; // For login/portal access
+  email: string;
   phone?: string;
   alternativePhone?: string;
   nationalId?: string;
@@ -43,54 +43,55 @@ export interface Tenant {
 export interface Agreement {
   id:string;
   tenantId: string;
-  tenantName: string; // Denormalized for easier display
+  tenantName: string;
   spaceId: string;
-  spaceDescription: string; // Denormalized e.g. "Building A, Unit 101, 500 sqft"
+  spaceDescription: string;
   agreementText: string;
-  startDate: string; // ISO date string
+  startDate: string;
   monthlyRentalPrice: number;
   additionalTerms?: string;
-  createdAt: string; // ISO date string
-  paymentTermMonths: number; // Total term of the agreement in months
-  initialPaymentMonths: number; // How many months paid upfront
-  nextPaymentDueDate: string; // ISO date string for the next payment
+  createdAt: string;
+  paymentTermMonths: number;
+  initialPaymentMonths: number;
+  nextPaymentDueDate: string;
 
-  // New fields for initial payment details
   initialPaymentAmount?: number;
   initialPaymentMethod?: string;
   initialPaymentReference?: string;
   initialPaymentBankOrWalletName?: string;
-  initialPaymentDate?: string; // ISO date string
+  initialPaymentDate?: string;
 }
 
 export interface BuildingUtilityItem {
-  name: string; // e.g., "Electricity", "Water"
+  name: string;
   totalCost: number;
+  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces'; // New field for scope
+  applicableFloor?: string;          // Used if appliesToScope is 'Floor'
+  applicableSpaceIdNames?: string[]; // Used if appliesToScope is 'SpecificSpaces' (using Space.spaceIdName)
 }
 
 export interface BuildingMonthlyUtilities {
-  id: string; // Unique ID, e.g., "buildingName-YYYY-MM"
+  id: string;
   buildingName: string;
   year: number;
-  month: number; // 0-11 (for Date object compatibility: 0 for Jan, 1 for Feb, etc.)
+  month: number;
   utilities: BuildingUtilityItem[];
-  createdAt: string; // ISO date string
+  createdAt: string;
 }
 
 export interface Bill {
   id: string;
   agreementId: string;
   tenantId: string;
-  // tenantName: string; // Denormalized
-  spaceDescription: string; // Denormalized
-  billDate: string; // ISO date string
-  dueDate: string; // ISO date string
+  spaceDescription: string;
+  billDate: string;
+  dueDate: string;
   rentAmount: number;
-  utilityBreakdown: Array<{ name: string; amount: number }>; // Stores prorated amounts for each utility type
-  penaltyAmount?: number; // Optional field for late payment penalties
-  totalAmount: number; // rentAmount + sum of utilityBreakdown amounts + penaltyAmount
+  utilityBreakdown: Array<{ name: string; amount: number }>;
+  penaltyAmount?: number;
+  totalAmount: number;
   status: 'Pending' | 'Paid' | 'Overdue';
-  paymentDate?: string; // ISO date string
+  paymentDate?: string;
   paymentMethod?: string;
   paymentReference?: string;
   bankOrWalletName?: string;
