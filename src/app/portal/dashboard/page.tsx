@@ -42,14 +42,14 @@ const mockTenantAgreement: Agreement = {
   createdAt: new Date(2024, 0, 10).toISOString(),
 };
 
-// Mock Building data for the portal tenant
 const mockPortalBuilding: Building = {
   id: 'building-portal',
   name: 'Portal View Residences',
   address: '1 Portal Drive',
   penaltyPolicyTiers: [
-    { fromDay: 3, toDay: 5, feeType: 'Fixed', feeValue: 25 }, // Penalty from day 3 to 5: $25 fixed
-    { fromDay: 6, feeType: 'Percentage', feeValue: 1.5 }    // Penalty from day 6 onwards: 1.5% of rent
+    { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 25 },    // For first 5 days: $25 fixed
+    { fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 50 },   // For next 5 days (days 6-10): $50 fixed
+    { fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 } // From day 11 onwards: 1.5% of rent
   ],
   createdAt: new Date().toISOString(),
 };
@@ -61,8 +61,8 @@ const initialMockTenantBills: Bill[] = [
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
-    billDate: new Date(2024, 5, 1).toISOString(), // June 1, 2024
-    dueDate: new Date(2024, 5, 15).toISOString(), // June 15, 2024
+    billDate: new Date(2024, 5, 1).toISOString(), 
+    dueDate: new Date(2024, 5, 15).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }],
     totalAmount: 1575, 
@@ -76,11 +76,12 @@ const initialMockTenantBills: Bill[] = [
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
+    // Make this bill significantly overdue to test penalties
     billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString(), 
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 15).toISOString(), 
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 5).toISOString(), // Due very early to ensure it's overdue by many days
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, {name: 'Water Service', amount: 30}],
-    totalAmount: 1605, 
+    totalAmount: 1605, // This will be recalculated
     status: 'Pending', 
   },
   {
@@ -89,10 +90,11 @@ const initialMockTenantBills: Bill[] = [
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
     billDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 1).toISOString(), 
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 15).toISOString(), 
+    // Make this bill slightly overdue
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 10).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, { name: 'Trash Removal', amount: 25}],
-    totalAmount: 1600, 
+    totalAmount: 1600, // This will be recalculated
     status: 'Pending',
   },
 ];
@@ -162,7 +164,7 @@ export default function CustomerDashboardPage() {
       description: `Payment for bill ${billId} (Total: $${billToPay.totalAmount.toFixed(2)}) is being processed. This is a demo.`,
     });
     setTimeout(() => {
-        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment", penaltyAmount: b.penaltyAmount} : b));
+        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment", penaltyAmount: b.penaltyAmount /* Keep penalty if paid late */} : b));
         toast({
             title: "Payment Successful (Simulated)",
             description: `Bill ${billId} has been marked as paid.`,
