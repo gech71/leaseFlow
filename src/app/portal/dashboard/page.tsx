@@ -4,12 +4,21 @@
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import type { Agreement, Bill } from '@/lib/types'; // Added Bill
+import type { Agreement, Bill } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { format, parseISO, isBefore, startOfDay } from 'date-fns'; // Added isBefore, startOfDay
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
 
 // --- Mock Data ---
 const mockTenantAgreement: Agreement = {
@@ -56,7 +65,7 @@ const initialMockTenantBills: Bill[] = [
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, {name: 'Water Service', amount: 30}],
     totalAmount: 1605,
-    status: 'Pending', // Will become Overdue if current date is past July 15
+    status: 'Pending', 
   },
   {
     id: 'bill-tp-3',
@@ -85,7 +94,6 @@ export default function CustomerDashboardPage() {
   useEffect(() => {
     setIsMounted(true);
     setToday(startOfDay(new Date()));
-    // In a real app, fetch data for the logged-in tenant
     setAgreement(mockTenantAgreement);
     
     const updatedBills = initialMockTenantBills.map(bill => {
@@ -95,16 +103,13 @@ export default function CustomerDashboardPage() {
       return bill;
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
     setBills(updatedBills);
-  }, []);
+  }, [today]); // Added today to dependency array for re-checking overdue status if day changes
 
   const handlePayBill = (billId: string) => {
-    // Simulate payment API call
     toast({
       title: "Processing Payment...",
       description: `Payment for bill ${billId} is being processed. This is a demo.`,
     });
-    // In a real app, you would update bill status after successful payment
-    // For demo, we can simulate it:
     setTimeout(() => {
         setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment"} : b));
         toast({
@@ -163,7 +168,7 @@ export default function CustomerDashboardPage() {
             )}
           </CardContent>
           <CardFooter>
-            <Button variant="outline" size="sm" onClick={() => alert("Full agreement text (mock):\n\n" + agreement.agreementText)}>
+            <Button variant="outline" size="sm" onClick={() => toast({title: "Full Agreement", description: "This is a mock full agreement text: " + agreement.agreementText, duration: 10000})}>
               <FileText className="mr-2 h-4 w-4" /> View Full Agreement (Text)
             </Button>
           </CardFooter>
@@ -191,52 +196,60 @@ export default function CustomerDashboardPage() {
             </Card>
         )}
         {bills.length > 0 && (
-            <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-6">
-                {bills.map(bill => (
-                    <Card key={bill.id} className="shadow-md hover:shadow-lg transition-shadow">
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
-                                <CardTitle className="font-headline text-lg">Bill ID: {bill.id.substring(bill.id.length-6)}</CardTitle>
-                                {getStatusBadge(bill.status)}
-                            </div>
-                            <CardDescription>Bill Date: {format(parseISO(bill.billDate), 'PP')}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="text-sm space-y-2">
-                            <p><strong>Due Date:</strong> <span className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</span></p>
-                            <p><strong>Rent Amount:</strong> ${bill.rentAmount.toFixed(2)}</p>
-                            {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 && (
-                                <div>
-                                    <strong>Utilities:</strong>
-                                    <ul className="list-disc list-inside ml-4 text-xs">
-                                        {bill.utilityBreakdown.map(util => (
-                                            <li key={util.name}>{util.name}: ${util.amount.toFixed(2)}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                            <p className="text-base font-semibold text-primary border-t pt-2 mt-2"><strong>Total Amount:</strong> ${bill.totalAmount.toFixed(2)}</p>
-                             {bill.status === 'Paid' && bill.paymentDate && (
-                                <div className="text-xs text-muted-foreground pt-1">
-                                    Paid on {format(parseISO(bill.paymentDate), 'PP')} via {bill.paymentMethod || 'N/A'}
-                                    {bill.paymentReference && <span> (Ref: {bill.paymentReference})</span>}
-                                </div>
-                            )}
-                        </CardContent>
-                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
-                            <CardFooter>
-                                <Button onClick={() => handlePayBill(bill.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                                    <CreditCard className="mr-2 h-4 w-4"/> Pay Now (${bill.totalAmount.toFixed(2)})
-                                </Button>
-                            </CardFooter>
+          <Card className="shadow-lg">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bill Date</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead className="hidden md:table-cell">Rent</TableHead>
+                    <TableHead className="hidden md:table-cell">Utilities</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bills.map(bill => (
+                    <TableRow key={bill.id}>
+                      <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
+                      <TableCell>
+                        <span className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
+                          {format(parseISO(bill.dueDate), 'PP')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">${bill.rentAmount.toFixed(2)}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 ? (
+                            `$${bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0).toFixed(2)}`
+                        ) : (
+                            '$0.00'
                         )}
-                    </Card>
-                ))}
-            </div>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">${bill.totalAmount.toFixed(2)}</TableCell>
+                      <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
+                      <TableCell className="text-right">
+                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                          <Button onClick={() => handlePayBill(bill.id)} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                            <CreditCard className="mr-0 md:mr-2 h-4 w-4"/><span className="hidden md:inline">Pay Now</span>
+                          </Button>
+                        )}
+                         {bill.status === 'Paid' && bill.paymentDate && (
+                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                Paid: {format(parseISO(bill.paymentDate), 'PP')}
+                            </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
       </section>
 
     </div>
   );
 }
-
-    
