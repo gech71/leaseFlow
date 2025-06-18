@@ -28,6 +28,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, getYear, getMonth, parseISO, differenceInDays } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from '@/components/ui/badge';
+
 
 // Mock data (ensure consistency with types.ts)
 const initialMockAgreements: Agreement[] = [
@@ -49,11 +59,10 @@ const initialMockSpaces: Space[] = [
  { id: 'space5', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, tenantId: undefined, createdAt: new Date().toISOString()},
 ];
 
-// Updated mock buildings with penaltyPolicyTiers
 const initialMockBuildings: Building[] = [
-  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 6, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() }, // Penalty after 5 days
-  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 4, feeType: 'Percentage', feeValue: 2 }], createdAt: new Date().toISOString() }, // Penalty after 3 days, 2%
-  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No penalty policy
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 6, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() },
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 4, feeType: 'Percentage', feeValue: 2 }], createdAt: new Date().toISOString() },
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() },
 ];
 
 
@@ -154,18 +163,15 @@ export default function BillingPage() {
     if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
-    // Only calculate for bills that would be overdue if not paid
     if (isAfter(dueDate, today) || bill.status === 'Paid') return 0; 
 
     const daysOverdue = differenceInDays(today, dueDate);
-    if (daysOverdue <= 0) return 0; // Not overdue yet or due today
+    if (daysOverdue <= 0) return 0;
 
-    // Sort tiers by fromDay to ensure correct application
     const sortedTiers = [...building.penaltyPolicyTiers].sort((a, b) => a.fromDay - b.fromDay);
 
     for (const tier of sortedTiers) {
       if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
-        // This tier applies
         if (tier.feeType === 'Fixed') {
           return tier.feeValue;
         } else if (tier.feeType === 'Percentage') {
@@ -173,7 +179,7 @@ export default function BillingPage() {
         }
       }
     }
-    return 0; // No applicable tier found
+    return 0;
   }, [agreements, spaces, buildings, today]);
 
   const processedBills = useMemo(() => {
@@ -185,15 +191,18 @@ export default function BillingPage() {
       
       const penalty = calculatePenalty({ ...bill, status: currentStatus }); 
       const newTotalAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0) + penalty;
+      const agreement = agreements.find(ag => ag.id === bill.agreementId);
+      const tenantName = agreement ? agreement.tenantName : 'N/A';
 
       return {
         ...bill,
         status: currentStatus,
         penaltyAmount: penalty > 0 ? penalty : undefined,
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
+        tenantName: tenantName,
       };
     }).sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime());
-  }, [bills, calculatePenalty, today]);
+  }, [bills, calculatePenalty, today, agreements]);
 
 
   useEffect(() => {
@@ -253,7 +262,7 @@ export default function BillingPage() {
       dueDate: targetDueDate.toISOString(),
       rentAmount,
       utilityBreakdown,
-      penaltyAmount: 0, // Initial penalty is 0, calculated later if overdue
+      penaltyAmount: 0,
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       status: 'Pending',
     };
@@ -393,12 +402,12 @@ export default function BillingPage() {
     });
   };
   
-  const getStatusColor = (status: Bill['status']) => {
+  const getStatusBadgeVariant = (status: Bill['status']): "default" | "destructive" | "secondary" => {
     switch (status) {
-      case 'Paid': return 'text-green-600 bg-green-100';
-      case 'Pending': return 'text-yellow-600 bg-yellow-100';
-      case 'Overdue': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'Paid': return 'secondary';
+      case 'Pending': return 'default';
+      case 'Overdue': return 'destructive';
+      default: return 'default';
     }
   };
 
@@ -602,74 +611,95 @@ export default function BillingPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 mt-8">
         <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {processedBills.map((bill) => (
-            <Card key={bill.id} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 ${bill.status === 'Overdue' && bill.penaltyAmount && bill.penaltyAmount > 0 ? 'border-destructive border-2' : ''}`}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle className="font-headline text-lg">{(agreements.find(a => a.id === bill.agreementId))?.tenantName || 'N/A'}</CardTitle>
-                        <CardDescription className="text-xs">{bill.spaceDescription}</CardDescription>
-                    </div>
-                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getStatusColor(bill.status)}`}>
-                        {bill.status}
-                    </span>
-                </div>
-              </CardHeader>
-              <CardContent className="text-sm space-y-2 flex-grow">
-                <p><strong>Bill Date:</strong> {format(parseISO(bill.billDate), 'PP')}</p>
-                <p><strong>Due Date:</strong> {format(parseISO(bill.dueDate), 'PP')}</p>
-                <p><strong>Rent:</strong> ${bill.rentAmount.toFixed(2)}</p>
-                <div>
-                  <strong>Utilities:</strong>
-                  {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 ? (
-                    <ul className="list-disc list-inside ml-4">
-                      {bill.utilityBreakdown.map(util => (
-                        <li key={util.name}>{util.name}: ${util.amount.toFixed(2)}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span> $0.00</span>
-                  )}
-                </div>
-                {bill.penaltyAmount && bill.penaltyAmount > 0 && (
-                    <p className="text-destructive"><strong>Penalty:</strong> ${bill.penaltyAmount.toFixed(2)}</p>
-                )}
-                <p className="font-semibold text-base text-primary"><strong>Total:</strong> ${bill.totalAmount.toFixed(2)}</p>
-                
-                {bill.status === 'Paid' && bill.paymentDate && (
-                    <div className="mt-3 pt-2 border-t border-border/50 text-xs">
-                        <p className="font-medium text-foreground">Payment Details:</p>
-                        <p>Paid on: {format(parseISO(bill.paymentDate), 'PP')}</p>
-                        {bill.paymentMethod && <p>Method: {bill.paymentMethod}</p>}
-                        {bill.bankOrWalletName && <p>{bill.paymentMethod === "Bank Transfer" ? "Bank" : "Wallet"}: {bill.bankOrWalletName}</p>}
-                        {bill.paymentReference && <p>Reference: {bill.paymentReference}</p>}
-                    </div>
-                )}
-              </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-between items-center">
-                 <div></div> 
-                <div className="flex gap-2 items-center">
-                    <Button 
-                        variant={bill.status === 'Paid' ? "secondary" : "default"} 
-                        size="sm" 
-                        onClick={() => handleOpenPaymentDialog(bill)}
-                        className={bill.status === 'Paid' ? "" : "bg-green-600 hover:bg-green-700 text-white"}
-                        disabled={bill.status === 'Paid'}
-                    >
-                      <CreditCard className="mr-1 h-4 w-4" /> 
-                      {bill.status === 'Paid' ? 'Paid' : 'Record Payment'}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => toast({title: "Delete Bill", description:"Functionality coming soon.", variant: "destructive"})}><Trash2 className="h-4 w-4"/></Button>
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+        <Card className="shadow-md">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tenant</TableHead>
+                  <TableHead className="hidden md:table-cell">Space</TableHead>
+                  <TableHead>Bill Date</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Rent</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Utilities</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Penalty</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {processedBills.map((bill) => (
+                  <TableRow key={bill.id} className={bill.status === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''}>
+                    <TableCell className="font-medium">{bill.tenantName}</TableCell>
+                    <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
+                    <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
+                    <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-right">${bill.rentAmount.toFixed(2)}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-right">
+                      {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 ? (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">
+                                ${bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0).toFixed(2)}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto text-xs p-2" side="top">
+                              <ul className="space-y-0.5">
+                                {bill.utilityBreakdown.map(util => (
+                                  <li key={util.name} className="flex justify-between">
+                                    <span>{util.name}:</span>
+                                    <span className="font-medium ml-2">${util.amount.toFixed(2)}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                            '$0.00'
+                        )}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-right text-destructive">{bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}</TableCell>
+                    <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={getStatusBadgeVariant(bill.status)} className="capitalize text-xs">
+                         {bill.status === 'Paid' && <CheckCircle className="mr-1 h-3 w-3" />}
+                         {bill.status === 'Pending' && <InfoIcon className="mr-1 h-3 w-3" />}
+                         {bill.status === 'Overdue' && <AlertTriangle className="mr-1 h-3 w-3" />}
+                         {bill.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-1 justify-end">
+                        {bill.status !== 'Paid' && (
+                          <Button 
+                              variant="default"
+                              size="sm" 
+                              onClick={() => handleOpenPaymentDialog(bill)}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <CreditCard className="mr-1 h-3.5 w-3.5" /> Record Payment
+                          </Button>
+                        )}
+                         {bill.status === 'Paid' && (
+                           <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)}>
+                             <Edit className="mr-1 h-3.5 w-3.5"/> View/Edit
+                           </Button>
+                         )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => toast({title: "Delete Bill", description:"Functionality coming soon.", variant: "destructive"})}><Trash2 className="h-4 w-4"/></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
         </div>
       )}
     </div>
   );
 }
+
