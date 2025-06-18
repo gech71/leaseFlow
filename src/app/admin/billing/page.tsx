@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX } from 'lucide-react';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip } from 'lucide-react';
 import type { Bill, Agreement, Space, Building, BuildingMonthlyUtilities, PenaltyTier } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -156,6 +156,9 @@ export default function BillingPage() {
   const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
   const [billForVerification, setBillForVerification] = useState<Bill | null>(null);
 
+  const [adminSelectedProofFile, setAdminSelectedProofFile] = useState<File | null>(null);
+  const adminProofFileInputRef = useRef<HTMLInputElement>(null);
+
 
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
@@ -284,9 +287,8 @@ export default function BillingPage() {
 
 
  useEffect(() => {
-    if (billForPayment || billForVerification) {
-      const currentBill = billForPayment || billForVerification;
-      const processedBill = processedBills.find(pb => pb.id === currentBill!.id);
+    if (isPaymentDialogOpen && billForPayment) {
+      const processedBill = processedBills.find(pb => pb.id === billForPayment.id);
       paymentForm.reset({
         paymentDate: processedBill?.paymentDate ? parseISO(processedBill.paymentDate) : new Date(),
         paymentMethod: processedBill?.paymentMethod || "",
@@ -294,8 +296,24 @@ export default function BillingPage() {
         bankOrWalletName: processedBill?.bankOrWalletName || "",
         adminVerificationNotes: processedBill?.adminVerificationNotes || "",
       });
+      setAdminSelectedProofFile(null); // Clear previous file
+      if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
     }
-  }, [billForPayment, billForVerification, paymentForm, processedBills]);
+    if (isVerificationDialogOpen && billForVerification) {
+        const processedBill = processedBills.find(pb => pb.id === billForVerification.id);
+        paymentForm.reset({
+            paymentDate: processedBill?.paymentDate ? parseISO(processedBill.paymentDate) : new Date(),
+            paymentMethod: processedBill?.paymentMethod || "",
+            paymentReference: processedBill?.paymentReference || "",
+            bankOrWalletName: processedBill?.bankOrWalletName || "",
+            adminVerificationNotes: processedBill?.adminVerificationNotes || "",
+        });
+        setAdminSelectedProofFile(null);
+        if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaymentDialogOpen, billForPayment, isVerificationDialogOpen, billForVerification, paymentForm]);
+
 
  const createBillForAgreement = (agreement: Agreement, targetDueDate: Date): Bill | null => {
     const space = spaces.find(sp => sp.id === agreement.spaceId);
@@ -396,9 +414,24 @@ export default function BillingPage() {
     if (!billForPayment) return;
     const processedBill = processedBills.find(pb => pb.id === billForPayment.id);
     if (!processedBill) return;
-    setBills(prevBills => prevBills.map(b => b.id === billForPayment.id ? { ...processedBill, status: 'Paid', paymentDate: values.paymentDate.toISOString(), paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes, penaltyAmount: processedBill.penaltyAmount } : b));
+
+    const proofUrl = adminSelectedProofFile ? `admin_slip_${adminSelectedProofFile.name}` : (processedBill.paymentProofUrl || undefined);
+
+    setBills(prevBills => prevBills.map(b => b.id === billForPayment.id ? { 
+        ...processedBill, 
+        status: 'Paid', 
+        paymentDate: values.paymentDate.toISOString(), 
+        paymentMethod: values.paymentMethod, 
+        paymentReference: values.paymentReference, 
+        bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, 
+        adminVerifiedPayment: true, 
+        adminVerificationNotes: values.adminVerificationNotes, 
+        penaltyAmount: processedBill.penaltyAmount,
+        paymentProofUrl: proofUrl,
+     } : b));
     toast({ title: "Payment Recorded", description: `Payment for bill ${billForPayment.id} recorded.` });
-    setIsPaymentDialogOpen(false); setBillForPayment(null); paymentForm.reset();
+    setIsPaymentDialogOpen(false); setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null);
+    if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
   };
   
   const handleVerificationSubmit = (values: PaymentFormValues, action: 'confirm' | 'reject') => {
@@ -406,12 +439,15 @@ export default function BillingPage() {
     const processedBill = processedBills.find(pb => pb.id === billForVerification.id);
     if (!processedBill) return;
 
+    const proofUrl = adminSelectedProofFile ? `admin_replaced_slip_${adminSelectedProofFile.name}` : (processedBill.paymentProofUrl || undefined);
+
     if (action === 'confirm') {
       setBills(prevBills => prevBills.map(b => b.id === billForVerification.id ? { 
         ...processedBill, status: 'Paid', paymentDate: values.paymentDate.toISOString(), 
         paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, 
         bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, 
         adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes, penaltyAmount: processedBill.penaltyAmount,
+        paymentProofUrl: proofUrl, // Keep or update proof
       } : b));
       toast({ title: "Payment Verified", description: `Payment for bill ${billForVerification.id} confirmed.` });
     } else { 
@@ -420,10 +456,12 @@ export default function BillingPage() {
         status: isBefore(parseISO(processedBill.dueDate), today) ? 'Overdue' : 'Pending', 
         adminVerifiedPayment: false, adminVerificationNotes: values.adminVerificationNotes,
         paymentDate: undefined, paymentMethod: undefined, paymentReference: undefined, bankOrWalletName: undefined,
+        // paymentProofUrl: proofUrl, // Keep or update proof if admin re-uploads on rejection, or clear it
       } : b));
       toast({ title: "Payment Rejected", description: `Payment proof for bill ${billForVerification.id} rejected. Status reverted.`, variant: "destructive" });
     }
-    setIsVerificationDialogOpen(false); setBillForVerification(null); paymentForm.reset();
+    setIsVerificationDialogOpen(false); setBillForVerification(null); paymentForm.reset(); setAdminSelectedProofFile(null);
+    if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
   };
 
   const getStatusBadgeVariant = (status: Bill['status']): "default" | "destructive" | "secondary" | "outline" => {
@@ -443,6 +481,14 @@ export default function BillingPage() {
       case 'Overdue': return <AlertTriangle className="mr-1 h-3 w-3 text-red-600" />;
       case 'Pending Verification': return <UploadCloud className="mr-1 h-3 w-3 text-blue-600" />;
       default: return <InfoIcon className="mr-1 h-3 w-3" />;
+    }
+  };
+
+  const handleAdminFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setAdminSelectedProofFile(event.target.files[0]);
+    } else {
+      setAdminSelectedProofFile(null);
     }
   };
 
@@ -495,7 +541,7 @@ export default function BillingPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); }}}>
+      <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
           <DialogContent className="sm:max-w-md">
               <DialogHeader>
                   <DialogTitle className="font-headline text-xl">{billForPayment?.status === 'Paid' ? 'Update Payment Details' : 'Record Payment'}</DialogTitle>
@@ -507,13 +553,30 @@ export default function BillingPage() {
                       <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                       {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
                       <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">{billForPayment?.status === 'Paid' ? 'Update' : 'Record Paid'}</Button></DialogFooter>
+                      
+                      <div>
+                        <Label htmlFor="adminPaymentProofFile" className="flex items-center mb-1 text-sm font-medium">
+                            <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach Payment Slip (Simulated)
+                        </Label>
+                        <Input 
+                            id="adminPaymentProofFile" 
+                            type="file" 
+                            ref={adminProofFileInputRef}
+                            onChange={handleAdminFileSelect}
+                            className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        />
+                        {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">Selected: {adminSelectedProofFile.name}</p>}
+                      </div>
+
+                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Confirmed via bank statement." rows={2} {...field} /></FormControl><FormMessage /></FormItem>)} />
+                      
+                      <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">{billForPayment?.status === 'Paid' ? 'Update Payment' : 'Record as Paid'}</Button></DialogFooter>
                   </form>
               </Form>
           </DialogContent>
       </Dialog>
 
-      <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); }}}>
+      <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
           <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                   <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
@@ -537,6 +600,21 @@ export default function BillingPage() {
                       <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                       {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
                       <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                      
+                      <div>
+                        <Label htmlFor="adminVerificationProofFile" className="flex items-center mb-1 text-sm font-medium">
+                            <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated)
+                        </Label>
+                        <Input 
+                            id="adminVerificationProofFile" 
+                            type="file"
+                            ref={adminProofFileInputRef} 
+                            onChange={handleAdminFileSelect}
+                            className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        />
+                        {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>}
+                      </div>
+
                       <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} /></FormControl><FormMessage /></FormItem>)} />
                       
                       <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
