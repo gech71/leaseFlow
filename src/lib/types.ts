@@ -3,6 +3,11 @@ export interface Building {
   id: string;
   name: string;
   address?: string;
+  penaltyPolicy?: {
+    gracePeriodDays: number;
+    feeType: 'Fixed' | 'Percentage';
+    feeValue: number; // If percentage, this is the rate (e.g., 5 for 5%). If fixed, it's the amount.
+  };
   createdAt: string; // ISO date string
 }
 
@@ -79,10 +84,12 @@ export interface Bill {
   dueDate: string; // ISO date string
   rentAmount: number;
   utilityBreakdown: Array<{ name: string; amount: number }>; // Stores prorated amounts for each utility type
-  totalAmount: number; // rentAmount + sum of utilityBreakdown amounts
+  penaltyAmount?: number; // Optional field for late payment penalties
+  totalAmount: number; // rentAmount + sum of utilityBreakdown amounts + penaltyAmount
   status: 'Pending' | 'Paid' | 'Overdue';
   paymentDate?: string; // ISO date string
   paymentMethod?: string;
   paymentReference?: string;
   bankOrWalletName?: string; 
 }
+

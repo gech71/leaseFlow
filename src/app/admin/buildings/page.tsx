@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin } from 'lucide-react';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Percent, DollarSign as DollarSignLucide } from 'lucide-react';
 import type { Building } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -31,11 +31,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const getStoredBuildings = (): Building[] => {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem('buildings');
-    return stored ? JSON.parse(stored) : [];
+    if (stored) {
+      try {
+        // Ensure penaltyPolicy is correctly parsed or defaulted
+        const parsed = JSON.parse(stored) as Building[];
+        return parsed.map(b => ({
+          ...b,
+          penaltyPolicy: b.penaltyPolicy || undefined // Ensure it's undefined if not present
+        }));
+      } catch (e) {
+        console.error("Error parsing buildings from localStorage", e);
+        return [];
+      }
+    }
   }
   return [];
 };
@@ -68,20 +81,44 @@ export default function BuildingsPage() {
       return;
     }
 
-    const newBuildingData: Building = {
+    const gracePeriodDays = currentBuilding.penaltyPolicy?.gracePeriodDays;
+    const feeValue = currentBuilding.penaltyPolicy?.feeValue;
+
+    if (gracePeriodDays !== undefined && (isNaN(gracePeriodDays) || gracePeriodDays < 0)) {
+        toast({ title: "Error", description: "Grace period must be a non-negative number.", variant: "destructive" });
+        return;
+    }
+    if (feeValue !== undefined && (isNaN(feeValue) || feeValue < 0)) {
+        toast({ title: "Error", description: "Fee value must be a non-negative number.", variant: "destructive" });
+        return;
+    }
+    if (currentBuilding.penaltyPolicy?.feeType && feeValue === undefined) {
+        toast({ title: "Error", description: "Fee value is required if fee type is selected.", variant: "destructive" });
+        return;
+    }
+
+
+    const buildingData: Building = {
       id: formMode === 'add' ? `building-${Date.now()}` : currentBuilding.id!,
       name: currentBuilding.name.trim(),
       address: currentBuilding.address?.trim() || undefined,
+      penaltyPolicy: currentBuilding.penaltyPolicy?.feeType // Only save policy if feeType is chosen
+        ? {
+            gracePeriodDays: Number(currentBuilding.penaltyPolicy.gracePeriodDays || 0),
+            feeType: currentBuilding.penaltyPolicy.feeType,
+            feeValue: Number(currentBuilding.penaltyPolicy.feeValue || 0),
+          }
+        : undefined,
       createdAt: currentBuilding.createdAt || new Date().toISOString(),
     };
 
     let updatedBuildings;
     if (formMode === 'add') {
-      updatedBuildings = [newBuildingData, ...buildings];
-      toast({ title: "Building Added", description: `${newBuildingData.name} has been added.` });
+      updatedBuildings = [buildingData, ...buildings];
+      toast({ title: "Building Added", description: `${buildingData.name} has been added.` });
     } else {
-      updatedBuildings = buildings.map(b => b.id === newBuildingData.id ? newBuildingData : b);
-      toast({ title: "Building Updated", description: `${newBuildingData.name} has been updated.` });
+      updatedBuildings = buildings.map(b => b.id === buildingData.id ? buildingData : b);
+      toast({ title: "Building Updated", description: `${buildingData.name} has been updated.` });
     }
     setBuildings(updatedBuildings);
     storeBuildings(updatedBuildings);
@@ -91,13 +128,13 @@ export default function BuildingsPage() {
 
   const openAddForm = () => {
     setFormMode('add');
-    setCurrentBuilding({});
+    setCurrentBuilding({ penaltyPolicy: { gracePeriodDays: 0, feeType: 'Fixed', feeValue: 0 } });
     setIsFormOpen(true);
   };
 
   const openEditForm = (building: Building) => {
     setFormMode('edit');
-    setCurrentBuilding({ ...building });
+    setCurrentBuilding({ ...building, penaltyPolicy: building.penaltyPolicy || { gracePeriodDays: 0, feeType: 'Fixed', feeValue: 0 } });
     setIsFormOpen(true);
   };
 
@@ -119,7 +156,7 @@ export default function BuildingsPage() {
       <PageHeader
         title="Manage Buildings"
         icon={BuildingIcon}
-        description="Add, view, and manage your property buildings."
+        description="Add, view, and manage your property buildings, including late fee policies."
         actions={
           <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground">
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Building
@@ -131,7 +168,7 @@ export default function BuildingsPage() {
         setIsFormOpen(isOpen);
         if (!isOpen) setCurrentBuilding({});
       }}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Building' : 'Edit Building'}</DialogTitle>
             <DialogDescription>
@@ -139,9 +176,9 @@ export default function BuildingsPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="buildingName" className="flex items-center">
+            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+              <div>
+                <Label htmlFor="buildingName" className="flex items-center text-sm font-medium">
                   <BuildingIcon className="mr-2 h-4 w-4 text-primary" />Building Name
                 </Label>
                 <Input 
@@ -150,10 +187,11 @@ export default function BuildingsPage() {
                   onChange={(e) => setCurrentBuilding(prev => ({ ...prev, name: e.target.value }))} 
                   placeholder="e.g., Sunrise Tower" 
                   required 
+                  className="mt-1"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="buildingAddress" className="flex items-center">
+              <div>
+                <Label htmlFor="buildingAddress" className="flex items-center text-sm font-medium">
                   <MapPin className="mr-2 h-4 w-4 text-primary" />Address (Optional)
                 </Label>
                 <Textarea 
@@ -162,10 +200,60 @@ export default function BuildingsPage() {
                   onChange={(e) => setCurrentBuilding(prev => ({ ...prev, address: e.target.value }))} 
                   placeholder="e.g., 123 Main St, Anytown, USA" 
                   rows={3}
+                  className="mt-1"
                 />
               </div>
+              
+              <div className="space-y-1 pt-2 border-t">
+                 <h4 className="text-md font-semibold text-foreground mb-2">Late Fee Policy (Optional)</h4>
+                 <div>
+                    <Label htmlFor="gracePeriodDays" className="flex items-center text-sm font-medium">
+                      <Clock className="mr-2 h-4 w-4 text-primary" />Grace Period (Days)
+                    </Label>
+                    <Input
+                      id="gracePeriodDays"
+                      type="number"
+                      value={currentBuilding.penaltyPolicy?.gracePeriodDays ?? ''}
+                      onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...prev.penaltyPolicy!, gracePeriodDays: parseInt(e.target.value) } }))}
+                      placeholder="e.g., 5"
+                      className="mt-1"
+                    />
+                 </div>
+                 <div>
+                    <Label htmlFor="feeType" className="flex items-center text-sm font-medium mt-2">
+                        <Percent className="mr-2 h-4 w-4 text-primary" />Fee Type
+                    </Label>
+                    <Select
+                        value={currentBuilding.penaltyPolicy?.feeType || ''}
+                        onValueChange={(value) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...prev.penaltyPolicy!, feeType: value as 'Fixed' | 'Percentage' } }))}
+                    >
+                        <SelectTrigger id="feeType" className="mt-1">
+                            <SelectValue placeholder="Select fee type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Fixed">Fixed Amount</SelectItem>
+                            <SelectItem value="Percentage">Percentage of Rent</SelectItem>
+                        </SelectContent>
+                    </Select>
+                 </div>
+                 <div>
+                    <Label htmlFor="feeValue" className="flex items-center text-sm font-medium mt-2">
+                      <DollarSignLucide className="mr-2 h-4 w-4 text-primary" />Fee Value
+                    </Label>
+                    <Input
+                      id="feeValue"
+                      type="number"
+                      step="0.01"
+                      value={currentBuilding.penaltyPolicy?.feeValue ?? ''}
+                      onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...prev.penaltyPolicy!, feeValue: parseFloat(e.target.value) } }))}
+                      placeholder={currentBuilding.penaltyPolicy?.feeType === 'Percentage' ? "e.g., 5 for 5%" : "e.g., 50 for $50"}
+                      className="mt-1"
+                    />
+                    {currentBuilding.penaltyPolicy?.feeType === 'Percentage' && <p className="text-xs text-muted-foreground mt-1">Enter percentage as a number (e.g., 5 for 5%).</p>}
+                 </div>
+              </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
@@ -214,8 +302,17 @@ export default function BuildingsPage() {
                 <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
                 {building.address && <CardDescription className="text-sm flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</CardDescription>}
               </CardHeader>
-              <CardContent className="text-sm">
-                <p className="text-xs text-muted-foreground">Registered: {format(new Date(building.createdAt), 'PP')}</p>
+              <CardContent className="text-sm space-y-2">
+                 <p className="text-xs text-muted-foreground">Registered: {format(new Date(building.createdAt), 'PP')}</p>
+                 {building.penaltyPolicy ? (
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                        <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policy:</h5>
+                        <p><Clock className="inline mr-1 h-3 w-3 text-primary" />Grace: {building.penaltyPolicy.gracePeriodDays} days</p>
+                        <p><DollarSignLucide className="inline mr-1 h-3 w-3 text-primary" />Fee: {building.penaltyPolicy.feeType === 'Fixed' ? `$${building.penaltyPolicy.feeValue.toFixed(2)}` : `${building.penaltyPolicy.feeValue}% of rent`}</p>
+                    </div>
+                 ) : (
+                    <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
+                 )}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => openEditForm(building)}>
@@ -232,3 +329,4 @@ export default function BuildingsPage() {
     </div>
   );
 }
+

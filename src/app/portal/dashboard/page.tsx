@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import type { Agreement, Bill } from '@/lib/types';
+import type { Agreement, Bill } from '@/lib/types'; // Building not needed here directly for simplified portal
 import { Button } from '@/components/ui/button';
-import { format, parseISO, isBefore, startOfDay } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -37,52 +37,54 @@ const mockTenantAgreement: Agreement = {
   monthlyRentalPrice: 1500,
   paymentTermMonths: 12,
   initialPaymentMonths: 1,
-  nextPaymentDueDate: new Date(2024, 7, 15).toISOString(), // Aug 15, 2024 (For agreement display)
+  nextPaymentDueDate: new Date(2024, 7, 15).toISOString(), 
   additionalTerms: 'No smoking. Small pets allowed with an additional deposit.',
   createdAt: new Date(2024, 0, 10).toISOString(),
 };
+
+// For portal simplicity, penalty is pre-applied in mock data or would come from backend
+// Here, we'll simulate a building policy for one of the bills.
+// Building Policy for Portal View Residences: Grace 2 days, Fixed $25 penalty
+const portalBuildingPenaltyPolicy = { gracePeriodDays: 2, feeType: 'Fixed' as 'Fixed' | 'Percentage', feeValue: 25 };
 
 const initialMockTenantBills: Bill[] = [
   {
     id: 'bill-tp-1',
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
-    tenantName: 'Portal User Tenant',
     spaceDescription: 'Unit P1, Portal View Residences',
     billDate: new Date(2024, 5, 1).toISOString(), // June 1, 2024
     dueDate: new Date(2024, 5, 15).toISOString(), // June 15, 2024
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }],
-    totalAmount: 1575,
+    totalAmount: 1575, // Original total
     status: 'Paid',
     paymentDate: new Date(2024, 5, 10).toISOString(),
     paymentMethod: 'Online Portal',
     paymentReference: 'PAY-PORTAL-JUNE',
   },
   {
-    id: 'bill-tp-2',
+    id: 'bill-tp-2', // This bill will become overdue and have a penalty
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
-    tenantName: 'Portal User Tenant',
     spaceDescription: 'Unit P1, Portal View Residences',
-    billDate: new Date(2024, 6, 1).toISOString(), // July 1, 2024
-    dueDate: new Date(2024, 6, 15).toISOString(), // July 15, 2024
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString(), // Make it 2 months ago
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 15).toISOString(), // Due 2 months ago
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, {name: 'Water Service', amount: 30}],
-    totalAmount: 1605,
+    totalAmount: 1605, // Original total
     status: 'Pending', 
   },
   {
     id: 'bill-tp-3',
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
-    tenantName: 'Portal User Tenant',
     spaceDescription: 'Unit P1, Portal View Residences',
-    billDate: new Date(2024, 7, 1).toISOString(), // August 1, 2024
-    dueDate: new Date(2024, 7, 15).toISOString(), // August 15, 2024
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 1).toISOString(), // Last month
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 15).toISOString(), // Due last month
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, { name: 'Trash Removal', amount: 25}],
-    totalAmount: 1600,
+    totalAmount: 1600, // Original total
     status: 'Pending',
   },
 ];
@@ -98,30 +100,54 @@ export default function CustomerDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // No need to set 'today' here, as it's already initialized with useState
-    // and its change will trigger re-renders if necessary.
+    setToday(startOfDay(new Date()));
   }, []);
 
-  useEffect(() => {
-    // This effect runs when 'today' changes, or on initial mount if today is already set.
-    setAgreement(mockTenantAgreement);
-    
-    const updatedBills = initialMockTenantBills.map(bill => {
-      if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
-        return { ...bill, status: 'Overdue' as Bill['status'] };
+  const processedBills = useMemo(() => {
+    return initialMockTenantBills.map(bill => {
+      let currentStatus = bill.status;
+      let calculatedPenalty = 0;
+      const dueDate = parseISO(bill.dueDate);
+
+      if (bill.status === 'Pending' && isBefore(dueDate, today)) {
+        currentStatus = 'Overdue';
+        const daysOverdue = differenceInDays(today, dueDate);
+        if (portalBuildingPenaltyPolicy && daysOverdue > portalBuildingPenaltyPolicy.gracePeriodDays) {
+          if (portalBuildingPenaltyPolicy.feeType === 'Fixed') {
+            calculatedPenalty = portalBuildingPenaltyPolicy.feeValue;
+          } else { // Percentage
+            calculatedPenalty = bill.rentAmount * (portalBuildingPenaltyPolicy.feeValue / 100);
+          }
+        }
       }
-      return bill;
+      
+      const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
+      const newTotalAmount = baseAmount + calculatedPenalty;
+
+      return {
+        ...bill,
+        status: currentStatus,
+        penaltyAmount: calculatedPenalty > 0 ? calculatedPenalty : undefined,
+        totalAmount: parseFloat(newTotalAmount.toFixed(2)),
+      };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-    setBills(updatedBills);
-  }, [today]); // Re-run when `today` changes (e.g. if app is open over midnight)
+  }, [today]);
+
+  useEffect(() => {
+    setAgreement(mockTenantAgreement);
+    setBills(processedBills);
+  }, [processedBills]);
 
   const handlePayBill = (billId: string) => {
+    const billToPay = bills.find(b => b.id === billId);
+    if (!billToPay) return;
+
     toast({
       title: "Processing Payment...",
-      description: `Payment for bill ${billId} is being processed. This is a demo.`,
+      description: `Payment for bill ${billId} (Total: $${billToPay.totalAmount.toFixed(2)}) is being processed. This is a demo.`,
     });
     setTimeout(() => {
-        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment"} : b));
+        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment", penaltyAmount: b.penaltyAmount} : b));
         toast({
             title: "Payment Successful (Simulated)",
             description: `Bill ${billId} has been marked as paid.`,
@@ -215,6 +241,7 @@ export default function CustomerDashboardPage() {
                     <TableHead>Due Date</TableHead>
                     <TableHead className="hidden md:table-cell">Rent</TableHead>
                     <TableHead className="hidden md:table-cell">Utilities</TableHead>
+                    <TableHead className="hidden md:table-cell">Penalty</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -252,6 +279,9 @@ export default function CustomerDashboardPage() {
                         ) : (
                             '$0.00'
                         )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-destructive">
+                        {bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}
                       </TableCell>
                       <TableCell className="text-right font-semibold">${bill.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>

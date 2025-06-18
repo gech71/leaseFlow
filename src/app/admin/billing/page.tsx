@@ -1,14 +1,13 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon } from 'lucide-react'; // Microscope removed
-import type { Bill, Agreement, Space, BuildingMonthlyUtilities } from '@/lib/types';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIcon } from 'lucide-react';
+import type { Bill, Agreement, Space, Building } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-// analyzeBillAction removed
 import {
   Dialog,
   DialogContent,
@@ -17,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
-  // DialogTrigger, // Not used anymore for analysis
 } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -29,7 +27,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, getYear, getMonth, parseISO } from 'date-fns';
+import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, getYear, getMonth, parseISO, differenceInDays } from 'date-fns';
 
 // Mock data (ensure consistency with types.ts)
 const initialMockAgreements: Agreement[] = [
@@ -51,10 +49,17 @@ const initialMockSpaces: Space[] = [
  { id: 'space5', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, tenantId: undefined, createdAt: new Date().toISOString()},
 ];
 
+const initialMockBuildings: Building[] = [
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicy: { gracePeriodDays: 5, feeType: 'Fixed', feeValue: 50 }, createdAt: new Date().toISOString() },
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicy: { gracePeriodDays: 3, feeType: 'Percentage', feeValue: 2 }, createdAt: new Date().toISOString() }, // 2%
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No penalty policy
+];
+
+
 const initialBills: Bill[] = [
-  { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 80}, {name: "Water", amount: 20}], totalAmount: 2600, status: 'Paid', paymentDate: new Date(2024,5,10).toISOString(), paymentMethod: "Card", paymentReference: "TXN12345" },
-  { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', tenantName: 'Bob The Builder', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "General Utility", amount: 175}], totalAmount: 3375, status: 'Pending' },
-  { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,4,1).toISOString(), dueDate: new Date(2024,4,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Paid', paymentDate: new Date(2024,4,10).toISOString(), paymentMethod: "Bank Transfer", paymentReference: "REF9876", bankOrWalletName: "City Bank" },
+  { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 80}, {name: "Water", amount: 20}], totalAmount: 2600, status: 'Paid', paymentDate: new Date(2024,5,10).toISOString(), paymentMethod: "Card", paymentReference: "TXN12345" },
+  { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "General Utility", amount: 175}], totalAmount: 3375, status: 'Pending' },
+  { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,4,1).toISOString(), dueDate: new Date(2024,4,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Paid', paymentDate: new Date(2024,4,10).toISOString(), paymentMethod: "Bank Transfer", paymentReference: "REF9876", bankOrWalletName: "City Bank" },
 
 ];
 
@@ -65,6 +70,15 @@ const getStoredBuildingUtilities = (): BuildingMonthlyUtilities[] => {
   }
   return [];
 };
+
+const getStoredBuildings = (): Building[] => {
+  if (typeof window !== 'undefined') {
+    const storedBuildings = localStorage.getItem('buildings');
+    return storedBuildings ? JSON.parse(storedBuildings) : initialMockBuildings;
+  }
+  return initialMockBuildings;
+};
+
 
 const paymentFormSchema = z.object({
   paymentDate: z.date({ required_error: "Payment date is required." }),
@@ -88,19 +102,15 @@ export default function BillingPage() {
   const [bills, setBills] = useState<Bill[]>(initialBills);
   const [agreements, setAgreements] = useState<Agreement[]>(initialMockAgreements);
   const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [allBuildingUtilities, setAllBuildingUtilities] = useState<BuildingMonthlyUtilities[]>([]);
   
-  // State related to bill analysis removed
-  // const [selectedBillForAnalysis, setSelectedBillForAnalysis] = useState<Bill | null>(null);
-  // const [analysisResult, setAnalysisResult] = useState<{ result: string; isAnomalous?: boolean; recommendations?: string } | null>(null);
-  // const [isAnalyzing, setIsAnalyzing] = useState(false);
-  // const [analysisError, setAnalysisError] = useState<string | null>(null);
-
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<Bill | null>(null);
 
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
+  const [today, setToday] = useState(startOfDay(new Date()));
 
   const paymentForm = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -117,18 +127,66 @@ export default function BillingPage() {
   useEffect(() => {
     setIsMounted(true);
     setAllBuildingUtilities(getStoredBuildingUtilities());
+    setBuildings(getStoredBuildings());
+    setToday(startOfDay(new Date())); // Ensure today is current
   }, []);
+
+  const calculatePenalty = useCallback((bill: Bill): number => {
+    const agreement = agreements.find(ag => ag.id === bill.agreementId);
+    if (!agreement) return 0;
+    const space = spaces.find(sp => sp.id === agreement.spaceId);
+    if (!space) return 0;
+    const building = buildings.find(b => b.name === space.buildingName);
+    if (!building || !building.penaltyPolicy) return 0;
+
+    const dueDate = parseISO(bill.dueDate);
+    if (isAfter(dueDate, today) || bill.status === 'Paid') return 0; // No penalty if not overdue or already paid
+
+    const daysOverdue = differenceInDays(today, dueDate);
+    const { gracePeriodDays, feeType, feeValue } = building.penaltyPolicy;
+
+    if (daysOverdue > gracePeriodDays) {
+      if (feeType === 'Fixed') {
+        return feeValue;
+      } else if (feeType === 'Percentage') {
+        // Assuming feeValue is stored as percentage number e.g. 5 for 5%
+        return bill.rentAmount * (feeValue / 100);
+      }
+    }
+    return 0;
+  }, [agreements, spaces, buildings, today]);
+
+  const processedBills = useMemo(() => {
+    return bills.map(bill => {
+      let currentStatus = bill.status;
+      if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
+        currentStatus = 'Overdue';
+      }
+      
+      const penalty = calculatePenalty({ ...bill, status: currentStatus }); // Pass current status to penalty calc
+      const newTotalAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0) + penalty;
+
+      return {
+        ...bill,
+        status: currentStatus,
+        penaltyAmount: penalty > 0 ? penalty : undefined,
+        totalAmount: parseFloat(newTotalAmount.toFixed(2)),
+      };
+    }).sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime());
+  }, [bills, calculatePenalty, today]);
+
 
   useEffect(() => {
     if (billForPayment) {
+      const processedBillForPayment = processedBills.find(pb => pb.id === billForPayment.id);
       paymentForm.reset({
-        paymentDate: billForPayment.paymentDate ? parseISO(billForPayment.paymentDate) : new Date(),
-        paymentMethod: billForPayment.paymentMethod || "",
-        paymentReference: billForPayment.paymentReference || "",
-        bankOrWalletName: billForPayment.bankOrWalletName || "",
+        paymentDate: processedBillForPayment?.paymentDate ? parseISO(processedBillForPayment.paymentDate) : new Date(),
+        paymentMethod: processedBillForPayment?.paymentMethod || "",
+        paymentReference: processedBillForPayment?.paymentReference || "",
+        bankOrWalletName: processedBillForPayment?.bankOrWalletName || "",
       });
     }
-  }, [billForPayment, paymentForm]);
+  }, [billForPayment, paymentForm, processedBills]);
 
   const createBillForAgreement = (agreement: Agreement, targetDueDate: Date): Bill | null => {
     const space = spaces.find(sp => sp.id === agreement.spaceId);
@@ -170,12 +228,12 @@ export default function BillingPage() {
       id: `bill-${Date.now()}-${agreement.id}`,
       agreementId: agreement.id,
       tenantId: agreement.tenantId,
-      tenantName: agreement.tenantName,
       spaceDescription: agreement.spaceDescription,
       billDate: targetDueDate.toISOString(),
       dueDate: targetDueDate.toISOString(),
       rentAmount,
       utilityBreakdown,
+      penaltyAmount: 0, // Initially no penalty
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       status: 'Pending',
     };
@@ -188,7 +246,6 @@ export default function BillingPage() {
       return;
     }
 
-    const today = startOfDay(new Date());
     const agreementStartDate = startOfDay(new Date(agreement.startDate));
     const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
 
@@ -213,7 +270,7 @@ export default function BillingPage() {
     const newBill = createBillForAgreement(agreement, nextDueDate);
     if (!newBill) return; 
 
-    setBills(prev => [newBill, ...prev].sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime()));
+    setBills(prev => [newBill, ...prev]);
     setAgreements(prevAgreements => 
       prevAgreements.map(ag => 
         ag.id === agreementId 
@@ -225,7 +282,6 @@ export default function BillingPage() {
   };
 
   const handleGenerateAllDueBills = () => {
-    const today = startOfDay(new Date());
     let generatedCount = 0;
     let skippedCount = 0;
     const newBillsBuffer: Bill[] = [];
@@ -275,33 +331,28 @@ export default function BillingPage() {
     });
 
     if (newBillsBuffer.length > 0) {
-      setBills(prev => [...newBillsBuffer, ...prev].sort((a,b) => new Date(b.billDate).getTime() - new Date(a.billDate).getTime()));
+      setBills(prev => [...newBillsBuffer, ...prev]);
     }
     setAgreements(updatedAgreementsData);
     toast({ title: "Bulk Bill Generation Complete", description: `${generatedCount} bills generated. ${skippedCount} agreements skipped (not due, expired, or pending bill exists).` });
   };
 
-  // handleAnalyzeBill function removed
 
   const handleOpenPaymentDialog = (bill: Bill) => {
     setBillForPayment(bill);
-    paymentForm.reset({
-        paymentDate: bill.paymentDate ? parseISO(bill.paymentDate) : new Date(),
-        paymentMethod: bill.paymentMethod || "",
-        paymentReference: bill.paymentReference || "",
-        bankOrWalletName: bill.bankOrWalletName || "",
-      });
     setIsPaymentDialogOpen(true);
   };
   
   const handleRecordPaymentSubmit = (values: PaymentFormValues) => {
     if (!billForPayment) return;
+    const processedBill = processedBills.find(pb => pb.id === billForPayment.id);
+    if (!processedBill) return;
 
     setBills(prevBills => 
       prevBills.map(b => 
         b.id === billForPayment.id 
         ? { 
-            ...b, 
+            ...processedBill, // Use the processed bill with correct total and penalty
             status: 'Paid', 
             paymentDate: values.paymentDate.toISOString(),
             paymentMethod: values.paymentMethod,
@@ -340,13 +391,13 @@ export default function BillingPage() {
       <PageHeader
         title="Billing Management"
         icon={DollarSign}
-        description="Generate and manage rental and utility bills. Ensure building utility costs are entered via 'Building Utilities' page before generation."
+        description="Generate and manage rental and utility bills. Penalties apply based on building policies."
       />
 
       <Card className="mb-6 shadow-sm">
         <CardHeader>
           <CardTitle className="font-headline">Generate Bills</CardTitle>
-          <CardDescription>Generate bills for individual agreements or all due agreements. Monthly utility costs must be entered on the 'Building Utilities' page for the respective month/year.</CardDescription>
+          <CardDescription>Generate bills for individual agreements or all due agreements. Monthly utility costs must be entered on the 'Building Utilities' page. Late fees are applied automatically if applicable.</CardDescription>
         </CardHeader>
         <CardContent>
             <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90">
@@ -392,8 +443,6 @@ export default function BillingPage() {
         </CardContent>
       </Card>
       
-      {/* Analysis Dialog Removed */}
-
       <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => {
           setIsPaymentDialogOpen(isOpen);
           if (!isOpen) {
@@ -411,9 +460,11 @@ export default function BillingPage() {
                   <DialogTitle className="font-headline text-xl">
                       {billForPayment?.status === 'Paid' ? 'Update Payment Details' : 'Record Payment'} for Bill
                   </DialogTitle>
-                  <DialogDescription>
-                      For {billForPayment?.tenantName} - Total: ${billForPayment?.totalAmount.toFixed(2)} (Due: {billForPayment?.dueDate ? format(parseISO(billForPayment.dueDate), 'PP') : 'N/A'})
-                  </DialogDescription>
+                  {billForPayment && (
+                    <DialogDescription>
+                        For {processedBills.find(pb => pb.id === billForPayment.id)?.spaceDescription.split(',')[0]} - Total: ${processedBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)} (Due: {billForPayment?.dueDate ? format(parseISO(billForPayment.dueDate), 'PP') : 'N/A'})
+                    </DialogDescription>
+                  )}
               </DialogHeader>
               <Form {...paymentForm}>
                   <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
@@ -522,7 +573,7 @@ export default function BillingPage() {
       </Dialog>
 
 
-      {bills.length === 0 ? (
+      {processedBills.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -534,12 +585,12 @@ export default function BillingPage() {
         <div className="space-y-4">
         <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {bills.map((bill) => (
-            <Card key={bill.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+          {processedBills.map((bill) => (
+            <Card key={bill.id} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 ${bill.status === 'Overdue' && bill.penaltyAmount ? 'border-destructive border-2' : ''}`}>
               <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle className="font-headline text-lg">{bill.tenantName}</CardTitle>
+                        <CardTitle className="font-headline text-lg">{(agreements.find(a => a.id === bill.agreementId))?.tenantName || 'N/A'}</CardTitle>
                         <CardDescription className="text-xs">{bill.spaceDescription}</CardDescription>
                     </div>
                     <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getStatusColor(bill.status)}`}>
@@ -563,6 +614,9 @@ export default function BillingPage() {
                     <span> $0.00</span>
                   )}
                 </div>
+                {bill.penaltyAmount && bill.penaltyAmount > 0 && (
+                    <p className="text-destructive"><strong>Penalty:</strong> ${bill.penaltyAmount.toFixed(2)}</p>
+                )}
                 <p className="font-semibold text-base text-primary"><strong>Total:</strong> ${bill.totalAmount.toFixed(2)}</p>
                 
                 {bill.status === 'Paid' && bill.paymentDate && (
@@ -574,21 +628,19 @@ export default function BillingPage() {
                         {bill.paymentReference && <p>Reference: {bill.paymentReference}</p>}
                     </div>
                 )}
-
-                {/* Analysis result display removed */}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-between items-center">
-                 {/* Analyze Button Removed */}
-                 <div></div> {/* Placeholder for spacing if analyze button was on left */}
+                 <div></div> 
                 <div className="flex gap-2 items-center">
                     <Button 
                         variant={bill.status === 'Paid' ? "secondary" : "default"} 
                         size="sm" 
                         onClick={() => handleOpenPaymentDialog(bill)}
                         className={bill.status === 'Paid' ? "" : "bg-green-600 hover:bg-green-700 text-white"}
+                        disabled={bill.status === 'Paid'}
                     >
                       <CreditCard className="mr-1 h-4 w-4" /> 
-                      {bill.status === 'Paid' ? 'Update Payment' : 'Record Payment'}
+                      {bill.status === 'Paid' ? 'Paid' : 'Record Payment'}
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => toast({title: "Delete Bill", description:"Functionality coming soon.", variant: "destructive"})}><Trash2 className="h-4 w-4"/></Button>
                 </div>
@@ -601,3 +653,4 @@ export default function BillingPage() {
     </div>
   );
 }
+

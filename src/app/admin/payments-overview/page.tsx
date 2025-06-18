@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download } from 'lucide-react';
-import type { Bill, Space } from '@/lib/types';
+import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIcon } from 'lucide-react';
+import type { Bill, Space, Building as BuildingType, Agreement } from '@/lib/types'; // Added BuildingType and Agreement
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO, isBefore, startOfDay, getYear, getMonth } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -27,45 +27,102 @@ const mockSpacesData: Space[] = [
   { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
   { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
   { id: 'space4', buildingName: 'Tech Park One', spaceIdName: 'Lab 3', area: 2000, floor: '1st', utilityProrationShare: 0.5, monthlyRentalPrice: 4500, isOccupied: false, createdAt: new Date().toISOString() },
+  { id: 'space-portal-unit', buildingName: 'Portal View Residences', spaceIdName: 'Unit P1', area: 1000, floor: '1st', utilityProrationShare: 0.1, monthlyRentalPrice: 1500, isOccupied: true, tenantId: 'tenant-portal-user', createdAt: new Date().toISOString() },
 ];
 
+const mockBuildingsData: BuildingType[] = [
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicy: { gracePeriodDays: 5, feeType: 'Fixed', feeValue: 50 }, createdAt: new Date().toISOString() },
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicy: { gracePeriodDays: 3, feeType: 'Percentage', feeValue: 2 }, createdAt: new Date().toISOString() },
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() },
+  { id: 'building-portal', name: 'Portal View Residences', address: '1 Portal Drive', penaltyPolicy: { gracePeriodDays: 2, feeType: 'Fixed', feeValue: 25 }, createdAt: new Date().toISOString() },
+];
+
+const mockAgreementsData: Agreement[] = [
+    { id: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceId: 'space1', spaceDescription: 'Unit 101, Sunrise Tower', agreementText: '...', startDate: new Date().toISOString(), monthlyRentalPrice: 2500, createdAt: new Date().toISOString(), paymentTermMonths:12, initialPaymentMonths:1, nextPaymentDueDate: new Date().toISOString()},
+    { id: 'agreement2', tenantId: 'tenant2', tenantName: 'Bob The Builder', spaceId: 'space3', spaceDescription: 'Office 5B, Downtown Hub', agreementText: '...', startDate: new Date().toISOString(), monthlyRentalPrice: 3200, createdAt: new Date().toISOString(), paymentTermMonths:12, initialPaymentMonths:1, nextPaymentDueDate: new Date().toISOString()},
+    { id: 'agreement3', tenantId: 'tenant3', tenantName: 'Carol Danvers', spaceId: 'space4', spaceDescription: 'Penthouse, Galaxy Tower', agreementText: '...', startDate: new Date().toISOString(), monthlyRentalPrice: 5000, createdAt: new Date().toISOString(), paymentTermMonths:12, initialPaymentMonths:1, nextPaymentDueDate: new Date().toISOString()},
+    { id: 'agree-tenant1-current', tenantId: 'tenant-portal-user', tenantName: 'Portal User Tenant', spaceId: 'space-portal-unit', spaceDescription: 'Unit P1, Portal View Residences', agreementText: '...', startDate: new Date().toISOString(), monthlyRentalPrice: 1500, createdAt: new Date().toISOString(), paymentTermMonths:12, initialPaymentMonths:1, nextPaymentDueDate: new Date().toISOString()},
+];
+
+
 const currentYear = new Date().getFullYear();
-const lastMonth = new Date().getMonth() -1 < 0 ? 11 : new Date().getMonth() -1;
-const lastMonthYear = new Date().getMonth() -1 < 0 ? currentYear -1 : currentYear;
+const currentMonth = new Date().getMonth();
+const lastMonth = currentMonth - 1 < 0 ? 11 : currentMonth - 1;
+const lastMonthYear = currentMonth - 1 < 0 ? currentYear - 1 : currentYear;
 
 
 const mockBillsData: Bill[] = [
-  { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(currentYear, 5, 1).toISOString(), dueDate: new Date(currentYear, 5, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 80}, {name: "Water", amount: 20}], totalAmount: 2600, status: 'Paid', paymentDate: new Date(currentYear, 5, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN12345" },
-  { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', tenantName: 'Bob The Builder', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(currentYear, new Date().getMonth(), 1).toISOString(), dueDate: new Date(currentYear, new Date().getMonth(), 15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "General Utility", amount: 175}], totalAmount: 3375, status: 'Pending' },
-  { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(currentYear, new Date().getMonth(), 1).toISOString(), dueDate: new Date(currentYear, new Date().getMonth(), 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Pending' },
-  { id: 'bill4', agreementId: 'agreement3', tenantId: 'tenant3', tenantName: 'Carol Danvers', spaceDescription: 'Penthouse, Galaxy Tower', billDate: new Date(currentYear, new Date().getMonth()-1, 20).toISOString(), dueDate: new Date(currentYear, new Date().getMonth(), 5).toISOString(), rentAmount: 5000, utilityBreakdown: [{name: "Premium Utilities", amount: 300}], totalAmount: 5300, status: 'Overdue' },
-  { id: 'bill5', agreementId: 'agreement2', tenantId: 'tenant2', tenantName: 'Bob The Builder', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 3200, utilityBreakdown: [], totalAmount: 3200, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 12).toISOString(), paymentMethod: "Bank Transfer", bankOrWalletName: "First National", paymentReference: "BNKREF001" },
-  { id: 'bill6', agreementId: 'agreement4', tenantId: 'tenant4', tenantName: 'David Copperfield', spaceDescription: 'Studio X, Creative Block', billDate: new Date(lastMonthYear, lastMonth, 5).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 20).toISOString(), rentAmount: 1200, utilityBreakdown: [{name: "Internet", amount: 50}], totalAmount: 1250, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 18).toISOString(), paymentMethod: "Wallet", bankOrWalletName: "PayZap", paymentReference: "WLTREF789" },
-   { id: 'bill7', agreementId: 'agreement1', tenantId: 'tenant1', tenantName: 'Alice Wonderland', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 75}, {name: "Water", amount: 22}], totalAmount: 2597, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN67890" },
+  { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(currentYear, 5, 1).toISOString(), dueDate: new Date(currentYear, 5, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 80}, {name: "Water", amount: 20}], totalAmount: 2600, status: 'Paid', paymentDate: new Date(currentYear, 5, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN12345" },
+  { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(currentYear, currentMonth, 1).toISOString(), dueDate: new Date(currentYear, currentMonth, 15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "General Utility", amount: 175}], totalAmount: 3375, status: 'Pending' },
+  { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(currentYear, currentMonth, 1).toISOString(), dueDate: new Date(currentYear, currentMonth, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Pending' },
+  { id: 'bill4', agreementId: 'agreement3', tenantId: 'tenant3', spaceDescription: 'Penthouse, Galaxy Tower', billDate: new Date(currentYear, currentMonth - 1, 20).toISOString(), dueDate: new Date(currentYear, currentMonth, 5).toISOString(), rentAmount: 5000, utilityBreakdown: [{name: "Premium Utilities", amount: 300}], totalAmount: 5300, status: 'Overdue' }, // This will be overdue
+  { id: 'bill5', agreementId: 'agreement2', tenantId: 'tenant2', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 3200, utilityBreakdown: [], totalAmount: 3200, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 12).toISOString(), paymentMethod: "Bank Transfer", bankOrWalletName: "First National", paymentReference: "BNKREF001" },
+  { id: 'bill6', agreementId: 'agree-tenant1-current', tenantId: 'tenant-portal-user', spaceDescription: 'Unit P1, Portal View Residences', billDate: new Date(lastMonthYear, lastMonth, 5).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 20).toISOString(), rentAmount: 1200, utilityBreakdown: [{name: "Internet", amount: 50}], totalAmount: 1250, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 18).toISOString(), paymentMethod: "Wallet", bankOrWalletName: "PayZap", paymentReference: "WLTREF789" },
+   { id: 'bill7', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 75}, {name: "Water", amount: 22}], totalAmount: 2597, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN67890" },
 ];
 
 
 export default function PaymentsOverviewPage() {
   const [allBills, setAllBills] = useState<Bill[]>([]);
   const [spaces, setSpaces] = useState<Space[]>(mockSpacesData);
+  const [buildings, setBuildings] = useState<BuildingType[]>(mockBuildingsData);
+  const [agreements, setAgreements] = useState<Agreement[]>(mockAgreementsData);
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
 
   const [selectedMonth, setSelectedMonth] = useState<number>(today.getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(today.getFullYear());
 
+  const calculatePenalty = useCallback((bill: Bill, currentStatus: Bill['status']): number => {
+    const agreement = agreements.find(ag => ag.id === bill.agreementId);
+    if (!agreement) return 0;
+    const space = spaces.find(sp => sp.id === agreement.spaceId);
+    if (!space) return 0;
+    const building = buildings.find(b => b.name === space.buildingName);
+    if (!building || !building.penaltyPolicy) return 0;
+
+    const dueDate = parseISO(bill.dueDate);
+    if (currentStatus !== 'Overdue') return 0;
+
+    const daysOverdue = differenceInDays(today, dueDate);
+    const { gracePeriodDays, feeType, feeValue } = building.penaltyPolicy;
+
+    if (daysOverdue > gracePeriodDays) {
+      if (feeType === 'Fixed') {
+        return feeValue;
+      } else if (feeType === 'Percentage') {
+        return bill.rentAmount * (feeValue / 100);
+      }
+    }
+    return 0;
+  }, [agreements, spaces, buildings, today]);
+
+  const processedBills = useMemo(() => {
+    return mockBillsData.map(bill => {
+      let currentStatus = bill.status;
+      if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
+        currentStatus = 'Overdue';
+      }
+      
+      const penalty = calculatePenalty(bill, currentStatus);
+      const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
+      const newTotalAmount = baseAmount + penalty;
+
+      return {
+        ...bill,
+        status: currentStatus,
+        penaltyAmount: penalty > 0 ? penalty : undefined,
+        totalAmount: parseFloat(newTotalAmount.toFixed(2)),
+        tenantName: agreements.find(a => a.id === bill.agreementId)?.tenantName || 'N/A' // Add tenantName for export
+      };
+    }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
+  }, [today, calculatePenalty, agreements]);
+
+
   useEffect(() => {
     setIsMounted(true);
-    // In a real app, fetch bills from an API
-    const updatedMockBills = mockBillsData.map(bill => {
-      if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
-        return { ...bill, status: 'Overdue' as Bill['status'] };
-      }
-      return bill;
-    });
-    setAllBills(updatedMockBills.sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime()));
-    // setSpaces from mock or API
-  }, [today]);
+    setAllBills(processedBills);
+  }, [processedBills]);
   
   const upcomingAndPendingBills = allBills.filter(b => b.status === 'Pending' || b.status === 'Overdue');
   
@@ -105,12 +162,13 @@ export default function PaymentsOverviewPage() {
 
   const exportToExcel = (data: Bill[], fileNamePrefix: string) => {
     const worksheetData = data.map(bill => ({
-      'Tenant Name': bill.tenantName,
+      'Tenant Name': bill.tenantName, // Ensure tenantName is on the bill object
       'Space Description': bill.spaceDescription,
       'Bill Date': format(parseISO(bill.billDate), 'PP'),
       'Due Date': format(parseISO(bill.dueDate), 'PP'),
       'Rent Amount': bill.rentAmount,
       'Utilities Amount': bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0),
+      'Penalty Amount': bill.penaltyAmount || 0,
       'Total Amount': bill.totalAmount,
       'Status': bill.status,
       'Payment Date': bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A',
@@ -134,7 +192,7 @@ export default function PaymentsOverviewPage() {
       <PageHeader
         title="Payments Overview"
         icon={ClipboardList}
-        description="View upcoming, pending, and paid transactions. Analyze potential and collected revenue."
+        description="View upcoming, pending, and paid transactions. Analyze potential and collected revenue. Penalties are applied based on building policies."
       />
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
@@ -195,9 +253,9 @@ export default function PaymentsOverviewPage() {
                   <TableRow>
                     <TableHead>Tenant</TableHead>
                     <TableHead className="hidden md:table-cell">Space</TableHead>
-                    <TableHead>Bill Date</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="hidden sm:table-cell">Penalty</TableHead>
+                    <TableHead className="text-right">Amount Due</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -206,9 +264,11 @@ export default function PaymentsOverviewPage() {
                     <TableRow key={bill.id}>
                       <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
                       <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
-                      <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
                       <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
                         {format(parseISO(bill.dueDate), 'PP')}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-xs text-destructive">
+                        {bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : ''}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
@@ -309,3 +369,4 @@ export default function PaymentsOverviewPage() {
     </div>
   );
 }
+
