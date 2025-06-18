@@ -18,6 +18,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 
 // --- Mock Data ---
@@ -76,8 +81,8 @@ const initialMockTenantBills: Bill[] = [
     billDate: new Date(2024, 7, 1).toISOString(), // August 1, 2024
     dueDate: new Date(2024, 7, 15).toISOString(), // August 15, 2024
     rentAmount: 1500,
-    utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }],
-    totalAmount: 1575,
+    utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, { name: 'Trash Removal', amount: 25}],
+    totalAmount: 1600,
     status: 'Pending',
   },
 ];
@@ -93,7 +98,12 @@ export default function CustomerDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    setToday(startOfDay(new Date()));
+    // No need to set 'today' here, as it's already initialized with useState
+    // and its change will trigger re-renders if necessary.
+  }, []);
+
+  useEffect(() => {
+    // This effect runs when 'today' changes, or on initial mount if today is already set.
     setAgreement(mockTenantAgreement);
     
     const updatedBills = initialMockTenantBills.map(bill => {
@@ -103,7 +113,7 @@ export default function CustomerDashboardPage() {
       return bill;
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
     setBills(updatedBills);
-  }, [today]); // Added today to dependency array for re-checking overdue status if day changes
+  }, [today]); // Re-run when `today` changes (e.g. if app is open over midnight)
 
   const handlePayBill = (billId: string) => {
     toast({
@@ -222,7 +232,23 @@ export default function CustomerDashboardPage() {
                       <TableCell className="hidden md:table-cell">${bill.rentAmount.toFixed(2)}</TableCell>
                       <TableCell className="hidden md:table-cell">
                         {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 ? (
-                            `$${bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0).toFixed(2)}`
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="link" className="p-0 h-auto font-normal text-primary hover:underline">
+                                ${bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0).toFixed(2)}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto text-sm p-2">
+                              <ul className="space-y-1">
+                                {bill.utilityBreakdown.map(util => (
+                                  <li key={util.name} className="flex justify-between">
+                                    <span>{util.name}:</span>
+                                    <span className="font-medium ml-2">${util.amount.toFixed(2)}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </PopoverContent>
+                          </Popover>
                         ) : (
                             '$0.00'
                         )}
@@ -253,3 +279,4 @@ export default function CustomerDashboardPage() {
     </div>
   );
 }
+
