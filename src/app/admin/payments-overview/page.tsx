@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIcon, UploadCloud } from 'lucide-react';
+import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud } from 'lucide-react';
 import type { Bill, Space, Building as BuildingType, Agreement, PenaltyTier } from '@/lib/types'; 
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
@@ -31,10 +31,19 @@ const mockSpacesData: Space[] = [
 ];
 
 const mockBuildingsData: BuildingType[] = [
-  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 50 }, { fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 100 }], createdAt: new Date().toISOString() },
-  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 2 }, { fromDay: 4, toDay: null, feeType: 'Percentage', feeValue: 5}], createdAt: new Date().toISOString() },
-  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() },
-  { id: 'building-portal', name: 'Portal View Residences', address: '1 Portal Drive', penaltyPolicyTiers: [{ fromDay: 1, toDay: 2, feeType: 'Fixed', feeValue: 25 }, { fromDay: 3, toDay: null, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() },
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [
+      { scope: 'Building', fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 50 }, 
+      { scope: 'Building', fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 100 }
+    ], createdAt: new Date().toISOString() },
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [
+      { scope: 'Building', fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 2 }, 
+      { scope: 'Building', fromDay: 4, toDay: null, feeType: 'Percentage', feeValue: 5}
+    ], createdAt: new Date().toISOString() },
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No penalty policy
+  { id: 'building-portal', name: 'Portal View Residences', address: '1 Portal Drive', penaltyPolicyTiers: [
+      { scope: 'Building', fromDay: 1, toDay: 2, feeType: 'Fixed', feeValue: 25 }, 
+      { scope: 'SpecificSpaces', applicableSpaceIdNames: ['Unit P1'], fromDay: 3, toDay: null, feeType: 'Fixed', feeValue: 50 }
+    ], createdAt: new Date().toISOString() },
 ];
 
 const mockAgreementsData: Agreement[] = [
@@ -65,9 +74,9 @@ const mockBillsData: Bill[] = [
 
 
 export default function PaymentsOverviewPage() {
-  const [spaces, setSpaces] = useState<Space[]>(mockSpacesData);
-  const [buildingsData, setBuildingsData] = useState<BuildingType[]>(mockBuildingsData); // Renamed to avoid conflict
-  const [agreementsData, setAgreementsData] = useState<Agreement[]>(mockAgreementsData); // Renamed
+  const [spaces, setSpacesState] = useState<Space[]>(mockSpacesData); // Renamed spaces state variable
+  const [buildingsData, setBuildingsDataState] = useState<BuildingType[]>(mockBuildingsData); 
+  const [agreementsData, setAgreementsDataState] = useState<Agreement[]>(mockAgreementsData); 
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
 
@@ -76,10 +85,10 @@ export default function PaymentsOverviewPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Simulating fetching data, replace with actual data sources if available
-    setSpaces(mockSpacesData);
-    setBuildingsData(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: b.penaltyPolicyTiers || [] })));
-    setAgreementsData(mockAgreementsData);
+    // Simulating fetching data
+    setSpacesState(mockSpacesData);
+    setBuildingsDataState(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(t=> ({...t, scope: t.scope || 'Building'})) })));
+    setAgreementsDataState(mockAgreementsData);
     setToday(startOfDay(new Date())); 
   }, []);
 
@@ -93,13 +102,31 @@ export default function PaymentsOverviewPage() {
     if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
-    // Only calculate for truly overdue, not yet paid or pending verification
     if (currentStatus !== 'Overdue') return 0; 
 
     const daysOverdue = differenceInDays(today, dueDate);
     if (daysOverdue <= 0) return 0;
+    
+    let applicableTiers: PenaltyTier[] = [];
+    const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
+      t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
+    );
+    if (spaceSpecificTiers.length > 0) {
+      applicableTiers = spaceSpecificTiers;
+    } else {
+      const floorSpecificTiers = building.penaltyPolicyTiers.filter(
+        t => t.scope === 'Floor' && t.applicableFloor === space.floor
+      );
+      if (floorSpecificTiers.length > 0) {
+        applicableTiers = floorSpecificTiers;
+      } else {
+        applicableTiers = building.penaltyPolicyTiers.filter(t => t.scope === 'Building');
+      }
+    }
+    
+    if (applicableTiers.length === 0) return 0;
 
-    const sortedTiers = [...building.penaltyPolicyTiers].sort((a, b) => a.fromDay - b.fromDay);
+    const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
     let calculatedPenalty = 0;
     for (const tier of sortedTiers) {
       if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
@@ -121,7 +148,10 @@ export default function PaymentsOverviewPage() {
         currentStatus = 'Overdue';
       }
       
-      const penalty = bill.status !== 'Paid' && bill.status !== 'Pending Verification' ? calculatePenalty(bill, currentStatus) : (bill.penaltyAmount || 0);
+      const penalty = (currentStatus === 'Overdue' && bill.status !== 'Paid' && bill.status !== 'Pending Verification') 
+                      ? calculatePenalty(bill, currentStatus) 
+                      : (bill.penaltyAmount || 0);
+
       const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
       const newTotalAmount = baseAmount + penalty;
 
@@ -385,3 +415,4 @@ export default function PaymentsOverviewPage() {
     </div>
   );
 }
+

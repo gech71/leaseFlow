@@ -1,16 +1,20 @@
 
 export interface PenaltyTier {
   fromDay: number;
-  toDay?: number | null; // null means it's the last, ongoing tier
+  toDay?: number | null; // null means it's the last, ongoing tier in its sequence for the scope
   feeType: 'Fixed' | 'Percentage';
   feeValue: number;
+  // Scope fields
+  scope: 'Building' | 'Floor' | 'SpecificSpaces';
+  applicableFloor?: string; // Used if scope is 'Floor'
+  applicableSpaceIdNames?: string[]; // Used if scope is 'SpecificSpaces', stores Space.spaceIdName
 }
 
 export interface Building {
   id: string;
   name: string;
   address?: string;
-  penaltyPolicyTiers?: PenaltyTier[];
+  penaltyPolicyTiers?: PenaltyTier[]; // A flat list of all tiers, each with its scope
   createdAt: string; // ISO date string
 }
 
@@ -100,3 +104,4 @@ export interface Bill {
   tenantPaymentNotes?: string; // Notes from tenant during proof submission
   adminVerificationNotes?: string; // Notes from admin during verification
 }
+

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIcon, UploadCloud, MessageSquare, ShieldCheck, ShieldX } from 'lucide-react';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX } from 'lucide-react';
 import type { Bill, Agreement, Space, Building, BuildingMonthlyUtilities, PenaltyTier } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -61,9 +61,15 @@ const initialMockSpaces: Space[] = [
 ];
 
 const initialMockBuildings: Building[] = [
-  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 1, toDay:5, feeType: 'Fixed', feeValue: 50 }, { fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 100 }], createdAt: new Date().toISOString() },
-  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 1, toDay:3, feeType: 'Percentage', feeValue: 2 }, {fromDay: 4, toDay: null, feeType: 'Percentage', feeValue: 5}], createdAt: new Date().toISOString() },
-  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() },
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [
+      { scope: 'Building', fromDay: 1, toDay:5, feeType: 'Fixed', feeValue: 50 }, 
+      { scope: 'Building', fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 100 }
+    ], createdAt: new Date().toISOString() },
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [
+      { scope: 'Building', fromDay: 1, toDay:3, feeType: 'Percentage', feeValue: 2 }, 
+      { scope: 'Building', fromDay: 4, toDay: null, feeType: 'Percentage', feeValue: 5}
+    ], createdAt: new Date().toISOString() },
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No policy
 ];
 
 
@@ -102,7 +108,10 @@ const getStoredBuildings = (): Building[] => {
         const parsed = JSON.parse(storedBuildings) as Building[];
         return parsed.map(b => ({
           ...b,
-          penaltyPolicyTiers: b.penaltyPolicyTiers || [], 
+          penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(tier => ({
+            ...tier,
+            scope: tier.scope || 'Building', // Default old data to 'Building'
+          })),
         }));
       } catch (e) {
         console.error("Error parsing buildings from localStorage on billing page", e);
@@ -120,7 +129,7 @@ const paymentFormSchema = z.object({
   paymentMethod: z.string().min(1, { message: "Payment method is required." }),
   paymentReference: z.string().optional(),
   bankOrWalletName: z.string().optional(),
-  adminVerificationNotes: z.string().optional(), // Added for verification
+  adminVerificationNotes: z.string().optional(), 
 }).refine(data => {
   if ((data.paymentMethod === "Bank Transfer" || data.paymentMethod === "Wallet") && (!data.bankOrWalletName || data.bankOrWalletName.trim() === "")) {
     return false;
@@ -138,7 +147,7 @@ export default function BillingPage() {
   const [bills, setBills] = useState<Bill[]>(initialBills);
   const [agreements, setAgreements] = useState<Agreement[]>(initialMockAgreements);
   const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces);
-  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [allBuildings, setAllBuildings] = useState<Building[]>([]);
   const [allBuildingUtilities, setAllBuildingUtilities] = useState<BuildingMonthlyUtilities[]>([]);
   
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -175,28 +184,49 @@ export default function BillingPage() {
       setSpaces(initialMockSpaces);
     }
     setAllBuildingUtilities(getStoredBuildingUtilities());
-    setBuildings(getStoredBuildings());
+    setAllBuildings(getStoredBuildings());
     setToday(startOfDay(new Date())); 
   }, []);
 
-  const calculatePenalty = useCallback((bill: Bill): number => {
+  const calculatePenalty = useCallback((bill: Bill, currentStatus: Bill['status']): number => {
     const agreement = agreements.find(ag => ag.id === bill.agreementId);
     if (!agreement) return 0;
     const space = spaces.find(sp => sp.id === agreement.spaceId);
     if (!space) return 0;
-    const building = buildings.find(b => b.name === space.buildingName);
+    const building = allBuildings.find(b => b.name === space.buildingName);
     
     if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
-    // Apply penalty if overdue, regardless of payment status for calculation display. Actual application depends on flow.
-    if (isAfter(dueDate, today) || bill.status === 'Paid') return 0; 
+    if (currentStatus !== 'Overdue') return 0;
 
     const daysOverdue = differenceInDays(today, dueDate);
     if (daysOverdue <= 0) return 0;
 
-    const sortedTiers = [...building.penaltyPolicyTiers].sort((a, b) => a.fromDay - b.fromDay);
+    // Hierarchy: Space > Floor > Building
+    let applicableTiers: PenaltyTier[] = [];
+    
+    const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
+      t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
+    );
+    if (spaceSpecificTiers.length > 0) {
+      applicableTiers = spaceSpecificTiers;
+    } else {
+      const floorSpecificTiers = building.penaltyPolicyTiers.filter(
+        t => t.scope === 'Floor' && t.applicableFloor === space.floor
+      );
+      if (floorSpecificTiers.length > 0) {
+        applicableTiers = floorSpecificTiers;
+      } else {
+        applicableTiers = building.penaltyPolicyTiers.filter(t => t.scope === 'Building');
+      }
+    }
+    
+    if (applicableTiers.length === 0) return 0;
+
+    const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
     let calculatedPenalty = 0;
+
     for (const tier of sortedTiers) {
       if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
         if (tier.feeType === 'Fixed') {
@@ -208,7 +238,7 @@ export default function BillingPage() {
       }
     }
     return parseFloat(calculatedPenalty.toFixed(2));
-  }, [agreements, spaces, buildings, today]);
+  }, [agreements, spaces, allBuildings, today]);
 
   const processedBills = useMemo(() => {
     return bills.map(bill => {
@@ -217,10 +247,13 @@ export default function BillingPage() {
         currentStatus = 'Overdue';
       }
       
-      const penalty = bill.status !== 'Paid' && bill.status !== 'Pending Verification' ? calculatePenalty({ ...bill, status: currentStatus }) : (bill.penaltyAmount || 0);
+      const penalty = (currentStatus === 'Overdue' && bill.status !== 'Paid' && bill.status !== 'Pending Verification') 
+                      ? calculatePenalty({ ...bill, status: currentStatus }, currentStatus) 
+                      : (bill.penaltyAmount || 0);
+                      
       const newTotalAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0) + penalty;
-      const agreement = agreements.find(ag => ag.id === bill.agreementId);
-      const tenantName = agreement ? agreement.tenantName : 'N/A';
+      const agreementLinked = agreements.find(ag => ag.id === bill.agreementId);
+      const tenantName = agreementLinked ? agreementLinked.tenantName : 'N/A';
 
       return {
         ...bill,
@@ -257,7 +290,8 @@ export default function BillingPage() {
     const utilityBreakdownItems: Array<{ name: string; amount: number }> = [];
     let totalUtilityCostForBill = 0;
     const billYear = getYear(targetDueDate);
-    const billMonth = getMonth(targetDueDate);
+    const billMonth = getMonth(targetDueDate); // 0-11
+    
     const monthlyBuildingUtilityData = allBuildingUtilities.find(
       entry => entry.buildingName === space.buildingName && entry.year === billYear && entry.month === billMonth
     );
@@ -282,8 +316,8 @@ export default function BillingPage() {
           totalUtilityCostForBill += costForThisUtility;
         }
       });
-    } else if (spaces.some(s => s.buildingName === space.buildingName && s.utilityProrationShare > 0)) {
-       toast({ title: "Warning: Missing Utilities", description: `No utility costs for ${space.buildingName} for ${format(targetDueDate, 'MMMM yyyy')}. Utilities will be $0.`, variant: "default", duration: 7000 });
+    } else if (spaces.some(s => s.buildingName === space.buildingName && s.utilityProrationShare > 0)) { // Check if any space in building expects utilities
+       toast({ title: "Warning: Missing Utilities", description: `No utility costs for ${space.buildingName} for ${format(setMonth(new Date(), billMonth), 'MMMM')} ${billYear}. Utilities will be $0.`, variant: "default", duration: 7000 });
     }
     const totalAmount = rentAmount + totalUtilityCostForBill;
     return {
@@ -345,7 +379,7 @@ export default function BillingPage() {
     if (!billForPayment) return;
     const processedBill = processedBills.find(pb => pb.id === billForPayment.id);
     if (!processedBill) return;
-    setBills(prevBills => prevBills.map(b => b.id === billForPayment.id ? { ...processedBill, status: 'Paid', paymentDate: values.paymentDate.toISOString(), paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes } : b));
+    setBills(prevBills => prevBills.map(b => b.id === billForPayment.id ? { ...processedBill, status: 'Paid', paymentDate: values.paymentDate.toISOString(), paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes, penaltyAmount: processedBill.penaltyAmount } : b));
     toast({ title: "Payment Recorded", description: `Payment for bill ${billForPayment.id} recorded.` });
     setIsPaymentDialogOpen(false); setBillForPayment(null); paymentForm.reset();
   };
@@ -360,16 +394,14 @@ export default function BillingPage() {
         ...processedBill, status: 'Paid', paymentDate: values.paymentDate.toISOString(), 
         paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, 
         bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, 
-        adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes,
-        // Keep tenant notes and proof URL
+        adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes, penaltyAmount: processedBill.penaltyAmount,
       } : b));
       toast({ title: "Payment Verified", description: `Payment for bill ${billForVerification.id} confirmed.` });
-    } else { // Reject
+    } else { 
       setBills(prevBills => prevBills.map(b => b.id === billForVerification.id ? { 
         ...processedBill, 
-        status: isBefore(parseISO(processedBill.dueDate), today) ? 'Overdue' : 'Pending', // Revert to appropriate pending/overdue
+        status: isBefore(parseISO(processedBill.dueDate), today) ? 'Overdue' : 'Pending', 
         adminVerifiedPayment: false, adminVerificationNotes: values.adminVerificationNotes,
-        // Clear payment specific fields that were potentially pre-filled from tenant submission
         paymentDate: undefined, paymentMethod: undefined, paymentReference: undefined, bankOrWalletName: undefined,
       } : b));
       toast({ title: "Payment Rejected", description: `Payment proof for bill ${billForVerification.id} rejected. Status reverted.`, variant: "destructive" });
@@ -419,15 +451,15 @@ export default function BillingPage() {
           <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle>
           <CardDescription>Select an active agreement to generate its next due bill.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {agreements.map(agreement => {
             const isAgreementActive = !isBefore(today, startOfDay(new Date(agreement.startDate))) && !isAfter(today, addMonths(startOfDay(new Date(agreement.startDate)), agreement.paymentTermMonths));
             const nextDueDate = startOfDay(new Date(agreement.nextPaymentDueDate));
             const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, today);
             
             return (
-              <Card key={agreement.id} className={`bg-secondary/30 ${!isAgreementActive ? 'opacity-60' : ''}`}>
-                <CardHeader className="pb-2">
+              <Card key={agreement.id} className={`bg-secondary/30 shadow-sm hover:shadow-md transition-shadow ${!isAgreementActive ? 'opacity-60' : ''}`}>
+                <CardHeader className="pb-2 pt-3">
                   <CardTitle className="text-base font-semibold">{agreement.tenantName}</CardTitle>
                   <CardDescription className="text-xs">{agreement.spaceDescription}</CardDescription>
                    <CardDescription className="text-xs pt-1">
@@ -437,8 +469,8 @@ export default function BillingPage() {
                     {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
                   </CardDescription>
                 </CardHeader>
-                <CardFooter>
-                  <Button size="sm" onClick={() => generateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={!isAgreementActive}>Generate Bill</Button>
+                <CardFooter className="pt-2 pb-3">
+                  <Button size="sm" onClick={() => generateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive}>Generate Bill</Button>
                 </CardFooter>
               </Card>
             );
@@ -446,7 +478,6 @@ export default function BillingPage() {
         </CardContent>
       </Card>
       
-      {/* Payment Dialog (for direct admin recording) */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); }}}>
           <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -465,7 +496,6 @@ export default function BillingPage() {
           </DialogContent>
       </Dialog>
 
-      {/* Verification Dialog */}
       <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); }}}>
           <DialogContent className="sm:max-w-lg">
               <DialogHeader>
@@ -485,7 +515,7 @@ export default function BillingPage() {
                 </div>
               )}
               <Form {...paymentForm}>
-                  <form className="space-y-4 py-1"> {/* onSubmit handled by footer buttons */}
+                  <form className="space-y-4 py-1"> 
                       <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
                       <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                       {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
@@ -551,3 +581,4 @@ export default function BillingPage() {
     </div>
   );
 }
+

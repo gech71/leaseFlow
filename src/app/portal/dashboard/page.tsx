@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare } from 'lucide-react';
 import type { Agreement, Bill, Building as BuildingType, PenaltyTier } from '@/lib/types'; 
@@ -59,9 +59,9 @@ const mockPortalBuilding: BuildingType = {
   name: 'Portal View Residences',
   address: '1 Portal Drive',
   penaltyPolicyTiers: [
-    { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 25 },
-    { fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 50 },
-    { fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 }
+    { scope: 'Building', fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 25 },
+    { scope: 'Building', fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 50 },
+    { scope: 'Building', fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 } // 1.5% of rent
   ],
   createdAt: new Date().toISOString(),
 };
@@ -142,71 +142,90 @@ export default function CustomerDashboardPage() {
     setToday(startOfDay(new Date()));
   }, []);
 
+  const calculatePenaltyForTenant = useCallback((bill: Bill, currentStatus: Bill['status']): number => {
+    if (!mockPortalBuilding.penaltyPolicyTiers || mockPortalBuilding.penaltyPolicyTiers.length === 0) return 0;
+    const dueDate = parseISO(bill.dueDate);
+    if (currentStatus !== 'Overdue') return 0;
+
+    const daysOverdue = differenceInDays(today, dueDate);
+    if (daysOverdue <= 0) return 0;
+
+    // For tenant portal, we assume building-wide policies or the most relevant one defined in mockPortalBuilding
+    // For simplicity, using the building-level policy defined in mockPortalBuilding
+    const applicableTiers = mockPortalBuilding.penaltyPolicyTiers.filter(t => t.scope === 'Building' || 
+      (t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(mockTenantAgreement?.spaceDescription.split(',')[0].trim() || '')) || // simplified match
+      (t.scope === 'Floor' && t.applicableFloor === (mockTenantAgreement?.spaceDescription.split(',')[1]?.trim().split(' ')[0] || '')) // simplified match
+    );
+
+    if (applicableTiers.length === 0) return 0;
+
+    const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
+    let calculatedPenalty = 0;
+
+    for (const tier of sortedTiers) {
+      if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
+        if (tier.feeType === 'Fixed') {
+          calculatedPenalty = tier.feeValue;
+        } else if (tier.feeType === 'Percentage') {
+          calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
+        }
+        break;
+      }
+    }
+    return parseFloat(calculatedPenalty.toFixed(2));
+  }, [today]);
+
+
   const processedBills = useMemo(() => {
     return bills.map(bill => {
       let currentStatus = bill.status;
-      let calculatedPenalty = 0;
       const dueDate = parseISO(bill.dueDate);
 
       if (bill.status === 'Pending' && isBefore(dueDate, today)) {
         currentStatus = 'Overdue';
       }
       
-      // Apply penalty only if it's truly overdue and not already paid or pending verification
-      if (currentStatus === 'Overdue') {
-        const daysOverdue = differenceInDays(today, dueDate);
-        if (daysOverdue > 0 && mockPortalBuilding.penaltyPolicyTiers && mockPortalBuilding.penaltyPolicyTiers.length > 0) {
-           const sortedTiers = [...mockPortalBuilding.penaltyPolicyTiers].sort((a,b) => a.fromDay - b.fromDay);
-           for (const tier of sortedTiers) {
-               if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
-                   if (tier.feeType === 'Fixed') {
-                       calculatedPenalty = tier.feeValue;
-                   } else { // Percentage
-                       calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
-                   }
-                   break; 
-               }
-           }
-        }
-      }
+      const penalty = (currentStatus === 'Overdue' && bill.status !== 'Paid' && bill.status !== 'Pending Verification')
+                      ? calculatePenaltyForTenant(bill, currentStatus)
+                      : (bill.penaltyAmount || 0);
       
       const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
-      const newTotalAmount = baseAmount + calculatedPenalty;
+      const newTotalAmount = baseAmount + penalty;
 
       return {
         ...bill,
         status: currentStatus,
-        penaltyAmount: calculatedPenalty > 0 ? parseFloat(calculatedPenalty.toFixed(2)) : bill.penaltyAmount, // Preserve penalty if already set (e.g. during verification)
+        penaltyAmount: penalty > 0 ? penalty : undefined,
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [bills, today]);
+  }, [bills, today, calculatePenaltyForTenant]);
 
   useEffect(() => {
     setAgreement(mockTenantAgreement);
-    // setBills(processedBills); // This was causing a loop with the above useMemo
-    // The bills state itself will be updated by actions, and processedBills will recompute
   }, []);
   
-  // Update bills state when processedBills changes if bills is initialMockTenantBills
-  // This is to ensure the initial load correctly processes statuses and penalties
   useEffect(() => {
-    if (bills === initialMockTenantBills) { // Only run on initial load/data set
+    if (bills === initialMockTenantBills) { 
         setBills(processedBills);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processedBills]); // Dependency on processedBills
+  }, [processedBills]); 
 
   const handlePayBill = (billId: string) => {
     const billToPay = bills.find(b => b.id === billId);
     if (!billToPay) return;
 
+    const processedBillToPay = processedBills.find(pb => pb.id === billId);
+    const finalAmount = processedBillToPay ? processedBillToPay.totalAmount : billToPay.totalAmount;
+
+
     toast({
       title: "Processing Payment...",
-      description: `Payment for bill ${billId} (Total: $${billToPay.totalAmount.toFixed(2)}) is being processed. This is a demo.`,
+      description: `Payment for bill ${billId} (Total: $${finalAmount.toFixed(2)}) is being processed. This is a demo.`,
     });
     setTimeout(() => {
-        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment", penaltyAmount: b.penaltyAmount} : b));
+        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment", penaltyAmount: processedBillToPay?.penaltyAmount } : b));
         toast({
             title: "Payment Successful (Simulated)",
             description: `Bill ${billId} has been marked as paid.`,
@@ -215,7 +234,8 @@ export default function CustomerDashboardPage() {
   };
 
   const handleOpenProofDialog = (bill: Bill) => {
-    setBillForProof(bill);
+    const currentProcessedBill = processedBills.find(pb => pb.id === bill.id) || bill;
+    setBillForProof(currentProcessedBill);
     setProofNotes('');
     setSelectedFile(null);
     if (fileInputRef.current) {
@@ -239,7 +259,6 @@ export default function CustomerDashboardPage() {
       return;
     }
 
-    // Simulate upload and update bill status
     toast({ title: "Submitting Proof...", description: `Uploading ${selectedFile.name} for bill ${billForProof.id}.`});
     setTimeout(() => {
       setBills(prevBills => 
@@ -250,7 +269,7 @@ export default function CustomerDashboardPage() {
               status: 'Pending Verification', 
               paymentProofUrl: `simulated_proof_${selectedFile.name}`, 
               tenantPaymentNotes: proofNotes,
-              // Keep existing penalty if one was calculated
+              penaltyAmount: billForProof.penaltyAmount, // Preserve penalty calculated at time of proof submission
             } 
           : b
         )
@@ -329,6 +348,7 @@ export default function CustomerDashboardPage() {
             <DialogTitle className="font-headline text-xl">Submit Payment Proof</DialogTitle>
             <DialogDescription>
               For bill due {billForProof ? format(parseISO(billForProof.dueDate), 'PP') : ''} (Total: ${billForProof?.totalAmount.toFixed(2)})
+              {billForProof?.penaltyAmount && billForProof.penaltyAmount > 0 && <span className="text-destructive block text-xs"> (Includes late fee of ${billForProof.penaltyAmount.toFixed(2)})</span>}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -478,3 +498,4 @@ export default function CustomerDashboardPage() {
     </div>
   );
 }
+

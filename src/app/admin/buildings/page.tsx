@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, DollarSign as DollarSignLucide, AlertTriangle } from 'lucide-react';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, DollarSign as DollarSignLucide, AlertTriangle, Layers, HomeIcon } from 'lucide-react';
 import type { Building, PenaltyTier } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -32,6 +32,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const getStoredBuildings = (): Building[] => {
   if (typeof window !== 'undefined') {
@@ -41,7 +42,10 @@ const getStoredBuildings = (): Building[] => {
         const parsed = JSON.parse(stored) as Building[];
         return parsed.map(b => ({
           ...b,
-          penaltyPolicyTiers: b.penaltyPolicyTiers || [], 
+          penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(tier => ({
+            ...tier,
+            scope: tier.scope || 'Building', // Default old data to 'Building'
+          })),
         }));
       } catch (e) {
         console.error("Error parsing buildings from localStorage", e);
@@ -58,12 +62,19 @@ const storeBuildings = (buildings: Building[]) => {
   }
 };
 
-// This state is for the form UI
 interface PenaltyRuleFormItem {
-  id: string; // For React list keys
-  days?: number; // Duration for this specific tier
+  id: string; 
+  durationDays?: number; 
   feeType?: 'Fixed' | 'Percentage';
   feeValue?: number;
+}
+
+interface ScopedPenaltyPolicyForm {
+  id: string; // For React list keys
+  scope: 'Building' | 'Floor' | 'SpecificSpaces';
+  applicableFloor?: string;
+  applicableSpaceIdNamesStr?: string; // Comma-separated string for UI
+  rules: PenaltyRuleFormItem[];
 }
 
 interface BuildingFormState {
@@ -71,16 +82,15 @@ interface BuildingFormState {
   name?: string;
   address?: string;
   createdAt?: string;
-  penaltyRules: PenaltyRuleFormItem[];
+  scopedPolicies: ScopedPenaltyPolicyForm[];
 }
-
 
 export default function BuildingsPage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
-  const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ penaltyRules: [] });
+  const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ scopedPolicies: [] });
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null);
@@ -90,28 +100,75 @@ export default function BuildingsPage() {
     setBuildings(getStoredBuildings());
   }, []);
 
-  // Penalty Rule form handlers
-  const handleAddPenaltyRule = () => {
+  const handleAddScopedPolicy = () => {
     setCurrentBuildingForm(prev => ({
       ...prev,
-      penaltyRules: [...prev.penaltyRules, { id: `rule-${Date.now()}`, feeType: 'Fixed' }]
+      scopedPolicies: [
+        ...prev.scopedPolicies,
+        { 
+          id: `scopedPolicy-${Date.now()}`, 
+          scope: 'Building', 
+          rules: [{ id: `rule-${Date.now()}`, feeType: 'Fixed' }] 
+        }
+      ]
     }));
   };
 
-  const handleRemovePenaltyRule = (ruleId: string) => {
+  const handleRemoveScopedPolicy = (scopedPolicyId: string) => {
     setCurrentBuildingForm(prev => ({
       ...prev,
-      penaltyRules: prev.penaltyRules.filter(rule => rule.id !== ruleId)
+      scopedPolicies: prev.scopedPolicies.filter(sp => sp.id !== scopedPolicyId)
     }));
   };
 
-  const handlePenaltyRuleChange = (ruleId: string, field: keyof Omit<PenaltyRuleFormItem, 'id'>, value: any) => {
+  const handleScopedPolicyChange = (scopedPolicyId: string, field: keyof Omit<ScopedPenaltyPolicyForm, 'id' | 'rules'>, value: any) => {
     setCurrentBuildingForm(prev => ({
       ...prev,
-      penaltyRules: prev.penaltyRules.map(rule => 
-        rule.id === ruleId 
-          ? { ...rule, [field]: field === 'days' || field === 'feeValue' ? (value ? Number(value) : undefined) : value } 
-          : rule
+      scopedPolicies: prev.scopedPolicies.map(sp =>
+        sp.id === scopedPolicyId
+          ? { ...sp, [field]: value, 
+              // Reset conditional fields if scope changes
+              applicableFloor: field === 'scope' && value !== 'Floor' ? undefined : sp.applicableFloor,
+              applicableSpaceIdNamesStr: field === 'scope' && value !== 'SpecificSpaces' ? undefined : sp.applicableSpaceIdNamesStr,
+            }
+          : sp
+      )
+    }));
+  };
+  
+  const handleAddRuleToScopedPolicy = (scopedPolicyId: string) => {
+    setCurrentBuildingForm(prev => ({
+      ...prev,
+      scopedPolicies: prev.scopedPolicies.map(sp =>
+        sp.id === scopedPolicyId
+          ? { ...sp, rules: [...sp.rules, { id: `rule-${Date.now()}-${scopedPolicyId}`, feeType: 'Fixed' }] }
+          : sp
+      )
+    }));
+  };
+
+  const handleRemoveRuleFromScopedPolicy = (scopedPolicyId: string, ruleId: string) => {
+     setCurrentBuildingForm(prev => ({
+      ...prev,
+      scopedPolicies: prev.scopedPolicies.map(sp =>
+        sp.id === scopedPolicyId
+          ? { ...sp, rules: sp.rules.filter(rule => rule.id !== ruleId) }
+          : sp
+      )
+    }));
+  };
+
+  const handleRuleChangeInScopedPolicy = (scopedPolicyId: string, ruleId: string, field: keyof Omit<PenaltyRuleFormItem, 'id'>, value: any) => {
+    setCurrentBuildingForm(prev => ({
+      ...prev,
+      scopedPolicies: prev.scopedPolicies.map(sp =>
+        sp.id === scopedPolicyId
+          ? { ...sp, rules: sp.rules.map(rule => 
+              rule.id === ruleId 
+                ? { ...rule, [field]: (field === 'durationDays' || field === 'feeValue') ? (value ? Number(value) : undefined) : value }
+                : rule
+            )}
+          : sp
       )
     }));
   };
@@ -125,37 +182,46 @@ export default function BuildingsPage() {
     }
 
     const finalPenaltyTiers: PenaltyTier[] = [];
-    let cumulativeStartDay = 1;
 
-    for (let i = 0; i < currentBuildingForm.penaltyRules.length; i++) {
-      const rule = currentBuildingForm.penaltyRules[i];
-      if (!rule.days || rule.days <= 0 || !rule.feeType || rule.feeValue === undefined || rule.feeValue < 0) {
-        toast({ title: "Error", description: `Penalty Rule ${i + 1} is incomplete or invalid. 'Days' and 'Fee Value' must be positive.`, variant: "destructive" });
+    for (const scopedPolicy of currentBuildingForm.scopedPolicies) {
+      if (scopedPolicy.scope === 'Floor' && !scopedPolicy.applicableFloor?.trim()) {
+        toast({ title: "Error", description: `Floor name is required for floor-scoped policy.`, variant: "destructive" });
+        return;
+      }
+      if (scopedPolicy.scope === 'SpecificSpaces' && !scopedPolicy.applicableSpaceIdNamesStr?.trim()) {
+         toast({ title: "Error", description: `Space ID(s) are required for space-scoped policy.`, variant: "destructive" });
         return;
       }
 
-      const fromDay = cumulativeStartDay;
-      const toDay = (i === currentBuildingForm.penaltyRules.length - 1) ? null : (cumulativeStartDay + rule.days - 1);
+      let cumulativeStartDay = 1;
+      for (let i = 0; i < scopedPolicy.rules.length; i++) {
+        const rule = scopedPolicy.rules[i];
+        if (!rule.durationDays || rule.durationDays <= 0 || !rule.feeType || rule.feeValue === undefined || rule.feeValue < 0) {
+          toast({ title: "Error", description: `Rule ${i + 1} in a scoped policy is incomplete or invalid. 'Duration Days' and 'Fee Value' must be positive.`, variant: "destructive" });
+          return;
+        }
 
-      finalPenaltyTiers.push({
-        fromDay: fromDay,
-        toDay: toDay,
-        feeType: rule.feeType,
-        feeValue: Number(rule.feeValue),
-      });
+        const fromDay = cumulativeStartDay;
+        const toDay = (i === scopedPolicy.rules.length - 1) ? null : (cumulativeStartDay + rule.durationDays - 1);
 
-      if (toDay !== null) {
-        cumulativeStartDay = toDay + 1;
-      } else {
-        // This is the last rule and it's indefinite, so break if there are somehow more UI rules.
-        // This check might be redundant if UI prevents adding more after an indefinite one.
-        break; 
+        finalPenaltyTiers.push({
+          fromDay: fromDay,
+          toDay: toDay,
+          feeType: rule.feeType,
+          feeValue: Number(rule.feeValue),
+          scope: scopedPolicy.scope,
+          applicableFloor: scopedPolicy.scope === 'Floor' ? scopedPolicy.applicableFloor?.trim() : undefined,
+          applicableSpaceIdNames: scopedPolicy.scope === 'SpecificSpaces' ? scopedPolicy.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : undefined,
+        });
+        
+        if (toDay !== null) {
+          cumulativeStartDay = toDay + 1;
+        } else {
+          break; 
+        }
       }
     }
     
-    // Validate that if multiple tiers, the 'toDay' of a preceding tier is less than 'fromDay' of next.
-    // This is handled by cumulativeStartDay logic.
-
     const buildingData: Building = {
       id: formMode === 'add' ? `building-${Date.now()}` : currentBuildingForm.id!,
       name: currentBuildingForm.name!.trim(),
@@ -175,7 +241,7 @@ export default function BuildingsPage() {
     setBuildings(updatedBuildings);
     storeBuildings(updatedBuildings);
     setIsFormOpen(false);
-    setCurrentBuildingForm({ penaltyRules: [] });
+    setCurrentBuildingForm({ scopedPolicies: [] });
   };
 
   const openAddForm = () => {
@@ -183,59 +249,64 @@ export default function BuildingsPage() {
     setCurrentBuildingForm({ 
       name: '', 
       address: '', 
-      penaltyRules: [{ id: `rule-${Date.now()}`, feeType: 'Fixed' }] // Start with one empty rule
+      scopedPolicies: [{ 
+        id: `scopedPolicy-${Date.now()}`, 
+        scope: 'Building', 
+        rules: [{ id: `rule-${Date.now()}`, feeType: 'Fixed' }] 
+      }]
     });
     setIsFormOpen(true);
   };
 
   const openEditForm = (building: Building) => {
     setFormMode('edit');
-    const formRules: PenaltyRuleFormItem[] = (building.penaltyPolicyTiers || []).map((tier, index, arr) => {
-      let days;
-      if (tier.toDay === null) { // Last, indefinite tier
-        // If it's the only tier and indefinite, 'days' could be a placeholder like 1, or UI could show "thereafter"
-        // For now, let's make 'days' reflect the start for simplicity in UI, actual duration is indefinite.
-        // Or, if this is the last tier, days could be considered '1' if fromDay is the start of this indefinite period
-        // This might need a better UI representation like a checkbox "applies thereafter" for the last rule.
-        // For simplicity, let's make `days` represent the duration from its start day if toDay is not null.
-        // If toDay is null, it means it's indefinite from fromDay.
-        // The user inputs duration for each segment.
-        // If the last saved tier has toDay: null, it means its original 'days' input led to it being last.
-        // For display, we'll assume it had a 'days' value that made it the last one.
-        // If toDay is null, then this rule had a 'days' input, but it's the last, so it goes on forever.
-        // The simplest is to calculate the original days if toDay is not null.
-        // If toDay is null for the last one, we can just use its fromDay to indicate where it started.
-        // The user provides duration for each tier.
-         days = (tier.toDay !== null) ? (tier.toDay - tier.fromDay + 1) : 1; // default to 1 if it's the indefinite one
-         if (tier.toDay === null && arr.length > 1) { // if it's last and not the only one
-            const prevTier = arr[index-1];
-            if (prevTier && prevTier.toDay) {
-                 // this is just a placeholder, as it's indefinite
-            }
-         } else if (tier.toDay === null && arr.length === 1) {
-            // only one tier, and it's indefinite. User must have entered some 'days' for it.
-         }
-
-      } else {
-        days = tier.toDay - tier.fromDay + 1;
-      }
-
-
-      return {
-        id: `rule-edit-${index}-${Date.now()}`,
-        days: (tier.toDay !== null) ? (tier.toDay - tier.fromDay + 1) : (building.penaltyPolicyTiers && building.penaltyPolicyTiers.length === 1 ? 1 : undefined), // If last tier (toDay is null), days is less defined this way. User will re-enter or it defaults.
-        feeType: tier.feeType,
-        feeValue: tier.feeValue,
-      };
+    
+    const groupedTiers: Record<string, PenaltyTier[]> = {};
+    (building.penaltyPolicyTiers || []).forEach(tier => {
+      let key = tier.scope;
+      if (tier.scope === 'Floor' && tier.applicableFloor) key += `_${tier.applicableFloor}`;
+      if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames) key += `_${tier.applicableSpaceIdNames.join(',')}`;
+      if (!groupedTiers[key]) groupedTiers[key] = [];
+      groupedTiers[key].push(tier);
     });
 
+    const formScopedPolicies: ScopedPenaltyPolicyForm[] = Object.values(groupedTiers).map((tiersInScope, index) => {
+      // Sort tiers by fromDay to correctly reconstruct durations
+      const sortedTiers = [...tiersInScope].sort((a,b) => a.fromDay - b.fromDay);
+      
+      const uiRules: PenaltyRuleFormItem[] = sortedTiers.map((tier, ruleIdx, arr) => {
+        let durationDays: number | undefined;
+        if (tier.toDay !== null && tier.toDay !== undefined) {
+          durationDays = tier.toDay - tier.fromDay + 1;
+        } else { // Last rule in this scope sequence (indefinite)
+          // For UI, we might set a placeholder or let user know it's indefinite.
+          // For now, let's assume a duration that made it the last, or simply 1 if it's the only rule.
+           durationDays = (arr.length === 1 || ruleIdx === arr.length -1) ? 1 : undefined; // Placeholder for indefinite, needs UI hint
+        }
+        return {
+          id: `rule-edit-${index}-${ruleIdx}-${Date.now()}`,
+          durationDays: durationDays,
+          feeType: tier.feeType,
+          feeValue: tier.feeValue,
+        };
+      });
+      
+      const firstTierInScope = sortedTiers[0];
+      return {
+        id: `scopedPolicy-edit-${index}-${Date.now()}`,
+        scope: firstTierInScope.scope,
+        applicableFloor: firstTierInScope.applicableFloor,
+        applicableSpaceIdNamesStr: firstTierInScope.applicableSpaceIdNames?.join(', '),
+        rules: uiRules.length > 0 ? uiRules : [{ id: `rule-empty-${index}-${Date.now()}`, feeType: 'Fixed'}]
+      };
+    });
 
     setCurrentBuildingForm({ 
       id: building.id,
       name: building.name,
       address: building.address,
       createdAt: building.createdAt,
-      penaltyRules: formRules.length > 0 ? formRules : [{ id: `rule-${Date.now()}`, feeType: 'Fixed' }],
+      scopedPolicies: formScopedPolicies.length > 0 ? formScopedPolicies : [{ id: `scopedPolicy-empty-${Date.now()}`, scope: 'Building', rules: [{ id: `rule-empty-inner-${Date.now()}`, feeType: 'Fixed'}] }],
     });
     setIsFormOpen(true);
   };
@@ -258,7 +329,7 @@ export default function BuildingsPage() {
       <PageHeader
         title="Manage Buildings"
         icon={BuildingIcon}
-        description="Add, view, and manage your property buildings, including multi-tier late fee policies."
+        description="Add, view, and manage your property buildings. Define late fee policies applicable to the entire building, specific floors, or specific spaces."
         actions={
           <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground">
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Building
@@ -268,91 +339,153 @@ export default function BuildingsPage() {
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
         setIsFormOpen(isOpen);
-        if (!isOpen) setCurrentBuildingForm({ penaltyRules: [] });
+        if (!isOpen) setCurrentBuildingForm({ scopedPolicies: [] });
       }}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Building' : 'Edit Building'}</DialogTitle>
             <DialogDescription>
-              Fill in the details for the building. Add penalty rules sequentially. The last rule applies indefinitely.
+              Fill in building details. Add penalty policies for different scopes (Building, Floor, Space). For each scope, define sequential rules; the last rule applies indefinitely.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-3">
-              <div>
-                <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
-                  <BuildingIcon className="mr-2 h-4 w-4 text-primary" />Building Name
-                </Label>
-                <Input 
-                  id="buildingNameMain" 
-                  value={currentBuildingForm.name || ''} 
-                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))} 
-                  placeholder="e.g., Sunrise Tower" 
-                  required 
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
-                  <MapPin className="mr-2 h-4 w-4 text-primary" />Address (Optional)
-                </Label>
-                <Textarea 
-                  id="buildingAddressMain" 
-                  value={currentBuildingForm.address || ''} 
-                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))} 
-                  placeholder="e.g., 123 Main St, Anytown, USA" 
-                  rows={2}
-                  className="mt-1"
-                />
-              </div>
+            <ScrollArea className="max-h-[70vh] pr-3">
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
+                    <BuildingIcon className="mr-2 h-4 w-4 text-primary" />Building Name
+                  </Label>
+                  <Input 
+                    id="buildingNameMain" 
+                    value={currentBuildingForm.name || ''} 
+                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))} 
+                    placeholder="e.g., Sunrise Tower" 
+                    required 
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
+                    <MapPin className="mr-2 h-4 w-4 text-primary" />Address (Optional)
+                  </Label>
+                  <Textarea 
+                    id="buildingAddressMain" 
+                    value={currentBuildingForm.address || ''} 
+                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))} 
+                    placeholder="e.g., 123 Main St, Anytown, USA" 
+                    rows={2}
+                    className="mt-1"
+                  />
+                </div>
               
-              <div className="space-y-3 pt-3 border-t">
-                 <div className="flex justify-between items-center">
-                    <h4 className="text-md font-semibold text-foreground">Late Fee Policy Rules</h4>
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddPenaltyRule}>
-                        <PlusCircle className="mr-1.5 h-4 w-4"/> Add Rule
-                    </Button>
-                 </div>
-                 {currentBuildingForm.penaltyRules.length === 0 && <p className="text-xs text-muted-foreground">No penalty rules defined. Add rules that will apply sequentially.</p>}
+                <div className="space-y-4 pt-3 border-t">
+                  <div className="flex justify-between items-center">
+                      <h4 className="text-md font-semibold text-foreground">Late Fee Policies (Scoped)</h4>
+                      <Button type="button" variant="outline" size="sm" onClick={handleAddScopedPolicy}>
+                          <PlusCircle className="mr-1.5 h-4 w-4"/> Add Policy Scope
+                      </Button>
+                  </div>
+                  {currentBuildingForm.scopedPolicies.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No penalty policies defined. Click "Add Policy Scope" to begin.</p>}
 
-                 {currentBuildingForm.penaltyRules.map((rule, index) => (
-                    <div key={rule.id} className="p-3 border rounded-md space-y-2 bg-secondary/30 relative">
-                        <p className="text-xs font-semibold text-muted-foreground">Rule {index + 1}{index === currentBuildingForm.penaltyRules.length - 1 ? " (Applies indefinitely from its start)" : ""}</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {currentBuildingForm.scopedPolicies.map((scopedPolicy, spIndex) => (
+                    <Card key={scopedPolicy.id} className="p-3 bg-secondary/20 shadow-sm">
+                      <CardHeader className="p-2 pb-1">
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-base">Policy Scope {spIndex + 1}</CardTitle>
+                          <Button type="button" variant="ghost" size="icon" 
+                                  onClick={() => handleRemoveScopedPolicy(scopedPolicy.id)}
+                                  className="h-7 w-7 text-destructive hover:bg-destructive/10">
+                              <Trash2 className="h-4 w-4"/>
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-2 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <Label htmlFor={`ruleDays-${rule.id}`}>Duration (Days)</Label>
-                                <Input id={`ruleDays-${rule.id}`} type="number" min="1" placeholder="e.g., 5" 
-                                       value={rule.days ?? ''} 
-                                       onChange={(e) => handlePenaltyRuleChange(rule.id, 'days', e.target.value)} 
-                                       className="mt-1"/>
-                                <p className="text-xs text-muted-foreground mt-0.5">For how many days this rule applies.</p>
-                            </div>
-                            <div>
-                                <Label htmlFor={`ruleFeeType-${rule.id}`}>Fee Type</Label>
-                                <Select value={rule.feeType || 'Fixed'} onValueChange={(value) => handlePenaltyRuleChange(rule.id, 'feeType', value as any)}>
-                                    <SelectTrigger id={`ruleFeeType-${rule.id}`} className="mt-1"><SelectValue /></SelectTrigger>
-                                    <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
+                                <Label htmlFor={`scopeType-${scopedPolicy.id}`}>Scope Type</Label>
+                                <Select value={scopedPolicy.scope} onValueChange={(value) => handleScopedPolicyChange(scopedPolicy.id, 'scope', value as ScopedPenaltyPolicyForm['scope'])}>
+                                    <SelectTrigger id={`scopeType-${scopedPolicy.id}`} className="mt-1"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Building">Entire Building</SelectItem>
+                                        <SelectItem value="Floor">Specific Floor</SelectItem>
+                                        <SelectItem value="SpecificSpaces">Specific Space(s)</SelectItem>
+                                    </SelectContent>
                                 </Select>
                             </div>
-                            <div>
-                                <Label htmlFor={`ruleFeeValue-${rule.id}`}>Fee Value</Label>
-                                <Input id={`ruleFeeValue-${rule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5" 
-                                       value={rule.feeValue ?? ''} 
-                                       onChange={(e) => handlePenaltyRuleChange(rule.id, 'feeValue', e.target.value)} 
-                                       className="mt-1"/>
-                                <p className="text-xs text-muted-foreground mt-0.5">{rule.feeType === 'Percentage' ? '% of rent' : 'Fixed amount'}</p>
-                            </div>
+                            {scopedPolicy.scope === 'Floor' && (
+                                <div>
+                                    <Label htmlFor={`applicableFloor-${scopedPolicy.id}`}>Floor Name</Label>
+                                    <Input id={`applicableFloor-${scopedPolicy.id}`} placeholder="e.g., 5th Floor" value={scopedPolicy.applicableFloor || ''} 
+                                           onChange={(e) => handleScopedPolicyChange(scopedPolicy.id, 'applicableFloor', e.target.value)} className="mt-1"/>
+                                </div>
+                            )}
                         </div>
-                        <Button type="button" variant="ghost" size="icon" 
-                                onClick={() => handleRemovePenaltyRule(rule.id)}
-                                className="absolute top-1 right-1 h-7 w-7 text-destructive hover:bg-destructive/10">
-                            <Trash2 className="h-4 w-4"/>
-                        </Button>
-                    </div>
-                 ))}
+                        {scopedPolicy.scope === 'SpecificSpaces' && (
+                            <div>
+                                <Label htmlFor={`applicableSpaces-${scopedPolicy.id}`}>Space ID Names (comma-separated)</Label>
+                                <Input id={`applicableSpaces-${scopedPolicy.id}`} placeholder="e.g., Unit 10A, Office 202B" value={scopedPolicy.applicableSpaceIdNamesStr || ''} 
+                                       onChange={(e) => handleScopedPolicyChange(scopedPolicy.id, 'applicableSpaceIdNamesStr', e.target.value)} className="mt-1"/>
+                                <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>
+                            </div>
+                        )}
+
+                        <div className="pt-2 border-t border-border/50">
+                            <div className="flex justify-between items-center mb-1.5">
+                                <h5 className="text-sm font-medium">Rules for this Scope (Sequential):</h5>
+                                <Button type="button" variant="outline" size="xs" onClick={() => handleAddRuleToScopedPolicy(scopedPolicy.id)}>
+                                    <PlusCircle className="mr-1 h-3 w-3"/> Add Rule
+                                </Button>
+                            </div>
+                            {scopedPolicy.rules.length === 0 && <p className="text-xs text-muted-foreground text-center py-1">No rules for this scope. Add at least one.</p>}
+                            {scopedPolicy.rules.map((rule, ruleIndex) => (
+                                <div key={rule.id} className="p-2.5 border rounded-md space-y-2 bg-background my-2 relative">
+                                     <p className="text-xs font-semibold text-muted-foreground">
+                                        Rule {ruleIndex + 1} for this scope 
+                                        {ruleIndex === scopedPolicy.rules.length - 1 ? " (Applies indefinitely from its start if last)" : ""}
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                        <div>
+                                            <Label htmlFor={`ruleDuration-${rule.id}`}>Duration (Days)</Label>
+                                            <Input id={`ruleDuration-${rule.id}`} type="number" min="1" placeholder="e.g., 5" 
+                                                   value={rule.durationDays ?? ''} 
+                                                   onChange={(e) => handleRuleChangeInScopedPolicy(scopedPolicy.id, rule.id, 'durationDays', e.target.value)} 
+                                                   className="mt-1 text-xs h-8"
+                                                   disabled={ruleIndex === scopedPolicy.rules.length - 1 && scopedPolicy.rules.length > 0} // Disable duration for the last rule, as it's indefinite
+                                                   />
+                                            {ruleIndex === scopedPolicy.rules.length - 1 && <p className="text-xs text-muted-foreground mt-0.5">Last rule: indefinite.</p>}
+                                        </div>
+                                        <div>
+                                            <Label htmlFor={`ruleFeeType-${rule.id}`}>Fee Type</Label>
+                                            <Select value={rule.feeType || 'Fixed'} onValueChange={(value) => handleRuleChangeInScopedPolicy(scopedPolicy.id, rule.id, 'feeType', value as any)}>
+                                                <SelectTrigger id={`ruleFeeType-${rule.id}`} className="mt-1 text-xs h-8"><SelectValue /></SelectTrigger>
+                                                <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <Label htmlFor={`ruleFeeValue-${rule.id}`}>Fee Value</Label>
+                                            <Input id={`ruleFeeValue-${rule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5" 
+                                                   value={rule.feeValue ?? ''} 
+                                                   onChange={(e) => handleRuleChangeInScopedPolicy(scopedPolicy.id, rule.id, 'feeValue', e.target.value)} 
+                                                   className="mt-1 text-xs h-8"/>
+                                        </div>
+                                    </div>
+                                    {scopedPolicy.rules.length > 1 && (
+                                        <Button type="button" variant="ghost" size="icon" 
+                                                onClick={() => handleRemoveRuleFromScopedPolicy(scopedPolicy.id, rule.id)}
+                                                className="absolute top-0.5 right-0.5 h-6 w-6 text-destructive hover:bg-destructive/10">
+                                            <Trash2 className="h-3.5 w-3.5"/>
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
-            </div>
-            <DialogFooter className="mt-4">
+            </ScrollArea>
+            <DialogFooter className="mt-4 pt-4 border-t">
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
@@ -395,7 +528,17 @@ export default function BuildingsPage() {
         </Card>
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {buildings.map((building) => (
+          {buildings.map((building) => {
+            const policiesByScope: Record<string, PenaltyTier[]> = {};
+            (building.penaltyPolicyTiers || []).forEach(tier => {
+              let key = tier.scope;
+              if (tier.scope === 'Floor' && tier.applicableFloor) key += `: ${tier.applicableFloor}`;
+              if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) key += `: ${tier.applicableSpaceIdNames.join(', ')}`;
+              if (!policiesByScope[key]) policiesByScope[key] = [];
+              policiesByScope[key].push(tier);
+            });
+
+            return (
             <Card key={building.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
               <CardHeader>
                 <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
@@ -403,32 +546,33 @@ export default function BuildingsPage() {
               </CardHeader>
               <CardContent className="text-sm space-y-2 flex-grow">
                    <p className="text-xs text-muted-foreground">Registered: {format(new Date(building.createdAt), 'PP')}</p>
-                   {building.penaltyPolicyTiers && building.penaltyPolicyTiers.length > 0 ? (
-                      <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
-                          <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policy:</h5>
-                          {building.penaltyPolicyTiers.map((tier, index, arr) => {
-                            let tierDurationDesc;
-                            if (index === 0) { // First tier
-                                tierDurationDesc = `First ${tier.toDay ? tier.toDay - tier.fromDay + 1 : '?'} days (Days ${tier.fromDay}${tier.toDay ? `-${tier.toDay}` : '+'})`;
-                            } else if (tier.toDay === null) { // Last tier, indefinite
-                                tierDurationDesc = `From Day ${tier.fromDay} onwards`;
-                            } else { // Intermediate tier
-                                tierDurationDesc = `Next ${tier.toDay - tier.fromDay + 1} days (Days ${tier.fromDay}-${tier.toDay})`;
-                            }
-                             if (arr.length === 1 && tier.toDay === null) { // Single indefinite tier
-                                tierDurationDesc = `From Day ${tier.fromDay} onwards`;
-                            }
-
-
-                            return (
-                            <div key={index} className="text-xs p-1.5 bg-secondary/30 rounded-sm">
-                                <p className="font-medium">Rule {index + 1}:</p>
-                                <p><Clock className="inline mr-1 h-3 w-3 text-primary" />
-                                    {tierDurationDesc}
+                   {Object.keys(policiesByScope).length > 0 ? (
+                      <div className="mt-2 pt-2 border-t border-border/50 space-y-2.5">
+                          <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policies:</h5>
+                          {Object.entries(policiesByScope).map(([scopeKey, tiers]) => (
+                            <div key={scopeKey} className="p-1.5 bg-secondary/30 rounded-sm">
+                                <p className="text-xs font-medium text-primary capitalize flex items-center">
+                                    {tiers[0].scope === 'Building' && <BuildingIcon className="inline mr-1 h-3 w-3"/>}
+                                    {tiers[0].scope === 'Floor' && <Layers className="inline mr-1 h-3 w-3"/>}
+                                    {tiers[0].scope === 'SpecificSpaces' && <HomeIcon className="inline mr-1 h-3 w-3"/>}
+                                    Scope: {scopeKey}
                                 </p>
-                                <p><DollarSignLucide className="inline mr-1 h-3 w-3 text-primary" />Fee: {tier.feeType === 'Fixed' ? `$${tier.feeValue.toFixed(2)}` : `${tier.feeValue}% of rent`}</p>
+                                {tiers.sort((a,b)=>a.fromDay - b.fromDay).map((tier, index) => {
+                                    let tierDurationDesc = `Days ${tier.fromDay}`;
+                                    if (tier.toDay !== null && tier.toDay !== undefined) {
+                                        tierDurationDesc += ` - ${tier.toDay}`;
+                                    } else {
+                                        tierDurationDesc += ` onwards`;
+                                    }
+                                    return (
+                                        <div key={index} className="text-xs pl-2 py-0.5">
+                                            <p><Clock className="inline mr-1 h-3 w-3"/>{tierDurationDesc}</p>
+                                            <p><DollarSignLucide className="inline mr-1 h-3 w-3"/>Fee: {tier.feeType === 'Fixed' ? `$${tier.feeValue.toFixed(2)}` : `${tier.feeValue}% of rent`}</p>
+                                        </div>
+                                    )
+                                })}
                             </div>
-                          )})}
+                          ))}
                       </div>
                    ) : (
                       <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
@@ -443,7 +587,7 @@ export default function BuildingsPage() {
                 </Button>
               </CardFooter>
             </Card>
-          ))}
+          )})}
         </div>
       )}
     </div>
