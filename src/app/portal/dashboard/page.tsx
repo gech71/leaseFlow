@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import type { Agreement, Bill } from '@/lib/types'; // Building not needed here directly for simplified portal
+import type { Agreement, Bill } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -42,9 +42,6 @@ const mockTenantAgreement: Agreement = {
   createdAt: new Date(2024, 0, 10).toISOString(),
 };
 
-// For portal simplicity, penalty is pre-applied in mock data or would come from backend
-// Here, we'll simulate a building policy for one of the bills.
-// Building Policy for Portal View Residences: Grace 2 days, Fixed $25 penalty
 const portalBuildingPenaltyPolicy = { gracePeriodDays: 2, feeType: 'Fixed' as 'Fixed' | 'Percentage', feeValue: 25 };
 
 const initialMockTenantBills: Bill[] = [
@@ -57,22 +54,22 @@ const initialMockTenantBills: Bill[] = [
     dueDate: new Date(2024, 5, 15).toISOString(), // June 15, 2024
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }],
-    totalAmount: 1575, // Original total
+    totalAmount: 1575, 
     status: 'Paid',
     paymentDate: new Date(2024, 5, 10).toISOString(),
     paymentMethod: 'Online Portal',
     paymentReference: 'PAY-PORTAL-JUNE',
   },
   {
-    id: 'bill-tp-2', // This bill will become overdue and have a penalty
+    id: 'bill-tp-2', 
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
-    billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString(), // Make it 2 months ago
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 15).toISOString(), // Due 2 months ago
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString(), 
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 15).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, {name: 'Water Service', amount: 30}],
-    totalAmount: 1605, // Original total
+    totalAmount: 1605, 
     status: 'Pending', 
   },
   {
@@ -80,11 +77,11 @@ const initialMockTenantBills: Bill[] = [
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
-    billDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 1).toISOString(), // Last month
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 15).toISOString(), // Due last month
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 1).toISOString(), 
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 15).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, { name: 'Trash Removal', amount: 25}],
-    totalAmount: 1600, // Original total
+    totalAmount: 1600, 
     status: 'Pending',
   },
 ];
@@ -309,4 +306,3 @@ export default function CustomerDashboardPage() {
     </div>
   );
 }
-

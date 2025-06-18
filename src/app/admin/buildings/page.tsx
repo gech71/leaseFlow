@@ -214,9 +214,10 @@ export default function BuildingsPage() {
                       id="gracePeriodDays"
                       type="number"
                       value={currentBuilding.penaltyPolicy?.gracePeriodDays ?? ''}
-                      onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...prev.penaltyPolicy!, gracePeriodDays: parseInt(e.target.value) } }))}
+                      onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...(prev.penaltyPolicy || { feeType: 'Fixed', feeValue: 0 }), gracePeriodDays: parseInt(e.target.value) || 0 } }))}
                       placeholder="e.g., 5"
                       className="mt-1"
+                      min="0"
                     />
                  </div>
                  <div>
@@ -225,10 +226,10 @@ export default function BuildingsPage() {
                     </Label>
                     <Select
                         value={currentBuilding.penaltyPolicy?.feeType || ''}
-                        onValueChange={(value) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...prev.penaltyPolicy!, feeType: value as 'Fixed' | 'Percentage' } }))}
+                        onValueChange={(value) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...(prev.penaltyPolicy || { gracePeriodDays: 0, feeValue: 0 }), feeType: value as 'Fixed' | 'Percentage' } }))}
                     >
                         <SelectTrigger id="feeType" className="mt-1">
-                            <SelectValue placeholder="Select fee type" />
+                            <SelectValue placeholder="Select fee type (optional)" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Fixed">Fixed Amount</SelectItem>
@@ -236,21 +237,24 @@ export default function BuildingsPage() {
                         </SelectContent>
                     </Select>
                  </div>
-                 <div>
-                    <Label htmlFor="feeValue" className="flex items-center text-sm font-medium mt-2">
-                      <DollarSignLucide className="mr-2 h-4 w-4 text-primary" />Fee Value
-                    </Label>
-                    <Input
-                      id="feeValue"
-                      type="number"
-                      step="0.01"
-                      value={currentBuilding.penaltyPolicy?.feeValue ?? ''}
-                      onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...prev.penaltyPolicy!, feeValue: parseFloat(e.target.value) } }))}
-                      placeholder={currentBuilding.penaltyPolicy?.feeType === 'Percentage' ? "e.g., 5 for 5%" : "e.g., 50 for $50"}
-                      className="mt-1"
-                    />
-                    {currentBuilding.penaltyPolicy?.feeType === 'Percentage' && <p className="text-xs text-muted-foreground mt-1">Enter percentage as a number (e.g., 5 for 5%).</p>}
-                 </div>
+                 {currentBuilding.penaltyPolicy?.feeType && (
+                    <div>
+                        <Label htmlFor="feeValue" className="flex items-center text-sm font-medium mt-2">
+                        <DollarSignLucide className="mr-2 h-4 w-4 text-primary" />Fee Value
+                        </Label>
+                        <Input
+                        id="feeValue"
+                        type="number"
+                        step="0.01"
+                        value={currentBuilding.penaltyPolicy?.feeValue ?? ''}
+                        onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...(prev.penaltyPolicy!), feeValue: parseFloat(e.target.value) || 0 } }))}
+                        placeholder={currentBuilding.penaltyPolicy?.feeType === 'Percentage' ? "e.g., 5 for 5%" : "e.g., 50 for $50"}
+                        className="mt-1"
+                        min="0"
+                        />
+                        {currentBuilding.penaltyPolicy?.feeType === 'Percentage' && <p className="text-xs text-muted-foreground mt-1">Enter percentage as a number (e.g., 5 for 5%).</p>}
+                    </div>
+                 )}
               </div>
             </div>
             <DialogFooter className="mt-4">
@@ -304,7 +308,7 @@ export default function BuildingsPage() {
               </CardHeader>
               <CardContent className="text-sm space-y-2">
                  <p className="text-xs text-muted-foreground">Registered: {format(new Date(building.createdAt), 'PP')}</p>
-                 {building.penaltyPolicy ? (
+                 {building.penaltyPolicy && building.penaltyPolicy.feeType ? (
                     <div className="mt-2 pt-2 border-t border-border/50">
                         <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policy:</h5>
                         <p><Clock className="inline mr-1 h-3 w-3 text-primary" />Grace: {building.penaltyPolicy.gracePeriodDays} days</p>
@@ -329,4 +333,3 @@ export default function BuildingsPage() {
     </div>
   );
 }
-

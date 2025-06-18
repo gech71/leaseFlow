@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIcon } from 'lucide-react';
-import type { Bill, Agreement, Space, Building } from '@/lib/types';
+import type { Bill, Agreement, Space, Building, BuildingMonthlyUtilities } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -128,7 +128,7 @@ export default function BillingPage() {
     setIsMounted(true);
     setAllBuildingUtilities(getStoredBuildingUtilities());
     setBuildings(getStoredBuildings());
-    setToday(startOfDay(new Date())); // Ensure today is current
+    setToday(startOfDay(new Date())); 
   }, []);
 
   const calculatePenalty = useCallback((bill: Bill): number => {
@@ -140,7 +140,7 @@ export default function BillingPage() {
     if (!building || !building.penaltyPolicy) return 0;
 
     const dueDate = parseISO(bill.dueDate);
-    if (isAfter(dueDate, today) || bill.status === 'Paid') return 0; // No penalty if not overdue or already paid
+    if (isAfter(dueDate, today) || bill.status === 'Paid') return 0; 
 
     const daysOverdue = differenceInDays(today, dueDate);
     const { gracePeriodDays, feeType, feeValue } = building.penaltyPolicy;
@@ -149,7 +149,6 @@ export default function BillingPage() {
       if (feeType === 'Fixed') {
         return feeValue;
       } else if (feeType === 'Percentage') {
-        // Assuming feeValue is stored as percentage number e.g. 5 for 5%
         return bill.rentAmount * (feeValue / 100);
       }
     }
@@ -163,7 +162,7 @@ export default function BillingPage() {
         currentStatus = 'Overdue';
       }
       
-      const penalty = calculatePenalty({ ...bill, status: currentStatus }); // Pass current status to penalty calc
+      const penalty = calculatePenalty({ ...bill, status: currentStatus }); 
       const newTotalAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0) + penalty;
 
       return {
@@ -233,7 +232,7 @@ export default function BillingPage() {
       dueDate: targetDueDate.toISOString(),
       rentAmount,
       utilityBreakdown,
-      penaltyAmount: 0, // Initially no penalty
+      penaltyAmount: 0, 
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       status: 'Pending',
     };
@@ -352,7 +351,7 @@ export default function BillingPage() {
       prevBills.map(b => 
         b.id === billForPayment.id 
         ? { 
-            ...processedBill, // Use the processed bill with correct total and penalty
+            ...processedBill, 
             status: 'Paid', 
             paymentDate: values.paymentDate.toISOString(),
             paymentMethod: values.paymentMethod,
@@ -586,7 +585,7 @@ export default function BillingPage() {
         <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {processedBills.map((bill) => (
-            <Card key={bill.id} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 ${bill.status === 'Overdue' && bill.penaltyAmount ? 'border-destructive border-2' : ''}`}>
+            <Card key={bill.id} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 ${bill.status === 'Overdue' && bill.penaltyAmount && bill.penaltyAmount > 0 ? 'border-destructive border-2' : ''}`}>
               <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
@@ -653,4 +652,3 @@ export default function BillingPage() {
     </div>
   );
 }
-

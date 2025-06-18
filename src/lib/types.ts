@@ -90,6 +90,5 @@ export interface Bill {
   paymentDate?: string; // ISO date string
   paymentMethod?: string;
   paymentReference?: string;
-  bankOrWalletName?: string; 
+  bankOrWalletName?: string;
 }
-
