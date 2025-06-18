@@ -61,7 +61,7 @@ const mockPortalBuilding: BuildingType = {
   penaltyPolicyTiers: [
     { scope: 'Building', fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 25 },
     { scope: 'Building', fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 50 },
-    { scope: 'Building', fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 } // 1.5% of rent
+    { scope: 'SpecificSpaces', applicableSpaceIdNames: ['Unit P1'], fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 } // 1.5% of rent
   ],
   createdAt: new Date().toISOString(),
 };
@@ -150,16 +150,30 @@ export default function CustomerDashboardPage() {
     const daysOverdue = differenceInDays(today, dueDate);
     if (daysOverdue <= 0) return 0;
 
-    // For tenant portal, we assume building-wide policies or the most relevant one defined in mockPortalBuilding
-    // For simplicity, using the building-level policy defined in mockPortalBuilding
-    const applicableTiers = mockPortalBuilding.penaltyPolicyTiers.filter(t => t.scope === 'Building' || 
-      (t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(mockTenantAgreement?.spaceDescription.split(',')[0].trim() || '')) || // simplified match
-      (t.scope === 'Floor' && t.applicableFloor === (mockTenantAgreement?.spaceDescription.split(',')[1]?.trim().split(' ')[0] || '')) // simplified match
+    let applicableTiersForScope: PenaltyTier[] = [];
+    const spaceIdNameFromAgreement = mockTenantAgreement?.spaceDescription.split(',')[0].trim();
+    const floorFromAgreement = mockTenantAgreement?.spaceDescription.split(',')[1]?.trim().split(' ')[0];
+
+
+    const spaceSpecificTiers = mockPortalBuilding.penaltyPolicyTiers.filter(
+      t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(spaceIdNameFromAgreement || '')
     );
+    if (spaceSpecificTiers.length > 0) {
+      applicableTiersForScope = spaceSpecificTiers;
+    } else {
+      const floorSpecificTiers = mockPortalBuilding.penaltyPolicyTiers.filter(
+        t => t.scope === 'Floor' && t.applicableFloor === floorFromAgreement
+      );
+      if (floorSpecificTiers.length > 0) {
+        applicableTiersForScope = floorSpecificTiers;
+      } else {
+        applicableTiersForScope = mockPortalBuilding.penaltyPolicyTiers.filter(t => t.scope === 'Building');
+      }
+    }
 
-    if (applicableTiers.length === 0) return 0;
+    if (applicableTiersForScope.length === 0) return 0;
 
-    const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
+    const sortedTiers = [...applicableTiersForScope].sort((a, b) => a.fromDay - b.fromDay);
     let calculatedPenalty = 0;
 
     for (const tier of sortedTiers) {
@@ -269,7 +283,7 @@ export default function CustomerDashboardPage() {
               status: 'Pending Verification', 
               paymentProofUrl: `simulated_proof_${selectedFile.name}`, 
               tenantPaymentNotes: proofNotes,
-              penaltyAmount: billForProof.penaltyAmount, // Preserve penalty calculated at time of proof submission
+              penaltyAmount: billForProof.penaltyAmount, 
             } 
           : b
         )

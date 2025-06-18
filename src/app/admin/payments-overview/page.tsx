@@ -37,9 +37,10 @@ const mockBuildingsData: BuildingType[] = [
     ], createdAt: new Date().toISOString() },
   { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [
       { scope: 'Building', fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 2 }, 
-      { scope: 'Building', fromDay: 4, toDay: null, feeType: 'Percentage', feeValue: 5}
+      { scope: 'Building', fromDay: 4, toDay: 7, feeType: 'Percentage', feeValue: 5},
+      { scope: 'Building', fromDay: 8, toDay: null, feeType: 'Fixed', feeValue: 200}
     ], createdAt: new Date().toISOString() },
-  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No penalty policy
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, 
   { id: 'building-portal', name: 'Portal View Residences', address: '1 Portal Drive', penaltyPolicyTiers: [
       { scope: 'Building', fromDay: 1, toDay: 2, feeType: 'Fixed', feeValue: 25 }, 
       { scope: 'SpecificSpaces', applicableSpaceIdNames: ['Unit P1'], fromDay: 3, toDay: null, feeType: 'Fixed', feeValue: 50 }
@@ -74,7 +75,7 @@ const mockBillsData: Bill[] = [
 
 
 export default function PaymentsOverviewPage() {
-  const [spaces, setSpacesState] = useState<Space[]>(mockSpacesData); // Renamed spaces state variable
+  const [spaces, setSpacesState] = useState<Space[]>(mockSpacesData); 
   const [buildingsData, setBuildingsDataState] = useState<BuildingType[]>(mockBuildingsData); 
   const [agreementsData, setAgreementsDataState] = useState<Agreement[]>(mockAgreementsData); 
   const [isMounted, setIsMounted] = useState(false);
@@ -85,7 +86,6 @@ export default function PaymentsOverviewPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Simulating fetching data
     setSpacesState(mockSpacesData);
     setBuildingsDataState(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(t=> ({...t, scope: t.scope || 'Building'})) })));
     setAgreementsDataState(mockAgreementsData);
@@ -107,26 +107,26 @@ export default function PaymentsOverviewPage() {
     const daysOverdue = differenceInDays(today, dueDate);
     if (daysOverdue <= 0) return 0;
     
-    let applicableTiers: PenaltyTier[] = [];
+    let applicableTiersForScope: PenaltyTier[] = [];
     const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
       t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
     );
     if (spaceSpecificTiers.length > 0) {
-      applicableTiers = spaceSpecificTiers;
+      applicableTiersForScope = spaceSpecificTiers;
     } else {
       const floorSpecificTiers = building.penaltyPolicyTiers.filter(
         t => t.scope === 'Floor' && t.applicableFloor === space.floor
       );
       if (floorSpecificTiers.length > 0) {
-        applicableTiers = floorSpecificTiers;
+        applicableTiersForScope = floorSpecificTiers;
       } else {
-        applicableTiers = building.penaltyPolicyTiers.filter(t => t.scope === 'Building');
+        applicableTiersForScope = building.penaltyPolicyTiers.filter(t => t.scope === 'Building');
       }
     }
     
-    if (applicableTiers.length === 0) return 0;
+    if (applicableTiersForScope.length === 0) return 0;
 
-    const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
+    const sortedTiers = [...applicableTiersForScope].sort((a, b) => a.fromDay - b.fromDay);
     let calculatedPenalty = 0;
     for (const tier of sortedTiers) {
       if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {

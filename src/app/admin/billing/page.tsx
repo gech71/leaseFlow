@@ -27,7 +27,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, getYear, getMonth, parseISO, differenceInDays } from 'date-fns';
+import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, getYear, getMonth, parseISO, differenceInDays, setMonth } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -110,7 +110,7 @@ const getStoredBuildings = (): Building[] => {
           ...b,
           penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(tier => ({
             ...tier,
-            scope: tier.scope || 'Building', // Default old data to 'Building'
+            scope: tier.scope || 'Building', 
           })),
         }));
       } catch (e) {
@@ -189,13 +189,13 @@ export default function BillingPage() {
   }, []);
 
   const calculatePenalty = useCallback((bill: Bill, currentStatus: Bill['status']): number => {
-    const agreement = agreements.find(ag => ag.id === bill.agreementId);
-    if (!agreement) return 0;
-    const space = spaces.find(sp => sp.id === agreement.spaceId);
-    if (!space) return 0;
-    const building = allBuildings.find(b => b.name === space.buildingName);
+    const agreementLinked = agreements.find(ag => ag.id === bill.agreementId);
+    if (!agreementLinked) return 0;
+    const spaceLinked = spaces.find(sp => sp.id === agreementLinked.spaceId);
+    if (!spaceLinked) return 0;
+    const buildingLinked = allBuildings.find(b => b.name === spaceLinked.buildingName);
     
-    if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
+    if (!buildingLinked || !buildingLinked.penaltyPolicyTiers || buildingLinked.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
     if (currentStatus !== 'Overdue') return 0;
@@ -203,31 +203,30 @@ export default function BillingPage() {
     const daysOverdue = differenceInDays(today, dueDate);
     if (daysOverdue <= 0) return 0;
 
-    // Hierarchy: Space > Floor > Building
     let applicableTiers: PenaltyTier[] = [];
     
-    const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
-      t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
+    const spaceSpecificTiers = buildingLinked.penaltyPolicyTiers.filter(
+      t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(spaceLinked.spaceIdName)
     );
     if (spaceSpecificTiers.length > 0) {
       applicableTiers = spaceSpecificTiers;
     } else {
-      const floorSpecificTiers = building.penaltyPolicyTiers.filter(
-        t => t.scope === 'Floor' && t.applicableFloor === space.floor
+      const floorSpecificTiers = buildingLinked.penaltyPolicyTiers.filter(
+        t => t.scope === 'Floor' && t.applicableFloor === spaceLinked.floor
       );
       if (floorSpecificTiers.length > 0) {
         applicableTiers = floorSpecificTiers;
       } else {
-        applicableTiers = building.penaltyPolicyTiers.filter(t => t.scope === 'Building');
+        applicableTiers = buildingLinked.penaltyPolicyTiers.filter(t => t.scope === 'Building');
       }
     }
     
     if (applicableTiers.length === 0) return 0;
 
-    const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
+    const sortedTiersForScope = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
     let calculatedPenalty = 0;
 
-    for (const tier of sortedTiers) {
+    for (const tier of sortedTiersForScope) {
       if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
         if (tier.feeType === 'Fixed') {
           calculatedPenalty = tier.feeValue;
@@ -290,7 +289,7 @@ export default function BillingPage() {
     const utilityBreakdownItems: Array<{ name: string; amount: number }> = [];
     let totalUtilityCostForBill = 0;
     const billYear = getYear(targetDueDate);
-    const billMonth = getMonth(targetDueDate); // 0-11
+    const billMonth = getMonth(targetDueDate); 
     
     const monthlyBuildingUtilityData = allBuildingUtilities.find(
       entry => entry.buildingName === space.buildingName && entry.year === billYear && entry.month === billMonth
@@ -316,7 +315,7 @@ export default function BillingPage() {
           totalUtilityCostForBill += costForThisUtility;
         }
       });
-    } else if (spaces.some(s => s.buildingName === space.buildingName && s.utilityProrationShare > 0)) { // Check if any space in building expects utilities
+    } else if (spaces.some(s => s.buildingName === space.buildingName && s.utilityProrationShare > 0)) { 
        toast({ title: "Warning: Missing Utilities", description: `No utility costs for ${space.buildingName} for ${format(setMonth(new Date(), billMonth), 'MMMM')} ${billYear}. Utilities will be $0.`, variant: "default", duration: 7000 });
     }
     const totalAmount = rentAmount + totalUtilityCostForBill;
