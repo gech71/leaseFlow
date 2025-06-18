@@ -3,11 +3,13 @@
 
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileText, Home, FileSignature } from 'lucide-react';
-import type { Agreement } from '@/lib/types';
+import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import type { Agreement, Bill } from '@/lib/types'; // Added Bill
 import { Button } from '@/components/ui/button';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns'; // Added isBefore, startOfDay
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 // --- Mock Data ---
 const mockTenantAgreement: Agreement = {
@@ -21,23 +23,109 @@ const mockTenantAgreement: Agreement = {
   monthlyRentalPrice: 1500,
   paymentTermMonths: 12,
   initialPaymentMonths: 1,
-  nextPaymentDueDate: new Date(2024, 7, 15).toISOString(), // Aug 15, 2024
+  nextPaymentDueDate: new Date(2024, 7, 15).toISOString(), // Aug 15, 2024 (For agreement display)
   additionalTerms: 'No smoking. Small pets allowed with an additional deposit.',
   createdAt: new Date(2024, 0, 10).toISOString(),
 };
+
+const initialMockTenantBills: Bill[] = [
+  {
+    id: 'bill-tp-1',
+    agreementId: 'agree-tenant1-current',
+    tenantId: 'tenant-portal-user',
+    tenantName: 'Portal User Tenant',
+    spaceDescription: 'Unit P1, Portal View Residences',
+    billDate: new Date(2024, 5, 1).toISOString(), // June 1, 2024
+    dueDate: new Date(2024, 5, 15).toISOString(), // June 15, 2024
+    rentAmount: 1500,
+    utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }],
+    totalAmount: 1575,
+    status: 'Paid',
+    paymentDate: new Date(2024, 5, 10).toISOString(),
+    paymentMethod: 'Online Portal',
+    paymentReference: 'PAY-PORTAL-JUNE',
+  },
+  {
+    id: 'bill-tp-2',
+    agreementId: 'agree-tenant1-current',
+    tenantId: 'tenant-portal-user',
+    tenantName: 'Portal User Tenant',
+    spaceDescription: 'Unit P1, Portal View Residences',
+    billDate: new Date(2024, 6, 1).toISOString(), // July 1, 2024
+    dueDate: new Date(2024, 6, 15).toISOString(), // July 15, 2024
+    rentAmount: 1500,
+    utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, {name: 'Water Service', amount: 30}],
+    totalAmount: 1605,
+    status: 'Pending', // Will become Overdue if current date is past July 15
+  },
+  {
+    id: 'bill-tp-3',
+    agreementId: 'agree-tenant1-current',
+    tenantId: 'tenant-portal-user',
+    tenantName: 'Portal User Tenant',
+    spaceDescription: 'Unit P1, Portal View Residences',
+    billDate: new Date(2024, 7, 1).toISOString(), // August 1, 2024
+    dueDate: new Date(2024, 7, 15).toISOString(), // August 15, 2024
+    rentAmount: 1500,
+    utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }],
+    totalAmount: 1575,
+    status: 'Pending',
+  },
+];
 // --- End Mock Data ---
 
 
 export default function CustomerDashboardPage() {
   const [agreement, setAgreement] = useState<Agreement | null>(null);
+  const [bills, setBills] = useState<Bill[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const { toast } = useToast();
+  const [today, setToday] = useState(startOfDay(new Date()));
 
   useEffect(() => {
     setIsMounted(true);
+    setToday(startOfDay(new Date()));
     // In a real app, fetch data for the logged-in tenant
     setAgreement(mockTenantAgreement);
+    
+    const updatedBills = initialMockTenantBills.map(bill => {
+      if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
+        return { ...bill, status: 'Overdue' as Bill['status'] };
+      }
+      return bill;
+    }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
+    setBills(updatedBills);
   }, []);
 
+  const handlePayBill = (billId: string) => {
+    // Simulate payment API call
+    toast({
+      title: "Processing Payment...",
+      description: `Payment for bill ${billId} is being processed. This is a demo.`,
+    });
+    // In a real app, you would update bill status after successful payment
+    // For demo, we can simulate it:
+    setTimeout(() => {
+        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment"} : b));
+        toast({
+            title: "Payment Successful (Simulated)",
+            description: `Bill ${billId} has been marked as paid.`,
+        });
+    }, 2000);
+  };
+
+  const getStatusBadge = (status: Bill['status']) => {
+    switch (status) {
+      case 'Paid':
+        return <Badge variant="secondary" className="bg-green-100 text-green-700"><CheckCircle className="mr-1 h-3.5 w-3.5" />Paid</Badge>;
+      case 'Pending':
+        return <Badge variant="default" className="bg-yellow-100 text-yellow-700"><Info className="mr-1 h-3.5 w-3.5" />Pending</Badge>;
+      case 'Overdue':
+        return <Badge variant="destructive"><AlertTriangle className="mr-1 h-3.5 w-3.5" />Overdue</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   if (!isMounted) {
      return (
@@ -52,7 +140,7 @@ export default function CustomerDashboardPage() {
       <PageHeader
         title="Welcome to Your Dashboard!"
         icon={Home}
-        description="Here's an overview of your lease agreement."
+        description="Overview of your lease agreement and billing information."
       />
 
       {agreement && (
@@ -66,7 +154,7 @@ export default function CustomerDashboardPage() {
             <div><strong className="text-muted-foreground">Lease Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</div>
             <div><strong className="text-muted-foreground">Lease Term:</strong> {agreement.paymentTermMonths} months</div>
             <div><strong className="text-muted-foreground">Monthly Rent:</strong> ${agreement.monthlyRentalPrice.toLocaleString()}</div>
-            <div className="md:col-span-2"><strong className="text-muted-foreground">Next Payment Due:</strong> <span className="font-semibold text-primary">{format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span></div>
+            <div className="md:col-span-2"><strong className="text-muted-foreground">Next Payment Due (Lease):</strong> <span className="font-semibold text-primary">{format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span></div>
             {agreement.additionalTerms && (
                  <div className="md:col-span-2">
                     <strong className="text-muted-foreground">Additional Terms:</strong>
@@ -75,22 +163,80 @@ export default function CustomerDashboardPage() {
             )}
           </CardContent>
           <CardFooter>
-            <Button variant="outline" size="sm" onClick={() => alert(agreement.agreementText)}>
+            <Button variant="outline" size="sm" onClick={() => alert("Full agreement text (mock):\n\n" + agreement.agreementText)}>
               <FileText className="mr-2 h-4 w-4" /> View Full Agreement (Text)
             </Button>
           </CardFooter>
         </Card>
       )}
 
-      {!agreement && (
-        <Card className="text-center py-12 shadow-sm">
-          <CardContent>
-            <FileSignature className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">No Agreement Found</h3>
-            <p className="text-muted-foreground">We could not find your active lease agreement. Please contact support.</p>
-          </CardContent>
-        </Card>
-      )}
+      <section className="mb-8">
+        <h2 className="text-2xl font-headline font-semibold mb-4 flex items-center"><DollarSign className="mr-2 h-7 w-7 text-primary"/>Billing & Payments</h2>
+        {bills.length === 0 && !agreement && (
+            <Card className="text-center py-12 shadow-sm">
+            <CardContent>
+                <FileSignature className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2 font-headline">No Information Found</h3>
+                <p className="text-muted-foreground">We could not find your active lease or billing information. Please contact support.</p>
+            </CardContent>
+            </Card>
+        )}
+        {bills.length === 0 && agreement && (
+            <Card className="text-center py-10 shadow-sm">
+            <CardContent>
+                <DollarSign className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                <h3 className="text-lg font-semibold font-headline">No Bills Generated Yet</h3>
+                <p className="text-muted-foreground">There are no outstanding or past bills for your account currently.</p>
+            </CardContent>
+            </Card>
+        )}
+        {bills.length > 0 && (
+            <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-6">
+                {bills.map(bill => (
+                    <Card key={bill.id} className="shadow-md hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <CardTitle className="font-headline text-lg">Bill ID: {bill.id.substring(bill.id.length-6)}</CardTitle>
+                                {getStatusBadge(bill.status)}
+                            </div>
+                            <CardDescription>Bill Date: {format(parseISO(bill.billDate), 'PP')}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-2">
+                            <p><strong>Due Date:</strong> <span className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</span></p>
+                            <p><strong>Rent Amount:</strong> ${bill.rentAmount.toFixed(2)}</p>
+                            {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 && (
+                                <div>
+                                    <strong>Utilities:</strong>
+                                    <ul className="list-disc list-inside ml-4 text-xs">
+                                        {bill.utilityBreakdown.map(util => (
+                                            <li key={util.name}>{util.name}: ${util.amount.toFixed(2)}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <p className="text-base font-semibold text-primary border-t pt-2 mt-2"><strong>Total Amount:</strong> ${bill.totalAmount.toFixed(2)}</p>
+                             {bill.status === 'Paid' && bill.paymentDate && (
+                                <div className="text-xs text-muted-foreground pt-1">
+                                    Paid on {format(parseISO(bill.paymentDate), 'PP')} via {bill.paymentMethod || 'N/A'}
+                                    {bill.paymentReference && <span> (Ref: {bill.paymentReference})</span>}
+                                </div>
+                            )}
+                        </CardContent>
+                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                            <CardFooter>
+                                <Button onClick={() => handlePayBill(bill.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                                    <CreditCard className="mr-2 h-4 w-4"/> Pay Now (${bill.totalAmount.toFixed(2)})
+                                </Button>
+                            </CardFooter>
+                        )}
+                    </Card>
+                ))}
+            </div>
+        )}
+      </section>
+
     </div>
   );
 }
+
+    
