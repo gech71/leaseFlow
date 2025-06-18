@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIcon } from 'lucide-react';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIcon, UploadCloud, MessageSquare, ShieldCheck, ShieldX } from 'lucide-react';
 import type { Bill, Agreement, Space, Building, BuildingMonthlyUtilities, PenaltyTier } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, getYear, getMonth, parseISO, differenceInDays } from 'date-fns';
@@ -37,6 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 
 
 // Mock data (ensure consistency with types.ts)
@@ -52,7 +53,6 @@ const initialMockAgreements: Agreement[] = [
   },
 ];
 
-// IMPORTANT: Ensure spaceIdName and floor are accurate for testing scoped utilities
 const initialMockSpaces: Space[] = [
  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.40, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
  { id: 'space1b', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, tenantId: undefined, createdAt: new Date().toISOString()},
@@ -61,8 +61,8 @@ const initialMockSpaces: Space[] = [
 ];
 
 const initialMockBuildings: Building[] = [
-  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 6, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() },
-  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 4, feeType: 'Percentage', feeValue: 2 }], createdAt: new Date().toISOString() },
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 1, toDay:5, feeType: 'Fixed', feeValue: 50 }, { fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 100 }], createdAt: new Date().toISOString() },
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 1, toDay:3, feeType: 'Percentage', feeValue: 2 }, {fromDay: 4, toDay: null, feeType: 'Percentage', feeValue: 5}], createdAt: new Date().toISOString() },
   { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() },
 ];
 
@@ -71,6 +71,7 @@ const initialBills: Bill[] = [
   { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 80}, {name: "Water", amount: 20}], totalAmount: 2600, status: 'Paid', paymentDate: new Date(2024,5,10).toISOString(), paymentMethod: "Card", paymentReference: "TXN12345" },
   { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(2024,5,1).toISOString(), dueDate: new Date(2024,5,15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "General Utility", amount: 175}], totalAmount: 3375, status: 'Pending' },
   { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(2024,4,1).toISOString(), dueDate: new Date(2024,4,15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Paid', paymentDate: new Date(2024,4,10).toISOString(), paymentMethod: "Bank Transfer", paymentReference: "REF9876", bankOrWalletName: "City Bank" },
+  { id: 'bill4-verify', agreementId: 'agreement2', tenantId: 'tenant2', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(2024,3,1).toISOString(), dueDate: new Date(2024,3,15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "Maintenance", amount: 50}], totalAmount: 3250, status: 'Pending Verification', paymentProofUrl: 'sim_bank_slip_bob.pdf', tenantPaymentNotes: 'Paid via transfer on April 14th.' },
 
 ];
 
@@ -119,6 +120,7 @@ const paymentFormSchema = z.object({
   paymentMethod: z.string().min(1, { message: "Payment method is required." }),
   paymentReference: z.string().optional(),
   bankOrWalletName: z.string().optional(),
+  adminVerificationNotes: z.string().optional(), // Added for verification
 }).refine(data => {
   if ((data.paymentMethod === "Bank Transfer" || data.paymentMethod === "Wallet") && (!data.bankOrWalletName || data.bankOrWalletName.trim() === "")) {
     return false;
@@ -135,12 +137,15 @@ type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 export default function BillingPage() {
   const [bills, setBills] = useState<Bill[]>(initialBills);
   const [agreements, setAgreements] = useState<Agreement[]>(initialMockAgreements);
-  const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces); // Using initialMockSpaces as fallback
+  const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [allBuildingUtilities, setAllBuildingUtilities] = useState<BuildingMonthlyUtilities[]>([]);
   
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<Bill | null>(null);
+  const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
+  const [billForVerification, setBillForVerification] = useState<Bill | null>(null);
+
 
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
@@ -153,6 +158,7 @@ export default function BillingPage() {
       paymentMethod: "",
       paymentReference: "",
       bankOrWalletName: "",
+      adminVerificationNotes: "",
     }
   });
   const paymentMethodWatcher = paymentForm.watch("paymentMethod");
@@ -160,17 +166,13 @@ export default function BillingPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // In a real app, spaces would be fetched or come from a central store
     const storedSpaces = localStorage.getItem('spaces');
     if (storedSpaces) {
       try {
         setSpaces(JSON.parse(storedSpaces));
-      } catch (e) {
-        console.error("Error parsing spaces from localStorage", e);
-        setSpaces(initialMockSpaces); // Fallback
-      }
+      } catch (e) { setSpaces(initialMockSpaces); }
     } else {
-      setSpaces(initialMockSpaces); // Fallback
+      setSpaces(initialMockSpaces);
     }
     setAllBuildingUtilities(getStoredBuildingUtilities());
     setBuildings(getStoredBuildings());
@@ -187,6 +189,7 @@ export default function BillingPage() {
     if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
+    // Apply penalty if overdue, regardless of payment status for calculation display. Actual application depends on flow.
     if (isAfter(dueDate, today) || bill.status === 'Paid') return 0; 
 
     const daysOverdue = differenceInDays(today, dueDate);
@@ -214,7 +217,7 @@ export default function BillingPage() {
         currentStatus = 'Overdue';
       }
       
-      const penalty = calculatePenalty({ ...bill, status: currentStatus }); 
+      const penalty = bill.status !== 'Paid' && bill.status !== 'Pending Verification' ? calculatePenalty({ ...bill, status: currentStatus }) : (bill.penaltyAmount || 0);
       const newTotalAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0) + penalty;
       const agreement = agreements.find(ag => ag.id === bill.agreementId);
       const tenantName = agreement ? agreement.tenantName : 'N/A';
@@ -230,233 +233,167 @@ export default function BillingPage() {
   }, [bills, calculatePenalty, today, agreements]);
 
 
-  useEffect(() => {
-    if (billForPayment) {
-      const processedBillForPayment = processedBills.find(pb => pb.id === billForPayment.id);
+ useEffect(() => {
+    if (billForPayment || billForVerification) {
+      const currentBill = billForPayment || billForVerification;
+      const processedBill = processedBills.find(pb => pb.id === currentBill!.id);
       paymentForm.reset({
-        paymentDate: processedBillForPayment?.paymentDate ? parseISO(processedBillForPayment.paymentDate) : new Date(),
-        paymentMethod: processedBillForPayment?.paymentMethod || "",
-        paymentReference: processedBillForPayment?.paymentReference || "",
-        bankOrWalletName: processedBillForPayment?.bankOrWalletName || "",
+        paymentDate: processedBill?.paymentDate ? parseISO(processedBill.paymentDate) : new Date(),
+        paymentMethod: processedBill?.paymentMethod || "",
+        paymentReference: processedBill?.paymentReference || "",
+        bankOrWalletName: processedBill?.bankOrWalletName || "",
+        adminVerificationNotes: processedBill?.adminVerificationNotes || "",
       });
     }
-  }, [billForPayment, paymentForm, processedBills]);
+  }, [billForPayment, billForVerification, paymentForm, processedBills]);
 
  const createBillForAgreement = (agreement: Agreement, targetDueDate: Date): Bill | null => {
     const space = spaces.find(sp => sp.id === agreement.spaceId);
     if (!space) {
-      console.error(`Space not found for agreement ${agreement.id}`);
-      toast({ title: "Error", description: `Space details for ${agreement.spaceDescription} not found. Cannot generate bill.`, variant: "destructive" });
+      toast({ title: "Error", description: `Space details for ${agreement.spaceDescription} not found.`, variant: "destructive" });
       return null;
     }
-
     const rentAmount = agreement.monthlyRentalPrice;
     const utilityBreakdownItems: Array<{ name: string; amount: number }> = [];
     let totalUtilityCostForBill = 0;
-
     const billYear = getYear(targetDueDate);
     const billMonth = getMonth(targetDueDate);
-
     const monthlyBuildingUtilityData = allBuildingUtilities.find(
       entry => entry.buildingName === space.buildingName && entry.year === billYear && entry.month === billMonth
     );
 
-    if (monthlyBuildingUtilityData && monthlyBuildingUtilityData.utilities.length > 0) {
+    if (monthlyBuildingUtilityData?.utilities.length) {
       monthlyBuildingUtilityData.utilities.forEach(utilItem => {
         let costForThisUtility = 0;
         switch (utilItem.appliesToScope) {
-          case 'Building':
-            costForThisUtility = utilItem.totalCost * space.utilityProrationShare;
-            break;
+          case 'Building': costForThisUtility = utilItem.totalCost * space.utilityProrationShare; break;
           case 'Floor':
             if (utilItem.applicableFloor && space.floor === utilItem.applicableFloor) {
               const spacesOnFloor = spaces.filter(s => s.buildingName === space.buildingName && s.floor === utilItem.applicableFloor);
-              if (spacesOnFloor.length > 0) {
-                costForThisUtility = utilItem.totalCost / spacesOnFloor.length;
-              }
-            }
-            break;
+              costForThisUtility = spacesOnFloor.length > 0 ? utilItem.totalCost / spacesOnFloor.length : 0;
+            } break;
           case 'SpecificSpaces':
-            if (utilItem.applicableSpaceIdNames && utilItem.applicableSpaceIdNames.includes(space.spaceIdName)) {
-              if (utilItem.applicableSpaceIdNames.length > 0) {
-                costForThisUtility = utilItem.totalCost / utilItem.applicableSpaceIdNames.length;
-              }
-            }
-            break;
-          default: // Should not happen if data is clean
-            costForThisUtility = utilItem.totalCost * space.utilityProrationShare;
+            if (utilItem.applicableSpaceIdNames?.includes(space.spaceIdName)) {
+              costForThisUtility = utilItem.applicableSpaceIdNames.length > 0 ? utilItem.totalCost / utilItem.applicableSpaceIdNames.length : 0;
+            } break;
         }
         if (costForThisUtility > 0) {
-            utilityBreakdownItems.push({ name: utilItem.name, amount: parseFloat(costForThisUtility.toFixed(2)) });
-            totalUtilityCostForBill += costForThisUtility;
+          utilityBreakdownItems.push({ name: utilItem.name, amount: parseFloat(costForThisUtility.toFixed(2)) });
+          totalUtilityCostForBill += costForThisUtility;
         }
       });
-    } else if (spaces.some(s => s.buildingName === space.buildingName && s.utilityProrationShare > 0)) { // Only warn if some spaces in building expect utilities
-       toast({
-        title: "Warning: Missing Utility Data",
-        description: `No utility costs found for ${space.buildingName} for ${format(targetDueDate, 'MMMM yyyy')}. Utility charges will be $0 for ${agreement.tenantName}. Visit 'Building Utilities' to add them.`,
-        variant: "default",
-        duration: 7000,
-      });
+    } else if (spaces.some(s => s.buildingName === space.buildingName && s.utilityProrationShare > 0)) {
+       toast({ title: "Warning: Missing Utilities", description: `No utility costs for ${space.buildingName} for ${format(targetDueDate, 'MMMM yyyy')}. Utilities will be $0.`, variant: "default", duration: 7000 });
     }
-    
     const totalAmount = rentAmount + totalUtilityCostForBill;
-
     return {
-      id: `bill-${Date.now()}-${agreement.id}`,
-      agreementId: agreement.id,
-      tenantId: agreement.tenantId,
-      spaceDescription: agreement.spaceDescription,
-      billDate: targetDueDate.toISOString(),
-      dueDate: targetDueDate.toISOString(),
-      rentAmount,
-      utilityBreakdown: utilityBreakdownItems,
-      penaltyAmount: 0,
-      totalAmount: parseFloat(totalAmount.toFixed(2)),
-      status: 'Pending',
+      id: `bill-${Date.now()}-${agreement.id}`, agreementId: agreement.id, tenantId: agreement.tenantId, spaceDescription: agreement.spaceDescription,
+      billDate: targetDueDate.toISOString(), dueDate: targetDueDate.toISOString(), rentAmount, utilityBreakdown: utilityBreakdownItems,
+      penaltyAmount: 0, totalAmount: parseFloat(totalAmount.toFixed(2)), status: 'Pending',
     };
   };
   
   const generateSingleBill = (agreementId: string) => {
     const agreement = agreements.find(ag => ag.id === agreementId);
-    if (!agreement) {
-      toast({ title: "Error", description: "Agreement not found.", variant: "destructive" });
-      return;
-    }
-
+    if (!agreement) { toast({ title: "Error", description: "Agreement not found.", variant: "destructive" }); return; }
     const agreementStartDate = startOfDay(new Date(agreement.startDate));
     const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-
     if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) {
-      toast({ title: "Info", description: "Agreement is not currently active or has expired.", variant: "default" });
-      return;
+      toast({ title: "Info", description: "Agreement not active or expired.", variant: "default" }); return;
     }
-    
     const nextDueDate = startOfDay(new Date(agreement.nextPaymentDueDate));
-
-    const existingPendingBill = bills.find(b => 
-      b.agreementId === agreement.id && 
-      b.status === 'Pending' &&
-      isSameDay(startOfDay(new Date(b.dueDate)), nextDueDate)
-    );
-
+    const existingPendingBill = bills.find(b => b.agreementId === agreement.id && (b.status === 'Pending' || b.status === 'Overdue') && isSameDay(startOfDay(new Date(b.dueDate)), nextDueDate));
     if (existingPendingBill) {
-      toast({ title: "Info", description: `A pending bill for ${format(nextDueDate, 'PP')} already exists for ${agreement.tenantName}.`, variant: "default" });
-      return;
+      toast({ title: "Info", description: `A bill for ${format(nextDueDate, 'PP')} for ${agreement.tenantName} already exists (Status: ${existingPendingBill.status}).`, variant: "default" }); return;
     }
-
     const newBill = createBillForAgreement(agreement, nextDueDate);
     if (!newBill) return; 
-
     setBills(prev => [newBill, ...prev]);
-    setAgreements(prevAgreements => 
-      prevAgreements.map(ag => 
-        ag.id === agreementId 
-          ? { ...ag, nextPaymentDueDate: addMonths(nextDueDate, 1).toISOString() } 
-          : ag
-      )
-    );
+    setAgreements(prevAgreements => prevAgreements.map(ag => ag.id === agreementId ? { ...ag, nextPaymentDueDate: addMonths(nextDueDate, 1).toISOString() } : ag));
     toast({ title: "Bill Generated", description: `New bill for ${agreement.tenantName} (Due: ${format(nextDueDate, 'PP')}) created. Total: $${newBill.totalAmount.toFixed(2)}` });
   };
 
   const handleGenerateAllDueBills = () => {
-    let generatedCount = 0;
-    let skippedCount = 0;
+    let generatedCount = 0, skippedCount = 0;
     const newBillsBuffer: Bill[] = [];
     const updatedAgreementsData = [...agreements]; 
-
     agreements.forEach(agreement => {
       const agreementStartDate = startOfDay(new Date(agreement.startDate));
       const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-
-      if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) {
-        skippedCount++; 
-        return;
-      }
-
+      if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) { skippedCount++; return; }
       const nextDueDate = startOfDay(new Date(agreement.nextPaymentDueDate));
-
-      if (isAfter(nextDueDate, today)) {
-        skippedCount++; 
-        return;
-      }
-      
-      const existingPendingBill = bills.find(b => 
-        b.agreementId === agreement.id && 
-        b.status === 'Pending' &&
-        isSameDay(startOfDay(new Date(b.dueDate)), nextDueDate)
-      );
-
-      if (existingPendingBill) {
-        skippedCount++;
-        return;
-      }
-
+      if (isAfter(nextDueDate, today)) { skippedCount++; return; }
+      const existingBill = bills.find(b => b.agreementId === agreement.id && (b.status === 'Pending' || b.status === 'Overdue' || b.status === 'Pending Verification') && isSameDay(startOfDay(new Date(b.dueDate)), nextDueDate));
+      if (existingBill) { skippedCount++; return; }
       const newBill = createBillForAgreement(agreement, nextDueDate);
       if (newBill) {
         newBillsBuffer.push(newBill);
-        const currentAgreementIndex = updatedAgreementsData.findIndex(a => a.id === agreement.id);
-        if (currentAgreementIndex > -1) {
-          updatedAgreementsData[currentAgreementIndex] = {
-            ...updatedAgreementsData[currentAgreementIndex],
-            nextPaymentDueDate: addMonths(nextDueDate, 1).toISOString()
-          };
-        }
+        const idx = updatedAgreementsData.findIndex(a => a.id === agreement.id);
+        if (idx > -1) updatedAgreementsData[idx] = { ...updatedAgreementsData[idx], nextPaymentDueDate: addMonths(nextDueDate, 1).toISOString() };
         generatedCount++;
-      } else {
-        skippedCount++; 
-      }
+      } else { skippedCount++; }
     });
-
-    if (newBillsBuffer.length > 0) {
-      setBills(prev => [...newBillsBuffer, ...prev]);
-    }
+    if (newBillsBuffer.length > 0) setBills(prev => [...newBillsBuffer, ...prev]);
     setAgreements(updatedAgreementsData);
-    toast({ title: "Bulk Bill Generation Complete", description: `${generatedCount} bills generated. ${skippedCount} agreements skipped (not due, expired, or pending bill exists).` });
+    toast({ title: "Bulk Bill Generation", description: `${generatedCount} bills generated. ${skippedCount} skipped.` });
   };
 
-
-  const handleOpenPaymentDialog = (bill: Bill) => {
-    setBillForPayment(bill);
-    setIsPaymentDialogOpen(true);
-  };
+  const handleOpenPaymentDialog = (bill: Bill) => { setBillForPayment(bill); setIsPaymentDialogOpen(true); };
+  const handleOpenVerificationDialog = (bill: Bill) => { setBillForVerification(bill); setIsVerificationDialogOpen(true); };
   
   const handleRecordPaymentSubmit = (values: PaymentFormValues) => {
     if (!billForPayment) return;
     const processedBill = processedBills.find(pb => pb.id === billForPayment.id);
     if (!processedBill) return;
-
-    setBills(prevBills => 
-      prevBills.map(b => 
-        b.id === billForPayment.id 
-        ? { 
-            ...processedBill, 
-            status: 'Paid', 
-            paymentDate: values.paymentDate.toISOString(),
-            paymentMethod: values.paymentMethod,
-            paymentReference: values.paymentReference,
-            bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined,
-          } 
-        : b
-      )
-    );
-    toast({ title: "Payment Recorded", description: `Payment for bill ${billForPayment.id} has been successfully recorded.` });
-    setIsPaymentDialogOpen(false);
-    setBillForPayment(null);
-    paymentForm.reset({
-      paymentDate: new Date(),
-      paymentMethod: "",
-      paymentReference: "",
-      bankOrWalletName: "",
-    });
+    setBills(prevBills => prevBills.map(b => b.id === billForPayment.id ? { ...processedBill, status: 'Paid', paymentDate: values.paymentDate.toISOString(), paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes } : b));
+    toast({ title: "Payment Recorded", description: `Payment for bill ${billForPayment.id} recorded.` });
+    setIsPaymentDialogOpen(false); setBillForPayment(null); paymentForm.reset();
   };
   
-  const getStatusBadgeVariant = (status: Bill['status']): "default" | "destructive" | "secondary" => {
+  const handleVerificationSubmit = (values: PaymentFormValues, action: 'confirm' | 'reject') => {
+    if (!billForVerification) return;
+    const processedBill = processedBills.find(pb => pb.id === billForVerification.id);
+    if (!processedBill) return;
+
+    if (action === 'confirm') {
+      setBills(prevBills => prevBills.map(b => b.id === billForVerification.id ? { 
+        ...processedBill, status: 'Paid', paymentDate: values.paymentDate.toISOString(), 
+        paymentMethod: values.paymentMethod, paymentReference: values.paymentReference, 
+        bankOrWalletName: (values.paymentMethod === "Bank Transfer" || values.paymentMethod === "Wallet") ? values.bankOrWalletName : undefined, 
+        adminVerifiedPayment: true, adminVerificationNotes: values.adminVerificationNotes,
+        // Keep tenant notes and proof URL
+      } : b));
+      toast({ title: "Payment Verified", description: `Payment for bill ${billForVerification.id} confirmed.` });
+    } else { // Reject
+      setBills(prevBills => prevBills.map(b => b.id === billForVerification.id ? { 
+        ...processedBill, 
+        status: isBefore(parseISO(processedBill.dueDate), today) ? 'Overdue' : 'Pending', // Revert to appropriate pending/overdue
+        adminVerifiedPayment: false, adminVerificationNotes: values.adminVerificationNotes,
+        // Clear payment specific fields that were potentially pre-filled from tenant submission
+        paymentDate: undefined, paymentMethod: undefined, paymentReference: undefined, bankOrWalletName: undefined,
+      } : b));
+      toast({ title: "Payment Rejected", description: `Payment proof for bill ${billForVerification.id} rejected. Status reverted.`, variant: "destructive" });
+    }
+    setIsVerificationDialogOpen(false); setBillForVerification(null); paymentForm.reset();
+  };
+
+  const getStatusBadgeVariant = (status: Bill['status']): "default" | "destructive" | "secondary" | "outline" => {
     switch (status) {
       case 'Paid': return 'secondary';
       case 'Pending': return 'default';
       case 'Overdue': return 'destructive';
+      case 'Pending Verification': return 'outline';
       default: return 'default';
+    }
+  };
+
+  const getStatusIcon = (status: Bill['status']) => {
+    switch (status) {
+      case 'Paid': return <CheckCircle className="mr-1 h-3 w-3 text-green-600" />;
+      case 'Pending': return <InfoIcon className="mr-1 h-3 w-3 text-yellow-600" />;
+      case 'Overdue': return <AlertTriangle className="mr-1 h-3 w-3 text-red-600" />;
+      case 'Pending Verification': return <UploadCloud className="mr-1 h-3 w-3 text-blue-600" />;
+      default: return <InfoIcon className="mr-1 h-3 w-3" />;
     }
   };
 
@@ -466,22 +403,17 @@ export default function BillingPage() {
 
   return (
     <div className="animate-fadeIn">
-      <PageHeader
-        title="Billing Management"
-        icon={DollarSign}
-        description="Generate and manage rental and utility bills. Penalties apply based on building policies."
-      />
+      <PageHeader title="Billing Management" icon={DollarSign} description="Generate and manage bills. Verify tenant-submitted payments." />
 
       <Card className="mb-6 shadow-sm">
         <CardHeader>
           <CardTitle className="font-headline">Generate Bills</CardTitle>
-          <CardDescription>Generate bills for individual agreements or all due agreements. Monthly utility costs must be entered on the 'Building Utilities' page. Late fees are applied automatically if applicable.</CardDescription>
+          <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription>
         </CardHeader>
         <CardContent>
             <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90">
                 <Zap className="mr-2 h-5 w-5" /> Generate All Due Bills
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">Generates bills for agreements where the 'Next Payment Due Date' is today or in the past, and no pending bill exists for that period. The agreement's 'Next Payment Due Date' will be advanced by one month after bill generation.</p>
         </CardContent>
         <CardHeader className="pt-4">
           <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle>
@@ -489,9 +421,9 @@ export default function BillingPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {agreements.map(agreement => {
-            const isAgreementActive = !isBefore(startOfDay(new Date()), startOfDay(new Date(agreement.startDate))) && !isAfter(startOfDay(new Date()), addMonths(startOfDay(new Date(agreement.startDate)), agreement.paymentTermMonths));
+            const isAgreementActive = !isBefore(today, startOfDay(new Date(agreement.startDate))) && !isAfter(today, addMonths(startOfDay(new Date(agreement.startDate)), agreement.paymentTermMonths));
             const nextDueDate = startOfDay(new Date(agreement.nextPaymentDueDate));
-            const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, startOfDay(new Date()));
+            const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, today);
             
             return (
               <Card key={agreement.id} className={`bg-secondary/30 ${!isAgreementActive ? 'opacity-60' : ''}`}>
@@ -500,20 +432,13 @@ export default function BillingPage() {
                   <CardDescription className="text-xs">{agreement.spaceDescription}</CardDescription>
                    <CardDescription className="text-xs pt-1">
                     Next Due: {format(nextDueDate, 'PP')}
-                    {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive/Expired)</span>}
-                    {isAgreementActive && isDueForGeneration && <span className="text-green-600 ml-1">(Due for Generation)</span>}
-                    {isAgreementActive && !isDueForGeneration && <span className="text-blue-500 ml-1">(Upcoming)</span>}
+                    {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive)</span>}
+                    {isAgreementActive && isDueForGeneration && <Badge variant="default" className="ml-1 text-xs bg-green-100 text-green-700">Due for Gen</Badge>}
+                    {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
                   </CardDescription>
                 </CardHeader>
                 <CardFooter>
-                  <Button 
-                    size="sm" 
-                    onClick={() => generateSingleBill(agreement.id)} 
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={!isAgreementActive}
-                  >
-                    Generate Bill
-                  </Button>
+                  <Button size="sm" onClick={() => generateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={!isAgreementActive}>Generate Bill</Button>
                 </CardFooter>
               </Card>
             );
@@ -521,143 +446,66 @@ export default function BillingPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => {
-          setIsPaymentDialogOpen(isOpen);
-          if (!isOpen) {
-            setBillForPayment(null);
-            paymentForm.reset({
-              paymentDate: new Date(),
-              paymentMethod: "",
-              paymentReference: "",
-              bankOrWalletName: "",
-            });
-          }
-      }}>
+      {/* Payment Dialog (for direct admin recording) */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); }}}>
           <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                  <DialogTitle className="font-headline text-xl">
-                      {billForPayment?.status === 'Paid' ? 'Update Payment Details' : 'Record Payment'} for Bill
-                  </DialogTitle>
-                  {billForPayment && (
-                    <DialogDescription>
-                        For {processedBills.find(pb => pb.id === billForPayment.id)?.spaceDescription.split(',')[0]} - Total: ${processedBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)} (Due: {billForPayment?.dueDate ? format(parseISO(billForPayment.dueDate), 'PP') : 'N/A'})
-                    </DialogDescription>
-                  )}
+                  <DialogTitle className="font-headline text-xl">{billForPayment?.status === 'Paid' ? 'Update Payment Details' : 'Record Payment'}</DialogTitle>
+                  {billForPayment && <DialogDescription>For {processedBills.find(pb => pb.id === billForPayment.id)?.spaceDescription.split(',')[0]} - Total: ${processedBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)}</DialogDescription>}
               </DialogHeader>
               <Form {...paymentForm}>
                   <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
-                      <FormField
-                          control={paymentForm.control}
-                          name="paymentDate"
-                          render={({ field }) => (
-                              <FormItem className="flex flex-col">
-                                  <FormLabel>Payment Date</FormLabel>
-                                  <Popover>
-                                      <PopoverTrigger asChild>
-                                          <FormControl>
-                                              <Button
-                                                  variant={"outline"}
-                                                  className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}
-                                              >
-                                                  {field.value ? (
-                                                      format(field.value, "PPP")
-                                                  ) : (
-                                                      <span>Pick a date</span>
-                                                  )}
-                                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                              </Button>
-                                          </FormControl>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0" align="start">
-                                          <Calendar
-                                              mode="single"
-                                              selected={field.value}
-                                              onSelect={field.onChange}
-                                              disabled={(date) =>
-                                                  date > new Date() || date < new Date("1900-01-01")
-                                              }
-                                              initialFocus
-                                          />
-                                      </PopoverContent>
-                                  </Popover>
-                                  <FormMessage />
-                              </FormItem>
-                          )}
-                      />
-                      <FormField
-                          control={paymentForm.control}
-                          name="paymentMethod"
-                          render={({ field }) => (
-                              <FormItem>
-                                  <FormLabel>Payment Method</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                      <FormControl>
-                                          <SelectTrigger>
-                                              <SelectValue placeholder="Select payment method" />
-                                          </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                          <SelectItem value="Card">Card</SelectItem>
-                                          <SelectItem value="Cash">Cash</SelectItem>
-                                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                          <SelectItem value="Wallet">Wallet</SelectItem>
-                                          <SelectItem value="Check">Check</SelectItem>
-                                          <SelectItem value="Other">Other</SelectItem>
-                                      </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                              </FormItem>
-                          )}
-                      />
-                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && (
-                        <FormField
-                          control={paymentForm.control}
-                          name="bankOrWalletName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel>
-                              <FormControl>
-                                <Input placeholder={`Enter ${paymentMethodWatcher === "Bank Transfer" ? "Bank" : "Wallet"} Name`} {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                      <FormField
-                          control={paymentForm.control}
-                          name="paymentReference"
-                          render={({ field }) => (
-                              <FormItem>
-                                  <FormLabel>Payment Reference (Optional)</FormLabel>
-                                  <FormControl>
-                                      <Input placeholder="e.g., TXN ID, Check No." {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                              </FormItem>
-                          )}
-                      />
-                      <DialogFooter className="pt-4">
-                          <DialogClose asChild>
-                              <Button type="button" variant="outline">Cancel</Button>
-                          </DialogClose>
-                          <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                            {billForPayment?.status === 'Paid' ? 'Update Payment' : 'Record as Paid'}
-                          </Button>
+                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
+                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                      <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">{billForPayment?.status === 'Paid' ? 'Update' : 'Record Paid'}</Button></DialogFooter>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
+
+      {/* Verification Dialog */}
+      <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); }}}>
+          <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                  <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
+                  {billForVerification && <DialogDescription>Bill for {processedBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: ${processedBills.find(pb => pb.id === billForVerification.id)?.totalAmount.toFixed(2)}</DialogDescription>}
+              </DialogHeader>
+              {billForVerification && (
+                <div className="text-sm space-y-2 py-2">
+                    <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p>
+                    <p><strong>Submitted Proof:</strong> 
+                        {billForVerification.paymentProofUrl ? 
+                            <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}>
+                                {billForVerification.paymentProofUrl} (Click to view - simulated)
+                            </Button> 
+                            : <span className="italic text-muted-foreground">No proof URL found.</span>}
+                    </p>
+                </div>
+              )}
+              <Form {...paymentForm}>
+                  <form className="space-y-4 py-1"> {/* onSubmit handled by footer buttons */}
+                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
+                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} /></FormControl><FormMessage /></FormItem>)} />
+                      
+                      <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
+                          <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'reject'))()}><ShieldX className="mr-2 h-4 w-4"/>Reject Payment</Button>
+                          <div className="flex-grow"></div>
+                          <DialogClose asChild><Button type="button" variant="outline" className="w-full sm:w-auto">Cancel</Button></DialogClose>
+                          <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirm'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"><ShieldCheck className="mr-2 h-4 w-4"/>Confirm Payment</Button>
                       </DialogFooter>
                   </form>
               </Form>
           </DialogContent>
       </Dialog>
 
-
       {processedBills.length === 0 ? (
-        <Card className="text-center py-12 shadow-sm">
-          <CardContent>
-            <DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">No Bills Yet</h3>
-            <p className="text-muted-foreground">Generate bills from active agreements to see them here.</p>
-          </CardContent>
+        <Card className="text-center py-12 shadow-sm mt-8">
+          <CardContent><DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" /><h3 className="text-xl font-semibold mb-2 font-headline">No Bills Yet</h3><p className="text-muted-foreground">Generate bills to see them here.</p></CardContent>
         </Card>
       ) : (
         <div className="space-y-4 mt-8">
@@ -665,78 +513,30 @@ export default function BillingPage() {
         <Card className="shadow-md">
           <CardContent className="p-0">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead className="hidden md:table-cell">Space</TableHead>
-                  <TableHead>Bill Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">Rent</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">Utilities</TableHead>
-                  <TableHead className="hidden sm:table-cell text-right">Penalty</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow><TableHead>Tenant</TableHead><TableHead className="hidden md:table-cell">Space</TableHead><TableHead>Bill Date</TableHead><TableHead>Due Date</TableHead><TableHead className="hidden sm:table-cell text-right">Rent</TableHead><TableHead className="hidden sm:table-cell text-right">Utilities</TableHead><TableHead className="hidden sm:table-cell text-right">Penalty</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
                 {processedBills.map((bill) => (
-                  <TableRow key={bill.id} className={bill.status === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''}>
+                  <TableRow key={bill.id} className={`${bill.status === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.status === 'Pending Verification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
                     <TableCell className="font-medium">{bill.tenantName}</TableCell>
                     <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
                     <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
                     <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
                     <TableCell className="hidden sm:table-cell text-right">${bill.rentAmount.toFixed(2)}</TableCell>
                     <TableCell className="hidden sm:table-cell text-right">
-                      {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 ? (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">
-                                ${bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0).toFixed(2)}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto text-xs p-2" side="top">
-                              <ul className="space-y-0.5">
-                                {bill.utilityBreakdown.map(util => (
-                                  <li key={util.name} className="flex justify-between">
-                                    <span>{util.name}:</span>
-                                    <span className="font-medium ml-2">${util.amount.toFixed(2)}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                            '$0.00'
-                        )}
+                      {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">${u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('$0.00')}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-right text-destructive">{bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}</TableCell>
                     <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={getStatusBadgeVariant(bill.status)} className="capitalize text-xs">
-                         {bill.status === 'Paid' && <CheckCircle className="mr-1 h-3 w-3" />}
-                         {bill.status === 'Pending' && <InfoIcon className="mr-1 h-3 w-3" />}
-                         {bill.status === 'Overdue' && <AlertTriangle className="mr-1 h-3 w-3" />}
-                         {bill.status}
-                      </Badge>
-                    </TableCell>
+                    <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize text-xs ${bill.status === 'Pending Verification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification', '')}</span></Badge></TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-1 justify-end">
-                        {bill.status !== 'Paid' && (
-                          <Button 
-                              variant="default"
-                              size="sm" 
-                              onClick={() => handleOpenPaymentDialog(bill)}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            <CreditCard className="mr-1 h-3.5 w-3.5" /> Record Payment
-                          </Button>
+                        {bill.status === 'Pending Verification' && (
+                          <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white"><ShieldCheck className="mr-1 h-3.5 w-3.5"/> Verify</Button>
                         )}
-                         {bill.status === 'Paid' && (
-                           <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)}>
-                             <Edit className="mr-1 h-3.5 w-3.5"/> View/Edit
-                           </Button>
-                         )}
+                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                          <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white"><CreditCard className="mr-1 h-3.5 w-3.5" /> Record Pymt</Button>
+                        )}
+                         {bill.status === 'Paid' && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)}><Edit className="mr-1 h-3.5 w-3.5"/> View/Edit</Button> )}
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => toast({title: "Delete Bill", description:"Functionality coming soon.", variant: "destructive"})}><Trash2 className="h-4 w-4"/></Button>
                       </div>
                     </TableCell>

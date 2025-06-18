@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIcon } from 'lucide-react';
+import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIcon, UploadCloud } from 'lucide-react';
 import type { Bill, Space, Building as BuildingType, Agreement, PenaltyTier } from '@/lib/types'; 
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
@@ -33,7 +33,7 @@ const mockSpacesData: Space[] = [
 const mockBuildingsData: BuildingType[] = [
   { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 50 }, { fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 100 }], createdAt: new Date().toISOString() },
   { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 2 }, { fromDay: 4, toDay: null, feeType: 'Percentage', feeValue: 5}], createdAt: new Date().toISOString() },
-  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No policy
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() },
   { id: 'building-portal', name: 'Portal View Residences', address: '1 Portal Drive', penaltyPolicyTiers: [{ fromDay: 1, toDay: 2, feeType: 'Fixed', feeValue: 25 }, { fromDay: 3, toDay: null, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() },
 ];
 
@@ -54,18 +54,20 @@ const lastMonthYear = currentMonth - 1 < 0 ? currentYear - 1 : currentYear;
 const mockBillsData: Bill[] = [
   { id: 'bill1', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(currentYear, 5, 1).toISOString(), dueDate: new Date(currentYear, 5, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 80}, {name: "Water", amount: 20}], totalAmount: 2600, status: 'Paid', paymentDate: new Date(currentYear, 5, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN12345" },
   { id: 'bill2', agreementId: 'agreement2', tenantId: 'tenant2', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(currentYear, currentMonth, 1).toISOString(), dueDate: new Date(currentYear, currentMonth, 15).toISOString(), rentAmount: 3200, utilityBreakdown: [{name: "General Utility", amount: 175}], totalAmount: 3375, status: 'Pending' },
-  { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(currentYear, currentMonth, 1).toISOString(), dueDate: new Date(currentYear, currentMonth, 10).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Pending' }, // Made slightly overdue
+  { id: 'bill3', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(currentYear, currentMonth, 1).toISOString(), dueDate: new Date(currentYear, currentMonth, 10).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 70}, {name: "Water", amount: 15}], totalAmount: 2585, status: 'Pending' },
   { id: 'bill4', agreementId: 'agreement3', tenantId: 'tenant3', spaceDescription: 'Penthouse, Galaxy Tower', billDate: new Date(currentYear, currentMonth - 1, 20).toISOString(), dueDate: new Date(currentYear, currentMonth -1 , 25).toISOString(), rentAmount: 5000, utilityBreakdown: [{name: "Premium Utilities", amount: 300}], totalAmount: 5300, status: 'Overdue' }, 
   { id: 'bill5', agreementId: 'agreement2', tenantId: 'tenant2', spaceDescription: 'Office 5B, Downtown Hub', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 3200, utilityBreakdown: [], totalAmount: 3200, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 12).toISOString(), paymentMethod: "Bank Transfer", bankOrWalletName: "First National", paymentReference: "BNKREF001" },
   { id: 'bill6', agreementId: 'agree-tenant1-current', tenantId: 'tenant-portal-user', spaceDescription: 'Unit P1, Portal View Residences', billDate: new Date(lastMonthYear, lastMonth, 5).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 20).toISOString(), rentAmount: 1200, utilityBreakdown: [{name: "Internet", amount: 50}], totalAmount: 1250, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 18).toISOString(), paymentMethod: "Wallet", bankOrWalletName: "PayZap", paymentReference: "WLTREF789" },
-   { id: 'bill7', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 75}, {name: "Water", amount: 22}], totalAmount: 2597, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN67890" },
+  { id: 'bill7', agreementId: 'agreement1', tenantId: 'tenant1', spaceDescription: 'Unit 101, Sunrise Tower', billDate: new Date(lastMonthYear, lastMonth, 1).toISOString(), dueDate: new Date(lastMonthYear, lastMonth, 15).toISOString(), rentAmount: 2500, utilityBreakdown: [{name: "Electricity", amount: 75}, {name: "Water", amount: 22}], totalAmount: 2597, status: 'Paid', paymentDate: new Date(lastMonthYear, lastMonth, 10).toISOString(), paymentMethod: "Card", paymentReference: "TXN67890" },
+  { id: 'bill8-verify', agreementId: 'agree-tenant1-current', tenantId: 'tenant-portal-user', spaceDescription: 'Unit P1, Portal View Residences', billDate: new Date(currentYear, currentMonth -1, 5).toISOString(), dueDate: new Date(currentYear, currentMonth -1, 20).toISOString(), rentAmount: 1200, utilityBreakdown: [{name: "Gas", amount: 30}], totalAmount: 1230, status: 'Pending Verification', paymentProofUrl: 'gas_bill_proof.jpg', tenantPaymentNotes: "Paid via app." },
+
 ];
 
 
 export default function PaymentsOverviewPage() {
   const [spaces, setSpaces] = useState<Space[]>(mockSpacesData);
-  const [buildings, setBuildings] = useState<BuildingType[]>(mockBuildingsData);
-  const [agreements, setAgreements] = useState<Agreement[]>(mockAgreementsData);
+  const [buildingsData, setBuildingsData] = useState<BuildingType[]>(mockBuildingsData); // Renamed to avoid conflict
+  const [agreementsData, setAgreementsData] = useState<Agreement[]>(mockAgreementsData); // Renamed
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
 
@@ -74,22 +76,24 @@ export default function PaymentsOverviewPage() {
 
   useEffect(() => {
     setIsMounted(true);
+    // Simulating fetching data, replace with actual data sources if available
     setSpaces(mockSpacesData);
-    setBuildings(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: b.penaltyPolicyTiers || [] })));
-    setAgreements(mockAgreementsData);
+    setBuildingsData(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: b.penaltyPolicyTiers || [] })));
+    setAgreementsData(mockAgreementsData);
     setToday(startOfDay(new Date())); 
   }, []);
 
   const calculatePenalty = useCallback((bill: Bill, currentStatus: Bill['status']): number => {
-    const agreement = agreements.find(ag => ag.id === bill.agreementId);
+    const agreement = agreementsData.find(ag => ag.id === bill.agreementId);
     if (!agreement) return 0;
     const space = spaces.find(sp => sp.id === agreement.spaceId);
     if (!space) return 0;
-    const building = buildings.find(b => b.name === space.buildingName);
+    const building = buildingsData.find(b => b.name === space.buildingName);
     
     if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
+    // Only calculate for truly overdue, not yet paid or pending verification
     if (currentStatus !== 'Overdue') return 0; 
 
     const daysOverdue = differenceInDays(today, dueDate);
@@ -108,7 +112,7 @@ export default function PaymentsOverviewPage() {
       }
     }
     return parseFloat(calculatedPenalty.toFixed(2));
-  }, [agreements, spaces, buildings, today]);
+  }, [agreementsData, spaces, buildingsData, today]);
 
   const processedBills = useMemo(() => {
     return mockBillsData.map(bill => {
@@ -117,7 +121,7 @@ export default function PaymentsOverviewPage() {
         currentStatus = 'Overdue';
       }
       
-      const penalty = calculatePenalty(bill, currentStatus);
+      const penalty = bill.status !== 'Paid' && bill.status !== 'Pending Verification' ? calculatePenalty(bill, currentStatus) : (bill.penaltyAmount || 0);
       const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
       const newTotalAmount = baseAmount + penalty;
 
@@ -126,12 +130,12 @@ export default function PaymentsOverviewPage() {
         status: currentStatus,
         penaltyAmount: penalty > 0 ? penalty : undefined,
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
-        tenantName: agreements.find(a => a.id === bill.agreementId)?.tenantName || 'N/A' 
+        tenantName: agreementsData.find(a => a.id === bill.agreementId)?.tenantName || 'N/A' 
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [today, calculatePenalty, agreements]); 
+  }, [today, calculatePenalty, agreementsData]); 
   
-  const upcomingAndPendingBills = useMemo(() => processedBills.filter(b => b.status === 'Pending' || b.status === 'Overdue'), [processedBills]);
+  const upcomingAndPendingBills = useMemo(() => processedBills.filter(b => b.status === 'Pending' || b.status === 'Overdue' || b.status === 'Pending Verification'), [processedBills]);
   
   const paidBillsInSelectedPeriod = useMemo(() => processedBills.filter(bill => {
     if (bill.status !== 'Paid' || !bill.paymentDate) return false;
@@ -149,11 +153,12 @@ export default function PaymentsOverviewPage() {
     label: format(new Date(0, i), 'MMMM'),
   })), []);
 
-  const getStatusBadgeVariant = (status: Bill['status']): "default" | "destructive" | "secondary" => {
+  const getStatusBadgeVariant = (status: Bill['status']): "default" | "destructive" | "secondary" | "outline" => {
     switch (status) {
       case 'Paid': return 'secondary';
       case 'Pending': return 'default';
       case 'Overdue': return 'destructive';
+      case 'Pending Verification': return 'outline';
       default: return 'default';
     }
   };
@@ -163,6 +168,7 @@ export default function PaymentsOverviewPage() {
       case 'Paid': return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'Pending': return <Info className="h-4 w-4 text-yellow-600" />;
       case 'Overdue': return <AlertTriangle className="h-4 w-4 text-red-600" />;
+      case 'Pending Verification': return <UploadCloud className="h-4 w-4 text-blue-600" />;
       default: return <Info className="h-4 w-4 text-gray-500" />;
     }
   };
@@ -182,6 +188,9 @@ export default function PaymentsOverviewPage() {
       'Payment Method': bill.paymentMethod || 'N/A',
       'Bank/Wallet': bill.bankOrWalletName || 'N/A',
       'Reference': bill.paymentReference || 'N/A',
+      'Tenant Notes': bill.tenantPaymentNotes || 'N/A',
+      'Admin Notes': bill.adminVerificationNotes || 'N/A',
+      'Proof URL': bill.paymentProofUrl || 'N/A',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
@@ -205,12 +214,12 @@ export default function PaymentsOverviewPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
         <Card className="shadow-sm bg-secondary/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Upcoming/Overdue</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Upcoming/Awaiting</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">${totalUpcomingAmount.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">{upcomingAndPendingBills.length} transactions</p>
+            <p className="text-xs text-muted-foreground">{upcomingAndPendingBills.length} transactions (incl. Overdue & Verification)</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm bg-secondary/50">
@@ -237,9 +246,9 @@ export default function PaymentsOverviewPage() {
 
       <section className="mb-10">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-headline font-semibold text-foreground">Upcoming & Overdue Payments</h2>
+          <h2 className="text-2xl font-headline font-semibold text-foreground">Upcoming, Overdue & Pending Verification</h2>
           {upcomingAndPendingBills.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => exportToExcel(upcomingAndPendingBills, 'Upcoming_Overdue_Payments')}>
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(upcomingAndPendingBills, 'Upcoming_Overdue_Verification_Payments')}>
               <Download className="mr-2 h-4 w-4" /> Export to Excel
             </Button>
           )}
@@ -249,7 +258,7 @@ export default function PaymentsOverviewPage() {
             <CardContent>
               <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
               <h3 className="text-lg font-semibold font-headline">All Clear!</h3>
-              <p className="text-muted-foreground">No upcoming or overdue payments at the moment.</p>
+              <p className="text-muted-foreground">No upcoming, overdue, or pending verification payments.</p>
             </CardContent>
           </Card>
         ) : (
@@ -268,7 +277,7 @@ export default function PaymentsOverviewPage() {
                 </TableHeader>
                 <TableBody>
                   {upcomingAndPendingBills.map(bill => (
-                    <TableRow key={bill.id}>
+                    <TableRow key={bill.id} className={`${bill.status === 'Pending Verification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
                       <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
                       <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
                       <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
@@ -279,8 +288,8 @@ export default function PaymentsOverviewPage() {
                       </TableCell>
                       <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant={getStatusBadgeVariant(bill.status)} className="capitalize">
-                          {getStatusIcon(bill.status)}<span className="ml-1">{bill.status}</span>
+                        <Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize ${bill.status === 'Pending Verification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                          {getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification',' Ver.')}</span>
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -294,7 +303,7 @@ export default function PaymentsOverviewPage() {
 
       <section>
         <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
-            <h2 className="text-2xl font-headline font-semibold text-foreground">Payment History</h2>
+            <h2 className="text-2xl font-headline font-semibold text-foreground">Payment History (Paid & Verified)</h2>
             <div className="flex gap-2 items-center flex-wrap">
                 <div className="flex gap-2 items-end">
                     <div>

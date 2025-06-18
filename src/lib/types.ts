@@ -1,7 +1,7 @@
 
 export interface PenaltyTier {
   fromDay: number;
-  toDay?: number | null;
+  toDay?: number | null; // null means it's the last, ongoing tier
   feeType: 'Fixed' | 'Percentage';
   feeValue: number;
 }
@@ -65,9 +65,9 @@ export interface Agreement {
 export interface BuildingUtilityItem {
   name: string;
   totalCost: number;
-  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces'; // New field for scope
-  applicableFloor?: string;          // Used if appliesToScope is 'Floor'
-  applicableSpaceIdNames?: string[]; // Used if appliesToScope is 'SpecificSpaces' (using Space.spaceIdName)
+  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
+  applicableFloor?: string;
+  applicableSpaceIdNames?: string[];
 }
 
 export interface BuildingMonthlyUtilities {
@@ -90,9 +90,13 @@ export interface Bill {
   utilityBreakdown: Array<{ name: string; amount: number }>;
   penaltyAmount?: number;
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue';
+  status: 'Pending' | 'Paid' | 'Overdue' | 'Pending Verification'; // Added 'Pending Verification'
   paymentDate?: string;
   paymentMethod?: string;
   paymentReference?: string;
   bankOrWalletName?: string;
+  paymentProofUrl?: string; // For tenant uploaded proof
+  adminVerifiedPayment?: boolean; // Flag for admin confirmation
+  tenantPaymentNotes?: string; // Notes from tenant during proof submission
+  adminVerificationNotes?: string; // Notes from admin during verification
 }

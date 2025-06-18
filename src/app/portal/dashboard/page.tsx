@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import type { Agreement, Bill, Building, PenaltyTier } from '@/lib/types'; 
+import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare } from 'lucide-react';
+import type { Agreement, Bill, Building as BuildingType, PenaltyTier } from '@/lib/types'; 
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -23,6 +23,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 
 // --- Mock Data ---
@@ -37,19 +49,19 @@ const mockTenantAgreement: Agreement = {
   monthlyRentalPrice: 1500,
   paymentTermMonths: 12,
   initialPaymentMonths: 1,
-  nextPaymentDueDate: new Date(2024, 7, 15).toISOString(), 
+  nextPaymentDueDate: new Date(new Date().getFullYear(), new Date().getMonth() + 2, 15).toISOString(), 
   additionalTerms: 'No smoking. Small pets allowed with an additional deposit.',
   createdAt: new Date(2024, 0, 10).toISOString(),
 };
 
-const mockPortalBuilding: Building = {
+const mockPortalBuilding: BuildingType = {
   id: 'building-portal',
   name: 'Portal View Residences',
   address: '1 Portal Drive',
   penaltyPolicyTiers: [
-    { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 25 },    // For first 5 days: $25 fixed
-    { fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 50 },   // For next 5 days (days 6-10): $50 fixed
-    { fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 } // From day 11 onwards: 1.5% of rent
+    { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 25 },
+    { fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 50 },
+    { fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 1.5 }
   ],
   createdAt: new Date().toISOString(),
 };
@@ -61,27 +73,26 @@ const initialMockTenantBills: Bill[] = [
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
-    billDate: new Date(2024, 5, 1).toISOString(), 
-    dueDate: new Date(2024, 5, 15).toISOString(), 
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString(), 
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 15).toISOString(), 
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }],
     totalAmount: 1575, 
     status: 'Paid',
-    paymentDate: new Date(2024, 5, 10).toISOString(),
+    paymentDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 10).toISOString(),
     paymentMethod: 'Online Portal',
-    paymentReference: 'PAY-PORTAL-JUNE',
+    paymentReference: 'PAY-PORTAL-PREV',
   },
   {
     id: 'bill-tp-2', 
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
-    // Make this bill significantly overdue to test penalties
-    billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1).toISOString(), 
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 2, 5).toISOString(), // Due very early to ensure it's overdue by many days
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString(), 
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 5).toISOString(), // Overdue
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, {name: 'Water Service', amount: 30}],
-    totalAmount: 1605, // This will be recalculated
+    totalAmount: 1605,
     status: 'Pending', 
   },
   {
@@ -89,12 +100,23 @@ const initialMockTenantBills: Bill[] = [
     agreementId: 'agree-tenant1-current',
     tenantId: 'tenant-portal-user',
     spaceDescription: 'Unit P1, Portal View Residences',
-    billDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 1).toISOString(), 
-    // Make this bill slightly overdue
-    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() -1, 10).toISOString(), 
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(), 
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth(), 10).toISOString(), // Slightly Overdue or Pending
     rentAmount: 1500,
     utilityBreakdown: [{ name: 'Common Area Maintenance', amount: 75 }, { name: 'Trash Removal', amount: 25}],
-    totalAmount: 1600, // This will be recalculated
+    totalAmount: 1600,
+    status: 'Pending',
+  },
+  {
+    id: 'bill-tp-4',
+    agreementId: 'agree-tenant1-current',
+    tenantId: 'tenant-portal-user',
+    spaceDescription: 'Unit P1, Portal View Residences',
+    billDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(), 
+    dueDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 15).toISOString(), // Future Pending
+    rentAmount: 1500,
+    utilityBreakdown: [{ name: 'Internet Fee', amount: 50 }],
+    totalAmount: 1550,
     status: 'Pending',
   },
 ];
@@ -103,10 +125,17 @@ const initialMockTenantBills: Bill[] = [
 
 export default function CustomerDashboardPage() {
   const [agreement, setAgreement] = useState<Agreement | null>(null);
-  const [bills, setBills] = useState<Bill[]>([]);
+  const [bills, setBills] = useState<Bill[]>(initialMockTenantBills);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
   const [today, setToday] = useState(startOfDay(new Date()));
+
+  const [isProofDialogOpen, setIsProofDialogOpen] = useState(false);
+  const [billForProof, setBillForProof] = useState<Bill | null>(null);
+  const [proofNotes, setProofNotes] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -114,15 +143,18 @@ export default function CustomerDashboardPage() {
   }, []);
 
   const processedBills = useMemo(() => {
-    return initialMockTenantBills.map(bill => {
+    return bills.map(bill => {
       let currentStatus = bill.status;
       let calculatedPenalty = 0;
       const dueDate = parseISO(bill.dueDate);
 
       if (bill.status === 'Pending' && isBefore(dueDate, today)) {
         currentStatus = 'Overdue';
+      }
+      
+      // Apply penalty only if it's truly overdue and not already paid or pending verification
+      if (currentStatus === 'Overdue') {
         const daysOverdue = differenceInDays(today, dueDate);
-
         if (daysOverdue > 0 && mockPortalBuilding.penaltyPolicyTiers && mockPortalBuilding.penaltyPolicyTiers.length > 0) {
            const sortedTiers = [...mockPortalBuilding.penaltyPolicyTiers].sort((a,b) => a.fromDay - b.fromDay);
            for (const tier of sortedTiers) {
@@ -144,16 +176,26 @@ export default function CustomerDashboardPage() {
       return {
         ...bill,
         status: currentStatus,
-        penaltyAmount: calculatedPenalty > 0 ? parseFloat(calculatedPenalty.toFixed(2)) : undefined,
+        penaltyAmount: calculatedPenalty > 0 ? parseFloat(calculatedPenalty.toFixed(2)) : bill.penaltyAmount, // Preserve penalty if already set (e.g. during verification)
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [today]);
+  }, [bills, today]);
 
   useEffect(() => {
     setAgreement(mockTenantAgreement);
-    setBills(processedBills);
-  }, [processedBills]);
+    // setBills(processedBills); // This was causing a loop with the above useMemo
+    // The bills state itself will be updated by actions, and processedBills will recompute
+  }, []);
+  
+  // Update bills state when processedBills changes if bills is initialMockTenantBills
+  // This is to ensure the initial load correctly processes statuses and penalties
+  useEffect(() => {
+    if (bills === initialMockTenantBills) { // Only run on initial load/data set
+        setBills(processedBills);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processedBills]); // Dependency on processedBills
 
   const handlePayBill = (billId: string) => {
     const billToPay = bills.find(b => b.id === billId);
@@ -164,13 +206,61 @@ export default function CustomerDashboardPage() {
       description: `Payment for bill ${billId} (Total: $${billToPay.totalAmount.toFixed(2)}) is being processed. This is a demo.`,
     });
     setTimeout(() => {
-        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment", penaltyAmount: b.penaltyAmount /* Keep penalty if paid late */} : b));
+        setBills(prevBills => prevBills.map(b => b.id === billId ? {...b, status: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: "Simulated Portal Payment", penaltyAmount: b.penaltyAmount} : b));
         toast({
             title: "Payment Successful (Simulated)",
             description: `Bill ${billId} has been marked as paid.`,
         });
-    }, 2000);
+    }, 1500);
   };
+
+  const handleOpenProofDialog = (bill: Bill) => {
+    setBillForProof(bill);
+    setProofNotes('');
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
+    setIsProofDialogOpen(true);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setSelectedFile(event.target.files[0]);
+    } else {
+      setSelectedFile(null);
+    }
+  };
+  
+  const handleSubmitProof = () => {
+    if (!billForProof) return;
+    if (!selectedFile) {
+      toast({ title: "No File Selected", description: "Please select a payment proof document.", variant: "destructive"});
+      return;
+    }
+
+    // Simulate upload and update bill status
+    toast({ title: "Submitting Proof...", description: `Uploading ${selectedFile.name} for bill ${billForProof.id}.`});
+    setTimeout(() => {
+      setBills(prevBills => 
+        prevBills.map(b => 
+          b.id === billForProof.id 
+          ? { 
+              ...b, 
+              status: 'Pending Verification', 
+              paymentProofUrl: `simulated_proof_${selectedFile.name}`, 
+              tenantPaymentNotes: proofNotes,
+              // Keep existing penalty if one was calculated
+            } 
+          : b
+        )
+      );
+      toast({ title: "Proof Submitted", description: "Your payment proof has been submitted for verification."});
+      setIsProofDialogOpen(false);
+      setBillForProof(null);
+    }, 1500);
+  };
+
 
   const getStatusBadge = (status: Bill['status']) => {
     switch (status) {
@@ -180,6 +270,8 @@ export default function CustomerDashboardPage() {
         return <Badge variant="default" className="bg-yellow-100 text-yellow-700"><Info className="mr-1 h-3.5 w-3.5" />Pending</Badge>;
       case 'Overdue':
         return <Badge variant="destructive"><AlertTriangle className="mr-1 h-3.5 w-3.5" />Overdue</Badge>;
+      case 'Pending Verification':
+        return <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300"><UploadCloud className="mr-1 h-3.5 w-3.5" />Awaiting Verification</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -187,7 +279,7 @@ export default function CustomerDashboardPage() {
 
   if (!isMounted) {
      return (
-        <div className="flex justify-center items-center h-[calc(100vh-10rem)]">
+        <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
      );
@@ -228,9 +320,59 @@ export default function CustomerDashboardPage() {
         </Card>
       )}
 
+      <Dialog open={isProofDialogOpen} onOpenChange={(isOpen) => {
+        if (!isOpen) setBillForProof(null);
+        setIsProofDialogOpen(isOpen);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-headline text-xl">Submit Payment Proof</DialogTitle>
+            <DialogDescription>
+              For bill due {billForProof ? format(parseISO(billForProof.dueDate), 'PP') : ''} (Total: ${billForProof?.totalAmount.toFixed(2)})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="paymentProofFile" className="flex items-center mb-1">
+                <UploadCloud className="mr-2 h-4 w-4 text-primary" /> Upload Document (Simulated)
+              </Label>
+              <Input 
+                id="paymentProofFile" 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileSelect} 
+                className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+              />
+              {selectedFile && <p className="text-xs text-muted-foreground mt-1">Selected: {selectedFile.name}</p>}
+            </div>
+            <div>
+              <Label htmlFor="proofNotes" className="flex items-center mb-1">
+                <MessageSquare className="mr-2 h-4 w-4 text-primary" /> Notes (Optional)
+              </Label>
+              <Textarea 
+                id="proofNotes"
+                value={proofNotes}
+                onChange={(e) => setProofNotes(e.target.value)}
+                placeholder="e.g., Paid via bank transfer, ref: XYZ123"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter className="pt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSubmitProof} disabled={!selectedFile} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              Submit Proof
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <section className="mb-8">
         <h2 className="text-2xl font-headline font-semibold mb-4 flex items-center"><DollarSign className="mr-2 h-7 w-7 text-primary"/>Billing & Payments</h2>
-        {bills.length === 0 && !agreement && (
+        {processedBills.length === 0 && !agreement && (
             <Card className="text-center py-12 shadow-sm">
             <CardContent>
                 <FileSignature className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -239,7 +381,7 @@ export default function CustomerDashboardPage() {
             </CardContent>
             </Card>
         )}
-        {bills.length === 0 && agreement && (
+        {processedBills.length === 0 && agreement && (
             <Card className="text-center py-10 shadow-sm">
             <CardContent>
                 <DollarSign className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
@@ -248,7 +390,7 @@ export default function CustomerDashboardPage() {
             </CardContent>
             </Card>
         )}
-        {bills.length > 0 && (
+        {processedBills.length > 0 && (
           <Card className="shadow-lg">
             <CardContent className="p-0">
               <Table>
@@ -265,7 +407,7 @@ export default function CustomerDashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {bills.map(bill => (
+                  {processedBills.map(bill => (
                     <TableRow key={bill.id}>
                       <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
                       <TableCell>
@@ -303,16 +445,26 @@ export default function CustomerDashboardPage() {
                       <TableCell className="text-right font-semibold">${bill.totalAmount.toFixed(2)}</TableCell>
                       <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
                       <TableCell className="text-right">
-                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
-                          <Button onClick={() => handlePayBill(bill.id)} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                            <CreditCard className="mr-0 md:mr-2 h-4 w-4"/><span className="hidden md:inline">Pay Now</span>
-                          </Button>
-                        )}
-                         {bill.status === 'Paid' && bill.paymentDate && (
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
-                                Paid: {format(parseISO(bill.paymentDate), 'PP')}
-                            </div>
-                        )}
+                        <div className="flex flex-col sm:flex-row gap-1 justify-end items-center">
+                            {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                            <>
+                                <Button onClick={() => handlePayBill(bill.id)} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto">
+                                    <CreditCard className="mr-0 md:mr-2 h-4 w-4"/><span className="hidden md:inline">Pay Now</span><span className="md:hidden">Pay</span>
+                                </Button>
+                                <Button onClick={() => handleOpenProofDialog(bill)} variant="outline" size="sm" className="w-full sm:w-auto">
+                                    <UploadCloud className="mr-0 md:mr-2 h-4 w-4"/><span className="hidden md:inline">Submit Proof</span><span className="md:hidden">Proof</span>
+                                </Button>
+                            </>
+                            )}
+                            {bill.status === 'Pending Verification' && (
+                                <span className="text-xs text-blue-600 whitespace-nowrap">Verification Pending</span>
+                            )}
+                            {bill.status === 'Paid' && bill.paymentDate && (
+                                <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                    Paid: {format(parseISO(bill.paymentDate), 'PP')}
+                                </div>
+                            )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -326,5 +478,3 @@ export default function CustomerDashboardPage() {
     </div>
   );
 }
-
-    
