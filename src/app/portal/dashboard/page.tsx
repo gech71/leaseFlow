@@ -152,7 +152,7 @@ export default function CustomerDashboardPage() {
 
     let applicableTiersForScope: PenaltyTier[] = [];
     const spaceIdNameFromAgreement = mockTenantAgreement?.spaceDescription.split(',')[0].trim();
-    const floorFromAgreement = mockTenantAgreement?.spaceDescription.split(',')[1]?.trim().split(' ')[0];
+    const floorFromAgreement = mockTenantAgreement?.spaceDescription.includes(',') && mockTenantAgreement?.spaceDescription.split(',')[1] ? mockTenantAgreement?.spaceDescription.split(',')[1].trim().split(' ')[0] : undefined;
 
 
     const spaceSpecificTiers = mockPortalBuilding.penaltyPolicyTiers.filter(
@@ -162,7 +162,7 @@ export default function CustomerDashboardPage() {
       applicableTiersForScope = spaceSpecificTiers;
     } else {
       const floorSpecificTiers = mockPortalBuilding.penaltyPolicyTiers.filter(
-        t => t.scope === 'Floor' && t.applicableFloor === floorFromAgreement
+        t => t.scope === 'Floor' && floorFromAgreement && t.applicableFloor === floorFromAgreement
       );
       if (floorSpecificTiers.length > 0) {
         applicableTiersForScope = floorSpecificTiers;
@@ -513,3 +513,5 @@ export default function CustomerDashboardPage() {
   );
 }
 
+
+    

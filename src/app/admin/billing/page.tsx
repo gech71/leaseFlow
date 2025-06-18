@@ -118,6 +118,7 @@ const getStoredBuildings = (): Building[] => {
         return initialMockBuildings;
       }
     }
+    localStorage.setItem('buildings', JSON.stringify(initialMockBuildings)); // Initialize if not present
     return initialMockBuildings;
   }
   return initialMockBuildings;
@@ -175,14 +176,31 @@ export default function BillingPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    const storedSpaces = localStorage.getItem('spaces');
-    if (storedSpaces) {
+    // Load spaces from localStorage
+    const storedSpacesData = localStorage.getItem('spaces');
+    if (storedSpacesData) {
       try {
-        setSpaces(JSON.parse(storedSpaces));
-      } catch (e) { setSpaces(initialMockSpaces); }
+        setSpaces(JSON.parse(storedSpacesData));
+      } catch (e) { 
+        console.error("Error parsing spaces from localStorage", e);
+        setSpaces(initialMockSpaces); 
+      }
     } else {
       setSpaces(initialMockSpaces);
     }
+    // Load agreements from localStorage
+    const storedAgreementsData = localStorage.getItem('mockAgreements');
+     if (storedAgreementsData) {
+      try {
+        setAgreements(JSON.parse(storedAgreementsData));
+      } catch (e) { 
+        console.error("Error parsing agreements from localStorage", e);
+        setAgreements(initialMockAgreements); 
+      }
+    } else {
+      setAgreements(initialMockAgreements);
+    }
+
     setAllBuildingUtilities(getStoredBuildingUtilities());
     setAllBuildings(getStoredBuildings());
     setToday(startOfDay(new Date())); 
@@ -581,3 +599,5 @@ export default function BillingPage() {
   );
 }
 
+
+    

@@ -63,13 +63,13 @@ const storeBuildings = (buildings: Building[]) => {
 };
 
 interface UIPenaltyRule {
-  id: string; // For React list keys
-  durationDays?: number; // For how many days this rule applies. Blank for the last rule of a scope implies indefinite.
+  id: string; 
+  durationDays?: number; 
   feeType?: 'Fixed' | 'Percentage';
   feeValue?: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string;
-  applicableSpaceIdNamesStr?: string; // Comma-separated string for UI
+  applicableSpaceIdNamesStr?: string; 
 }
 
 interface BuildingFormState {
@@ -104,7 +104,7 @@ export default function BuildingsPage() {
           id: `uiRule-${Date.now()}`, 
           scope: 'Building', 
           feeType: 'Fixed',
-          durationDays: 5, // Default duration
+          durationDays: 5, 
           feeValue: 0,
         }
       ]
@@ -124,7 +124,6 @@ export default function BuildingsPage() {
       uiPenaltyRules: prev.uiPenaltyRules.map(rule =>
         rule.id === ruleId
           ? { ...rule, [field]: (field === 'durationDays' || field === 'feeValue') ? (value ? Number(value) : undefined) : value,
-              // Reset conditional fields if scope changes
               applicableFloor: field === 'scope' && value !== 'Floor' ? undefined : rule.applicableFloor,
               applicableSpaceIdNamesStr: field === 'scope' && value !== 'SpecificSpaces' ? undefined : rule.applicableSpaceIdNamesStr,
             }
@@ -143,14 +142,13 @@ export default function BuildingsPage() {
     const finalPenaltyTiers: PenaltyTier[] = [];
     const groupedUIRules: Record<string, UIPenaltyRule[]> = {};
 
-    // Group UI rules by their effective scope identifier
     currentBuildingForm.uiPenaltyRules.forEach(uiRule => {
       let scopeKey = uiRule.scope;
-      if (uiRule.scope === 'Floor' && uiRule.applicableFloor) {
-        scopeKey += `_${uiRule.applicableFloor.trim()}`;
-      } else if (uiRule.scope === 'SpecificSpaces' && uiRule.applicableSpaceIdNamesStr) {
+      if (uiRule.scope === 'Floor' && uiRule.applicableFloor?.trim()) {
+        scopeKey += `_Floor_${uiRule.applicableFloor.trim()}`;
+      } else if (uiRule.scope === 'SpecificSpaces' && uiRule.applicableSpaceIdNamesStr?.trim()) {
         const sortedSpaceIds = uiRule.applicableSpaceIdNamesStr.split(',').map(s => s.trim()).filter(s => s).sort().join(',');
-        scopeKey += `_${sortedSpaceIds}`;
+        scopeKey += `_Spaces_${sortedSpaceIds}`;
       }
       
       if (!groupedUIRules[scopeKey]) {
@@ -167,27 +165,27 @@ export default function BuildingsPage() {
         const uiRule = rulesInScope[i];
 
         if (!uiRule.feeType || uiRule.feeValue === undefined || uiRule.feeValue < 0) {
-          toast({ title: "Error", description: `Rule ${i + 1} in scope '${scopeKey}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
+          toast({ title: "Error", description: `A rule in scope '${scopeKey.replace("_Floor_", " Floor: ").replace("_Spaces_", " Spaces: ")}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
           return;
         }
         if (i < rulesInScope.length - 1 && (!uiRule.durationDays || uiRule.durationDays <= 0)) {
-             toast({ title: "Error", description: `Rule ${i + 1} in scope '${scopeKey}' needs a positive duration. Only the last rule for a scope can have an indefinite duration.`, variant: "destructive" });
+             toast({ title: "Error", description: `A rule in scope '${scopeKey.replace("_Floor_", " Floor: ").replace("_Spaces_", " Spaces: ")}' needs a positive duration. Only the last rule for a scope can have an indefinite duration (blank duration).`, variant: "destructive" });
             return;
         }
          if (uiRule.scope === 'Floor' && !uiRule.applicableFloor?.trim()) {
-            toast({ title: "Error", description: `Floor name is required for floor-scoped rule in '${scopeKey}'.`, variant: "destructive" });
+            toast({ title: "Error", description: `Floor name is required for floor-scoped rule.`, variant: "destructive" });
             return;
         }
         if (uiRule.scope === 'SpecificSpaces' && !uiRule.applicableSpaceIdNamesStr?.trim()) {
-            toast({ title: "Error", description: `Space ID(s) are required for space-scoped rule in '${scopeKey}'.`, variant: "destructive" });
+            toast({ title: "Error", description: `Space ID(s) are required for space-scoped rule.`, variant: "destructive" });
             return;
         }
 
         const fromDay = cumulativeStartDay;
         let toDay: number | null = null;
 
-        if (i === rulesInScope.length - 1) { // Last rule for this scope
-          toDay = null; // Applies indefinitely
+        if (i === rulesInScope.length - 1) { 
+          toDay = null; 
         } else {
           toDay = fromDay + (uiRule.durationDays || 1) - 1;
         }
@@ -205,7 +203,7 @@ export default function BuildingsPage() {
         if (toDay !== null) {
           cumulativeStartDay = toDay + 1;
         } else {
-          break; // No more rules for this scope after an indefinite one
+          break; 
         }
       }
     }
@@ -240,7 +238,7 @@ export default function BuildingsPage() {
       uiPenaltyRules: [{ 
         id: `uiRule-${Date.now()}`, 
         scope: 'Building', 
-        durationDays: 7, // Default duration for first rule
+        durationDays: 7, 
         feeType: 'Fixed',
         feeValue: 10,
       }]
@@ -252,28 +250,27 @@ export default function BuildingsPage() {
     setFormMode('edit');
     
     const loadedUIPenaltyRules: UIPenaltyRule[] = [];
-    const tiersGroupedByScope: Record<string, PenaltyTier[]> = {};
+    const tiersGroupedByScopeKey: Record<string, PenaltyTier[]> = {};
 
     (building.penaltyPolicyTiers || []).forEach(tier => {
       let scopeKey = tier.scope;
-      if (tier.scope === 'Floor' && tier.applicableFloor) scopeKey += `_${tier.applicableFloor}`;
-      if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) scopeKey += `_${tier.applicableSpaceIdNames.join(',')}`;
-      if (!tiersGroupedByScope[scopeKey]) tiersGroupedByScope[scopeKey] = [];
-      tiersGroupedByScope[scopeKey].push(tier);
+      if (tier.scope === 'Floor' && tier.applicableFloor) scopeKey += `_Floor_${tier.applicableFloor}`;
+      if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) scopeKey += `_Spaces_${tier.applicableSpaceIdNames.sort().join(',')}`;
+      
+      if (!tiersGroupedByScopeKey[scopeKey]) tiersGroupedByScopeKey[scopeKey] = [];
+      tiersGroupedByScopeKey[scopeKey].push(tier);
     });
 
-    Object.values(tiersGroupedByScope).forEach(scopeTiers => {
-        scopeTiers.sort((a,b) => a.fromDay - b.fromDay).forEach((tier, index, arr) => {
+    Object.values(tiersGroupedByScopeKey).forEach(scopeTiers => {
+        scopeTiers.sort((a,b) => a.fromDay - b.fromDay).forEach((tier) => {
             let duration: number | undefined;
             if (tier.toDay !== null && tier.toDay !== undefined) {
                 duration = tier.toDay - tier.fromDay + 1;
             } else {
-                // For the last tier in this scope group, durationDays might be left undefined in UI
-                // or set to a placeholder if needed by UI logic (e.g., 1 if it's an indefinite starting from a point)
-                duration = undefined; // Represents indefinite for the last rule of a scope
+                duration = undefined; 
             }
             loadedUIPenaltyRules.push({
-                id: `uiRule-edit-${tier.scope}-${tier.fromDay}-${Date.now()}`,
+                id: `uiRule-edit-${tier.scope}-${tier.fromDay}-${Math.random()}`,
                 durationDays: duration,
                 feeType: tier.feeType,
                 feeValue: tier.feeValue,
@@ -312,7 +309,7 @@ export default function BuildingsPage() {
       <PageHeader
         title="Manage Buildings"
         icon={BuildingIcon}
-        description="Add, view, and manage buildings. Define late fee policies with multiple sequential rules for different scopes (Building, Floor, Specific Spaces)."
+        description="Add, view, and manage buildings. Define late fee policies by adding sequential rules, each specifying its duration, fee, and scope (Building, Floor, or Specific Spaces). The last rule for each scope applies indefinitely."
         actions={
           <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground">
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Building
@@ -328,7 +325,7 @@ export default function BuildingsPage() {
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Building' : 'Edit Building'}</DialogTitle>
             <DialogDescription>
-              Fill in building details. Add sequential penalty rules. For each rule, specify its duration, fee, and scope. The last rule for a given scope applies indefinitely.
+              Fill in building details. Add penalty rules: for each rule, set its duration, fee, and scope. Rules are processed sequentially within their defined scope.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
@@ -390,7 +387,7 @@ export default function BuildingsPage() {
                                         value={uiRule.durationDays ?? ''} 
                                         onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)} 
                                         className="mt-1 text-xs h-8"/>
-                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank if this is the last, indefinite rule for its scope.</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank if last rule for its scope (indefinite).</p>
                             </div>
                             <div>
                                 <Label htmlFor={`ruleFeeType-${uiRule.id}`}>Fee Type</Label>
@@ -511,7 +508,7 @@ export default function BuildingsPage() {
                                     {tiersInGroup[0].scope === 'Building' && <BuildingIcon className="inline mr-1 h-3 w-3"/>}
                                     {tiersInGroup[0].scope === 'Floor' && <Layers className="inline mr-1 h-3 w-3"/>}
                                     {tiersInGroup[0].scope === 'SpecificSpaces' && <HomeIcon className="inline mr-1 h-3 w-3"/>}
-                                    Scope: {scopeKey}
+                                    Scope: {scopeKey.replace("_Floor_", " Floor: ").replace("_Spaces_", " Spaces: ")}
                                 </p>
                                 {tiersInGroup.sort((a,b)=>a.fromDay - b.fromDay).map((tier, index) => {
                                     let tierDurationDesc = `Days ${tier.fromDay}`;
@@ -549,4 +546,6 @@ export default function BuildingsPage() {
     </div>
   );
 }
+    
+
     

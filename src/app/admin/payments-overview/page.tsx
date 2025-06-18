@@ -73,11 +73,48 @@ const mockBillsData: Bill[] = [
 
 ];
 
+const getStoredSpaces = (): Space[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('spaces');
+    return stored ? JSON.parse(stored) : mockSpacesData;
+  }
+  return mockSpacesData;
+};
+
+const getStoredBuildings = (): BuildingType[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('buildings');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as BuildingType[];
+        return parsed.map(b => ({
+          ...b,
+          penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(tier => ({
+            ...tier,
+            scope: tier.scope || 'Building', 
+          })),
+        }));
+      } catch (e) {
+        return mockBuildingsData;
+      }
+    }
+  }
+  return mockBuildingsData;
+};
+
+const getStoredAgreements = (): Agreement[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('mockAgreements'); // Assuming this is the key used elsewhere
+    return stored ? JSON.parse(stored) : mockAgreementsData;
+  }
+  return mockAgreementsData;
+}
+
 
 export default function PaymentsOverviewPage() {
-  const [spaces, setSpacesState] = useState<Space[]>(mockSpacesData); 
-  const [buildingsData, setBuildingsDataState] = useState<BuildingType[]>(mockBuildingsData); 
-  const [agreementsData, setAgreementsDataState] = useState<Agreement[]>(mockAgreementsData); 
+  const [spaces, setSpacesState] = useState<Space[]>([]); 
+  const [buildingsData, setBuildingsDataState] = useState<BuildingType[]>([]); 
+  const [agreementsData, setAgreementsDataState] = useState<Agreement[]>([]); 
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
 
@@ -86,9 +123,9 @@ export default function PaymentsOverviewPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    setSpacesState(mockSpacesData);
-    setBuildingsDataState(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(t=> ({...t, scope: t.scope || 'Building'})) })));
-    setAgreementsDataState(mockAgreementsData);
+    setSpacesState(getStoredSpaces());
+    setBuildingsDataState(getStoredBuildings());
+    setAgreementsDataState(getStoredAgreements());
     setToday(startOfDay(new Date())); 
   }, []);
 
@@ -416,3 +453,5 @@ export default function PaymentsOverviewPage() {
   );
 }
 
+
+    
