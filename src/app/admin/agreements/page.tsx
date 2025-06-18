@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle } from 'lucide-react';
+import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw } from 'lucide-react';
 import type { Agreement } from '@/lib/types';
 import { Input } from '@/components/ui/input';
-import { addMonths, format, isBefore, startOfDay } from 'date-fns';
+import { addMonths, format, isBefore, startOfDay, subDays, differenceInDays, isAfter } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 // Mock data for agreements
 const initialAgreements: Agreement[] = [
@@ -22,7 +23,7 @@ const initialAgreements: Agreement[] = [
     spaceId: 'space1',
     spaceDescription: 'Unit 101, Sunrise Tower',
     agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Alice Wonderland (Tenant) for the lease of Unit 101, Sunrise Tower.\n\nTerm: 12 months\nRent: $2500/month\nInitial Payment: 1 month\n\nAdditional Clauses:\n- No pets allowed.\n- Quiet hours after 10 PM.\n\nSigned:____________________',
-    startDate: new Date(2023, 0, 15).toISOString(),
+    startDate: new Date(2023, 0, 15).toISOString(), // Expired
     monthlyRentalPrice: 2500,
     createdAt: new Date(2023,0,10).toISOString(),
     paymentTermMonths: 12,
@@ -35,11 +36,11 @@ const initialAgreements: Agreement[] = [
     tenantName: 'Bob The Builder',
     spaceId: 'space3',
     spaceDescription: 'Office 5B, Downtown Hub',
-    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Bob The Builder (Tenant) for the lease of Office 5B, Downtown Hub.\n\nTerm: 6 months\nRent: $3200/month\nInitial Payment: 1 month\n\nAdditional Clauses:\n- Parking spot #12 included.\n\nSigned:____________________',
-    startDate: new Date(2024, 4, 1).toISOString(), 
+    agreementText: 'RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Bob The Builder (Tenant) for the lease of Office 5B, Downtown Hub.\n\nTerm: 3 months\nRent: $3200/month\nInitial Payment: 1 month\n\nAdditional Clauses:\n- Parking spot #12 included.\n\nSigned:____________________',
+    startDate: new Date(2024, 4, 1).toISOString(), // May 1, 2024 -> Expires Aug 1, 2024
     monthlyRentalPrice: 3200,
     createdAt: new Date(2024,4,1).toISOString(),
-    paymentTermMonths: 6,
+    paymentTermMonths: 3, // Changed to 3 months for testing renewal
     initialPaymentMonths: 1,
     nextPaymentDueDate: addMonths(new Date(2024, 4, 1), 1).toISOString(), 
   },
@@ -50,7 +51,7 @@ const initialAgreements: Agreement[] = [
     spaceId: 'space4',
     spaceDescription: 'Penthouse Suite, Galaxy Tower',
     agreementText: 'PREMIUM RENTAL AGREEMENT\n\nThis agreement is made between Landlord and Carol Danvers (Tenant) for the lease of Penthouse Suite, Galaxy Tower.\n\nTerm: 24 months\nRent: $5000/month\nInitial Payment: 3 months\n\nAdditional Clauses:\n- Access to rooftop pool included.\n- Weekly cleaning service provided.\n\nSigned:____________________',
-    startDate: new Date(2024, 6, 1).toISOString(), 
+    startDate: new Date(2024, 6, 1).toISOString(), // July 1, 2024 -> Expires July 1, 2026
     monthlyRentalPrice: 5000,
     createdAt: new Date(2024,6,1).toISOString(),
     paymentTermMonths: 24,
@@ -65,7 +66,6 @@ export const getMockAgreements = (): Agreement[] => {
     if (storedAgreements) {
       try {
         const parsedAgreements = JSON.parse(storedAgreements);
-        // Basic validation to ensure it's an array and items have an ID
         if (Array.isArray(parsedAgreements) && parsedAgreements.every(item => typeof item.id === 'string')) {
           return parsedAgreements;
         } else {
@@ -97,6 +97,8 @@ export default function AgreementsListPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
   const { toast } = useToast();
+  const router = useRouter();
+  const renewalWindowDays = 30; // Show renew button if 30 days or less to expiry
 
   useEffect(() => {
     setIsMounted(true);
@@ -107,18 +109,43 @@ export default function AgreementsListPage() {
   const filteredAgreements = agreements.filter(agreement =>
     agreement.tenantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     agreement.spaceDescription.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const isPaymentOverdue = (agreement: Agreement): boolean => {
     const nextPaymentDate = startOfDay(new Date(agreement.nextPaymentDueDate));
     const leaseEndDate = addMonths(new Date(agreement.startDate), agreement.paymentTermMonths);
     return isBefore(nextPaymentDate, today) && isBefore(today, leaseEndDate);
   };
+  
+  const isEligibleForRenewal = (agreement: Agreement): boolean => {
+    const agreementStartDate = startOfDay(new Date(agreement.startDate));
+    const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
+    
+    // Not eligible if already past end date
+    if (isBefore(agreementEndDate, today)) {
+      return false;
+    }
+  
+    const renewalEligibilityStartDate = subDays(agreementEndDate, renewalWindowDays);
+  
+    // Eligible if today is on or after renewalEligibilityStartDate AND on or before agreementEndDate
+    return !isBefore(today, renewalEligibilityStartDate) && !isAfter(today, agreementEndDate);
+  };
 
   const handleDownloadPdf = (agreementId: string) => {
     toast({
       title: "Download PDF",
       description: "PDF download functionality is coming soon!",
+    });
+  };
+
+  const handleRenewAgreement = (agreementId: string) => {
+    // Future: router.push(`/admin/agreements/generate?renewId=${agreementId}`);
+    const agreementToRenew = agreements.find(ag => ag.id === agreementId);
+    toast({
+      title: "Renew Agreement",
+      description: `Initiating renewal for ${agreementToRenew?.tenantName}'s agreement. (This is a placeholder action)`,
+      duration: 5000,
     });
   };
 
@@ -176,37 +203,55 @@ export default function AgreementsListPage() {
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {filteredAgreements.map((agreement) => {
             const overdue = isPaymentOverdue(agreement);
+            const eligibleForRenewal = isEligibleForRenewal(agreement);
+            const agreementEndDate = addMonths(new Date(agreement.startDate), agreement.paymentTermMonths);
             return (
               <Card key={agreement.id} className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${overdue ? 'border-destructive border-2' : ''}`}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <CardTitle className="font-headline text-lg">{agreement.tenantName}</CardTitle>
-                    {overdue && (
-                      <Badge variant="destructive" className="flex items-center">
-                        <AlertTriangle className="mr-1 h-3 w-3" /> Overdue
-                      </Badge>
-                    )}
+                    <div className="flex flex-col items-end space-y-1">
+                      {overdue && (
+                        <Badge variant="destructive" className="flex items-center">
+                          <AlertTriangle className="mr-1 h-3 w-3" /> Payment Overdue
+                        </Badge>
+                      )}
+                       {eligibleForRenewal && (
+                        <Badge variant="default" className="bg-accent text-accent-foreground">
+                          Renew Soon
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <CardDescription>{agreement.spaceDescription}</CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm space-y-1.5">
                   <p><strong>Start Date:</strong> {format(new Date(agreement.startDate), 'PP')}</p>
+                  <p><strong>End Date:</strong> {format(agreementEndDate, 'PP')}</p>
                   <p><strong>Rent:</strong> ${agreement.monthlyRentalPrice.toLocaleString()}/month</p>
                   <p><strong>Term:</strong> {agreement.paymentTermMonths} months</p>
-                  <p><strong>Initial Pmt:</strong> {agreement.initialPaymentMonths} month(s)</p>
                   <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}>
                     <strong>Next Payment:</strong> {format(new Date(agreement.nextPaymentDueDate), 'PP')}
                   </p>
                   <p className="text-xs text-muted-foreground pt-1">Generated: {format(new Date(agreement.createdAt), 'PP')}</p>
                 </CardContent>
                 <CardFooter className="border-t pt-4 flex justify-end gap-2">
+                  {eligibleForRenewal && (
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleRenewAgreement(agreement.id)}
+                      className="bg-accent hover:bg-accent/90 text-accent-foreground"
+                    >
+                      <RefreshCw className="mr-1 h-4 w-4" /> Renew
+                    </Button>
+                  )}
                   <Link href={`/admin/agreements/${agreement.id}`} passHref>
                     <Button variant="outline" size="sm">
                       <Eye className="mr-1 h-4 w-4" /> View
                     </Button>
                   </Link>
                   <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(agreement.id)}>
-                    <Download className="mr-1 h-4 w-4" /> Download PDF
+                    <Download className="mr-1 h-4 w-4" /> PDF
                   </Button>
                 </CardFooter>
               </Card>
@@ -217,3 +262,4 @@ export default function AgreementsListPage() {
     </div>
   );
 }
+
