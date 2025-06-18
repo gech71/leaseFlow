@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import type { Agreement, Bill, Building, PenaltyTier } from '@/lib/types'; // Added Building, PenaltyTier
+import type { Agreement, Bill, Building, PenaltyTier } from '@/lib/types'; 
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -48,8 +48,8 @@ const mockPortalBuilding: Building = {
   name: 'Portal View Residences',
   address: '1 Portal Drive',
   penaltyPolicyTiers: [
-    { fromDay: 3, toDay: 5, feeType: 'Fixed', feeValue: 25 },         // Penalty from day 3 to 5
-    { fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 50 }       // Higher penalty from day 6 onwards
+    { fromDay: 3, toDay: 5, feeType: 'Fixed', feeValue: 25 }, // Penalty from day 3 to 5: $25 fixed
+    { fromDay: 6, feeType: 'Percentage', feeValue: 1.5 }    // Penalty from day 6 onwards: 1.5% of rent
   ],
   createdAt: new Date().toISOString(),
 };
@@ -120,7 +120,8 @@ export default function CustomerDashboardPage() {
       if (bill.status === 'Pending' && isBefore(dueDate, today)) {
         currentStatus = 'Overdue';
         const daysOverdue = differenceInDays(today, dueDate);
-        if (daysOverdue > 0 && mockPortalBuilding.penaltyPolicyTiers) {
+
+        if (daysOverdue > 0 && mockPortalBuilding.penaltyPolicyTiers && mockPortalBuilding.penaltyPolicyTiers.length > 0) {
            const sortedTiers = [...mockPortalBuilding.penaltyPolicyTiers].sort((a,b) => a.fromDay - b.fromDay);
            for (const tier of sortedTiers) {
                if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
@@ -129,7 +130,7 @@ export default function CustomerDashboardPage() {
                    } else { // Percentage
                        calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
                    }
-                   break; // Apply first matching tier
+                   break; 
                }
            }
         }
@@ -141,7 +142,7 @@ export default function CustomerDashboardPage() {
       return {
         ...bill,
         status: currentStatus,
-        penaltyAmount: calculatedPenalty > 0 ? calculatedPenalty : undefined,
+        penaltyAmount: calculatedPenalty > 0 ? parseFloat(calculatedPenalty.toFixed(2)) : undefined,
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
@@ -323,3 +324,5 @@ export default function CustomerDashboardPage() {
     </div>
   );
 }
+
+    
