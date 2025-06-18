@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIcon } from 'lucide-react';
-import type { Bill, Space, Building as BuildingType, Agreement } from '@/lib/types'; 
+import type { Bill, Space, Building as BuildingType, Agreement, PenaltyTier } from '@/lib/types'; 
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
 import {
@@ -31,10 +31,10 @@ const mockSpacesData: Space[] = [
 ];
 
 const mockBuildingsData: BuildingType[] = [
-  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicy: { gracePeriodDays: 5, feeType: 'Fixed', feeValue: 50 }, createdAt: new Date().toISOString() },
-  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicy: { gracePeriodDays: 3, feeType: 'Percentage', feeValue: 2 }, createdAt: new Date().toISOString() },
-  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() },
-  { id: 'building-portal', name: 'Portal View Residences', address: '1 Portal Drive', penaltyPolicy: { gracePeriodDays: 2, feeType: 'Fixed', feeValue: 25 }, createdAt: new Date().toISOString() },
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 6, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() },
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 4, feeType: 'Percentage', feeValue: 2 }], createdAt: new Date().toISOString() },
+  { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No policy
+  { id: 'building-portal', name: 'Portal View Residences', address: '1 Portal Drive', penaltyPolicyTiers: [{ fromDay: 3, toDay: 5, feeType: 'Fixed', feeValue: 25 }, { fromDay: 6, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() },
 ];
 
 const mockAgreementsData: Agreement[] = [
@@ -79,25 +79,31 @@ export default function PaymentsOverviewPage() {
     const space = spaces.find(sp => sp.id === agreement.spaceId);
     if (!space) return 0;
     const building = buildings.find(b => b.name === space.buildingName);
-    if (!building || !building.penaltyPolicy) return 0;
+    
+    if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
-    if (currentStatus !== 'Overdue') return 0;
+    if (currentStatus !== 'Overdue') return 0; // Only apply to Overdue bills
 
     const daysOverdue = differenceInDays(today, dueDate);
-    const { gracePeriodDays, feeType, feeValue } = building.penaltyPolicy;
+    if (daysOverdue <= 0) return 0;
 
-    if (daysOverdue > gracePeriodDays) {
-      if (feeType === 'Fixed') {
-        return feeValue;
-      } else if (feeType === 'Percentage') {
-        return bill.rentAmount * (feeValue / 100);
+    const sortedTiers = [...building.penaltyPolicyTiers].sort((a, b) => a.fromDay - b.fromDay);
+
+    for (const tier of sortedTiers) {
+      if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
+        if (tier.feeType === 'Fixed') {
+          return tier.feeValue;
+        } else if (tier.feeType === 'Percentage') {
+          return bill.rentAmount * (tier.feeValue / 100);
+        }
       }
     }
     return 0;
   }, [agreements, spaces, buildings, today]);
 
   const processedBills = useMemo(() => {
+    // Assuming mockBuildingsData and mockAgreementsData are up-to-date or fetched if not mock
     return mockBillsData.map(bill => {
       let currentStatus = bill.status;
       if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
@@ -116,13 +122,17 @@ export default function PaymentsOverviewPage() {
         tenantName: agreements.find(a => a.id === bill.agreementId)?.tenantName || 'N/A' 
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [today, calculatePenalty, agreements]);
+  }, [today, calculatePenalty, agreements]); // Added agreements to dependency array
 
 
   useEffect(() => {
     setIsMounted(true);
-    setAllBills(processedBills);
-  }, [processedBills]);
+    // Simulate fetching or ensure mock data is loaded
+    setSpaces(mockSpacesData);
+    setBuildings(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: b.penaltyPolicyTiers || [] }))); // Ensure tiers is an array
+    setAgreements(mockAgreementsData);
+    setAllBills(processedBills); // Use processedBills which now depends on up-to-date agreements/buildings
+  }, [processedBills]); // Re-run if processedBills changes
   
   const upcomingAndPendingBills = allBills.filter(b => b.status === 'Pending' || b.status === 'Overdue');
   

@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon, InfoIcon, Building as BuildingIcon } from 'lucide-react';
-import type { Bill, Agreement, Space, Building, BuildingMonthlyUtilities } from '@/lib/types';
+import type { Bill, Agreement, Space, Building, BuildingMonthlyUtilities, PenaltyTier } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -49,9 +49,10 @@ const initialMockSpaces: Space[] = [
  { id: 'space5', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 102', area: 1000, floor: '10th', utilityProrationShare: 0.30, monthlyRentalPrice: 2200, isOccupied: false, tenantId: undefined, createdAt: new Date().toISOString()},
 ];
 
+// Updated mock buildings with penaltyPolicyTiers
 const initialMockBuildings: Building[] = [
-  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicy: { gracePeriodDays: 5, feeType: 'Fixed', feeValue: 50 }, createdAt: new Date().toISOString() },
-  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicy: { gracePeriodDays: 3, feeType: 'Percentage', feeValue: 2 }, createdAt: new Date().toISOString() }, // 2%
+  { id: 'building1', name: 'Sunrise Tower', address: '123 Sunrise Ave', penaltyPolicyTiers: [{ fromDay: 6, feeType: 'Fixed', feeValue: 50 }], createdAt: new Date().toISOString() }, // Penalty after 5 days
+  { id: 'building2', name: 'Downtown Hub', address: '456 Main St', penaltyPolicyTiers: [{ fromDay: 4, feeType: 'Percentage', feeValue: 2 }], createdAt: new Date().toISOString() }, // Penalty after 3 days, 2%
   { id: 'building3', name: 'Galaxy Tower', address: '789 Star Rd', createdAt: new Date().toISOString() }, // No penalty policy
 ];
 
@@ -74,7 +75,19 @@ const getStoredBuildingUtilities = (): BuildingMonthlyUtilities[] => {
 const getStoredBuildings = (): Building[] => {
   if (typeof window !== 'undefined') {
     const storedBuildings = localStorage.getItem('buildings');
-    return storedBuildings ? JSON.parse(storedBuildings) : initialMockBuildings;
+    if (storedBuildings) {
+      try {
+        const parsed = JSON.parse(storedBuildings) as Building[];
+        return parsed.map(b => ({
+          ...b,
+          penaltyPolicyTiers: b.penaltyPolicyTiers || [], 
+        }));
+      } catch (e) {
+        console.error("Error parsing buildings from localStorage on billing page", e);
+        return initialMockBuildings;
+      }
+    }
+    return initialMockBuildings;
   }
   return initialMockBuildings;
 };
@@ -137,22 +150,30 @@ export default function BillingPage() {
     const space = spaces.find(sp => sp.id === agreement.spaceId);
     if (!space) return 0;
     const building = buildings.find(b => b.name === space.buildingName);
-    if (!building || !building.penaltyPolicy) return 0;
+    
+    if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
+    // Only calculate for bills that would be overdue if not paid
     if (isAfter(dueDate, today) || bill.status === 'Paid') return 0; 
 
     const daysOverdue = differenceInDays(today, dueDate);
-    const { gracePeriodDays, feeType, feeValue } = building.penaltyPolicy;
+    if (daysOverdue <= 0) return 0; // Not overdue yet or due today
 
-    if (daysOverdue > gracePeriodDays) {
-      if (feeType === 'Fixed') {
-        return feeValue;
-      } else if (feeType === 'Percentage') {
-        return bill.rentAmount * (feeValue / 100);
+    // Sort tiers by fromDay to ensure correct application
+    const sortedTiers = [...building.penaltyPolicyTiers].sort((a, b) => a.fromDay - b.fromDay);
+
+    for (const tier of sortedTiers) {
+      if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
+        // This tier applies
+        if (tier.feeType === 'Fixed') {
+          return tier.feeValue;
+        } else if (tier.feeType === 'Percentage') {
+          return bill.rentAmount * (tier.feeValue / 100);
+        }
       }
     }
-    return 0;
+    return 0; // No applicable tier found
   }, [agreements, spaces, buildings, today]);
 
   const processedBills = useMemo(() => {
@@ -232,7 +253,7 @@ export default function BillingPage() {
       dueDate: targetDueDate.toISOString(),
       rentAmount,
       utilityBreakdown,
-      penaltyAmount: 0, 
+      penaltyAmount: 0, // Initial penalty is 0, calculated later if overdue
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       status: 'Pending',
     };

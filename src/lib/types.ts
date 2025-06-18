@@ -1,13 +1,16 @@
 
+export interface PenaltyTier {
+  fromDay: number;       // Inclusive start day of this penalty (e.g., 1 means penalty starts from 1st day overdue)
+  toDay?: number | null;  // Inclusive end day of this penalty. null/undefined means this is the final/ongoing tier.
+  feeType: 'Fixed' | 'Percentage';
+  feeValue: number;
+}
+
 export interface Building {
   id: string;
   name: string;
   address?: string;
-  penaltyPolicy?: {
-    gracePeriodDays: number;
-    feeType: 'Fixed' | 'Percentage';
-    feeValue: number; // If percentage, this is the rate (e.g., 5 for 5%). If fixed, it's the amount.
-  };
+  penaltyPolicyTiers?: PenaltyTier[]; // Changed from penaltyPolicy to support multiple tiers
   createdAt: string; // ISO date string
 }
 

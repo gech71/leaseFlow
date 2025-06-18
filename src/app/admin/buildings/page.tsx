@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Percent, DollarSign as DollarSignLucide } from 'lucide-react';
-import type { Building } from '@/lib/types';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Percent, DollarSign as DollarSignLucide, AlertTriangle } from 'lucide-react';
+import type { Building, PenaltyTier } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -38,11 +38,10 @@ const getStoredBuildings = (): Building[] => {
     const stored = localStorage.getItem('buildings');
     if (stored) {
       try {
-        // Ensure penaltyPolicy is correctly parsed or defaulted
         const parsed = JSON.parse(stored) as Building[];
         return parsed.map(b => ({
           ...b,
-          penaltyPolicy: b.penaltyPolicy || undefined // Ensure it's undefined if not present
+          penaltyPolicyTiers: b.penaltyPolicyTiers || [], 
         }));
       } catch (e) {
         console.error("Error parsing buildings from localStorage", e);
@@ -59,12 +58,21 @@ const storeBuildings = (buildings: Building[]) => {
   }
 };
 
+interface BuildingFormState extends Partial<Omit<Building, 'penaltyPolicyTiers'>> {
+  // For UI, we manage a single tier directly
+  penaltyStartsFromDay?: number;
+  penaltyEndsOnDay?: number | null;
+  penaltyFeeType?: 'Fixed' | 'Percentage';
+  penaltyFeeValue?: number;
+}
+
+
 export default function BuildingsPage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
-  const [currentBuilding, setCurrentBuilding] = useState<Partial<Building>>({});
+  const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({});
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [buildingToDelete, setBuildingToDelete] = useState<Building | null>(null);
@@ -76,40 +84,53 @@ export default function BuildingsPage() {
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!currentBuilding.name?.trim()) {
+    if (!currentBuildingForm.name?.trim()) {
       toast({ title: "Error", description: "Building name is required.", variant: "destructive" });
       return;
     }
 
-    const gracePeriodDays = currentBuilding.penaltyPolicy?.gracePeriodDays;
-    const feeValue = currentBuilding.penaltyPolicy?.feeValue;
+    const { 
+      penaltyStartsFromDay, 
+      penaltyEndsOnDay, 
+      penaltyFeeType, 
+      penaltyFeeValue, 
+      ...buildingCoreData 
+    } = currentBuildingForm;
 
-    if (gracePeriodDays !== undefined && (isNaN(gracePeriodDays) || gracePeriodDays < 0)) {
-        toast({ title: "Error", description: "Grace period must be a non-negative number.", variant: "destructive" });
+    let penaltyTiers: PenaltyTier[] = [];
+
+    if (penaltyStartsFromDay !== undefined && penaltyStartsFromDay > 0 && penaltyFeeType && penaltyFeeValue !== undefined && penaltyFeeValue >= 0) {
+      if (penaltyStartsFromDay <= 0) {
+        toast({ title: "Error", description: "Penalty 'Starts From Day' must be a positive number.", variant: "destructive" });
         return;
-    }
-    if (feeValue !== undefined && (isNaN(feeValue) || feeValue < 0)) {
+      }
+      if (penaltyEndsOnDay !== undefined && penaltyEndsOnDay !== null && penaltyEndsOnDay < penaltyStartsFromDay) {
+         toast({ title: "Error", description: "Penalty 'Ends On Day' cannot be before 'Starts From Day'.", variant: "destructive" });
+        return;
+      }
+       if (penaltyFeeValue < 0) {
         toast({ title: "Error", description: "Fee value must be a non-negative number.", variant: "destructive" });
         return;
-    }
-    if (currentBuilding.penaltyPolicy?.feeType && feeValue === undefined) {
-        toast({ title: "Error", description: "Fee value is required if fee type is selected.", variant: "destructive" });
+      }
+      penaltyTiers.push({
+        fromDay: penaltyStartsFromDay,
+        toDay: penaltyEndsOnDay === undefined || penaltyEndsOnDay === null ? null : Number(penaltyEndsOnDay),
+        feeType: penaltyFeeType,
+        feeValue: Number(penaltyFeeValue),
+      });
+    } else if (penaltyFeeType || penaltyFeeValue !== undefined || penaltyStartsFromDay !== undefined) {
+        // If any penalty field is partially filled but not all required ones
+        toast({ title: "Error", description: "To set a penalty, 'Starts From Day', 'Fee Type', and 'Fee Value' are required.", variant: "destructive" });
         return;
     }
 
 
     const buildingData: Building = {
-      id: formMode === 'add' ? `building-${Date.now()}` : currentBuilding.id!,
-      name: currentBuilding.name.trim(),
-      address: currentBuilding.address?.trim() || undefined,
-      penaltyPolicy: currentBuilding.penaltyPolicy?.feeType // Only save policy if feeType is chosen
-        ? {
-            gracePeriodDays: Number(currentBuilding.penaltyPolicy.gracePeriodDays || 0),
-            feeType: currentBuilding.penaltyPolicy.feeType,
-            feeValue: Number(currentBuilding.penaltyPolicy.feeValue || 0),
-          }
-        : undefined,
-      createdAt: currentBuilding.createdAt || new Date().toISOString(),
+      id: formMode === 'add' ? `building-${Date.now()}` : buildingCoreData.id!,
+      name: buildingCoreData.name!.trim(),
+      address: buildingCoreData.address?.trim() || undefined,
+      penaltyPolicyTiers: penaltyTiers.length > 0 ? penaltyTiers : undefined,
+      createdAt: buildingCoreData.createdAt || new Date().toISOString(),
     };
 
     let updatedBuildings;
@@ -123,18 +144,25 @@ export default function BuildingsPage() {
     setBuildings(updatedBuildings);
     storeBuildings(updatedBuildings);
     setIsFormOpen(false);
-    setCurrentBuilding({});
+    setCurrentBuildingForm({});
   };
 
   const openAddForm = () => {
     setFormMode('add');
-    setCurrentBuilding({ penaltyPolicy: { gracePeriodDays: 0, feeType: 'Fixed', feeValue: 0 } });
+    setCurrentBuildingForm({ penaltyStartsFromDay: 1, penaltyFeeType: 'Fixed', penaltyFeeValue: 0 });
     setIsFormOpen(true);
   };
 
   const openEditForm = (building: Building) => {
     setFormMode('edit');
-    setCurrentBuilding({ ...building, penaltyPolicy: building.penaltyPolicy || { gracePeriodDays: 0, feeType: 'Fixed', feeValue: 0 } });
+    const firstTier = building.penaltyPolicyTiers?.[0];
+    setCurrentBuildingForm({ 
+      ...building,
+      penaltyStartsFromDay: firstTier?.fromDay,
+      penaltyEndsOnDay: firstTier?.toDay,
+      penaltyFeeType: firstTier?.feeType,
+      penaltyFeeValue: firstTier?.feeValue,
+    });
     setIsFormOpen(true);
   };
 
@@ -166,7 +194,7 @@ export default function BuildingsPage() {
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
         setIsFormOpen(isOpen);
-        if (!isOpen) setCurrentBuilding({});
+        if (!isOpen) setCurrentBuildingForm({});
       }}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
@@ -183,8 +211,8 @@ export default function BuildingsPage() {
                 </Label>
                 <Input 
                   id="buildingName" 
-                  value={currentBuilding.name || ''} 
-                  onChange={(e) => setCurrentBuilding(prev => ({ ...prev, name: e.target.value }))} 
+                  value={currentBuildingForm.name || ''} 
+                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))} 
                   placeholder="e.g., Sunrise Tower" 
                   required 
                   className="mt-1"
@@ -196,40 +224,59 @@ export default function BuildingsPage() {
                 </Label>
                 <Textarea 
                   id="buildingAddress" 
-                  value={currentBuilding.address || ''} 
-                  onChange={(e) => setCurrentBuilding(prev => ({ ...prev, address: e.target.value }))} 
+                  value={currentBuildingForm.address || ''} 
+                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))} 
                   placeholder="e.g., 123 Main St, Anytown, USA" 
                   rows={3}
                   className="mt-1"
                 />
               </div>
               
-              <div className="space-y-1 pt-2 border-t">
-                 <h4 className="text-md font-semibold text-foreground mb-2">Late Fee Policy (Optional)</h4>
-                 <div>
-                    <Label htmlFor="gracePeriodDays" className="flex items-center text-sm font-medium">
-                      <Clock className="mr-2 h-4 w-4 text-primary" />Grace Period (Days)
-                    </Label>
-                    <Input
-                      id="gracePeriodDays"
-                      type="number"
-                      value={currentBuilding.penaltyPolicy?.gracePeriodDays ?? ''}
-                      onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...(prev.penaltyPolicy || { feeType: 'Fixed', feeValue: 0 }), gracePeriodDays: parseInt(e.target.value) || 0 } }))}
-                      placeholder="e.g., 5"
-                      className="mt-1"
-                      min="0"
-                    />
+              <div className="space-y-3 pt-3 border-t">
+                 <h4 className="text-md font-semibold text-foreground mb-2">Late Fee Policy (Primary Tier)</h4>
+                 <p className="text-xs text-muted-foreground -mt-1 mb-3">Define one penalty tier. The system supports multiple, but UI currently allows one. Grace period is implicitly the days before 'Penalty Starts From Day'.</p>
+                 
+                 <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <Label htmlFor="penaltyStartsFromDay" className="flex items-center text-sm font-medium">
+                        <Clock className="mr-2 h-4 w-4 text-primary" />Starts From Day
+                        </Label>
+                        <Input
+                        id="penaltyStartsFromDay"
+                        type="number"
+                        value={currentBuildingForm.penaltyStartsFromDay ?? ''}
+                        onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, penaltyStartsFromDay: e.target.value ? parseInt(e.target.value) : undefined }))}
+                        placeholder="e.g., 6 (for 5 grace days)"
+                        className="mt-1"
+                        min="1"
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="penaltyEndsOnDay" className="flex items-center text-sm font-medium">
+                        <Clock className="mr-2 h-4 w-4 text-primary" />Ends On Day (Optional)
+                        </Label>
+                        <Input
+                        id="penaltyEndsOnDay"
+                        type="number"
+                        value={currentBuildingForm.penaltyEndsOnDay ?? ''}
+                        onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, penaltyEndsOnDay: e.target.value ? parseInt(e.target.value) : undefined }))}
+                        placeholder="e.g., 10 (or blank)"
+                        className="mt-1"
+                        min={currentBuildingForm.penaltyStartsFromDay || 1}
+                        />
+                    </div>
                  </div>
+                 
                  <div>
                     <Label htmlFor="feeType" className="flex items-center text-sm font-medium mt-2">
                         <Percent className="mr-2 h-4 w-4 text-primary" />Fee Type
                     </Label>
                     <Select
-                        value={currentBuilding.penaltyPolicy?.feeType || ''}
-                        onValueChange={(value) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...(prev.penaltyPolicy || { gracePeriodDays: 0, feeValue: 0 }), feeType: value as 'Fixed' | 'Percentage' } }))}
+                        value={currentBuildingForm.penaltyFeeType || ''}
+                        onValueChange={(value) => setCurrentBuildingForm(prev => ({ ...prev, penaltyFeeType: value as 'Fixed' | 'Percentage' | undefined }))}
                     >
                         <SelectTrigger id="feeType" className="mt-1">
-                            <SelectValue placeholder="Select fee type (optional)" />
+                            <SelectValue placeholder="Select fee type" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Fixed">Fixed Amount</SelectItem>
@@ -237,7 +284,7 @@ export default function BuildingsPage() {
                         </SelectContent>
                     </Select>
                  </div>
-                 {currentBuilding.penaltyPolicy?.feeType && (
+                 {currentBuildingForm.penaltyFeeType && (
                     <div>
                         <Label htmlFor="feeValue" className="flex items-center text-sm font-medium mt-2">
                         <DollarSignLucide className="mr-2 h-4 w-4 text-primary" />Fee Value
@@ -246,15 +293,18 @@ export default function BuildingsPage() {
                         id="feeValue"
                         type="number"
                         step="0.01"
-                        value={currentBuilding.penaltyPolicy?.feeValue ?? ''}
-                        onChange={(e) => setCurrentBuilding(prev => ({ ...prev, penaltyPolicy: { ...(prev.penaltyPolicy!), feeValue: parseFloat(e.target.value) || 0 } }))}
-                        placeholder={currentBuilding.penaltyPolicy?.feeType === 'Percentage' ? "e.g., 5 for 5%" : "e.g., 50 for $50"}
+                        value={currentBuildingForm.penaltyFeeValue ?? ''}
+                        onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, penaltyFeeValue: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                        placeholder={currentBuildingForm.penaltyFeeType === 'Percentage' ? "e.g., 5 for 5%" : "e.g., 50 for $50"}
                         className="mt-1"
                         min="0"
                         />
-                        {currentBuilding.penaltyPolicy?.feeType === 'Percentage' && <p className="text-xs text-muted-foreground mt-1">Enter percentage as a number (e.g., 5 for 5%).</p>}
+                        {currentBuildingForm.penaltyFeeType === 'Percentage' && <p className="text-xs text-muted-foreground mt-1">Enter percentage as a number (e.g., 5 for 5%).</p>}
                     </div>
                  )}
+                 {!currentBuildingForm.penaltyFeeType && !currentBuildingForm.penaltyFeeValue && !currentBuildingForm.penaltyStartsFromDay &&
+                    <p className="text-xs text-muted-foreground italic mt-2">No penalty policy will be set if fields are left blank.</p>
+                 }
               </div>
             </div>
             <DialogFooter className="mt-4">
@@ -272,15 +322,15 @@ export default function BuildingsPage() {
       <AlertDialog open={!!buildingToDelete} onOpenChange={(open) => { if (!open) setBuildingToDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-5 w-5"/>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the building "{buildingToDelete?.name}".
-              Ensure no spaces are currently associated with this building.
+              Associated spaces or agreements will NOT be deleted but may become orphaned.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setBuildingToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteBuilding} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleDeleteBuilding} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
               Delete Building
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -300,34 +350,40 @@ export default function BuildingsPage() {
         </Card>
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {buildings.map((building) => (
-            <Card key={building.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
-              <CardHeader>
-                <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
-                {building.address && <CardDescription className="text-sm flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</CardDescription>}
-              </CardHeader>
-              <CardContent className="text-sm space-y-2">
-                 <p className="text-xs text-muted-foreground">Registered: {format(new Date(building.createdAt), 'PP')}</p>
-                 {building.penaltyPolicy && building.penaltyPolicy.feeType ? (
-                    <div className="mt-2 pt-2 border-t border-border/50">
-                        <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policy:</h5>
-                        <p><Clock className="inline mr-1 h-3 w-3 text-primary" />Grace: {building.penaltyPolicy.gracePeriodDays} days</p>
-                        <p><DollarSignLucide className="inline mr-1 h-3 w-3 text-primary" />Fee: {building.penaltyPolicy.feeType === 'Fixed' ? `$${building.penaltyPolicy.feeValue.toFixed(2)}` : `${building.penaltyPolicy.feeValue}% of rent`}</p>
-                    </div>
-                 ) : (
-                    <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
-                 )}
-              </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openEditForm(building)}>
-                  <Edit3 className="mr-1 h-4 w-4" /> Edit
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => setBuildingToDelete(building)}>
-                  <Trash2 className="mr-1 h-4 w-4" /> Delete
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+          {buildings.map((building) => {
+            const firstPolicyTier = building.penaltyPolicyTiers?.[0];
+            return (
+              <Card key={building.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
+                <CardHeader>
+                  <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
+                  {building.address && <CardDescription className="text-sm flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</CardDescription>}
+                </CardHeader>
+                <CardContent className="text-sm space-y-2 flex-grow">
+                   <p className="text-xs text-muted-foreground">Registered: {format(new Date(building.createdAt), 'PP')}</p>
+                   {firstPolicyTier ? (
+                      <div className="mt-2 pt-2 border-t border-border/50">
+                          <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policy (Primary Tier):</h5>
+                          <p><Clock className="inline mr-1 h-3 w-3 text-primary" />
+                            Applies from Day {firstPolicyTier.fromDay} 
+                            {firstPolicyTier.toDay ? ` to Day ${firstPolicyTier.toDay}` : ' onwards'} (overdue)
+                          </p>
+                          <p><DollarSignLucide className="inline mr-1 h-3 w-3 text-primary" />Fee: {firstPolicyTier.feeType === 'Fixed' ? `$${firstPolicyTier.feeValue.toFixed(2)}` : `${firstPolicyTier.feeValue}% of rent`}</p>
+                      </div>
+                   ) : (
+                      <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
+                   )}
+                </CardContent>
+                <CardFooter className="border-t pt-4 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => openEditForm(building)}>
+                    <Edit3 className="mr-1 h-4 w-4" /> Edit
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => setBuildingToDelete(building)}>
+                    <Trash2 className="mr-1 h-4 w-4" /> Delete
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

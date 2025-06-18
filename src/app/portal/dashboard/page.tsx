@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import type { Agreement, Bill } from '@/lib/types';
+import type { Agreement, Bill, Building, PenaltyTier } from '@/lib/types'; // Added Building, PenaltyTier
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -42,7 +42,18 @@ const mockTenantAgreement: Agreement = {
   createdAt: new Date(2024, 0, 10).toISOString(),
 };
 
-const portalBuildingPenaltyPolicy = { gracePeriodDays: 2, feeType: 'Fixed' as 'Fixed' | 'Percentage', feeValue: 25 };
+// Mock Building data for the portal tenant
+const mockPortalBuilding: Building = {
+  id: 'building-portal',
+  name: 'Portal View Residences',
+  address: '1 Portal Drive',
+  penaltyPolicyTiers: [
+    { fromDay: 3, toDay: 5, feeType: 'Fixed', feeValue: 25 },         // Penalty from day 3 to 5
+    { fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 50 }       // Higher penalty from day 6 onwards
+  ],
+  createdAt: new Date().toISOString(),
+};
+
 
 const initialMockTenantBills: Bill[] = [
   {
@@ -109,12 +120,18 @@ export default function CustomerDashboardPage() {
       if (bill.status === 'Pending' && isBefore(dueDate, today)) {
         currentStatus = 'Overdue';
         const daysOverdue = differenceInDays(today, dueDate);
-        if (portalBuildingPenaltyPolicy && daysOverdue > portalBuildingPenaltyPolicy.gracePeriodDays) {
-          if (portalBuildingPenaltyPolicy.feeType === 'Fixed') {
-            calculatedPenalty = portalBuildingPenaltyPolicy.feeValue;
-          } else { // Percentage
-            calculatedPenalty = bill.rentAmount * (portalBuildingPenaltyPolicy.feeValue / 100);
-          }
+        if (daysOverdue > 0 && mockPortalBuilding.penaltyPolicyTiers) {
+           const sortedTiers = [...mockPortalBuilding.penaltyPolicyTiers].sort((a,b) => a.fromDay - b.fromDay);
+           for (const tier of sortedTiers) {
+               if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
+                   if (tier.feeType === 'Fixed') {
+                       calculatedPenalty = tier.feeValue;
+                   } else { // Percentage
+                       calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
+                   }
+                   break; // Apply first matching tier
+               }
+           }
         }
       }
       
