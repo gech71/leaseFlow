@@ -63,7 +63,6 @@ const mockBillsData: Bill[] = [
 
 
 export default function PaymentsOverviewPage() {
-  const [allBills, setAllBills] = useState<Bill[]>([]);
   const [spaces, setSpaces] = useState<Space[]>(mockSpacesData);
   const [buildings, setBuildings] = useState<BuildingType[]>(mockBuildingsData);
   const [agreements, setAgreements] = useState<Agreement[]>(mockAgreementsData);
@@ -72,6 +71,14 @@ export default function PaymentsOverviewPage() {
 
   const [selectedMonth, setSelectedMonth] = useState<number>(today.getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(today.getFullYear());
+
+  useEffect(() => {
+    setIsMounted(true);
+    setSpaces(mockSpacesData);
+    setBuildings(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: b.penaltyPolicyTiers || [] })));
+    setAgreements(mockAgreementsData);
+    setToday(startOfDay(new Date())); 
+  }, []);
 
   const calculatePenalty = useCallback((bill: Bill, currentStatus: Bill['status']): number => {
     const agreement = agreements.find(ag => ag.id === bill.agreementId);
@@ -123,33 +130,24 @@ export default function PaymentsOverviewPage() {
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
   }, [today, calculatePenalty, agreements]); 
-
-
-  useEffect(() => {
-    setIsMounted(true);
-    setSpaces(mockSpacesData);
-    setBuildings(mockBuildingsData.map(b => ({ ...b, penaltyPolicyTiers: b.penaltyPolicyTiers || [] })));
-    setAgreements(mockAgreementsData);
-    setAllBills(processedBills); 
-  }, [processedBills]);
   
-  const upcomingAndPendingBills = allBills.filter(b => b.status === 'Pending' || b.status === 'Overdue');
+  const upcomingAndPendingBills = useMemo(() => processedBills.filter(b => b.status === 'Pending' || b.status === 'Overdue'), [processedBills]);
   
-  const paidBillsInSelectedPeriod = allBills.filter(bill => {
+  const paidBillsInSelectedPeriod = useMemo(() => processedBills.filter(bill => {
     if (bill.status !== 'Paid' || !bill.paymentDate) return false;
     const paymentDateObj = parseISO(bill.paymentDate);
     return getMonth(paymentDateObj) === selectedMonth && getYear(paymentDateObj) === selectedYear;
-  });
+  }), [processedBills, selectedMonth, selectedYear]);
 
-  const totalUpcomingAmount = upcomingAndPendingBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
-  const totalPaidSelectedPeriod = paidBillsInSelectedPeriod.reduce((sum, bill) => sum + bill.totalAmount, 0);
-  const totalPotentialRevenue = spaces.reduce((sum, space) => sum + space.monthlyRentalPrice, 0);
+  const totalUpcomingAmount = useMemo(() => upcomingAndPendingBills.reduce((sum, bill) => sum + bill.totalAmount, 0), [upcomingAndPendingBills]);
+  const totalPaidSelectedPeriod = useMemo(() => paidBillsInSelectedPeriod.reduce((sum, bill) => sum + bill.totalAmount, 0), [paidBillsInSelectedPeriod]);
+  const totalPotentialRevenue = useMemo(() => spaces.reduce((sum, space) => sum + space.monthlyRentalPrice, 0), [spaces]);
 
-  const yearsForFilter = Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i);
-  const monthsForFilter = Array.from({ length: 12 }, (_, i) => ({
+  const yearsForFilter = useMemo(() => Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i), []);
+  const monthsForFilter = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
     value: i,
     label: format(new Date(0, i), 'MMMM'),
-  }));
+  })), []);
 
   const getStatusBadgeVariant = (status: Bill['status']): "default" | "destructive" | "secondary" => {
     switch (status) {
@@ -378,5 +376,3 @@ export default function PaymentsOverviewPage() {
     </div>
   );
 }
-
-    
