@@ -129,8 +129,9 @@ export default function BuildingsPage() {
         
         if (field === 'scope') {
           updatedRule.scope = value as UIPenaltyRule['scope'];
-          updatedRule.applicableFloor = value === 'Floor' ? rule.applicableFloor : undefined;
-          updatedRule.applicableSpaceIdNamesStr = value === 'SpecificSpaces' ? rule.applicableSpaceIdNamesStr : undefined;
+          // Reset dependent fields when scope changes to avoid lingering invalid data
+          if (value !== 'Floor') updatedRule.applicableFloor = undefined;
+          if (value !== 'SpecificSpaces') updatedRule.applicableSpaceIdNamesStr = undefined;
         }
         return updatedRule;
       })
@@ -147,70 +148,64 @@ export default function BuildingsPage() {
     const finalPenaltyTiers: PenaltyTier[] = [];
     const groupedUIRules: Record<string, UIPenaltyRule[]> = {}; 
 
-    currentBuildingForm.uiPenaltyRules.forEach(uiRule => {
-      let scopeKey = uiRule.scope;
-      if (uiRule.scope === 'Floor') {
-        if (!uiRule.applicableFloor?.trim()) {
-            toast({ title: "Error", description: `Floor name is required for floor-scoped rule. Problem in rule with duration ${uiRule.durationDays || 'N/A'} days.`, variant: "destructive" });
-            throw new Error("Invalid floor rule");
+    for (const uiRule of currentBuildingForm.uiPenaltyRules) {
+        let scopeKey = uiRule.scope;
+        if (uiRule.scope === 'Floor') {
+            if (!uiRule.applicableFloor?.trim()) {
+                toast({ title: "Error", description: `Floor name is required for floor-scoped rule. Problem in rule with duration ${uiRule.durationDays || 'N/A'} days.`, variant: "destructive" });
+                return; 
+            }
+            scopeKey += `_Floor_${uiRule.applicableFloor.trim()}`;
+        } else if (uiRule.scope === 'SpecificSpaces') {
+            if (!uiRule.applicableSpaceIdNamesStr?.trim()) {
+                toast({ title: "Error", description: `Space ID(s) are required for space-scoped rule. Problem in rule with duration ${uiRule.durationDays || 'N/A'} days.`, variant: "destructive" });
+                return; 
+            }
+            const sortedSpaceIds = uiRule.applicableSpaceIdNamesStr.split(',').map(s => s.trim()).filter(s => s).sort().join(',');
+            scopeKey += `_Spaces_${sortedSpaceIds}`;
         }
-        scopeKey += `_Floor_${uiRule.applicableFloor.trim()}`;
-      } else if (uiRule.scope === 'SpecificSpaces') {
-         if (!uiRule.applicableSpaceIdNamesStr?.trim()) {
-            toast({ title: "Error", description: `Space ID(s) are required for space-scoped rule. Problem in rule with duration ${uiRule.durationDays || 'N/A'} days.`, variant: "destructive" });
-            throw new Error("Invalid space rule");
-        }
-        const sortedSpaceIds = uiRule.applicableSpaceIdNamesStr.split(',').map(s => s.trim()).filter(s => s).sort().join(',');
-        scopeKey += `_Spaces_${sortedSpaceIds}`;
-      }
-      
-      if (!groupedUIRules[scopeKey]) groupedUIRules[scopeKey] = [];
-      groupedUIRules[scopeKey].push(uiRule);
-    });
+        
+        if (!groupedUIRules[scopeKey]) groupedUIRules[scopeKey] = [];
+        groupedUIRules[scopeKey].push(uiRule);
+    }
+    
+    for (const scopeKey in groupedUIRules) {
+        const rulesInScope = groupedUIRules[scopeKey]; // No need to sort here if UI order implies sequence
+        let cumulativeStartDay = 1;
 
-    try {
-        for (const scopeKey in groupedUIRules) {
-          const rulesInScope = groupedUIRules[scopeKey].sort((a,b) => (a.durationDays ?? Infinity) - (b.durationDays ?? Infinity)); // Sort for processing, not strictly necessary if UI order is trusted
-          let cumulativeStartDay = 1;
-
-          for (let i = 0; i < rulesInScope.length; i++) {
+        for (let i = 0; i < rulesInScope.length; i++) {
             const uiRule = rulesInScope[i];
 
             if (!uiRule.feeType || uiRule.feeValue === undefined || uiRule.feeValue < 0) {
-              toast({ title: "Error", description: `A rule for scope '${scopeKey.replace("_Floor_", ": Floor ").replace("_Spaces_", ": Spaces ")}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
-              return;
+                toast({ title: "Error", description: `A rule for scope '${scopeKey.replace("_Floor_", ": Floor ").replace("_Spaces_", ": Spaces ")}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
+                return;
             }
             
             const fromDay = cumulativeStartDay;
             let toDay: number | null = null;
 
-            // If it's the last rule for this scope OR if its duration is undefined/null/0, it's indefinite
             if (i === rulesInScope.length - 1 || uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) {
-              toDay = null; 
+                toDay = null; 
             } else {
-              toDay = fromDay + uiRule.durationDays - 1;
+                toDay = fromDay + uiRule.durationDays - 1;
             }
 
             finalPenaltyTiers.push({
-              fromDay: fromDay,
-              toDay: toDay,
-              feeType: uiRule.feeType,
-              feeValue: Number(uiRule.feeValue),
-              scope: uiRule.scope,
-              applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
-              applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : undefined,
+                fromDay: fromDay,
+                toDay: toDay,
+                feeType: uiRule.feeType,
+                feeValue: Number(uiRule.feeValue),
+                scope: uiRule.scope,
+                applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
+                applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : undefined,
             });
             
             if (toDay !== null) {
-              cumulativeStartDay = toDay + 1;
+                cumulativeStartDay = toDay + 1;
             } else {
-              break; // This was the last (indefinite) rule for this scope group
+                break; 
             }
-          }
         }
-    } catch (error: any) {
-        // Error toast is already shown
-        return;
     }
     
     const buildingData: Building = {
@@ -256,7 +251,6 @@ export default function BuildingsPage() {
     const loadedUIPenaltyRules: UIPenaltyRule[] = [];
     const tiersByScopeAndSequence: Record<string, PenaltyTier[]> = {};
 
-    // Group tiers by their effective scope string
     (building.penaltyPolicyTiers || []).forEach(tier => {
         let scopeKey = tier.scope;
         if (tier.scope === 'Floor' && tier.applicableFloor) scopeKey += `_Floor_${tier.applicableFloor}`;
@@ -266,13 +260,12 @@ export default function BuildingsPage() {
         tiersByScopeAndSequence[scopeKey].push(tier);
     });
 
-    // For each scope group, sort by fromDay and convert to UIPenaltyRule
     Object.values(tiersByScopeAndSequence).forEach(scopeGroup => {
         scopeGroup.sort((a,b) => a.fromDay - b.fromDay).forEach((tier, index) => {
             let duration: number | undefined;
             if (tier.toDay !== null && tier.toDay !== undefined) {
                 duration = tier.toDay - tier.fromDay + 1;
-            } // else duration is undefined for indefinite (last) tier for this scope
+            } 
             loadedUIPenaltyRules.push({
                 id: `uiRule-edit-${index}-${tier.fromDay}-${Math.random().toString(36).substr(2, 9)}`,
                 durationDays: duration,
@@ -329,41 +322,46 @@ export default function BuildingsPage() {
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Building' : 'Edit Building'}</DialogTitle>
             <DialogDescription>
-              Fill in building details. Add penalty rules: for each rule, set its duration, fee, and scope. Rules are processed sequentially within their defined scope.
+              Fill in building details. Add penalty rules: for each rule, set its duration, fee, and scope. Rules are processed sequentially within their defined scope. The last rule in any scope sequence applies indefinitely.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col min-h-0">
-            <ScrollArea className="flex-1 pr-3"> 
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
-                    <BuildingIcon className="mr-2 h-4 w-4 text-primary" />Building Name
-                  </Label>
-                  <Input 
-                    id="buildingNameMain" 
-                    value={currentBuildingForm.name || ''} 
-                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))} 
-                    placeholder="e.g., Sunrise Tower" 
-                    required 
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
-                    <MapPin className="mr-2 h-4 w-4 text-primary" />Address (Optional)
-                  </Label>
-                  <Textarea 
-                    id="buildingAddressMain" 
-                    value={currentBuildingForm.address || ''} 
-                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))} 
-                    placeholder="e.g., 123 Main St, Anytown, USA" 
-                    rows={2}
-                    className="mt-1"
-                  />
-                </div>
-              
-                <div className="space-y-3 pt-3 border-t">
-                  <div className="flex justify-between items-center">
+          <form onSubmit={handleFormSubmit} className="flex-1 flex flex-col min-h-0"> {/* Form takes up remaining space and enables child shrinking */}
+            
+            {/* Non-scrolling building details part */}
+            <div className="px-1 py-4 space-y-4 flex-shrink-0"> {/* flex-shrink-0 to prevent this part from shrinking */}
+              <div>
+                <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
+                  <BuildingIcon className="mr-2 h-4 w-4 text-primary" />Building Name
+                </Label>
+                <Input 
+                  id="buildingNameMain" 
+                  value={currentBuildingForm.name || ''} 
+                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))} 
+                  placeholder="e.g., Sunrise Tower" 
+                  required 
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
+                  <MapPin className="mr-2 h-4 w-4 text-primary" />Address (Optional)
+                </Label>
+                <Textarea 
+                  id="buildingAddressMain" 
+                  value={currentBuildingForm.address || ''} 
+                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))} 
+                  placeholder="e.g., 123 Main St, Anytown, USA" 
+                  rows={2}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            {/* Penalty Rules Section - This part scrolls */}
+            <div className="flex-1 min-h-0 border-t"> {/* This div grows and allows ScrollArea to take full height */}
+              <ScrollArea className="h-full p-4"> {/* ScrollArea fills its container and has internal padding */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center mb-2">
                       <h4 className="text-md font-semibold text-foreground">Late Fee Penalty Rules</h4>
                       <Button type="button" variant="outline" size="sm" onClick={handleAddUIPenaltyRule}>
                           <PlusCircle className="mr-1.5 h-4 w-4"/> Add Rule
@@ -391,7 +389,7 @@ export default function BuildingsPage() {
                                         value={uiRule.durationDays ?? ''} 
                                         onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)} 
                                         className="mt-1 text-xs h-8"/>
-                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank for the LAST rule in this scope sequence to make it indefinite.</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">Leave blank for the last rule in a specific scope to make it indefinite.</p>
                             </div>
                             <div>
                                 <Label htmlFor={`ruleFeeType-${uiRule.id}`}>Fee Type</Label>
@@ -440,9 +438,10 @@ export default function BuildingsPage() {
                     </Card>
                   ))}
                 </div>
-              </div>
-            </ScrollArea>
-            <DialogFooter className="pt-4 border-t flex-shrink-0">
+              </ScrollArea>
+            </div>
+            
+            <DialogFooter className="pt-4 border-t flex-shrink-0"> {/* flex-shrink-0 keeps footer at bottom */}
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
@@ -551,4 +550,6 @@ export default function BuildingsPage() {
     </div>
   );
 }
+    
+
     
