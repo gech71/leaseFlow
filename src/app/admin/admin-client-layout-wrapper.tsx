@@ -86,8 +86,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                   <item.icon />
                   <span
                     className={cn(
-                      "truncate", // Apply truncate for the "original image" look
-                      (!isMobile && sidebarState === "collapsed") && "hidden" // Hide if collapsed on non-mobile
+                      "flex-1 min-w-0", // Allow text to take space and wrap if needed
+                      (!isMobile && sidebarState === "collapsed") && "hidden" // Hide if collapsed on non-mobile desktop
                     )}
                   >
                     {item.label}
@@ -98,7 +98,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               const commonButtonProps = {
                 isActive: isActive,
                 className: cn(
-                  "block",
+                  "block", // Link component needs block or similar for full width
                   item.label === 'Tenant Portal (View)' && 'mt-auto border-t border-sidebar-border pt-2'
                 ),
                 target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
@@ -172,7 +172,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="hidden md:flex items-center justify-start mb-6 h-[3.7rem]">
-            {/* This SidebarTrigger is for the main content area, allowing toggle from there */}
             <SidebarTrigger />
           </div>
           {children}
@@ -190,8 +189,6 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
-    // Fallback for SSR or before client-side mount to avoid hydration mismatch with useSidebar
-    // You could render a simplified layout or a loader here if needed
     return null; 
   }
 
