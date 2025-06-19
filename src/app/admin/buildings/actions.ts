@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma } from '@prisma/client'; // Changed from "import type { Prisma }"
+import { Prisma } from '@prisma/client'; // Ensure Prisma namespace is imported for runtime checks
 
 export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
   try {
@@ -45,7 +45,7 @@ export async function updateBuildingAction(id: string, data: Prisma.BuildingUpda
 export async function deleteBuildingAction(id: string) {
   try {
     // Check if building has spaces
-    const buildingWithSpaces = await databaseService.getBuildingById(id, { include: { spaces: { take: 1 } } });
+    const buildingWithSpaces = await databaseService.getBuildingById(id, { spaces: { take: 1 } }); // Corrected: Pass Prisma.BuildingInclude directly
     if (buildingWithSpaces && buildingWithSpaces.spaces.length > 0) {
       return { success: false, error: "Cannot delete building with associated spaces. Please remove or reassign spaces first." };
     }
