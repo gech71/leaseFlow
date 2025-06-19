@@ -63,7 +63,7 @@ export async function deleteBuildingAction(id: string) {
     console.error("Error deleting building:", error);
      if (error instanceof Prisma.PrismaClientKnownRequestError) {
       // P2003 is foreign key constraint failure, means it's still referenced somewhere not checked above.
-      if (error.code === 'P2003' || error.code === 'P2014' ) { 
+      if (error.code === 'P2003' || error.code === 'P2014' ) {
          return { success: false, error: "Cannot delete this building as it's referenced by other records (e.g., spaces, utility entries, or agreements via spaces). Ensure all dependencies are removed." };
       }
        if (error.code === 'P2025') { // Record to delete not found
