@@ -47,6 +47,7 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -84,12 +85,19 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 <SidebarMenuButton 
                   isActive={isActive} 
                   className="block" 
+                  // href is passed by Link asChild
                   target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined}
                   rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}
-                  // href is passed by Link asChild
                 >
                   <item.icon />
-                  <span className="flex-1 min-w-0">{item.label}</span>
+                  <span
+                    className={cn(
+                      "min-w-0", // Basic flex text handling
+                      (!isMobile && sidebarState === "collapsed") ? "hidden" : "flex-1" // Explicitly hide when collapsed, expand otherwise
+                    )}
+                  >
+                    {item.label}
+                  </span>
                 </SidebarMenuButton>
               );
 
@@ -173,8 +181,6 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
-    // Return null or a basic loading state to avoid rendering ActualAdminLayout (and its useSidebar calls) prematurely
-    // This ensures SidebarProvider is mounted before useSidebar is called.
     return null; 
   }
 
