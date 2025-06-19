@@ -28,11 +28,6 @@ interface UIPenaltyRule {
   applicableSpaceIdNamesStr?: string; // Comma-separated string of space ID names
 }
 
-// Represents a rule that has been saved and has a database ID.
-interface ExistingPenaltyTier extends PenaltyTierTypePrisma {
-  // we might not need extra fields if PenaltyTierTypePrisma is sufficient
-}
-
 interface BuildingFormState {
   id?: string; // For edit mode
   name: string;
@@ -40,79 +35,66 @@ interface BuildingFormState {
   uiPenaltyRules: UIPenaltyRule[];
 }
 
+// Interface for props passed from Server Component
+interface BuildingUpsertFormInternalProps {
+  initialBuildingData?: { // Make this optional; present only in edit mode
+    id: string;
+    name: string;
+    address: string | null;
+    penaltyPolicyTiers: PenaltyTierTypePrisma[];
+    createdAt: string; // Serialized date
+  } | null;
+}
+
+
 // This component will be wrapped by Suspense for searchParams
-function BuildingUpsertFormInternal() {
+function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormInternalProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', uiPenaltyRules: [] });
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoading, setIsLoading] = useState(true); // For initial form setup
   const [isSaving, setIsSaving] = useState(false);
   const [pageTitle, setPageTitle] = useState("Add New Building");
 
   useEffect(() => {
-    const buildingId = searchParams.get('id');
-    if (buildingId) {
+    setIsLoading(true);
+    if (initialBuildingData) {
       setFormMode('edit');
       setPageTitle("Edit Building");
-      setIsLoading(true);
-      const fetchBuildingData = async () => {
-        try {
-          const buildingToEdit = await databaseService.getBuildingById(buildingId, { 
-            include: { penaltyPolicyTiers: true } 
-          });
-          if (buildingToEdit) {
-            const uiRules: UIPenaltyRule[] = (buildingToEdit.penaltyPolicyTiers || []).map(tier => {
-              let duration: number | undefined;
-              if (tier.toDay !== null && tier.toDay !== undefined) {
-                duration = tier.toDay - tier.fromDay + 1;
-              }
-
-              return {
-                id: tier.id, // Use existing DB ID for UI key
-                durationDays: duration,
-                feeType: tier.feeType as 'Fixed' | 'Percentage',
-                feeValue: tier.feeValue,
-                scope: tier.scope as 'Building' | 'Floor' | 'SpecificSpaces',
-                applicableFloor: tier.applicableFloor || undefined,
-                applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || undefined,
-              };
-            });
-            // Sort UI rules for display consistency (important for "duration" logic)
-            // Primarily sort by scope, then by fromDay implicitly by how they were generated from `durationDays`
-            uiRules.sort((a, b) => {
-              if (a.scope !== b.scope) return a.scope.localeCompare(b.scope);
-              // Further sort by original fromDay if needed, but durationDays re-calculation handles this
-              return 0; 
-            });
-
-            setCurrentBuildingForm({
-              id: buildingToEdit.id,
-              name: buildingToEdit.name,
-              address: buildingToEdit.address || '',
-              uiPenaltyRules: uiRules,
-            });
-          } else {
-            toast({ title: "Error", description: "Building not found.", variant: "destructive" });
-            router.push('/admin/buildings');
-          }
-        } catch (error) {
-          console.error("Failed to fetch building data:", error);
-          toast({ title: "Error", description: "Failed to load building data.", variant: "destructive" });
-        } finally {
-          setIsLoading(false);
+      const uiRules: UIPenaltyRule[] = (initialBuildingData.penaltyPolicyTiers || []).map(tier => {
+        let duration: number | undefined;
+        if (tier.toDay !== null && tier.toDay !== undefined) {
+          duration = tier.toDay - tier.fromDay + 1;
         }
-      };
-      fetchBuildingData();
+        return {
+          id: tier.id,
+          durationDays: duration,
+          feeType: tier.feeType as 'Fixed' | 'Percentage',
+          feeValue: tier.feeValue,
+          scope: tier.scope as 'Building' | 'Floor' | 'SpecificSpaces',
+          applicableFloor: tier.applicableFloor || undefined,
+          applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || undefined,
+        };
+      });
+      uiRules.sort((a, b) => {
+        if (a.scope !== b.scope) return a.scope.localeCompare(b.scope);
+        return 0; 
+      });
+      setCurrentBuildingForm({
+        id: initialBuildingData.id,
+        name: initialBuildingData.name,
+        address: initialBuildingData.address || '',
+        uiPenaltyRules: uiRules,
+      });
     } else {
       setFormMode('add');
       setPageTitle("Add New Building");
       setCurrentBuildingForm({ name: '', address: '', uiPenaltyRules: [] });
-      setIsLoading(false);
     }
-  }, [searchParams, router, toast]);
+    setIsLoading(false);
+  }, [initialBuildingData]);
 
 
   const handleAddUIPenaltyRule = () => {
@@ -120,8 +102,8 @@ function BuildingUpsertFormInternal() {
       id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, 
       scope: 'Building', 
       feeType: 'Fixed',
-      feeValue: undefined, // Explicitly undefined
-      durationDays: undefined, // Explicitly undefined
+      feeValue: undefined, 
+      durationDays: undefined, 
     };
     setCurrentBuildingForm(prev => ({
       ...prev,
@@ -255,8 +237,8 @@ function BuildingUpsertFormInternal() {
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
         penaltyPolicyTiers: {
-          deleteMany: {}, // Delete all existing tiers for this building
-          create: finalPenaltyTiersCreateInput, // Create the new set
+          deleteMany: {}, 
+          create: finalPenaltyTiersCreateInput,
         },
       };
       result = await updateBuildingAction(currentBuildingForm.id!, buildingUpdateInput);
@@ -423,11 +405,39 @@ function BuildingUpsertFormInternal() {
   );
 }
 
-export default function BuildingUpsertPage() {
+// This is the main Server Component for the page
+// It will handle fetching data based on searchParams and pass it to the client component
+export default function BuildingUpsertPage({ searchParams }: { searchParams: { id?: string } }) {
   return (
     <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-      <BuildingUpsertFormInternal />
+      <BuildingUpsertDataFetcher buildingIdParam={searchParams.id} />
     </Suspense>
   );
 }
 
+async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?: string}) {
+  let initialBuildingData = null;
+  if (buildingIdParam) {
+    const buildingToEdit = await databaseService.getBuildingById(buildingIdParam, { 
+      include: { penaltyPolicyTiers: true } 
+    });
+    if (buildingToEdit) {
+      // Serialize data for the client component
+      initialBuildingData = {
+        ...buildingToEdit,
+        address: buildingToEdit.address || '', // Ensure address is string, not null for client form state
+        createdAt: buildingToEdit.createdAt.toISOString(), // Serialize date
+        // penaltyPolicyTiers should be fine as they don't have Date objects
+        penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map(tier => ({
+          ...tier,
+          // Ensure all fields are present as expected by PenaltyTierTypePrisma
+        }))
+      };
+    }
+    // If buildingToEdit is null (e.g., bad ID), initialBuildingData remains null,
+    // and the client component will handle it (likely by showing an error or redirecting).
+  }
+  return <BuildingUpsertFormInternal initialBuildingData={initialBuildingData} />;
+}
+
+    
