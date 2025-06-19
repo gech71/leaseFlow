@@ -70,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined} rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}>
+                <Link href={item.href} asChild target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined} rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}>
                   <SidebarMenuButton
                     isActive={pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href))}
                     tooltip={{children: item.label, side: "right", className: "font-headline"}}
