@@ -10,34 +10,32 @@ async function main() {
   // 1. Clear existing data
   console.log('Clearing existing data...');
   try {
-    // Delete records in an order that respects foreign key constraints,
-    // or relies on onDelete: Cascade where appropriate.
+    // Rely on onDelete: Cascade where appropriate from schema.prisma
+    // Order: Delete records that depend on others first, or records whose deletion cascades.
 
-    // UtilityBreakdownItem is a child of Bill.
-    // Bill is a child of Agreement.
-    // Agreement is a child of Tenant and Space.
-    // BuildingUtilityItem is a child of BuildingMonthlyUtilities.
-    // BuildingMonthlyUtilities is a child of Building.
-    // PenaltyTier is a child of Building.
-    // Space is a child of Building.
-    // Tenant has a relation to Space.
-
-    // Start with records that have fewer dependencies or whose deletion cascades effectively.
+    // Bill is child of Agreement. UtilityBreakdownItem is child of Bill.
     await prisma.bill.deleteMany({});
     console.log('Deleted Bills (and cascaded to UtilityBreakdownItems if schema is set up for it)');
 
+    // Agreement is child of Tenant and Space.
     await prisma.agreement.deleteMany({});
     console.log('Deleted Agreements');
 
-    await prisma.buildingUtilityItem.deleteMany({});
+    // BuildingUtilityItem is child of BuildingMonthlyUtilities.
+    await prisma.buildingUtilityItem.deleteMany({}); // Or rely on cascade from BuildingMonthlyUtilities
     console.log('Deleted BuildingUtilityItems');
+
+    // BuildingMonthlyUtilities is child of Building.
     await prisma.buildingMonthlyUtilities.deleteMany({});
     console.log('Deleted BuildingMonthlyUtilities');
 
-    await prisma.penaltyTier.deleteMany({});
+    // PenaltyTier is child of Building.
+    await prisma.penaltyTier.deleteMany({}); // Or rely on cascade from Building
     console.log('Deleted PenaltyTiers');
 
-    // Break links between Tenant and Space before deleting them
+    // Explicitly break links for Tenant <-> Space (1-to-1) before deleting Tenants and Spaces
+    // to handle potential cycles or specific logic like setting isOccupied.
+
     // Find tenants that have a rentedSpace
     const tenantsToClearLink = await prisma.tenant.findMany({
       where: {
@@ -45,11 +43,19 @@ async function main() {
           isNot: null,
         },
       },
+      select: { id: true }
     });
     for (const tenant of tenantsToClearLink) {
-      await prisma.tenant.update({ where: { id: tenant.id }, data: { rentedSpaceId: null } });
+      await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          rentedSpace: {
+            disconnect: true,
+          },
+        },
+      });
     }
-    console.log('Cleared rentedSpaceId from Tenants');
+    console.log('Cleared rentedSpace link from Tenants');
 
     // Find spaces that have a tenant
     const spacesToClearLink = await prisma.space.findMany({
@@ -58,16 +64,28 @@ async function main() {
           isNot: null,
         },
       },
+      select: {id: true}
     });
     for (const space of spacesToClearLink) {
-      await prisma.space.update({ where: { id: space.id }, data: { tenantId: null, isOccupied: false } });
+      await prisma.space.update({
+        where: { id: space.id },
+        data: {
+          tenant: {
+            disconnect: true,
+          },
+          isOccupied: false, // Also update isOccupied status
+        },
+      });
     }
-    console.log('Cleared tenantId from Spaces and set isOccupied to false');
+    console.log('Cleared tenant link from Spaces and set isOccupied to false');
 
+    // Now delete Tenants and Spaces
     await prisma.tenant.deleteMany({});
     console.log('Deleted Tenants');
     await prisma.space.deleteMany({});
     console.log('Deleted Spaces');
+
+    // Finally, delete Buildings (which should cascade to PenaltyTiers if schema is set)
     await prisma.building.deleteMany({});
     console.log('Deleted Buildings');
 
@@ -327,7 +345,7 @@ async function main() {
       billDate: formatISO(bill1_billDate),
       dueDate: formatISO(addMonths(bill1_billDate, 0, {days: 14})), 
       rentAmount: agreement1.monthlyRentalPrice,
-      totalAmount: agreement1.monthlyRentalPrice + 50 + 20,
+      totalAmount: agreement1.monthlyRentalPrice + 50 + 20, // Example utility costs
       status: 'Paid',
       paymentDate: formatISO(addMonths(bill1_billDate, 0, {days: 10})),
       paymentMethod: 'Bank Transfer',
@@ -352,7 +370,7 @@ async function main() {
       billDate: formatISO(bill2_billDate),
       dueDate: formatISO(addMonths(bill2_billDate, 0, {days: 14})),
       rentAmount: agreement1.monthlyRentalPrice,
-      totalAmount: agreement1.monthlyRentalPrice + 55 + 22,
+      totalAmount: agreement1.monthlyRentalPrice + 55 + 22, // Example utility costs
       status: 'Pending',
       utilityBreakdown: {
         create: [
@@ -374,7 +392,7 @@ async function main() {
       billDate: formatISO(bill3_billDate), 
       dueDate: formatISO(bobBillDueDate),
       rentAmount: agreement2.monthlyRentalPrice,
-      totalAmount: agreement2.monthlyRentalPrice + 100,
+      totalAmount: agreement2.monthlyRentalPrice + 100, // Example utility cost
       status: 'Overdue', // Assuming today is past this due date for seeding
       utilityBreakdown: {
         create: [
@@ -394,7 +412,7 @@ async function main() {
       billDate: formatISO(bill4_billDate), 
       dueDate: formatISO(addMonths(bill4_billDate, 0, {days: 14})),
       rentAmount: agreement3.monthlyRentalPrice,
-      totalAmount: agreement3.monthlyRentalPrice + 150 + 75,
+      totalAmount: agreement3.monthlyRentalPrice + 150 + 75, // Example utility costs
       status: 'Pending',
       utilityBreakdown: {
         create: [
