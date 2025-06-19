@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2 } from 'lucide-react';
-import type { Building, Space as SpaceType } from '@prisma/client'; // Using Prisma generated types
+import type { Building, Space as SpaceType, Prisma } from '@prisma/client'; // Using Prisma generated types
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -62,10 +62,10 @@ function SpacesClientPage({ initialSpaces, initialBuildings }: { initialSpaces: 
     // though revalidatePath in server actions should handle most cases.
     try {
       const fetchedSpaces = await databaseService.getAllSpaces({ include: { building: true }, orderBy: { createdAt: 'desc' } });
-      const processedSpaces = fetchedSpaces.map(s => ({ ...s, buildingName: s.building.name }));
+      const processedSpaces = fetchedSpaces.map(s => ({ ...s, buildingName: s.building.name, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt?.toISOString() }));
       setSpaces(processedSpaces);
       const fetchedBuildings = await databaseService.getAllBuildings({ orderBy: { name: 'asc' } });
-      setBuildings(fetchedBuildings);
+      setBuildings(fetchedBuildings.map(b => ({...b, createdAt: b.createdAt.toISOString(), updatedAt: b.updatedAt!.toISOString() })));
     } catch (error) {
       console.error("Failed to refresh spaces data:", error);
       toast({ title: "Error", description: "Could not refresh spaces data.", variant: "destructive" });
@@ -374,7 +374,7 @@ export default async function SpacesPage() {
   const serializableSpaces = spacesData.map(space => ({
     ...space,
     createdAt: space.createdAt.toISOString(),
-    updatedAt: space.updatedAt.toISOString(),
+    updatedAt: space.updatedAt?.toISOString(), // Added optional chaining
     buildingName: space.building.name, // Denormalize buildingName for easier use in client
     // buildingId is already part of space from Prisma
   }));
@@ -382,10 +382,11 @@ export default async function SpacesPage() {
   const serializableBuildings = buildingsData.map(building => ({
     ...building,
     createdAt: building.createdAt.toISOString(),
-    updatedAt: building.updatedAt.toISOString(),
+    updatedAt: building.updatedAt?.toISOString(), // Added optional chaining here as a good practice
     // Penalty tiers are not directly needed by the spaces form, so we can omit them for client prop
     penaltyPolicyTiers: [], // Or map them if needed, but likely not for this client component
   }));
 
   return <SpacesClientPage initialSpaces={serializableSpaces} initialBuildings={serializableBuildings} />;
 }
+
