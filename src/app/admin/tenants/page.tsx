@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, PlusCircle, FileText, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact } from 'lucide-react';
-import type { Tenant, Space } from '@/lib/types';
+import type { Tenant, Space, Agreement } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import {
@@ -35,20 +35,37 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getMockAgreements } from '../agreements/page'; // To get agreement texts
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-const initialMockSpaces: Space[] = [
-  { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.4, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
-  { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
-  { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
-  { id: 'space4', buildingName: 'Tech Park One', spaceIdName: 'Lab 3', area: 2000, floor: '1st', utilityProrationShare: 0.5, monthlyRentalPrice: 4500, isOccupied: false, createdAt: new Date().toISOString() },
 
-];
+const getStoredTenants = (): Tenant[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('tenants');
+    return stored ? JSON.parse(stored) : [];
+  }
+  return [];
+};
 
-const initialTenants: Tenant[] = [
-  { id: 'tenant1', name: 'Alice Wonderland', email: 'alice@example.com', phone: '555-0101', nationalId: 'AB123456', representativeName: 'Mad Hatter', representativePhone: '555-0199', rentedSpaceId: 'space1', createdAt: new Date().toISOString() },
-  { id: 'tenant2', name: 'Bob The Builder', email: 'bob@example.com', phone: '555-0202', rentedSpaceId: 'space3', createdAt: new Date().toISOString() },
-  { id: 'tenant3', name: 'Charlie Brown', email: 'charlie@example.com', phone: '555-0303', alternativePhone: '555-0333', nationalId: 'XY789012', rentedSpaceId: null, createdAt: new Date().toISOString() },
-];
+const storeTenants = (tenants: Tenant[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('tenants', JSON.stringify(tenants));
+  }
+};
+
+const getStoredSpaces = (): Space[] => {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('spaces');
+    return stored ? JSON.parse(stored) : [];
+  }
+  return [];
+};
+
+const storeSpaces = (spaces: Space[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('spaces', JSON.stringify(spaces));
+  }
+};
 
 const tenantFormSchema = z.object({
   name: z.string().min(2, { message: "Tenant name must be at least 2 characters." }),
@@ -64,8 +81,9 @@ type TenantFormValues = z.infer<typeof tenantFormSchema>;
 
 
 export default function TenantsPage() {
-  const [tenants, setTenants] = useState<Tenant[]>(initialTenants);
-  const [spaces, setSpaces] = useState<Space[]>(initialMockSpaces);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
@@ -90,9 +108,38 @@ export default function TenantsPage() {
 
   useEffect(() => {
     setIsMounted(true);
+    const loadedTenants = getStoredTenants();
+    const loadedSpaces = getStoredSpaces();
+    const loadedAgreements = getMockAgreements(); // Fetch agreements for their text
+    
+    // Initialize with some mock data if local storage is empty
+    if (loadedTenants.length === 0) {
+        const initialTenants: Tenant[] = [
+          { id: 'tenant1', name: 'Alice Wonderland', email: 'alice@example.com', phone: '555-0101', nationalId: 'AB123456', representativeName: 'Mad Hatter', representativePhone: '555-0199', rentedSpaceId: 'space1', createdAt: new Date().toISOString() },
+          { id: 'tenant2', name: 'Bob The Builder', email: 'bob@example.com', phone: '555-0202', rentedSpaceId: 'space3', createdAt: new Date().toISOString() },
+        ];
+        setTenants(initialTenants);
+        storeTenants(initialTenants);
+    } else {
+        setTenants(loadedTenants);
+    }
+
+    if (loadedSpaces.length === 0) {
+        const initialSpaces: Space[] = [
+            { id: 'space1', buildingName: 'Sunrise Tower', spaceIdName: 'Unit 101', area: 1200, floor: '10th', utilityProrationShare: 0.4, monthlyRentalPrice: 2500, isOccupied: true, tenantId: 'tenant1', createdAt: new Date().toISOString() },
+            { id: 'space3', buildingName: 'Downtown Hub', spaceIdName: 'Office 5B', area: 1500, floor: '5th', utilityProrationShare: 0.35, monthlyRentalPrice: 3200, isOccupied: true, tenantId: 'tenant2', createdAt: new Date().toISOString() },
+            { id: 'space2', buildingName: 'Ocean View Plaza', spaceIdName: 'Suite 20A', area: 800, floor: '2nd', utilityProrationShare: 0.25, monthlyRentalPrice: 1800, isOccupied: false, createdAt: new Date().toISOString() },
+        ];
+        setSpaces(initialSpaces);
+        storeSpaces(initialSpaces);
+    } else {
+        setSpaces(loadedSpaces);
+    }
+    setAgreements(loadedAgreements);
+
   }, []);
 
-  const getSpaceDetails = (spaceId: string | null) => {
+  const getSpaceDetails = (spaceId: string | null | undefined) => {
     if (!spaceId) return "No space assigned";
     const space = spaces.find(s => s.id === spaceId);
     return space ? `${space.spaceIdName}, ${space.buildingName}` : "Unknown Space";
@@ -143,6 +190,7 @@ export default function TenantsPage() {
       rentedSpaceId: newRentedSpaceId,
     };
 
+    let updatedTenants;
     if (formMode === 'add') {
       tenantIdForSpaceUpdate = `tenant-${Date.now()}`;
       const newTenant: Tenant = {
@@ -150,18 +198,20 @@ export default function TenantsPage() {
         ...tenantData,
         createdAt: new Date().toISOString(),
       };
-      setTenants(prev => [newTenant, ...prev]);
+      updatedTenants = [newTenant, ...tenants];
       toast({ title: "Tenant Added", description: `${newTenant.name} has been added.` });
     } else if (currentTenant && currentTenant.id) {
       tenantIdForSpaceUpdate = currentTenant.id;
       oldRentedSpaceIdOfCurrentTenant = tenants.find(t => t.id === currentTenant.id)?.rentedSpaceId;
-      setTenants(prev => prev.map(t => t.id === currentTenant.id ? { ...t, ...tenantData } : t));
+      updatedTenants = tenants.map(t => t.id === currentTenant.id ? { ...t, ...tenantData, createdAt: t.createdAt } : t);
       toast({ title: "Tenant Updated", description: `${values.name} has been updated.` });
+    } else {
+      return; // Should not happen
     }
+    setTenants(updatedTenants);
+    storeTenants(updatedTenants);
 
-
-    setSpaces(prevSpaces => {
-      return prevSpaces.map(space => {
+    const updatedSpaces = spaces.map(space => {
         if (oldRentedSpaceIdOfCurrentTenant && space.id === oldRentedSpaceIdOfCurrentTenant && space.id !== newRentedSpaceId) {
           return { ...space, isOccupied: false, tenantId: undefined };
         }
@@ -170,7 +220,9 @@ export default function TenantsPage() {
         }
         return space;
       });
-    });
+    setSpaces(updatedSpaces);
+    storeSpaces(updatedSpaces);
+
 
     setIsFormOpen(false);
     setCurrentTenant(null);
@@ -185,16 +237,18 @@ export default function TenantsPage() {
 
     const spaceIdToVacate = tenantToDelete.rentedSpaceId;
 
-    setTenants(prev => prev.filter(t => t.id !== tenantToDelete.id));
+    const updatedTenants = tenants.filter(t => t.id !== tenantToDelete.id);
+    setTenants(updatedTenants);
+    storeTenants(updatedTenants);
     
     if (spaceIdToVacate) {
-      setSpaces(prevSpaces => 
-        prevSpaces.map(s => 
+      const updatedSpaces = spaces.map(s => 
           s.id === spaceIdToVacate 
             ? { ...s, isOccupied: false, tenantId: undefined } 
             : s
-        )
-      );
+        );
+      setSpaces(updatedSpaces);
+      storeSpaces(updatedSpaces);
     }
     
     toast({ title: "Tenant Removed", description: `${tenantToDelete.name} has been removed.`, variant: "destructive" });
@@ -415,46 +469,73 @@ export default function TenantsPage() {
         </Card>
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {tenants.map((tenant) => (
-            <Card key={tenant.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
-              <CardHeader>
-                <div className="flex items-center gap-4">
-                  <Image src={`https://placehold.co/60x60.png?text=${tenant.name.charAt(0)}`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person avatar"/>
-                  <div>
-                    <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
-                    <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
+          {tenants.map((tenant) => {
+            const tenantAgreement = agreements.find(ag => ag.tenantId === tenant.id);
+            return (
+              <Card key={tenant.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex items-center gap-4">
+                    <Image src={`https://placehold.co/60x60.png?text=${tenant.name.charAt(0)}`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person avatar"/>
+                    <div>
+                      <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
+                      <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm flex-grow">
-                {tenant.phone && (
-                  <div className="flex items-center text-muted-foreground">
-                    <Phone className="mr-2 h-4 w-4 text-primary" /> Phone: {tenant.phone}
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm flex-grow">
+                  {tenant.phone && (
+                    <div className="flex items-center text-muted-foreground">
+                      <Phone className="mr-2 h-4 w-4 text-primary" /> Phone: {tenant.phone}
+                    </div>
+                  )}
+                  <div className="flex items-center">
+                    <BedDouble className="mr-2 h-4 w-4 text-primary" /> 
+                    Rented Space: {getSpaceDetails(tenant.rentedSpaceId)}
                   </div>
-                )}
-                <div className="flex items-center">
-                  <BedDouble className="mr-2 h-4 w-4 text-primary" /> 
-                  Rented Space: {getSpaceDetails(tenant.rentedSpaceId)}
-                </div>
-                 <p className="text-xs text-muted-foreground pt-2">Joined: {new Date(tenant.createdAt).toLocaleDateString()}</p>
-              </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-between gap-2">
-                 <Button variant="outline" size="sm" onClick={() => toast({title: "View Agreement", description: "Agreement viewing coming soon!"})}>
-                  <FileText className="mr-1 h-4 w-4" /> Agreement
-                </Button>
-                <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
-                        <Edit3 className="h-4 w-4 text-blue-600" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
+                   <p className="text-xs text-muted-foreground pt-2">Joined: {new Date(tenant.createdAt).toLocaleDateString()}</p>
+                </CardContent>
+                <CardFooter className="border-t pt-4 flex justify-between items-center gap-2">
+                   <div>
+                    {tenantAgreement && tenantAgreement.agreementText ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          toast({
+                            title: `Agreement for ${tenant.name}`,
+                            description: (
+                              <ScrollArea className="h-[300px] w-full max-w-full">
+                                <pre className="whitespace-pre-wrap text-xs p-1">
+                                  {tenantAgreement.agreementText}
+                                </pre>
+                              </ScrollArea>
+                            ),
+                            duration: 30000,
+                            className: "w-11/12 sm:w-4/5 md:w-3/5 lg:w-1/2 xl:max-w-2xl h-auto"
+                          });
+                        }}
+                      >
+                        <FileText className="mr-1 h-4 w-4" /> Agreement
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">No agreement yet</span>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
+                          <Edit3 className="h-4 w-4 text-blue-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                  </div>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
+
