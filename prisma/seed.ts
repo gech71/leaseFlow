@@ -10,9 +10,8 @@ async function main() {
   // 1. Clear existing data
   console.log('Clearing existing data...');
   try {
-    // Order: Delete records that depend on others first, or records whose deletion cascades.
-
     // Bill is child of Agreement. UtilityBreakdownItem is child of Bill.
+    // Prisma's onDelete: Cascade on UtilityBreakdownItem.billId and Bill.agreementId should handle this.
     await prisma.bill.deleteMany({});
     console.log('Deleted Bills (and cascaded to UtilityBreakdownItems if schema is set up for it)');
 
@@ -21,6 +20,7 @@ async function main() {
     console.log('Deleted Agreements');
 
     // BuildingUtilityItem is child of BuildingMonthlyUtilities.
+    // Prisma's onDelete: Cascade on BuildingUtilityItem.monthlyUtilitiesId should handle this.
     await prisma.buildingUtilityItem.deleteMany({});
     console.log('Deleted BuildingUtilityItems');
 
@@ -29,6 +29,7 @@ async function main() {
     console.log('Deleted BuildingMonthlyUtilities');
 
     // PenaltyTier is child of Building.
+    // Prisma's onDelete: Cascade on PenaltyTier.buildingId should handle this.
     await prisma.penaltyTier.deleteMany({});
     console.log('Deleted PenaltyTiers');
 
@@ -264,60 +265,60 @@ async function main() {
 
   // 5. Create Agreements
   console.log('Creating Agreements...');
-  const agreement1_startDate = subDays(new Date(), 60);
+  const agreement1_startDate_obj = subDays(new Date(), 60);
   const agreement1 = await prisma.agreement.create({ // Alice's agreement
     data: {
       tenantId: tenant1.id,
       spaceId: space1_B1.id,
       agreementText: 'Standard Rental Agreement for Alice Wonderland...',
-      startDate: formatISO(agreement1_startDate), 
+      startDate: agreement1_startDate_obj, 
       monthlyRentalPrice: space1_B1.monthlyRentalPrice,
       paymentTermMonths: 12,
       initialPaymentMonths: 1,
-      nextPaymentDueDate: formatISO(addMonths(agreement1_startDate, 2)), 
+      nextPaymentDueDate: addMonths(agreement1_startDate_obj, 2), 
       initialPaymentAmount: space1_B1.monthlyRentalPrice * 1,
       initialPaymentMethod: 'Bank Transfer',
       initialPaymentBankOrWalletName: 'Metro Bank',
       initialPaymentReference: 'INITPAY001',
-      initialPaymentDate: formatISO(agreement1_startDate),
+      initialPaymentDate: agreement1_startDate_obj,
     },
   });
 
-  const agreement2_startDate = subDays(new Date(), 30);
+  const agreement2_startDate_obj = subDays(new Date(), 30);
   const agreement2 = await prisma.agreement.create({ // Bob's agreement
     data: {
       tenantId: tenant2.id,
       spaceId: space1_B2.id,
       agreementText: 'Standard Rental Agreement for Bob The Builder...',
-      startDate: formatISO(agreement2_startDate), 
+      startDate: agreement2_startDate_obj, 
       monthlyRentalPrice: space1_B2.monthlyRentalPrice,
       paymentTermMonths: 6,
       initialPaymentMonths: 2,
-      nextPaymentDueDate: formatISO(addMonths(agreement2_startDate, 2)), 
+      nextPaymentDueDate: addMonths(agreement2_startDate_obj, 2), 
       initialPaymentAmount: space1_B2.monthlyRentalPrice * 2,
       initialPaymentMethod: 'Credit Card',
       initialPaymentReference: 'INITPAY002',
-      initialPaymentDate: formatISO(agreement2_startDate),
+      initialPaymentDate: agreement2_startDate_obj,
     },
   });
   
-  const agreement3_startDate = new Date();
+  const agreement3_startDate_obj = new Date();
   const agreement3 = await prisma.agreement.create({ // Carol's agreement
     data: {
         tenantId: tenant3.id,
         spaceId: space2_B2.id,
         agreementText: 'Premium Rental Agreement for Carol Danvers...',
-        startDate: formatISO(agreement3_startDate), 
+        startDate: agreement3_startDate_obj, 
         monthlyRentalPrice: space2_B2.monthlyRentalPrice,
         paymentTermMonths: 24,
         initialPaymentMonths: 3,
-        nextPaymentDueDate: formatISO(addMonths(agreement3_startDate, 3)),
+        nextPaymentDueDate: addMonths(agreement3_startDate_obj, 3),
         additionalTerms: "Access to rooftop pool and gym included. Bi-weekly cleaning service.",
         initialPaymentAmount: space2_B2.monthlyRentalPrice * 3,
         initialPaymentMethod: 'Wallet',
         initialPaymentBankOrWalletName: 'StarPay',
         initialPaymentReference: 'INITPAY003',
-        initialPaymentDate: formatISO(agreement3_startDate),
+        initialPaymentDate: agreement3_startDate_obj,
     }
   });
   console.log(`Created Agreements: ${agreement1.id}, ${agreement2.id}, ${agreement3.id}`);
@@ -325,18 +326,19 @@ async function main() {
   // 6. Create Bills (with nested UtilityBreakdownItems)
   console.log('Creating Bills...');
   // Bill for Alice (last month, paid)
-  const bill1_billDate = addMonths(parseISO(agreement1.startDate), 1);
+  // agreement1.startDate is already a Date object from Prisma
+  const bill1_billDate = addMonths(agreement1.startDate, 1); 
   await prisma.bill.create({
     data: {
       agreementId: agreement1.id,
       tenantId: tenant1.id,
-      spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`, // Bill can store this denormalized
-      billDate: formatISO(bill1_billDate),
-      dueDate: formatISO(addMonths(bill1_billDate, 0, {days: 14})), 
+      spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`, 
+      billDate: bill1_billDate,
+      dueDate: addMonths(bill1_billDate, 0, {days: 14}), 
       rentAmount: agreement1.monthlyRentalPrice,
-      totalAmount: agreement1.monthlyRentalPrice + 50 + 20, // Example utility costs
+      totalAmount: agreement1.monthlyRentalPrice + 50 + 20, 
       status: 'Paid',
-      paymentDate: formatISO(addMonths(bill1_billDate, 0, {days: 10})),
+      paymentDate: addMonths(bill1_billDate, 0, {days: 10}),
       paymentMethod: 'Bank Transfer',
       paymentReference: 'BILLPAY001',
       bankOrWalletName: 'Metro Bank',
@@ -350,16 +352,16 @@ async function main() {
   });
 
   // Bill for Alice (current month, pending)
-  const bill2_billDate = addMonths(parseISO(agreement1.startDate), 2);
+  const bill2_billDate = addMonths(agreement1.startDate, 2);
   await prisma.bill.create({
     data: {
       agreementId: agreement1.id,
       tenantId: tenant1.id,
       spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`,
-      billDate: formatISO(bill2_billDate),
-      dueDate: formatISO(addMonths(bill2_billDate, 0, {days: 14})),
+      billDate: bill2_billDate,
+      dueDate: addMonths(bill2_billDate, 0, {days: 14}),
       rentAmount: agreement1.monthlyRentalPrice,
-      totalAmount: agreement1.monthlyRentalPrice + 55 + 22, // Example utility costs
+      totalAmount: agreement1.monthlyRentalPrice + 55 + 22, 
       status: 'Pending',
       utilityBreakdown: {
         create: [
@@ -371,18 +373,19 @@ async function main() {
   });
   
   // Bill for Bob (current month, overdue)
-  const bill3_billDate = addMonths(parseISO(agreement2.startDate), 1); // Bill for month after initial payment
+  // agreement2.startDate is already a Date object
+  const bill3_billDate = addMonths(agreement2.startDate, 1); 
   const bobBillDueDate = addMonths(bill3_billDate, 0, {days: 5}); 
   await prisma.bill.create({
     data: {
       agreementId: agreement2.id,
       tenantId: tenant2.id,
       spaceDescription: `${space1_B2.spaceIdName}, ${building2.name}`,
-      billDate: formatISO(bill3_billDate), 
-      dueDate: formatISO(bobBillDueDate),
+      billDate: bill3_billDate, 
+      dueDate: bobBillDueDate,
       rentAmount: agreement2.monthlyRentalPrice,
-      totalAmount: agreement2.monthlyRentalPrice + 100, // Example utility cost
-      status: 'Overdue', // Assuming today is past this due date for seeding
+      totalAmount: agreement2.monthlyRentalPrice + 100, 
+      status: 'Overdue', 
       utilityBreakdown: {
         create: [
           { name: 'Common Area Maintenance', amount: 100 },
@@ -392,16 +395,17 @@ async function main() {
   });
   
   // Bill for Carol (next month, pending, as initial payment covers first 3 months)
-  const bill4_billDate = addMonths(parseISO(agreement3.startDate), 3); // Bill for 4th month
+  // agreement3.startDate is already a Date object
+  const bill4_billDate = addMonths(agreement3.startDate, 3); 
   await prisma.bill.create({
     data: {
       agreementId: agreement3.id,
       tenantId: tenant3.id,
       spaceDescription: `${space2_B2.spaceIdName}, ${building2.name}`,
-      billDate: formatISO(bill4_billDate), 
-      dueDate: formatISO(addMonths(bill4_billDate, 0, {days: 14})),
+      billDate: bill4_billDate, 
+      dueDate: addMonths(bill4_billDate, 0, {days: 14}),
       rentAmount: agreement3.monthlyRentalPrice,
-      totalAmount: agreement3.monthlyRentalPrice + 150 + 75, // Example utility costs
+      totalAmount: agreement3.monthlyRentalPrice + 150 + 75, 
       status: 'Pending',
       utilityBreakdown: {
         create: [
@@ -423,7 +427,7 @@ async function main() {
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building1.id,
-      buildingName: building1.name, // Added buildingName
+      buildingName: building1.name, 
       year: lastMonthYear,
       month: lastMonth, 
       utilities: {
@@ -439,7 +443,7 @@ async function main() {
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building2.id,
-      buildingName: building2.name, // Added buildingName
+      buildingName: building2.name, 
       year: lastMonthYear,
       month: lastMonth,
       utilities: {
