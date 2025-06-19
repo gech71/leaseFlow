@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -543,48 +544,61 @@ const SidebarMenuButton = React.forwardRef<
 >(
   (
     {
-      asChild = false,
+      asChild: useSlot = false, // Renamed for clarity: this is SidebarMenuButton's own asChild prop
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
-      ...props
+      children, // Explicitly destructure children
+      ...restProps // All other props passed from parent (e.g., Link)
     },
     ref
   ) => {
-    const Comp = asChild ? Slot : "button"
+    const Comp = useSlot ? Slot : "button"
     const { isMobile, state } = useSidebar()
 
-    const button = (
+    // If Comp is a DOM button, we must ensure 'asChild' is not in restProps to avoid the warning.
+    // If useSlot is true, Comp is Slot, and Slot handles its own 'asChild' prop correctly if present in restProps.
+    let finalProps = restProps
+    if (Comp === "button") {
+      // Explicitly remove 'asChild' from restProps if it exists
+      const { asChild: _ignored, ...validRestProps } = restProps as any
+      finalProps = validRestProps
+    }
+
+    const buttonElement = (
       <Comp
         ref={ref}
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        {...props}
-      />
+        {...finalProps} // Spread the cleaned props
+      >
+        {children}
+      </Comp>
     )
 
     if (!tooltip) {
-      return button
+      return buttonElement
     }
 
+    let tooltipProps: React.ComponentProps<typeof TooltipContent> = {}
     if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
+      tooltipProps.children = tooltip
+    } else {
+      tooltipProps = tooltip
     }
 
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
           hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
+          {...tooltipProps}
         />
       </Tooltip>
     )
