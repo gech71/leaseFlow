@@ -81,25 +81,29 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href));
               
-              const menuItemCore = (
-                <SidebarMenuButton 
-                  isActive={isActive} 
-                  className="block" 
-                  // href is passed by Link asChild
-                  target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined}
-                  rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}
-                >
+              const menuItemContent = (
+                <>
                   <item.icon />
                   <span
                     className={cn(
-                      "min-w-0", // Basic flex text handling
-                      (!isMobile && sidebarState === "collapsed") ? "hidden" : "flex-1" // Explicitly hide when collapsed, expand otherwise
+                      "truncate", // Apply truncate for the "original image" look
+                      (!isMobile && sidebarState === "collapsed") && "hidden" // Hide if collapsed on non-mobile
                     )}
                   >
                     {item.label}
                   </span>
-                </SidebarMenuButton>
+                </>
               );
+
+              const commonButtonProps = {
+                isActive: isActive,
+                className: cn(
+                  "block",
+                  item.label === 'Tenant Portal (View)' && 'mt-auto border-t border-sidebar-border pt-2'
+                ),
+                target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
+                rel: item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined,
+              };
 
               if (!isMobile && sidebarState === "collapsed") {
                 return (
@@ -107,7 +111,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Link href={item.href} asChild>
-                           {menuItemCore}
+                           <SidebarMenuButton {...commonButtonProps}>
+                            {menuItemContent}
+                           </SidebarMenuButton>
                         </Link>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="font-headline">
@@ -120,7 +126,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               return (
                 <SidebarMenuItem key={item.href}>
                   <Link href={item.href} asChild>
-                     {menuItemCore}
+                     <SidebarMenuButton {...commonButtonProps}>
+                       {menuItemContent}
+                     </SidebarMenuButton>
                   </Link>
                 </SidebarMenuItem>
               );
@@ -135,7 +143,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                   <AvatarImage src="https://placehold.co/100x100.png" alt="Admin User" data-ai-hint="user avatar"/>
                   <AvatarFallback>AU</AvatarFallback>
                 </Avatar>
-                <div className="text-left group-data-[collapsible=icon]:hidden">
+                <div className={cn("text-left", sidebarState === "collapsed" && !isMobile ? "hidden" : "")}>
                   <p className="text-sm font-medium">Admin User</p>
                   <p className="text-xs text-sidebar-foreground/70">admin@leaseflow.com</p>
                 </div>
@@ -164,6 +172,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="hidden md:flex items-center justify-start mb-6 h-[3.7rem]">
+            {/* This SidebarTrigger is for the main content area, allowing toggle from there */}
             <SidebarTrigger />
           </div>
           {children}
@@ -181,6 +190,8 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
+    // Fallback for SSR or before client-side mount to avoid hydration mismatch with useSidebar
+    // You could render a simplified layout or a loader here if needed
     return null; 
   }
 
