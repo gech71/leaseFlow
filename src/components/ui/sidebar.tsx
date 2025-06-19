@@ -544,25 +544,29 @@ const SidebarMenuButton = React.forwardRef<
 >(
   (
     {
-      asChild: useSlot = false,
+      asChild: useSlotProp = false, // Renamed to avoid conflict with potential 'asChild' in restProps
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
       children,
-      ...restProps
+      ...restProps // Contains all other props passed to SidebarMenuButton
     },
     ref
   ) => {
-    const Comp = useSlot ? Slot : "button";
-    const { isMobile, state } = useSidebar();
+    const { isMobile, state: sidebarState } = useSidebar(); // Renamed 'state' to avoid conflict
 
-    // Explicitly remove 'asChild' from restProps as it has served its purpose 
-    // by setting useSlot or is intended for the Slot component if Comp is Slot.
-    // If Comp is 'button', 'asChild' is not a valid DOM attribute.
-    // If Comp is 'Slot', Slot itself will handle 'asChild' if present in restProps.
-    const { asChild: _asChildFromRest, ...cleanedRestProps } = restProps as any;
+    // Determine if the component should render as a Slot.
+    // It should be a Slot if:
+    // 1. Its own asChild prop (useSlotProp) is true (e.g., passed from Link asChild).
+    // 2. Or, if it has a tooltip, because TooltipTrigger will use asChild.
+    const shouldBeSlot = useSlotProp || (tooltip != null);
+    const Comp = shouldBeSlot ? Slot : "button";
+
+    // Remove 'asChild' from restProps if it exists, to prevent it from reaching the DOM element.
+    // This handles cases where a parent component might inadvertently pass 'asChild' through.
+    const { asChild: _forwardedAsChild, ...compProps } = restProps as any;
 
     const buttonElement = (
       <Comp
@@ -571,37 +575,38 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        {...cleanedRestProps} // Pass the cleaned props
+        {...compProps} // Use compProps which has 'asChild' removed
       >
         {children}
       </Comp>
     );
 
-    if (!tooltip) {
-      return buttonElement;
+    if (tooltip) {
+      let tooltipContentProps: React.ComponentProps<typeof TooltipContent> = {};
+      if (typeof tooltip === "string") {
+        tooltipContentProps.children = tooltip;
+      } else {
+        tooltipContentProps = tooltip;
+      }
+
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{buttonElement}</TooltipTrigger> {/* TooltipTrigger uses asChild, so buttonElement must be a Slot if shouldBeSlot is true */}
+          <TooltipContent
+            side="right"
+            align="center"
+            hidden={sidebarState !== "collapsed" || isMobile}
+            {...tooltipContentProps}
+          />
+        </Tooltip>
+      );
     }
 
-    let tooltipProps: React.ComponentProps<typeof TooltipContent> = {};
-    if (typeof tooltip === "string") {
-      tooltipProps.children = tooltip;
-    } else {
-      tooltipProps = tooltip;
-    }
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{buttonElement}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltipProps}
-        />
-      </Tooltip>
-    );
+    return buttonElement;
   }
 );
 SidebarMenuButton.displayName = "SidebarMenuButton";
+
 
 const SidebarMenuAction = React.forwardRef<
   HTMLButtonElement,
