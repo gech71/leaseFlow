@@ -1,16 +1,16 @@
 
-"use client"; // This page involves client-side state for the form
+// REMOVED: "use client"; directive from the top of the file
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // useRouter is a client hook, used in BuildingUpsertFormInternal
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building as BuildingIconLucide, PlusCircle, Trash2, MapPin, DollarSign as DollarSignLucide, Layers, HomeIcon, ArrowLeft, Loader2 } from 'lucide-react';
-import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, Prisma } from '@prisma/client'; // Use Prisma types
-import { useToast } from '@/hooks/use-toast';
+import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, Prisma } from '@prisma/client';
+import { useToast } from '@/hooks/use-toast'; // useToast is a client hook, used in BuildingUpsertFormInternal
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
@@ -19,8 +19,8 @@ import { databaseService } from '@/lib/services/databaseService'; // For fetchin
 
 // Represents a rule in the UI before it's converted to PenaltyTier
 interface UIPenaltyRule {
-  id: string; 
-  durationDays?: number; 
+  id: string;
+  durationDays?: number;
   feeType: 'Fixed' | 'Percentage';
   feeValue?: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
@@ -37,7 +37,7 @@ interface BuildingFormState {
 
 // Interface for props passed from Server Component
 interface BuildingUpsertFormInternalProps {
-  initialBuildingData?: { // Make this optional; present only in edit mode
+  initialBuildingData?: {
     id: string;
     name: string;
     address: string | null;
@@ -47,14 +47,15 @@ interface BuildingUpsertFormInternalProps {
 }
 
 
-// This component will be wrapped by Suspense for searchParams
+// This component will be treated as a Client Component by Next.js
+// because it uses client-side hooks (useState, useEffect, useRouter, useToast).
 function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormInternalProps) {
   const router = useRouter();
   const { toast } = useToast();
 
   const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', uiPenaltyRules: [] });
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
-  const [isLoading, setIsLoading] = useState(true); // For initial form setup
+  const [isLoading, setIsLoading] = useState(true); // For initial form setup based on props
   const [isSaving, setIsSaving] = useState(false);
   const [pageTitle, setPageTitle] = useState("Add New Building");
 
@@ -80,7 +81,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
       });
       uiRules.sort((a, b) => {
         if (a.scope !== b.scope) return a.scope.localeCompare(b.scope);
-        return 0; 
+        return 0;
       });
       setCurrentBuildingForm({
         id: initialBuildingData.id,
@@ -98,12 +99,12 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
 
 
   const handleAddUIPenaltyRule = () => {
-    const newRule: UIPenaltyRule = { 
-      id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, 
-      scope: 'Building', 
+    const newRule: UIPenaltyRule = {
+      id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      scope: 'Building',
       feeType: 'Fixed',
-      feeValue: undefined, 
-      durationDays: undefined, 
+      feeValue: undefined,
+      durationDays: undefined,
     };
     setCurrentBuildingForm(prev => ({
       ...prev,
@@ -124,7 +125,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
       uiPenaltyRules: (prev.uiPenaltyRules || []).map(rule => {
         if (rule.id !== ruleId) return rule;
         let updatedRule = { ...rule, [field]: value };
-        
+
         if (field === 'durationDays' || field === 'feeValue') {
            updatedRule[field] = (value === '' || value === null || value === undefined || isNaN(Number(value))) ? undefined : Number(value);
         }
@@ -138,7 +139,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
       })
     }));
   };
-  
+
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
@@ -150,13 +151,13 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
     }
 
     const finalPenaltyTiersCreateInput: Prisma.PenaltyTierCreateWithoutBuildingInput[] = [];
-    const groupedUIRules: Record<string, UIPenaltyRule[]> = {}; 
+    const groupedUIRules: Record<string, UIPenaltyRule[]> = {};
 
     try {
       currentBuildingForm.uiPenaltyRules.forEach(uiRule => {
         if (!uiRule.feeType || uiRule.feeValue === undefined || uiRule.feeValue < 0) {
             toast({ title: "Validation Error", description: `Rule for scope '${uiRule.scope}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
-            throw new Error("Incomplete UI rule."); 
+            throw new Error("Incomplete UI rule.");
         }
 
         let scopeKey = uiRule.scope;
@@ -174,13 +175,13 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
             const sortedSpaceIds = uiRule.applicableSpaceIdNamesStr.split(',').map(s => s.trim()).filter(s => s).sort().join(',');
             scopeKey += `_Spaces_${sortedSpaceIds}`;
         }
-        
+
         if (!groupedUIRules[scopeKey]) groupedUIRules[scopeKey] = [];
         groupedUIRules[scopeKey].push(uiRule);
       });
-        
+
       for (const scopeKey in groupedUIRules) {
-        const rulesInScope = groupedUIRules[scopeKey].sort((a,b) => (a.durationDays ?? Infinity) - (b.durationDays ?? Infinity)); 
+        const rulesInScope = groupedUIRules[scopeKey].sort((a,b) => (a.durationDays ?? Infinity) - (b.durationDays ?? Infinity));
         let cumulativeStartDay = 1;
 
         for (let i = 0; i < rulesInScope.length; i++) {
@@ -188,12 +189,12 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
             const fromDay = cumulativeStartDay;
             let toDay: number | null = null;
 
-            if (uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) { 
+            if (uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) {
               if (i < rulesInScope.length -1) {
                 toast({title: "Validation Error", description: `Only the last rule in a scope group can have an indefinite duration (blank duration). Check rule for scope: ${scopeKey}`, variant: "destructive"});
                 throw new Error("Invalid indefinite duration placement.");
               }
-              toDay = null; 
+              toDay = null;
             } else {
               toDay = fromDay + uiRule.durationDays - 1;
             }
@@ -202,26 +203,25 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
               fromDay: fromDay,
               toDay: toDay,
               feeType: uiRule.feeType,
-              feeValue: Number(uiRule.feeValue!), 
+              feeValue: Number(uiRule.feeValue!),
               scope: uiRule.scope,
               applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
               applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : [],
             });
-            
+
             if (toDay !== null) {
               cumulativeStartDay = toDay + 1;
             } else {
-              break; 
+              break;
             }
         }
       }
     } catch (error: any) {
-        // Error toast is already shown inside the loop
         console.error("Validation error during penalty tier processing:", error.message);
         setIsSaving(false);
-        return; 
+        return;
     }
-    
+
     let result;
     if (formMode === 'add') {
       const buildingCreateInput: Prisma.BuildingCreateInput = {
@@ -237,7 +237,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
         penaltyPolicyTiers: {
-          deleteMany: {}, 
+          deleteMany: {},
           create: finalPenaltyTiersCreateInput,
         },
       };
@@ -279,12 +279,12 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
                 <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
                   <BuildingIconLucide className="mr-2 h-4 w-4 text-primary" />Building Name
                 </Label>
-                <Input 
-                  id="buildingNameMain" 
-                  value={currentBuildingForm.name || ''} 
-                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))} 
-                  placeholder="e.g., Sunrise Tower" 
-                  required 
+                <Input
+                  id="buildingNameMain"
+                  value={currentBuildingForm.name || ''}
+                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., Sunrise Tower"
+                  required
                   className="mt-1"
                   disabled={isSaving}
                 />
@@ -293,11 +293,11 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
                 <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
                   <MapPin className="mr-2 h-4 w-4 text-primary" />Address (Optional)
                 </Label>
-                <Textarea 
-                  id="buildingAddressMain" 
-                  value={currentBuildingForm.address || ''} 
-                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))} 
-                  placeholder="e.g., 123 Main St, Anytown, USA" 
+                <Textarea
+                  id="buildingAddressMain"
+                  value={currentBuildingForm.address || ''}
+                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="e.g., 123 Main St, Anytown, USA"
                   rows={2}
                   className="mt-1"
                   disabled={isSaving}
@@ -323,7 +323,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
                     <CardHeader className="p-0 pb-3">
                       <div className="flex justify-between items-center">
                         <CardTitle className="text-md font-medium">Rule {ruleIndex + 1}</CardTitle>
-                        <Button type="button" variant="ghost" size="icon" 
+                        <Button type="button" variant="ghost" size="icon"
                                 onClick={() => handleRemoveUIPenaltyRule(uiRule.id)}
                                 className="h-7 w-7 text-destructive hover:bg-destructive/10"
                                 disabled={isSaving}>
@@ -335,9 +335,9 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div>
                               <Label htmlFor={`ruleDuration-${uiRule.id}`} className="text-xs">Duration (Days)</Label>
-                              <Input id={`ruleDuration-${uiRule.id}`} type="number" min="1" placeholder="e.g., 5" 
-                                      value={uiRule.durationDays ?? ''} 
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)} 
+                              <Input id={`ruleDuration-${uiRule.id}`} type="number" min="1" placeholder="e.g., 5"
+                                      value={uiRule.durationDays ?? ''}
+                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)}
                                       className="mt-1 text-sm h-9" disabled={isSaving}/>
                               <p className="text-xs text-muted-foreground mt-0.5">For last rule in scope, leave blank for indefinite.</p>
                           </div>
@@ -350,9 +350,9 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
                           </div>
                           <div>
                               <Label htmlFor={`ruleFeeValue-${uiRule.id}`} className="text-xs">Fee Value</Label>
-                              <Input id={`ruleFeeValue-${uiRule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5" 
-                                      value={uiRule.feeValue ?? ''} 
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'feeValue', e.target.value)} 
+                              <Input id={`ruleFeeValue-${uiRule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5"
+                                      value={uiRule.feeValue ?? ''}
+                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'feeValue', e.target.value)}
                                       className="mt-1 text-sm h-9" disabled={isSaving}/>
                           </div>
                       </div>
@@ -371,7 +371,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
                           {uiRule.scope === 'Floor' && (
                               <div>
                                   <Label htmlFor={`applicableFloor-${uiRule.id}`} className="text-xs">Floor Name</Label>
-                                  <Input id={`applicableFloor-${uiRule.id}`} placeholder="e.g., 5th Floor" value={uiRule.applicableFloor || ''} 
+                                  <Input id={`applicableFloor-${uiRule.id}`} placeholder="e.g., 5th Floor" value={uiRule.applicableFloor || ''}
                                           onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableFloor', e.target.value)} className="mt-1 h-9" disabled={isSaving}/>
                               </div>
                           )}
@@ -379,7 +379,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
                       {uiRule.scope === 'SpecificSpaces' && (
                           <div>
                               <Label htmlFor={`applicableSpaces-${uiRule.id}`} className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)</Label>
-                              <Input id={`applicableSpaces-${uiRule.id}`} placeholder="e.g., Unit 10A, Office 202B" value={uiRule.applicableSpaceIdNamesStr || ''} 
+                              <Input id={`applicableSpaces-${uiRule.id}`} placeholder="e.g., Unit 10A, Office 202B" value={uiRule.applicableSpaceIdNamesStr || ''}
                                       onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableSpaceIdNamesStr', e.target.value)} className="mt-1 h-9" disabled={isSaving}/>
                               <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>
                           </div>
@@ -390,7 +390,7 @@ function BuildingUpsertFormInternal({ initialBuildingData }: BuildingUpsertFormI
               </div>
             </div>
           </CardContent>
-          <CardFooter className="border-t p-6 flex justify-end gap-2"> 
+          <CardFooter className="border-t p-6 flex justify-end gap-2">
             <Link href="/admin/buildings" passHref>
                 <Button type="button" variant="outline" disabled={isSaving}>Cancel</Button>
             </Link>
@@ -418,26 +418,19 @@ export default function BuildingUpsertPage({ searchParams }: { searchParams: { i
 async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?: string}) {
   let initialBuildingData = null;
   if (buildingIdParam) {
-    const buildingToEdit = await databaseService.getBuildingById(buildingIdParam, { 
-      include: { penaltyPolicyTiers: true } 
+    const buildingToEdit = await databaseService.getBuildingById(buildingIdParam, {
+      include: { penaltyPolicyTiers: true }
     });
     if (buildingToEdit) {
-      // Serialize data for the client component
       initialBuildingData = {
         ...buildingToEdit,
-        address: buildingToEdit.address || '', // Ensure address is string, not null for client form state
-        createdAt: buildingToEdit.createdAt.toISOString(), // Serialize date
-        // penaltyPolicyTiers should be fine as they don't have Date objects
+        address: buildingToEdit.address || '',
+        createdAt: buildingToEdit.createdAt.toISOString(),
         penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map(tier => ({
           ...tier,
-          // Ensure all fields are present as expected by PenaltyTierTypePrisma
         }))
       };
     }
-    // If buildingToEdit is null (e.g., bad ID), initialBuildingData remains null,
-    // and the client component will handle it (likely by showing an error or redirecting).
   }
   return <BuildingUpsertFormInternal initialBuildingData={initialBuildingData} />;
 }
-
-    
