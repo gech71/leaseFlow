@@ -9,12 +9,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Building as BuildingIconLucide, PlusCircle, Trash2, MapPin, DollarSign as DollarSignLucide, Layers, HomeIcon, ArrowLeft, Loader2 } from 'lucide-react';
-import type { Building as BuildingType, PenaltyTier as PenaltyTierType, Prisma } from '@prisma/client';
+import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, Prisma } from '@prisma/client'; // Use Prisma types
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { createBuildingAction, updateBuildingAction } from '../actions'; // Server Actions
+import { databaseService } from '@/lib/services/databaseService'; // For fetching data for edit
 
 // Represents a rule in the UI before it's converted to PenaltyTier
 interface UIPenaltyRule {
@@ -27,12 +28,16 @@ interface UIPenaltyRule {
   applicableSpaceIdNamesStr?: string; // Comma-separated string of space ID names
 }
 
+// Represents a rule that has been saved and has a database ID.
+interface ExistingPenaltyTier extends PenaltyTierTypePrisma {
+  // we might not need extra fields if PenaltyTierTypePrisma is sufficient
+}
+
 interface BuildingFormState {
   id?: string; // For edit mode
   name: string;
   address: string;
   uiPenaltyRules: UIPenaltyRule[];
-  // createdAt is handled by DB
 }
 
 // This component will be wrapped by Suspense for searchParams
@@ -43,7 +48,7 @@ function BuildingUpsertFormInternal() {
 
   const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', uiPenaltyRules: [] });
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
-  const [isLoading, setIsLoading] = useState(true); // For initial data load in edit mode
+  const [isLoading, setIsLoading] = useState(true); 
   const [isSaving, setIsSaving] = useState(false);
   const [pageTitle, setPageTitle] = useState("Add New Building");
 
@@ -53,55 +58,61 @@ function BuildingUpsertFormInternal() {
       setFormMode('edit');
       setPageTitle("Edit Building");
       setIsLoading(true);
-      // Fetch building data via a server component prop or an API call if this page must remain fully client
-      // For this refactor, we'll assume data is fetched server-side and passed if possible,
-      // or we'd call a new server action to get building details.
-      // Since this is a "page", we can make it a server component that fetches, then passes to a client form component.
-      // Or, a client component that calls a server action on mount.
-      // For simplicity of this refactor, if buildingId exists, we'd ideally fetch in a parent server component.
-      // Let's simulate this by assuming `initialBuildingData` prop if provided.
-      // This part requires a dedicated fetch function if this page is to be fully client-rendered post-navigation.
-      // For now, we'll assume a simple fetch, or that data comes via props which isn't directly possible here.
-      // A practical way for a client page: use a server action to fetch.
       const fetchBuildingData = async () => {
-        // In a real scenario, you'd call a server action here:
-        // const { data, error } = await getBuildingByIdAction(buildingId);
-        // For now, this part will be simplified; direct DB access not ideal from client page.
-        // This should ideally be done in a Server Component parent, or via a dedicated Server Action.
-        // Let's assume this page is for the form part and receives data.
-        // The `getBuildingById` needs to be a server action or fetched in parent.
-        // Since the prompt is to replace `getStoredBuildings`, we need a server way.
-        // This component is a client component due to form interactions.
-        // We'll keep the local state management for the form itself.
-        // Data fetching for edit would be in a Server Component that wraps this.
-        // For now, I'll leave the placeholder for fetching logic that would be needed.
-        // This structure is more suited if this form was part of a Server Component that fetched `buildingToEdit`.
-        // For a standalone client page `.../upsert?id=...`, it needs to fetch on mount.
-        // This part is tricky as the original used localStorage.
-        // I'll leave it as is for now, focusing on the save logic.
-        // The expectation is that a Server Component parent would fetch and pass data.
-        // For this example, if an `id` is present, it's an edit, but data source isn't directly fetched here.
-        // The user will need to adapt this to fetch building data if it's a client-routed edit.
-        // The prompt is to *replace mock/internal state*, this was one such.
-        // A proper way is a server component for the page that fetches data and passes it to this form component.
-        // Or, a useEffect call to a server action.
-        // Let's assume for now, if ID is present, the `initialBuildingData` would be fetched and passed.
-        // To make it work within this structure without parent, we'll simulate loading.
-        toast({ title: "Edit Mode", description: "Fetching building data (simulated for this example)." });
-        // Actual data fetching logic here if this page handles it directly.
-        // const buildingToEdit = await databaseService.getBuildingById(buildingId, { include: { penaltyPolicyTiers: true }});
-        // ... then populate setCurrentBuildingForm
-        setIsLoading(false); // Simulate end of loading
-      };
-      if (buildingId) fetchBuildingData(); else setIsLoading(false);
+        try {
+          const buildingToEdit = await databaseService.getBuildingById(buildingId, { 
+            include: { penaltyPolicyTiers: true } 
+          });
+          if (buildingToEdit) {
+            const uiRules: UIPenaltyRule[] = (buildingToEdit.penaltyPolicyTiers || []).map(tier => {
+              let duration: number | undefined;
+              if (tier.toDay !== null && tier.toDay !== undefined) {
+                duration = tier.toDay - tier.fromDay + 1;
+              }
 
+              return {
+                id: tier.id, // Use existing DB ID for UI key
+                durationDays: duration,
+                feeType: tier.feeType as 'Fixed' | 'Percentage',
+                feeValue: tier.feeValue,
+                scope: tier.scope as 'Building' | 'Floor' | 'SpecificSpaces',
+                applicableFloor: tier.applicableFloor || undefined,
+                applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || undefined,
+              };
+            });
+            // Sort UI rules for display consistency (important for "duration" logic)
+            // Primarily sort by scope, then by fromDay implicitly by how they were generated from `durationDays`
+            uiRules.sort((a, b) => {
+              if (a.scope !== b.scope) return a.scope.localeCompare(b.scope);
+              // Further sort by original fromDay if needed, but durationDays re-calculation handles this
+              return 0; 
+            });
+
+            setCurrentBuildingForm({
+              id: buildingToEdit.id,
+              name: buildingToEdit.name,
+              address: buildingToEdit.address || '',
+              uiPenaltyRules: uiRules,
+            });
+          } else {
+            toast({ title: "Error", description: "Building not found.", variant: "destructive" });
+            router.push('/admin/buildings');
+          }
+        } catch (error) {
+          console.error("Failed to fetch building data:", error);
+          toast({ title: "Error", description: "Failed to load building data.", variant: "destructive" });
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchBuildingData();
     } else {
       setFormMode('add');
       setPageTitle("Add New Building");
       setCurrentBuildingForm({ name: '', address: '', uiPenaltyRules: [] });
       setIsLoading(false);
     }
-  }, [searchParams, toast]);
+  }, [searchParams, router, toast]);
 
 
   const handleAddUIPenaltyRule = () => {
@@ -109,8 +120,8 @@ function BuildingUpsertFormInternal() {
       id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, 
       scope: 'Building', 
       feeType: 'Fixed',
-      feeValue: 0,
-      durationDays: undefined,
+      feeValue: undefined, // Explicitly undefined
+      durationDays: undefined, // Explicitly undefined
     };
     setCurrentBuildingForm(prev => ({
       ...prev,
@@ -187,7 +198,7 @@ function BuildingUpsertFormInternal() {
       });
         
       for (const scopeKey in groupedUIRules) {
-        const rulesInScope = groupedUIRules[scopeKey].sort((a,b) => (a.durationDays ?? Infinity) - (b.durationDays ?? Infinity)); // Process rules with fixed duration first
+        const rulesInScope = groupedUIRules[scopeKey].sort((a,b) => (a.durationDays ?? Infinity) - (b.durationDays ?? Infinity)); 
         let cumulativeStartDay = 1;
 
         for (let i = 0; i < rulesInScope.length; i++) {
@@ -195,9 +206,9 @@ function BuildingUpsertFormInternal() {
             const fromDay = cumulativeStartDay;
             let toDay: number | null = null;
 
-            if (uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) { // Indefinite duration
+            if (uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) { 
               if (i < rulesInScope.length -1) {
-                toast({title: "Validation Error", description: `Only the last rule in a scope group can have an indefinite duration. Check rule for scope: ${scopeKey}`, variant: "destructive"});
+                toast({title: "Validation Error", description: `Only the last rule in a scope group can have an indefinite duration (blank duration). Check rule for scope: ${scopeKey}`, variant: "destructive"});
                 throw new Error("Invalid indefinite duration placement.");
               }
               toDay = null; 
@@ -223,6 +234,7 @@ function BuildingUpsertFormInternal() {
         }
       }
     } catch (error: any) {
+        // Error toast is already shown inside the loop
         console.error("Validation error during penalty tier processing:", error.message);
         setIsSaving(false);
         return; 
@@ -239,9 +251,6 @@ function BuildingUpsertFormInternal() {
       };
       result = await createBuildingAction(buildingCreateInput);
     } else {
-      // For update, it's often easier to delete existing tiers and create new ones
-      // or use more complex nested update logic if specific tier IDs need to be preserved.
-      // For simplicity here, we'll replace all tiers.
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
@@ -322,7 +331,7 @@ function BuildingUpsertFormInternal() {
                   </Button>
               </div>
               <CardDescription>
-                Define sequential penalty rules for each scope (Building, specific Floor, or specific Spaces). The last rule defined for a given scope will apply indefinitely if no duration is set.
+                Define sequential penalty rules for each scope (Building, specific Floor, or specific Spaces). The last rule defined for a given scope will apply indefinitely if no duration (blank duration) is set.
               </CardDescription>
               {currentBuildingForm.uiPenaltyRules.length === 0 && <p className="text-sm text-muted-foreground text-center py-3">No penalty rules defined. Click "Add Rule" to begin.</p>}
 
@@ -403,7 +412,7 @@ function BuildingUpsertFormInternal() {
             <Link href="/admin/buildings" passHref>
                 <Button type="button" variant="outline" disabled={isSaving}>Cancel</Button>
             </Link>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving || isLoading}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
               {isSaving ? 'Saving...' : (formMode === 'add' ? 'Add Building' : 'Save Changes')}
             </Button>
@@ -415,11 +424,9 @@ function BuildingUpsertFormInternal() {
 }
 
 export default function BuildingUpsertPage() {
-  // This page needs to fetch building data for editing if an ID is present.
-  // This is best done in a Server Component parent that then passes data to BuildingUpsertFormInternal.
-  // For a direct navigation to /admin/buildings/upsert?id=xyz, the BuildingUpsertFormInternal
-  // would need its own data fetching logic (e.g., a useEffect calling a server action).
-  // The provided structure focuses on form state and submission.
-  // The prompt asked to replace mock data, which this setup now enables via server actions.
   return (
-    <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin
+    <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
+      <BuildingUpsertFormInternal />
+    </Suspense>
+  );
+}
