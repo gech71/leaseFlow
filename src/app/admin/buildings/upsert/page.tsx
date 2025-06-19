@@ -3,10 +3,9 @@ import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Building as BuildingIconLucide, ArrowLeft, Loader2 } from 'lucide-react';
-import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma } from '@prisma/client';
 import Link from 'next/link';
 import { databaseService } from '@/lib/services/databaseService';
-import { BuildingUpsertFormInternal, type BuildingUpsertFormInternalProps } from './building-form'; // Import from new file
+import { BuildingUpsertFormInternal, type BuildingUpsertFormInternalProps } from './building-form';
 
 // This is the main Server Component for the page
 // It will handle fetching data based on searchParams and pass it to the client component
@@ -35,11 +34,9 @@ async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?
         name: buildingToEdit.name,
         address: buildingToEdit.address || '', // Ensure address is string or empty string
         createdAt: buildingToEdit.createdAt.toISOString(), // Serialize date
-        // Ensure penaltyPolicyTiers are correctly serialized if they contain dates or complex objects not directly usable by client.
-        // For now, assuming PenaltyTierTypePrisma is simple enough or its dates are handled by the client form.
         penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map(tier => ({
           ...tier,
-          // No dates in PenaltyTier, so direct mapping is fine
+          // Assuming PenaltyTier doesn't have Date objects that need serialization.
         })),
       };
     }
