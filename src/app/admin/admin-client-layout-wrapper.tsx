@@ -80,28 +80,25 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href));
               
-              const menuItemContent = (
-                <SidebarMenuButton isActive={isActive} href={item.href}> {/* SidebarMenuButton receives href from Link */}
+              const menuItemCore = (
+                <SidebarMenuButton 
+                  isActive={isActive} 
+                  className="block" // Apply 'block' for layout
+                  target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined}
+                  rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}
+                >
                   <item.icon />
                   <span>{item.label}</span>
                 </SidebarMenuButton>
               );
-
-              const linkProps = {
-                href: item.href,
-                legacyBehavior: false, // Default, ensures Link passes props to child
-                target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
-                rel: item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined,
-                className:"block" // This className will be passed to SidebarMenuButton
-              };
 
               if (!isMobile && sidebarState === "collapsed") {
                 return (
                   <SidebarMenuItem key={item.href}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Link {...linkProps}>
-                          {menuItemContent}
+                        <Link href={item.href} asChild>
+                           {menuItemCore}
                         </Link>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="font-headline">
@@ -113,8 +110,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               }
               return (
                 <SidebarMenuItem key={item.href}>
-                  <Link {...linkProps}>
-                    {menuItemContent}
+                  <Link href={item.href} asChild>
+                     {menuItemCore}
                   </Link>
                 </SidebarMenuItem>
               );
@@ -175,9 +172,6 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
-    // Optional: return a loading skeleton or null to avoid flash of unstyled content or layout shifts
-    // For simplicity, returning null might be fine if the layout pop-in is not jarring.
-    // Consider a more sophisticated skeleton if needed.
     return null; 
   }
 

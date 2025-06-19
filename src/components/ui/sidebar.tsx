@@ -14,10 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
@@ -522,27 +519,27 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-type SidebarMenuButtonProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'asChild'> & {
+type SidebarMenuButtonProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
   isActive?: boolean;
   variant?: VariantProps<typeof sidebarMenuButtonVariants>["variant"];
   size?: VariantProps<typeof sidebarMenuButtonVariants>["size"];
-} & Omit<VariantProps<typeof sidebarMenuButtonVariants>, "variant" | "size">;
+};
 
 
 const SidebarMenuButton = React.forwardRef<HTMLAnchorElement, SidebarMenuButtonProps>(
-  ({ className, variant, size, isActive, children, href, ...restProps }, ref) => {
-    // Explicitly remove asChild from restProps before spreading, as it's not a valid attribute for <a> if passed down.
-    const { asChild: _asChild, ...anchorEffectiveProps } = restProps as any;
+  ({ className, variant, size, isActive, children, ...restProps }, ref) => {
+    // Ensure 'asChild' from restProps is not passed to the <a> tag
+    // 'href' will come from restProps when Link asChild is used.
+    const { asChild: _asChild, ...propsToPassToAnchor } = restProps;
 
     return (
       <a
         ref={ref}
-        href={href} // Use the href passed from Link
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
-        {...anchorEffectiveProps} // Spread other props (like onClick from Link, or TooltipTrigger props)
+        {...propsToPassToAnchor}
       >
         {children}
       </a>
@@ -719,6 +716,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-    
-
