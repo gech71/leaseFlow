@@ -1,29 +1,32 @@
 
 
 export interface PenaltyTier {
-  id?: string; // Optional ID if fetched from DB
+  id?: string; 
   fromDay: number;
   toDay?: number | null; 
   feeType: 'Fixed' | 'Percentage';
   feeValue: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
-  applicableFloor?: string; 
-  applicableSpaceIdNames?: string[]; 
+  applicableFloor?: string | null; // Prisma schema allows null
+  applicableSpaceIdNames?: string[] | null; // Prisma schema allows null for the array itself
+  buildingId?: string; // Foreign key to Building
 }
 
 export interface Building {
   id: string;
   name: string;
-  address?: string;
-  penaltyPolicyTiers?: PenaltyTier[]; 
+  address?: string | null; // Prisma schema allows null
+  penaltyPolicyTiers: PenaltyTier[]; // Relation, should be array of PenaltyTier objects
   createdAt: string; 
   updatedAt?: string;
+  spaces?: Space[]; // Relation
+  buildingMonthlyUtilities?: BuildingMonthlyUtilities[]; // Relation
 }
 
 export interface Space {
   id: string;
-  buildingId: string; // Added foreign key
-  buildingName: string;
+  buildingId: string; 
+  buildingName: string; // Denormalized
   spaceIdName: string; 
   area: number; 
   floor: string; 
@@ -34,23 +37,25 @@ export interface Space {
   createdAt: string; 
   updatedAt?: string;
   tenant?: Tenant | null; 
-  building: Building; // Added relation to Building
+  building?: Building; // Relation
+  agreements?: Agreement[]; // Relation
 }
 
 export interface Tenant {
   id: string;
   name: string;
   email: string;
-  phone?: string;
-  alternativePhone?: string;
-  nationalId?: string;
-  representativeName?: string;
-  representativePhone?: string;
-  rentedSpaceId: string | null;
+  phone?: string | null;
+  alternativePhone?: string | null;
+  nationalId?: string | null;
+  representativeName?: string | null;
+  representativePhone?: string | null;
+  rentedSpaceId?: string | null; // Prisma schema allows null
   createdAt: string; 
   updatedAt?: string;
   rentedSpace?: Space | null; 
-  agreements?: Agreement[]; // Added for checking active agreements
+  agreements?: Agreement[]; 
+  bills?: Bill[]; // Relation
 }
 
 export interface Agreement {
@@ -72,58 +77,65 @@ export interface Agreement {
   initialPaymentReference?: string | null;
   initialPaymentBankOrWalletName?: string | null;
   initialPaymentDate?: string | null; 
-  endDate?: string | null; // Added for checking active agreements
+  endDate?: string | null; 
 
-  tenant?: Tenant | null; // Made optional, as it might not always be included
-  space?: Space | null;   // Made optional
-  bills?: Bill[]; // For checking associated bills
+  tenant: Tenant; // Relation - assuming always included when needed
+  space: Space;   // Relation - assuming always included when needed
+  bills?: Bill[]; 
+}
+
+export interface UtilityBreakdownItem {
+  id?: string;
+  name: string;
+  amount: number;
+  billId?: string; // Foreign key
 }
 
 export interface BuildingUtilityItem {
-  id?: string; // Optional: useful if managing items individually, but not strictly needed for createMany
+  id?: string; 
   name: string;
   totalCost: number;
-  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
-  applicableFloor?: string | null; // Made nullable to match Prisma
-  applicableSpaceIdNames?: string[] | null; // Made nullable to match Prisma
-  monthlyUtilitiesId?: string | null; // Added foreign key
+  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces'; // Matches Prisma Enum
+  applicableFloor?: string | null; 
+  applicableSpaceIdNames?: string[] | null; 
+  monthlyUtilitiesId?: string | null; 
 }
 
 export interface BuildingMonthlyUtilities {
   id: string;
-  buildingId: string; // Added foreign key
-  buildingName: string;
+  buildingId: string; 
+  buildingName: string; // Denormalized
   year: number;
   month: number; // 0-11
   utilities: BuildingUtilityItem[];
   createdAt: string;
-  updatedAt?: string; // Added updatedAt
-  building?: Building; // Added relation to Building
+  updatedAt?: string; 
+  building?: Building; 
 }
 
 export interface Bill {
   id: string;
   agreementId: string;
-  tenantId: string;
+  tenantId: string; // Prisma schema has this
   billDate: string;
   dueDate: string;
   rentAmount: number;
-  utilityBreakdown: Array<{ name: string; amount: number }>;
-  penaltyAmount?: number;
+  utilityBreakdown: UtilityBreakdownItem[]; // This is a relation, client type might be flat array
+  penaltyAmount?: number | null; // Prisma schema allows null
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue' | 'Pending Verification';
-  paymentDate?: string;
-  paymentMethod?: string;
-  paymentReference?: string;
-  bankOrWalletName?: string;
-  paymentProofUrl?: string;
-  adminVerifiedPayment?: boolean;
-  tenantPaymentNotes?: string;
-  adminVerificationNotes?: string;
-  createdAt?: string; // Added createdAt for recent activity
-  updatedAt?: string; // Added updatedAt
+  status: 'Pending' | 'Paid' | 'Overdue' | 'PendingVerification'; // Prisma Enum BillStatus
+  paymentDate?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  bankOrWalletName?: string | null;
+  paymentProofUrl?: string | null;
+  adminVerifiedPayment?: boolean | null; // Prisma schema allows null
+  tenantPaymentNotes?: string | null;
+  adminVerificationNotes?: string | null;
+  createdAt: string; 
+  updatedAt: string; 
 
-  agreement?: Agreement | null; // Relation for tenant/space info
+  agreement: Agreement; // Relation, assuming always included
 }
 
 export interface AgreementInput {

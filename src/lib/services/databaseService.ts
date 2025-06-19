@@ -163,13 +163,13 @@ export class DatabaseService {
   }
   
   async getBuildingMonthlyUtilitiesByBuildingMonthYear(
-    buildingName: string, 
+    buildingId: string, // Changed from buildingName to buildingId
     month: number, 
     year: number, 
     include?: Prisma.BuildingMonthlyUtilitiesInclude
   ): Promise<BuildingMonthlyUtilities | null> {
     return prisma.buildingMonthlyUtilities.findFirst({ 
-      where: { buildingName, month, year }, 
+      where: { buildingId, month, year }, // Updated to use buildingId
       include 
     });
   }
@@ -190,7 +190,7 @@ export class DatabaseService {
   }
 
   async upsertBuildingMonthlyUtilities(
-    where: Prisma.BuildingMonthlyUtilitiesWhereUniqueInput, // For identifying the record to upsert (e.g., using the custom ID or unique constraint)
+    where: Prisma.BuildingMonthlyUtilitiesWhereUniqueInput, 
     create: Prisma.BuildingMonthlyUtilitiesCreateInput,
     update: Prisma.BuildingMonthlyUtilitiesUpdateInput,
     include?: Prisma.BuildingMonthlyUtilitiesInclude
@@ -208,8 +208,6 @@ export class DatabaseService {
   }
   
   // --- PenaltyTier ---
-  // Note: PenaltyTiers are often managed via nested writes when creating/updating a Building.
-  // These direct CRUD methods are provided for completeness or specific use cases.
   async createPenaltyTier(data: Prisma.PenaltyTierCreateInput): Promise<PenaltyTier> {
     return prisma.penaltyTier.create({ data });
   }
@@ -224,7 +222,7 @@ export class DatabaseService {
     cursor?: Prisma.PenaltyTierWhereUniqueInput;
     where?: Prisma.PenaltyTierWhereInput;
     orderBy?: Prisma.PenaltyTierOrderByWithRelationInput | Prisma.PenaltyTierOrderByWithRelationInput[];
-    include?: Prisma.PenaltyTierInclude; // Added include for PenaltyTier
+    include?: Prisma.PenaltyTierInclude; 
   }): Promise<PenaltyTier[]> {
     return prisma.penaltyTier.findMany(params);
   }
@@ -238,5 +236,4 @@ export class DatabaseService {
   }
 }
 
-// Export a singleton instance of the service
 export const databaseService = new DatabaseService();
