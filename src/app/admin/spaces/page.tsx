@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3 } from 'lucide-react';
-import type { Space, Building } from '@/lib/types';
+import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2 } from 'lucide-react';
+import type { Building, Space as SpaceType } from '@prisma/client'; // Using Prisma generated types
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -30,97 +30,128 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-const getStoredSpaces = (): Space[] => {
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('spaces');
-    return stored ? JSON.parse(stored) : [];
-  }
-  return [];
-};
-
-const storeSpaces = (spaces: Space[]) => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('spaces', JSON.stringify(spaces));
-  }
-};
-
-const getStoredBuildings = (): Building[] => {
-  if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem('buildings');
-    return stored ? JSON.parse(stored) : [];
-  }
-  return [];
-};
+import { createSpaceAction, updateSpaceAction, deleteSpaceAction } from './actions';
+import { databaseService } from '@/lib/services/databaseService';
 
 
-export default function SpacesPage() {
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
+interface SpaceWithBuildingName extends SpaceType {
+  buildingName: string; // Denormalized for display
+}
+
+// This is the new Client Component
+function SpacesClientPage({ initialSpaces, initialBuildings }: { initialSpaces: SpaceWithBuildingName[], initialBuildings: Building[] }) {
+  const [spaces, setSpaces] = useState<SpaceWithBuildingName[]>(initialSpaces);
+  const [buildings, setBuildings] = useState<Building[]>(initialBuildings);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
-  const [currentSpace, setCurrentSpace] = useState<Partial<Space>>({});
+  const [currentSpaceData, setCurrentSpaceData] = useState<Partial<SpaceType & { buildingName?: string }>>({});
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
-  const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
-
+  const [spaceToDelete, setSpaceToDelete] = useState<SpaceWithBuildingName | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
-    setSpaces(getStoredSpaces());
-    setBuildings(getStoredBuildings());
-  }, []);
+    setSpaces(initialSpaces); // Sync with props on initial load or if props change
+    setBuildings(initialBuildings);
+  }, [initialSpaces, initialBuildings]);
 
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const refreshSpacesData = async () => {
+    // This function can be called to re-fetch data if needed after an action,
+    // though revalidatePath in server actions should handle most cases.
+    try {
+      const fetchedSpaces = await databaseService.getAllSpaces({ include: { building: true }, orderBy: { createdAt: 'desc' } });
+      const processedSpaces = fetchedSpaces.map(s => ({ ...s, buildingName: s.building.name }));
+      setSpaces(processedSpaces);
+      const fetchedBuildings = await databaseService.getAllBuildings({ orderBy: { name: 'asc' } });
+      setBuildings(fetchedBuildings);
+    } catch (error) {
+      console.error("Failed to refresh spaces data:", error);
+      toast({ title: "Error", description: "Could not refresh spaces data.", variant: "destructive" });
+    }
+  };
+
+
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!currentSpace.buildingName) {
+    setIsSaving(true);
+
+    if (!currentSpaceData.buildingId) {
       toast({ title: "Error", description: "Please select a building.", variant: "destructive" });
+      setIsSaving(false);
       return;
     }
-    if (!currentSpace.spaceIdName?.trim()) {
+    if (!currentSpaceData.spaceIdName?.trim()) {
       toast({ title: "Error", description: "Space ID/Name is required.", variant: "destructive" });
+      setIsSaving(false);
       return;
     }
-     if (currentSpace.area === undefined || currentSpace.area <= 0) {
+    if (currentSpaceData.area === undefined || currentSpaceData.area <= 0) {
       toast({ title: "Error", description: "Area must be a positive number.", variant: "destructive" });
+      setIsSaving(false);
       return;
     }
-    if (currentSpace.utilityProrationShare === undefined || currentSpace.utilityProrationShare < 0 || currentSpace.utilityProrationShare > 1) {
-      toast({ title: "Error", description: "Proration share must be between 0% and 100%.", variant: "destructive" });
+    // utilityProrationShare is handled as a percentage in UI (0-100), converted to decimal (0-1) for storage
+    const prorationShareValue = currentSpaceData.utilityProrationShare; // Already a decimal from input handler
+    if (prorationShareValue === undefined || prorationShareValue < 0 || prorationShareValue > 1) {
+      toast({ title: "Error", description: "Proration share must be between 0 and 1 (e.g., 0.1 for 10%).", variant: "destructive" });
+      setIsSaving(false);
       return;
     }
-     if (currentSpace.monthlyRentalPrice === undefined || currentSpace.monthlyRentalPrice <= 0) {
+    if (currentSpaceData.monthlyRentalPrice === undefined || currentSpaceData.monthlyRentalPrice <= 0) {
       toast({ title: "Error", description: "Monthly rent must be a positive number.", variant: "destructive" });
+      setIsSaving(false);
       return;
     }
 
+    const selectedBuilding = buildings.find(b => b.id === currentSpaceData.buildingId);
 
-    const newSpaceData: Space = {
-      id: formMode === 'add' ? `space-${Date.now()}` : currentSpace.id!,
-      buildingName: currentSpace.buildingName,
-      spaceIdName: currentSpace.spaceIdName.trim(),
-      area: Number(currentSpace.area),
-      floor: currentSpace.floor || 'N/A',
-      utilityProrationShare: Number(currentSpace.utilityProrationShare),
-      monthlyRentalPrice: Number(currentSpace.monthlyRentalPrice),
-      isOccupied: currentSpace.isOccupied || false,
-      tenantId: currentSpace.tenantId,
-      createdAt: currentSpace.createdAt || new Date().toISOString(),
+    const spaceInputData = {
+      buildingId: currentSpaceData.buildingId!,
+      buildingName: selectedBuilding?.name || 'Unknown Building', // Denormalized
+      spaceIdName: currentSpaceData.spaceIdName.trim(),
+      area: Number(currentSpaceData.area),
+      floor: currentSpaceData.floor || 'N/A',
+      utilityProrationShare: Number(prorationShareValue),
+      monthlyRentalPrice: Number(currentSpaceData.monthlyRentalPrice),
+      isOccupied: currentSpaceData.isOccupied || false, // Defaults to false if not set
+      tenantId: currentSpaceData.tenantId || null, // Ensure it's null if undefined
     };
 
-    let updatedSpaces;
+    let result;
     if (formMode === 'add') {
-      updatedSpaces = [newSpaceData, ...spaces];
-      toast({ title: "Space Added", description: `${newSpaceData.spaceIdName} in ${newSpaceData.buildingName} has been added.` });
+      result = await createSpaceAction(spaceInputData);
     } else {
-      updatedSpaces = spaces.map(s => s.id === newSpaceData.id ? newSpaceData : s);
-      toast({ title: "Space Updated", description: `${newSpaceData.spaceIdName} has been updated.` });
+      if (!currentSpaceData.id) {
+        toast({ title: "Error", description: "Space ID is missing for update.", variant: "destructive" });
+        setIsSaving(false);
+        return;
+      }
+      // For update, tenantId should only be set if explicitly changed.
+      // Prisma's update handles partial data.
+      const updatePayload: Prisma.SpaceUpdateInput = {
+        building: { connect: { id: spaceInputData.buildingId } },
+        buildingName: spaceInputData.buildingName,
+        spaceIdName: spaceInputData.spaceIdName,
+        area: spaceInputData.area,
+        floor: spaceInputData.floor,
+        utilityProrationShare: spaceInputData.utilityProrationShare,
+        monthlyRentalPrice: spaceInputData.monthlyRentalPrice,
+        // isOccupied and tenantId are typically managed via Tenant assignment logic, not directly here.
+      };
+      result = await updateSpaceAction(currentSpaceData.id, updatePayload);
     }
-    setSpaces(updatedSpaces);
-    storeSpaces(updatedSpaces);
-    setIsFormOpen(false);
-    setCurrentSpace({});
+    setIsSaving(false);
+
+    if (result.success) {
+      toast({ title: `Space ${formMode === 'add' ? 'Added' : 'Updated'}`, description: `${result.space?.spaceIdName} has been saved.` });
+      setIsFormOpen(false);
+      setCurrentSpaceData({});
+      await refreshSpacesData(); // Re-fetch data to reflect changes, or rely on revalidatePath
+    } else {
+      toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Space`, description: result.error, variant: "destructive" });
+    }
   };
   
   const openAddForm = () => {
@@ -129,28 +160,35 @@ export default function SpacesPage() {
       return;
     }
     setFormMode('add');
-    setCurrentSpace({ utilityProrationShare: 0.1, buildingName: buildings[0]?.name || "" }); 
+    setCurrentSpaceData({ utilityProrationShare: 0.1, buildingId: buildings[0]?.id || "" }); 
     setIsFormOpen(true);
   };
 
-  const openEditForm = (space: Space) => {
+  const openEditForm = (space: SpaceWithBuildingName) => {
     setFormMode('edit');
-    setCurrentSpace({...space});
+    setCurrentSpaceData({
+      ...space,
+      utilityProrationShare: space.utilityProrationShare, // Already a decimal
+    });
     setIsFormOpen(true);
   };
 
-  const handleDeleteSpace = () => {
+  const handleDeleteSpace = async () => {
     if (!spaceToDelete) return;
-    const updatedSpaces = spaces.filter(s => s.id !== spaceToDelete.id);
-    setSpaces(updatedSpaces);
-    storeSpaces(updatedSpaces);
-    toast({ title: "Space Deleted", description: "The space has been removed.", variant: "destructive" });
-    setSpaceToDelete(null);
+    setIsSaving(true);
+    const result = await deleteSpaceAction(spaceToDelete.id);
+    setIsSaving(false);
+    if (result.success) {
+      toast({ title: "Space Deleted", description: "The space has been removed."});
+      setSpaceToDelete(null);
+      await refreshSpacesData(); // Re-fetch data
+    } else {
+      toast({ title: "Error Deleting Space", description: result.error, variant: "destructive" });
+    }
   };
-
 
   if (!isMounted) {
-    return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
   }
 
   return (
@@ -160,7 +198,7 @@ export default function SpacesPage() {
         icon={Building2}
         description="Add, view, and manage rental spaces."
         actions={
-          <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={buildings.length === 0}>
+          <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={buildings.length === 0 || isSaving}>
             <PlusCircle className="mr-2 h-5 w-5" /> Add New Space
           </Button>
         }
@@ -178,9 +216,9 @@ export default function SpacesPage() {
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
         setIsFormOpen(isOpen);
-        if (!isOpen) setCurrentSpace({});
+        if (!isOpen) setCurrentSpaceData({});
       }}>
-        <DialogContent className="sm:max-w-lg"> {/* Increased max-width slightly for better spacing */}
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Space' : 'Edit Space'}</DialogTitle>
             <DialogDescription>
@@ -188,21 +226,21 @@ export default function SpacesPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
-            {/* Changed grid to simple stacking for responsiveness */}
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <div>
-                <Label htmlFor="buildingName">Building</Label>
+                <Label htmlFor="buildingId">Building</Label>
                 <Select 
-                  value={currentSpace.buildingName || ""}
-                  onValueChange={(value) => setCurrentSpace(prev => ({...prev, buildingName: value}))}
+                  value={currentSpaceData.buildingId || ""}
+                  onValueChange={(value) => setCurrentSpaceData(prev => ({...prev, buildingId: value}))}
                   required
+                  disabled={isSaving}
                 >
-                  <SelectTrigger id="buildingName" className="mt-1">
+                  <SelectTrigger id="buildingId" className="mt-1">
                     <SelectValue placeholder="Select a building" />
                   </SelectTrigger>
                   <SelectContent>
                     {buildings.map(building => (
-                      <SelectItem key={building.id} value={building.name}>
+                      <SelectItem key={building.id} value={building.id}>
                         {building.name}
                       </SelectItem>
                     ))}
@@ -211,30 +249,43 @@ export default function SpacesPage() {
               </div>
               <div>
                 <Label htmlFor="spaceIdName">Space ID/Name</Label>
-                <Input id="spaceIdName" value={currentSpace.spaceIdName || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required />
+                <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required disabled={isSaving}/>
               </div>
               <div>
                 <Label htmlFor="area">Area (sq ft)</Label>
-                <Input id="area" type="number" value={currentSpace.area || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required />
+                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required disabled={isSaving}/>
               </div>
               <div>
                 <Label htmlFor="floor">Floor</Label>
-                <Input id="floor" value={currentSpace.floor || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" />
+                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" disabled={isSaving}/>
               </div>
               <div>
-                <Label htmlFor="utilityProrationShare">Proration Share (%)</Label>
-                <Input id="utilityProrationShare" type="number" step="0.01" value={currentSpace.utilityProrationShare !== undefined ? currentSpace.utilityProrationShare * 100 : ''} onChange={(e) => setCurrentSpace(prev => ({...prev, utilityProrationShare: parseFloat(e.target.value) / 100 }))} className="mt-1" placeholder="e.g., 10 for 10%" required />
+                <Label htmlFor="utilityProrationShare">Proration Share (e.g., 10 for 10%)</Label>
+                <Input 
+                    id="utilityProrationShare" 
+                    type="number" 
+                    step="0.01" 
+                    value={currentSpaceData.utilityProrationShare !== undefined ? currentSpaceData.utilityProrationShare * 100 : ''} 
+                    onChange={(e) => setCurrentSpaceData(prev => ({...prev, utilityProrationShare: parseFloat(e.target.value) / 100 }))} 
+                    className="mt-1" 
+                    placeholder="e.g., 10 for 10%" 
+                    required 
+                    disabled={isSaving}
+                />
               </div>
               <div>
                 <Label htmlFor="monthlyRentalPrice">Monthly Rent</Label>
-                <Input id="monthlyRentalPrice" type="number" value={currentSpace.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpace(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 2500" required />
+                <Input id="monthlyRentalPrice" type="number" value={currentSpaceData.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 2500" required disabled={isSaving}/>
               </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
+                <Button type="button" variant="outline" disabled={isSaving}>Cancel</Button>
               </DialogClose>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">{formMode === 'add' ? 'Add Space' : 'Save Changes'}</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {formMode === 'add' ? 'Add Space' : 'Save Changes'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -246,12 +297,13 @@ export default function SpacesPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the space "{spaceToDelete?.spaceIdName}".
-              You can only delete vacant spaces. If this space is occupied, please vacate it first.
+              Ensure the space is not occupied and has no active agreements.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSpaceToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSpace} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogCancel onClick={() => setSpaceToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSpace} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Delete Space
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -267,7 +319,7 @@ export default function SpacesPage() {
               {buildings.length > 0 ? "Get started by adding your first rental space." : "Please add buildings first."}
             </p>
             {buildings.length > 0 && (
-                <Button onClick={openAddForm}>
+                <Button onClick={openAddForm} disabled={isSaving}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Add Space
                 </Button>
             )}
@@ -278,7 +330,7 @@ export default function SpacesPage() {
           {spaces.map((space) => (
             <Card key={space.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
               <CardHeader>
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-2"> {/* Adjusted for stacking on small screens */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                   <div>
                     <CardTitle className="font-headline text-xl mb-1">{space.spaceIdName}</CardTitle>
                     <CardDescription className="text-sm">{space.buildingName}</CardDescription>
@@ -291,14 +343,14 @@ export default function SpacesPage() {
               <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> Floor: {space.floor}</div>
                 <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} sq ft</div>
-                <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(space.utilityProrationShare * 100).toFixed(2)}%</div>
+                <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(space.utilityProrationShare * 100).toFixed(0)}%</div>
                 <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${space.monthlyRentalPrice.toLocaleString()}/month</div>
               </CardContent>
-              <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2"> {/* Stack buttons on small screens */}
-                <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto">
+              <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto" disabled={isSaving}>
                   <Edit3 className="mr-1 h-4 w-4" /> Edit
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied} className="w-full sm:w-auto">
+                <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving} className="w-full sm:w-auto">
                   <Trash2 className="mr-1 h-4 w-4" /> Delete
                 </Button>
               </CardFooter>
@@ -308,4 +360,32 @@ export default function SpacesPage() {
       )}
     </div>
   );
+}
+
+// This is the main Server Component for the page
+export default async function SpacesPage() {
+  const spacesData = await databaseService.getAllSpaces({ 
+    include: { building: true }, // To get buildingName
+    orderBy: { createdAt: 'desc' }
+  });
+  const buildingsData = await databaseService.getAllBuildings({ orderBy: { name: 'asc' } });
+
+  // Serialize dates and structure data for the client component
+  const serializableSpaces = spacesData.map(space => ({
+    ...space,
+    createdAt: space.createdAt.toISOString(),
+    updatedAt: space.updatedAt.toISOString(),
+    buildingName: space.building.name, // Denormalize buildingName for easier use in client
+    // buildingId is already part of space from Prisma
+  }));
+
+  const serializableBuildings = buildingsData.map(building => ({
+    ...building,
+    createdAt: building.createdAt.toISOString(),
+    updatedAt: building.updatedAt.toISOString(),
+    // Penalty tiers are not directly needed by the spaces form, so we can omit them for client prop
+    penaltyPolicyTiers: [], // Or map them if needed, but likely not for this client component
+  }));
+
+  return <SpacesClientPage initialSpaces={serializableSpaces} initialBuildings={serializableBuildings} />;
 }
