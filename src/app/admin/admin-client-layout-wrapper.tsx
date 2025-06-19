@@ -83,12 +83,13 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               const menuItemCore = (
                 <SidebarMenuButton 
                   isActive={isActive} 
-                  className="block" // Apply 'block' for layout
+                  className="block" 
                   target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined}
                   rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}
+                  // href is passed by Link asChild
                 >
                   <item.icon />
-                  <span>{item.label}</span>
+                  <span className="flex-1 min-w-0">{item.label}</span>
                 </SidebarMenuButton>
               );
 
@@ -172,6 +173,8 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
+    // Return null or a basic loading state to avoid rendering ActualAdminLayout (and its useSidebar calls) prematurely
+    // This ensures SidebarProvider is mounted before useSidebar is called.
     return null; 
   }
 
