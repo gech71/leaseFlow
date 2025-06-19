@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Building, DollarSign, TrendingUp, AlertCircle, Clock, CheckCircle } from "lucide-react";
 
 interface BuildingFinancialCardProps {
