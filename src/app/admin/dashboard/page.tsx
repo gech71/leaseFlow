@@ -5,7 +5,7 @@ import { Building2, FileText, DollarSign, LayoutDashboard, AlertCircle, User } f
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart'; // Import the new chart component
 import { databaseService } from '@/lib/services/databaseService';
-import { getMonth, getYear, parseISO, format, isAfter, addMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { getMonth, getYear, format, isAfter, addMonths, startOfMonth, endOfMonth, isValid } from 'date-fns'; // Added parseISO and isValid
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
@@ -112,7 +112,7 @@ export default async function AdminDashboardPage() {
       .filter(b => b.status === 'Paid')
       .reduce((sum, b) => sum + b.totalAmount, 0);
     const incomePendingConfirmation = billsForBuildingCurrentMonth
-      .filter(b => b.status === 'Pending Verification')
+      .filter(b => b.status === 'PendingVerification') // Corrected status check
       .reduce((sum, b) => sum + b.totalAmount, 0);
     const incomeToBeCollected = billsForBuildingCurrentMonth
       .filter(b => b.status === 'Pending' || b.status === 'Overdue')
@@ -138,34 +138,61 @@ export default async function AdminDashboardPage() {
   ];
   
   const recentActivities = allBills
-    .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort((a, b) => {
+        const dateA = a.createdAt;
+        const dateB = b.createdAt;
+        // Ensure createdAt is a valid Date object before calling getTime()
+        // Handle null/undefined or invalid Date objects by treating them as epoch 0 or placing them consistently
+        const timeA = dateA && isValid(dateA) ? dateA.getTime() : 0;
+        const timeB = dateB && isValid(dateB) ? dateB.getTime() : 0;
+
+        if (isNaN(timeA) && isNaN(timeB)) return 0; // Both invalid, treat as equal
+        if (isNaN(timeA)) return 1; // Invalid a.createdAt comes after valid b.createdAt
+        if (isNaN(timeB)) return -1; // Invalid b.createdAt comes after valid a.createdAt
+        
+        return timeB - timeA; // Descending order (newest first)
+    })
     .slice(0, 5)
     .map(bill => {
         let actionText = "";
         const tenantName = bill.agreement?.tenant?.name || "A tenant";
         const spaceName = bill.agreement?.space?.spaceIdName || "a space";
-        const billDueDate = format(new Date(bill.dueDate), 'PP');
+        
+        let billDueDateFormatted = 'N/A';
+        if (bill.dueDate && isValid(bill.dueDate)) {
+            billDueDateFormatted = format(bill.dueDate, 'PP');
+        } else {
+            console.warn(`Dashboard: Invalid dueDate for bill ID ${bill.id}:`, bill.dueDate);
+        }
 
         switch(bill.status) {
             case "Paid":
                 actionText = `${tenantName} paid bill for ${spaceName}.`;
                 break;
             case "Pending":
-                actionText = `Bill generated for ${tenantName} for ${spaceName}, due ${billDueDate}.`;
+                actionText = `Bill generated for ${tenantName} for ${spaceName}, due ${billDueDateFormatted}.`;
                 break;
             case "Overdue":
-                 actionText = `Bill for ${tenantName} (${spaceName}) is overdue since ${billDueDate}.`;
+                 actionText = `Bill for ${tenantName} (${spaceName}) is overdue since ${billDueDateFormatted}.`;
                 break;
-            case "Pending Verification":
+            case "PendingVerification":
                 actionText = `${tenantName} submitted payment proof for ${spaceName}.`;
                 break;
             default:
                 actionText = `Activity related to bill ID ${bill.id} for ${tenantName}.`;
         }
+        
+        let formattedTime = 'Date N/A';
+        if (bill.createdAt && isValid(bill.createdAt)) {
+            formattedTime = format(bill.createdAt, 'PPp');
+        } else {
+            console.warn(`Dashboard: Invalid createdAt for bill ID ${bill.id}:`, bill.createdAt);
+        }
+
         return {
-            user: bill.status === "Pending Verification" ? tenantName : "System",
+            user: bill.status === "PendingVerification" ? tenantName : "System",
             action: actionText,
-            time: format(new Date(bill.createdAt), 'PPp'), 
+            time: formattedTime, 
             avatar: tenantName.substring(0,2).toUpperCase()
         }
     });
