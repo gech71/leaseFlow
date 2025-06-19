@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client'; // Changed from "import type { Prisma }"
 
 export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
   try {
