@@ -10,36 +10,55 @@ async function main() {
   // 1. Clear existing data
   console.log('Clearing existing data...');
   try {
-    // Explicitly delete records that might have foreign key constraints pointing to others,
-    // or rely on cascade deletes from parent tables.
-    // Start with tables that are most dependent or have relations that might cause issues if parents are deleted first without proper cascade.
+    // Delete records in an order that respects foreign key constraints,
+    // or relies on onDelete: Cascade where appropriate.
 
-    // UtilityBreakdownItem is a child of Bill. Delete Bill, and cascade should handle UtilityBreakdownItem.
-    // If cascade isn't working or prisma.utilityBreakdownItem is the issue, deleting Bill first is safer.
+    // UtilityBreakdownItem is a child of Bill.
+    // Bill is a child of Agreement.
+    // Agreement is a child of Tenant and Space.
+    // BuildingUtilityItem is a child of BuildingMonthlyUtilities.
+    // BuildingMonthlyUtilities is a child of Building.
+    // PenaltyTier is a child of Building.
+    // Space is a child of Building.
+    // Tenant has a relation to Space.
+
+    // Start with records that have fewer dependencies or whose deletion cascades effectively.
     await prisma.bill.deleteMany({});
     console.log('Deleted Bills (and cascaded to UtilityBreakdownItems if schema is set up for it)');
 
     await prisma.agreement.deleteMany({});
     console.log('Deleted Agreements');
 
-    // BuildingUtilityItem is a child of BuildingMonthlyUtilities.
-    await prisma.buildingUtilityItem.deleteMany({}); // Delete child records first
+    await prisma.buildingUtilityItem.deleteMany({});
     console.log('Deleted BuildingUtilityItems');
     await prisma.buildingMonthlyUtilities.deleteMany({});
     console.log('Deleted BuildingMonthlyUtilities');
 
-    // PenaltyTier is a child of Building.
-    await prisma.penaltyTier.deleteMany({}); // Delete child records first
+    await prisma.penaltyTier.deleteMany({});
     console.log('Deleted PenaltyTiers');
 
     // Break links between Tenant and Space before deleting them
-    const tenantsToClearLink = await prisma.tenant.findMany({ where: { rentedSpaceId: { not: null } } });
+    // Find tenants that have a rentedSpace
+    const tenantsToClearLink = await prisma.tenant.findMany({
+      where: {
+        rentedSpace: {
+          isNot: null,
+        },
+      },
+    });
     for (const tenant of tenantsToClearLink) {
       await prisma.tenant.update({ where: { id: tenant.id }, data: { rentedSpaceId: null } });
     }
     console.log('Cleared rentedSpaceId from Tenants');
 
-    const spacesToClearLink = await prisma.space.findMany({ where: { tenantId: { not: null } } });
+    // Find spaces that have a tenant
+    const spacesToClearLink = await prisma.space.findMany({
+      where: {
+        tenant: {
+          isNot: null,
+        },
+      },
+    });
     for (const space of spacesToClearLink) {
       await prisma.space.update({ where: { id: space.id }, data: { tenantId: null, isOccupied: false } });
     }
@@ -65,7 +84,6 @@ async function main() {
     data: {
       name: 'Sunrise Tower',
       address: '123 Sunrise Ave, Metro City',
-      createdAt: new Date(),
       penaltyPolicyTiers: {
         create: [
           { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 50, scope: 'Building' },
@@ -80,7 +98,6 @@ async function main() {
     data: {
       name: 'Ocean View Plaza',
       address: '456 Ocean Dr, Pacifica',
-      createdAt: new Date(),
       penaltyPolicyTiers: {
         create: [
           { fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 1, scope: 'Building' },
@@ -96,7 +113,6 @@ async function main() {
     data: {
         name: 'Tech Park One',
         address: '789 Innovation Rd, Silicon Valley',
-        createdAt: new Date(),
         // No specific penalty policy tiers initially, can be added later
     }
   });
@@ -112,7 +128,6 @@ async function main() {
       nationalId: 'AW12345X',
       representativeName: 'Cheshire Cat',
       representativePhone: '555-0199',
-      createdAt: new Date(),
     },
   });
 
@@ -121,7 +136,6 @@ async function main() {
       name: 'Bob The Builder',
       email: 'bob@example.com',
       phone: '555-0202',
-      createdAt: new Date(),
     },
   });
 
@@ -131,7 +145,6 @@ async function main() {
       email: 'carol@example.com',
       phone: '555-0303',
       nationalId: 'CD98765Z',
-      createdAt: new Date(),
     },
   });
   console.log(`Created Tenants: ${tenant1.name}, ${tenant2.name}, ${tenant3.name}`);
@@ -147,10 +160,10 @@ async function main() {
       utilityProrationShare: 0.15,
       monthlyRentalPrice: 2500,
       isOccupied: true,
-      tenantId: tenant1.id,
-      createdAt: new Date(),
+      tenantId: tenant1.id, // Link tenant to space
     },
   });
+  // Link space back to tenant
   await prisma.tenant.update({ where: { id: tenant1.id }, data: { rentedSpaceId: space1_B1.id } });
 
 
@@ -163,7 +176,6 @@ async function main() {
       utilityProrationShare: 0.10,
       monthlyRentalPrice: 1800,
       isOccupied: false,
-      createdAt: new Date(),
     },
   });
 
@@ -176,10 +188,10 @@ async function main() {
       utilityProrationShare: 0.20,
       monthlyRentalPrice: 1950,
       isOccupied: true,
-      tenantId: tenant2.id,
-      createdAt: new Date(),
+      tenantId: tenant2.id, // Link tenant to space
     },
   });
+   // Link space back to tenant
   await prisma.tenant.update({ where: { id: tenant2.id }, data: { rentedSpaceId: space1_B2.id } });
 
   const space2_B2 = await prisma.space.create({ // Carol's Penthouse in Ocean View Plaza
@@ -191,10 +203,10 @@ async function main() {
         utilityProrationShare: 0.40,
         monthlyRentalPrice: 5500,
         isOccupied: true,
-        tenantId: tenant3.id,
-        createdAt: new Date(),
+        tenantId: tenant3.id, // Link tenant to space
     }
   });
+   // Link space back to tenant
   await prisma.tenant.update({ where: { id: tenant3.id }, data: { rentedSpaceId: space2_B2.id } });
   
   const space1_B3 = await prisma.space.create({ // Vacant space in Tech Park One
@@ -206,7 +218,6 @@ async function main() {
         utilityProrationShare: 0.30,
         monthlyRentalPrice: 3200,
         isOccupied: false,
-        createdAt: new Date(),
     }
   });
   console.log('Created Spaces and linked occupied ones to tenants.');
@@ -227,7 +238,6 @@ async function main() {
       paymentTermMonths: 12,
       initialPaymentMonths: 1,
       nextPaymentDueDate: formatISO(addMonths(agreement1_startDate, 2)), 
-      createdAt: new Date(),
       initialPaymentAmount: space1_B1.monthlyRentalPrice * 1,
       initialPaymentMethod: 'Bank Transfer',
       initialPaymentBankOrWalletName: 'Metro Bank',
@@ -249,7 +259,6 @@ async function main() {
       paymentTermMonths: 6,
       initialPaymentMonths: 2,
       nextPaymentDueDate: formatISO(addMonths(agreement2_startDate, 2)), 
-      createdAt: new Date(),
       initialPaymentAmount: space1_B2.monthlyRentalPrice * 2,
       initialPaymentMethod: 'Credit Card',
       initialPaymentReference: 'INITPAY002',
@@ -270,7 +279,6 @@ async function main() {
         paymentTermMonths: 24,
         initialPaymentMonths: 3,
         nextPaymentDueDate: formatISO(addMonths(agreement3_startDate, 3)),
-        createdAt: new Date(),
         additionalTerms: "Access to rooftop pool and gym included. Bi-weekly cleaning service.",
         initialPaymentAmount: space2_B2.monthlyRentalPrice * 3,
         initialPaymentMethod: 'Wallet',
@@ -384,7 +392,6 @@ async function main() {
       buildingId: building1.id,
       year: lastMonthYear,
       month: lastMonth, 
-      createdAt: new Date(),
       utilities: {
         create: [
           { name: 'Building Electricity', totalCost: 1200, appliesToScope: 'Building' },
@@ -400,7 +407,6 @@ async function main() {
       buildingId: building2.id,
       year: lastMonthYear,
       month: lastMonth,
-      createdAt: new Date(),
       utilities: {
         create: [
           { name: 'General Building Maintenance', totalCost: 1500, appliesToScope: 'Building' },
@@ -423,6 +429,3 @@ main()
     await prisma.$disconnect();
     console.log('Prisma client disconnected.');
   });
-
-
-    
