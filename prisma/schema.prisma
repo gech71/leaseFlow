@@ -1,0 +1,194 @@
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Building {
+  id                 String                      @id @default(cuid())
+  name               String                      @unique
+  address            String?
+  createdAt          DateTime                    @default(now())
+  spaces             Space[]
+  penaltyPolicyTiers PenaltyTier[]
+  monthlyUtilities   BuildingMonthlyUtilities[]
+
+  @@index([name])
+}
+
+model Space {
+  id                   String        @id @default(cuid())
+  buildingName         String // Used to initially find building, but relation is via buildingId
+  spaceIdName          String // e.g., "Unit 10A", "Office 201"
+  area                 Float
+  floor                String
+  utilityProrationShare Float // For building-wide utilities
+  monthlyRentalPrice   Float
+  isOccupied           Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+
+  building             Building      @relation(fields: [buildingId], references: [id])
+  buildingId           String
+  tenant               Tenant?       @relation(fields: [tenantId], references: [id], onDelete: SetNull) // A space can have one tenant
+  tenantId             String?       @unique // Ensures a tenant ID is unique across spaces if present
+  agreements           Agreement[]
+
+  @@unique([buildingId, spaceIdName]) // A spaceIdName must be unique within a building
+  @@index([buildingId])
+  @@index([tenantId])
+}
+
+model Tenant {
+  id                  String      @id @default(cuid())
+  name                String
+  email               String      @unique
+  phone               String?
+  alternativePhone    String?
+  nationalId          String?
+  representativeName  String?
+  representativePhone String?
+  createdAt           DateTime    @default(now())
+
+  // rentedSpaceId from types.ts suggests a direct link to a single currently rented space.
+  // This is modeled by making Space.tenantId unique and linking back.
+  rentedSpace         Space? // This relation is through Space.tenantId
+  agreements          Agreement[]
+  bills               Bill[]
+
+  @@index([email])
+}
+
+model Agreement {
+  id                  String    @id @default(cuid())
+  // tenantName and spaceDescription from types.ts are denormalized. Relations used instead.
+  agreementText       String    @db.Text
+  startDate           DateTime
+  monthlyRentalPrice  Float
+  additionalTerms     String?   @db.Text
+  createdAt           DateTime  @default(now())
+  paymentTermMonths   Int
+  initialPaymentMonths Int
+  nextPaymentDueDate  DateTime
+
+  initialPaymentAmount         Float?
+  initialPaymentMethod         String?
+  initialPaymentReference      String?
+  initialPaymentBankOrWalletName String?
+  initialPaymentDate           DateTime?
+
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  tenantId            String
+  space               Space     @relation(fields: [spaceId], references: [id])
+  spaceId             String
+  bills               Bill[]
+
+  @@index([tenantId])
+  @@index([spaceId])
+}
+
+model BuildingMonthlyUtilities {
+  id           String                @id @default(cuid())
+  buildingName String    // Used to initially find building, relation via buildingId
+  year         Int
+  month        Int // 0-11 for Jan-Dec
+  createdAt    DateTime              @default(now())
+
+  building     Building              @relation(fields: [buildingId], references: [id])
+  buildingId   String
+  utilities    BuildingUtilityItem[]
+
+  @@unique([buildingId, year, month])
+  @@index([buildingId])
+}
+
+model BuildingUtilityItem {
+  id           String   @id @default(cuid())
+  name         String
+  totalCost    Float
+  appliesToScope UtilityScopeType // Building, Floor, SpecificSpaces
+  applicableFloor String? // Used if scope is 'Floor'
+  applicableSpaceIdNames String[] // Used if scope is 'SpecificSpaces', stores Space.spaceIdName
+
+  monthlyUtilities BuildingMonthlyUtilities @relation(fields: [buildingMonthlyUtilitiesId], references: [id])
+  buildingMonthlyUtilitiesId String
+
+  @@index([buildingMonthlyUtilitiesId])
+}
+
+model Bill {
+  id                   String        @id @default(cuid())
+  // spaceDescription from types.ts is denormalized.
+  billDate             DateTime
+  dueDate              DateTime
+  rentAmount           Float
+  utilityBreakdown     Json // Array<{ name: string; amount: number }>
+  penaltyAmount        Float?
+  totalAmount          Float
+  status               BillStatus
+  paymentDate          DateTime?
+  paymentMethod        String?
+  paymentReference     String?
+  bankOrWalletName     String?
+  paymentProofUrl      String?
+  adminVerifiedPayment Boolean?      @default(false)
+  tenantPaymentNotes   String?       @db.Text
+  adminVerificationNotes String?     @db.Text
+
+  agreement            Agreement     @relation(fields: [agreementId], references: [id])
+  agreementId          String
+  tenant               Tenant        @relation(fields: [tenantId], references: [id])
+  tenantId             String
+
+  @@index([agreementId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model PenaltyTier {
+  id                      String            @id @default(cuid())
+  fromDay                 Int
+  toDay                   Int?
+  feeType                 FeeType
+  feeValue                Float
+  scope                   PenaltyScopeType
+  applicableFloor         String?
+  applicableSpaceIdNames  String[] // Stores Space.spaceIdName values
+
+  building                Building          @relation(fields: [buildingId], references: [id])
+  buildingId              String
+
+  @@index([buildingId])
+}
+
+enum BillStatus {
+  Pending
+  Paid
+  Overdue
+  PendingVerification
+}
+
+enum FeeType {
+  Fixed
+  Percentage
+}
+
+enum PenaltyScopeType {
+  Building
+  Floor
+  SpecificSpaces
+}
+
+enum UtilityScopeType {
+  Building
+  Floor
+  SpecificSpaces
+}
+
