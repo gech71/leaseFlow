@@ -332,7 +332,6 @@ async function main() {
     data: {
       agreementId: agreement1.id,
       tenantId: tenant1.id,
-      spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`, 
       billDate: bill1_billDate,
       dueDate: addMonths(bill1_billDate, 0, {days: 14}), 
       rentAmount: agreement1.monthlyRentalPrice,
@@ -357,7 +356,6 @@ async function main() {
     data: {
       agreementId: agreement1.id,
       tenantId: tenant1.id,
-      spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`,
       billDate: bill2_billDate,
       dueDate: addMonths(bill2_billDate, 0, {days: 14}),
       rentAmount: agreement1.monthlyRentalPrice,
@@ -380,7 +378,6 @@ async function main() {
     data: {
       agreementId: agreement2.id,
       tenantId: tenant2.id,
-      spaceDescription: `${space1_B2.spaceIdName}, ${building2.name}`,
       billDate: bill3_billDate, 
       dueDate: bobBillDueDate,
       rentAmount: agreement2.monthlyRentalPrice,
@@ -401,7 +398,6 @@ async function main() {
     data: {
       agreementId: agreement3.id,
       tenantId: tenant3.id,
-      spaceDescription: `${space2_B2.spaceIdName}, ${building2.name}`,
       billDate: bill4_billDate, 
       dueDate: addMonths(bill4_billDate, 0, {days: 14}),
       rentAmount: agreement3.monthlyRentalPrice,
