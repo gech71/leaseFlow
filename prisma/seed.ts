@@ -10,7 +10,6 @@ async function main() {
   // 1. Clear existing data
   console.log('Clearing existing data...');
   try {
-    // Rely on onDelete: Cascade where appropriate from schema.prisma
     // Order: Delete records that depend on others first, or records whose deletion cascades.
 
     // Bill is child of Agreement. UtilityBreakdownItem is child of Bill.
@@ -22,7 +21,7 @@ async function main() {
     console.log('Deleted Agreements');
 
     // BuildingUtilityItem is child of BuildingMonthlyUtilities.
-    await prisma.buildingUtilityItem.deleteMany({}); // Or rely on cascade from BuildingMonthlyUtilities
+    await prisma.buildingUtilityItem.deleteMany({});
     console.log('Deleted BuildingUtilityItems');
 
     // BuildingMonthlyUtilities is child of Building.
@@ -30,11 +29,8 @@ async function main() {
     console.log('Deleted BuildingMonthlyUtilities');
 
     // PenaltyTier is child of Building.
-    await prisma.penaltyTier.deleteMany({}); // Or rely on cascade from Building
+    await prisma.penaltyTier.deleteMany({});
     console.log('Deleted PenaltyTiers');
-
-    // Explicitly break links for Tenant <-> Space (1-to-1) before deleting Tenants and Spaces
-    // to handle potential cycles or specific logic like setting isOccupied.
 
     // Find tenants that have a rentedSpace
     const tenantsToClearLink = await prisma.tenant.findMany({
@@ -273,7 +269,7 @@ async function main() {
   const agreement1 = await prisma.agreement.create({ // Alice's agreement
     data: {
       tenantId: tenant1.id,
-      tenantName: tenant1.name,
+      // tenantName: tenant1.name, // Removed
       spaceId: space1_B1.id,
       spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`,
       agreementText: 'Standard Rental Agreement for Alice Wonderland...',
@@ -294,7 +290,7 @@ async function main() {
   const agreement2 = await prisma.agreement.create({ // Bob's agreement
     data: {
       tenantId: tenant2.id,
-      tenantName: tenant2.name,
+      // tenantName: tenant2.name, // Removed
       spaceId: space1_B2.id,
       spaceDescription: `${space1_B2.spaceIdName}, ${building2.name}`,
       agreementText: 'Standard Rental Agreement for Bob The Builder...',
@@ -314,7 +310,7 @@ async function main() {
   const agreement3 = await prisma.agreement.create({ // Carol's agreement
     data: {
         tenantId: tenant3.id,
-        tenantName: tenant3.name,
+        // tenantName: tenant3.name, // Removed
         spaceId: space2_B2.id,
         spaceDescription: `${space2_B2.spaceIdName}, ${building2.name}`,
         agreementText: 'Premium Rental Agreement for Carol Danvers...',
