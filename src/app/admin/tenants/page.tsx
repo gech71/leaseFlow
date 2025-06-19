@@ -5,10 +5,11 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, FileText, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact } from 'lucide-react';
+import { Users, PlusCircle, FileText, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye } from 'lucide-react';
 import type { Tenant, Space, Agreement } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +36,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getMockAgreements } from '../agreements/page'; // To get agreement texts
+import { getMockAgreements } from '../agreements/page'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
@@ -110,9 +111,8 @@ export default function TenantsPage() {
     setIsMounted(true);
     const loadedTenants = getStoredTenants();
     const loadedSpaces = getStoredSpaces();
-    const loadedAgreements = getMockAgreements(); // Fetch agreements for their text
+    const loadedAgreements = getMockAgreements(); 
     
-    // Initialize with some mock data if local storage is empty
     if (loadedTenants.length === 0) {
         const initialTenants: Tenant[] = [
           { id: 'tenant1', name: 'Alice Wonderland', email: 'alice@example.com', phone: '555-0101', nationalId: 'AB123456', representativeName: 'Mad Hatter', representativePhone: '555-0199', rentedSpaceId: 'space1', createdAt: new Date().toISOString() },
@@ -206,7 +206,7 @@ export default function TenantsPage() {
       updatedTenants = tenants.map(t => t.id === currentTenant.id ? { ...t, ...tenantData, createdAt: t.createdAt } : t);
       toast({ title: "Tenant Updated", description: `${values.name} has been updated.` });
     } else {
-      return; // Should not happen
+      return; 
     }
     setTenants(updatedTenants);
     storeTenants(updatedTenants);
@@ -496,27 +496,12 @@ export default function TenantsPage() {
                 </CardContent>
                 <CardFooter className="border-t pt-4 flex justify-between items-center gap-2">
                    <div>
-                    {tenantAgreement && tenantAgreement.agreementText ? (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                          toast({
-                            title: `Agreement for ${tenant.name}`,
-                            description: (
-                              <ScrollArea className="h-[300px] w-full max-w-full">
-                                <pre className="whitespace-pre-wrap text-xs p-1">
-                                  {tenantAgreement.agreementText}
-                                </pre>
-                              </ScrollArea>
-                            ),
-                            duration: 30000,
-                            className: "w-11/12 sm:w-4/5 md:w-3/5 lg:w-1/2 xl:max-w-2xl h-auto"
-                          });
-                        }}
-                      >
-                        <FileText className="mr-1 h-4 w-4" /> Agreement
-                      </Button>
+                    {tenantAgreement && tenantAgreement.id ? (
+                      <Link href={`/admin/agreements/${tenantAgreement.id}`} passHref>
+                        <Button variant="outline" size="sm">
+                          <Eye className="mr-1 h-4 w-4" /> View Agreement
+                        </Button>
+                      </Link>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">No agreement yet</span>
                     )}

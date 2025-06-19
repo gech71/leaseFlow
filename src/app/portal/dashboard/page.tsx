@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare, Loader2 } from 'lucide-react';
+import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare, Loader2, Download } from 'lucide-react';
 import type { Agreement, Bill, Building as BuildingType, PenaltyTier, AgreementInput } from '@/lib/types'; 
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
@@ -36,9 +36,9 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { generateAgreementAction } from '@/app/actions'; // Import the action
+import { generateAgreementAction } from '@/app/actions'; 
 
-const initialMockTenantAgreement: Omit<Agreement, 'agreementText'> & { agreementText?: string } = { // Make agreementText optional initially
+const initialMockTenantAgreement: Omit<Agreement, 'agreementText'> & { agreementText?: string } = { 
   id: 'agree-tenant1-current',
   tenantId: 'tenant-portal-user',
   tenantName: 'Portal User Tenant',
@@ -144,7 +144,7 @@ export default function CustomerDashboardPage() {
     const fetchAgreement = async () => {
       setIsGeneratingAgreement(true);
       setAgreementGenerationError(null);
-      setAgreement(null); // Clear previous agreement if any
+      setAgreement(null); 
       
       const buildingNameFromMock = initialMockTenantAgreement.spaceDescription.split(', ')[1] || 'Unknown Building';
       const spaceIdNameFromMock = initialMockTenantAgreement.spaceDescription.split(', ')[0] || 'Unknown Space';
@@ -355,6 +355,13 @@ export default function CustomerDashboardPage() {
     }
   };
 
+  const handleDownloadAgreement = () => {
+    toast({
+      title: "Download Agreement",
+      description: "PDF download functionality is coming soon!",
+    });
+  };
+
   if (!isMounted) {
      return (
         <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -404,20 +411,9 @@ export default function CustomerDashboardPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => toast({
-                  title: "Full Agreement", 
-                  description: (
-                    <ScrollArea className="h-[300px] w-full max-w-full">
-                      <pre className="whitespace-pre-wrap text-xs p-1">
-                        {agreement.agreementText}
-                      </pre>
-                    </ScrollArea>
-                  ), 
-                  duration: 30000, 
-                  className: "w-11/12 sm:w-4/5 md:w-3/5 lg:w-1/2 xl:max-w-2xl h-auto" // Responsive width
-                })}
+                onClick={handleDownloadAgreement}
               >
-                <FileText className="mr-2 h-4 w-4" /> View Full Agreement
+                <Download className="mr-2 h-4 w-4" /> Download Agreement (PDF)
               </Button>
             )}
           </CardFooter>
