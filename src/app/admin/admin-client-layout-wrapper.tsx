@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React, { useState, useEffect } from 'react'; // Added useState and useEffect
+import React, { useState, useEffect } from 'react';
 import {
   SidebarProvider,
   Sidebar,
@@ -80,32 +80,29 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href));
               
-              const MenuButtonWrapper = ({ children: buttonChildren }: {children: React.ReactNode}) => (
-                <Link 
-                  href={item.href} 
-                  passHref 
-                  legacyBehavior={false} 
-                  target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined}
-                  rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}
-                  className="block"
-                >
-                  {buttonChildren}
-                </Link>
-              );
-
-              const menuItemCore = (
-                <SidebarMenuButton isActive={isActive} href={item.href}> {/* Pass href for the <a> tag */}
+              const menuItemContent = (
+                <SidebarMenuButton isActive={isActive} href={item.href}> {/* SidebarMenuButton receives href from Link */}
                   <item.icon />
                   <span>{item.label}</span>
                 </SidebarMenuButton>
               );
+
+              const linkProps = {
+                href: item.href,
+                legacyBehavior: false, // Default, ensures Link passes props to child
+                target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
+                rel: item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined,
+                className:"block" // This className will be passed to SidebarMenuButton
+              };
 
               if (!isMobile && sidebarState === "collapsed") {
                 return (
                   <SidebarMenuItem key={item.href}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <MenuButtonWrapper>{menuItemCore}</MenuButtonWrapper>
+                        <Link {...linkProps}>
+                          {menuItemContent}
+                        </Link>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="font-headline">
                         {item.label}
@@ -116,7 +113,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               }
               return (
                 <SidebarMenuItem key={item.href}>
-                  <MenuButtonWrapper>{menuItemCore}</MenuButtonWrapper>
+                  <Link {...linkProps}>
+                    {menuItemContent}
+                  </Link>
                 </SidebarMenuItem>
               );
             })}
@@ -175,10 +174,17 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
     setIsMounted(true);
   }, []);
 
+  if (!isMounted) {
+    // Optional: return a loading skeleton or null to avoid flash of unstyled content or layout shifts
+    // For simplicity, returning null might be fine if the layout pop-in is not jarring.
+    // Consider a more sophisticated skeleton if needed.
+    return null; 
+  }
+
   return (
     <SidebarProvider defaultOpen>
       <TooltipProvider>
-        {isMounted ? <ActualAdminLayout>{children}</ActualAdminLayout> : null}
+        <ActualAdminLayout>{children}</ActualAdminLayout>
       </TooltipProvider>
     </SidebarProvider>
   );
