@@ -163,13 +163,13 @@ export class DatabaseService {
   }
   
   async getBuildingMonthlyUtilitiesByBuildingMonthYear(
-    buildingId: string, // Changed from buildingName to buildingId
+    buildingId: string, 
     month: number, 
     year: number, 
     include?: Prisma.BuildingMonthlyUtilitiesInclude
   ): Promise<BuildingMonthlyUtilities | null> {
     return prisma.buildingMonthlyUtilities.findFirst({ 
-      where: { buildingId, month, year }, // Updated to use buildingId
+      where: { buildingId, month, year }, 
       include 
     });
   }
@@ -233,6 +233,10 @@ export class DatabaseService {
 
   async deletePenaltyTier(id: string): Promise<PenaltyTier> {
     return prisma.penaltyTier.delete({ where: { id } });
+  }
+
+  async deletePenaltyTiersByBuildingId(buildingId: string): Promise<Prisma.BatchPayload> {
+    return prisma.penaltyTier.deleteMany({ where: { buildingId } });
   }
 }
 

@@ -45,7 +45,7 @@ export async function updateBuildingAction(id: string, data: Prisma.BuildingUpda
 export async function deleteBuildingAction(id: string) {
   try {
     // Check if building has spaces
-    const buildingWithSpaces = await databaseService.getBuildingById(id, { spaces: { take: 1 } }); // Corrected: Pass Prisma.BuildingInclude directly
+    const buildingWithSpaces = await databaseService.getBuildingById(id, { spaces: { take: 1 } });
     if (buildingWithSpaces && buildingWithSpaces.spaces.length > 0) {
       return { success: false, error: "Cannot delete building with associated spaces. Please remove or reassign spaces first." };
     }
@@ -55,7 +55,10 @@ export async function deleteBuildingAction(id: string) {
       return { success: false, error: "Cannot delete building with associated utility entries. Please remove them first." };
     }
 
+    // Delete associated PenaltyTiers first
+    await databaseService.deletePenaltyTiersByBuildingId(id);
 
+    // Then delete the building
     await databaseService.deleteBuilding(id);
     revalidatePath('/admin/buildings'); // Revalidate the list page
     return { success: true };
