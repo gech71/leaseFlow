@@ -32,7 +32,7 @@ async function main() {
     await prisma.penaltyTier.deleteMany({});
     console.log('Deleted PenaltyTiers');
 
-    // Find tenants that have a rentedSpace
+    // Break links between Tenant and Space before deleting them
     const tenantsToClearLink = await prisma.tenant.findMany({
       where: {
         rentedSpace: {
@@ -53,7 +53,6 @@ async function main() {
     }
     console.log('Cleared rentedSpace link from Tenants');
 
-    // Find spaces that have a tenant
     const spacesToClearLink = await prisma.space.findMany({
       where: {
         tenant: {
@@ -269,9 +268,7 @@ async function main() {
   const agreement1 = await prisma.agreement.create({ // Alice's agreement
     data: {
       tenantId: tenant1.id,
-      // tenantName: tenant1.name, // Removed
       spaceId: space1_B1.id,
-      spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`,
       agreementText: 'Standard Rental Agreement for Alice Wonderland...',
       startDate: formatISO(agreement1_startDate), 
       monthlyRentalPrice: space1_B1.monthlyRentalPrice,
@@ -290,9 +287,7 @@ async function main() {
   const agreement2 = await prisma.agreement.create({ // Bob's agreement
     data: {
       tenantId: tenant2.id,
-      // tenantName: tenant2.name, // Removed
       spaceId: space1_B2.id,
-      spaceDescription: `${space1_B2.spaceIdName}, ${building2.name}`,
       agreementText: 'Standard Rental Agreement for Bob The Builder...',
       startDate: formatISO(agreement2_startDate), 
       monthlyRentalPrice: space1_B2.monthlyRentalPrice,
@@ -310,9 +305,7 @@ async function main() {
   const agreement3 = await prisma.agreement.create({ // Carol's agreement
     data: {
         tenantId: tenant3.id,
-        // tenantName: tenant3.name, // Removed
         spaceId: space2_B2.id,
-        spaceDescription: `${space2_B2.spaceIdName}, ${building2.name}`,
         agreementText: 'Premium Rental Agreement for Carol Danvers...',
         startDate: formatISO(agreement3_startDate), 
         monthlyRentalPrice: space2_B2.monthlyRentalPrice,
@@ -337,7 +330,7 @@ async function main() {
     data: {
       agreementId: agreement1.id,
       tenantId: tenant1.id,
-      spaceDescription: agreement1.spaceDescription,
+      spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`, // Bill can store this denormalized
       billDate: formatISO(bill1_billDate),
       dueDate: formatISO(addMonths(bill1_billDate, 0, {days: 14})), 
       rentAmount: agreement1.monthlyRentalPrice,
@@ -362,7 +355,7 @@ async function main() {
     data: {
       agreementId: agreement1.id,
       tenantId: tenant1.id,
-      spaceDescription: agreement1.spaceDescription,
+      spaceDescription: `${space1_B1.spaceIdName}, ${building1.name}`,
       billDate: formatISO(bill2_billDate),
       dueDate: formatISO(addMonths(bill2_billDate, 0, {days: 14})),
       rentAmount: agreement1.monthlyRentalPrice,
@@ -384,7 +377,7 @@ async function main() {
     data: {
       agreementId: agreement2.id,
       tenantId: tenant2.id,
-      spaceDescription: agreement2.spaceDescription,
+      spaceDescription: `${space1_B2.spaceIdName}, ${building2.name}`,
       billDate: formatISO(bill3_billDate), 
       dueDate: formatISO(bobBillDueDate),
       rentAmount: agreement2.monthlyRentalPrice,
@@ -404,7 +397,7 @@ async function main() {
     data: {
       agreementId: agreement3.id,
       tenantId: tenant3.id,
-      spaceDescription: agreement3.spaceDescription,
+      spaceDescription: `${space2_B2.spaceIdName}, ${building2.name}`,
       billDate: formatISO(bill4_billDate), 
       dueDate: formatISO(addMonths(bill4_billDate, 0, {days: 14})),
       rentAmount: agreement3.monthlyRentalPrice,
@@ -430,7 +423,7 @@ async function main() {
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building1.id,
-      buildingName: building1.name,
+      buildingName: building1.name, // Added buildingName
       year: lastMonthYear,
       month: lastMonth, 
       utilities: {
@@ -446,7 +439,7 @@ async function main() {
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building2.id,
-      buildingName: building2.name,
+      buildingName: building2.name, // Added buildingName
       year: lastMonthYear,
       month: lastMonth,
       utilities: {
