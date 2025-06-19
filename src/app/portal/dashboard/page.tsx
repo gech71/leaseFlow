@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare } from 'lucide-react';
-import type { Agreement, Bill, Building as BuildingType, PenaltyTier } from '@/lib/types'; 
+import { FileText, Home, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare, Loader2 } from 'lucide-react';
+import type { Agreement, Bill, Building as BuildingType, PenaltyTier, AgreementInput } from '@/lib/types'; 
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -35,14 +35,15 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { generateAgreementAction } from '@/app/actions'; // Import the action
 
-const mockTenantAgreement: Agreement = {
+const initialMockTenantAgreement: Omit<Agreement, 'agreementText'> & { agreementText?: string } = { // Make agreementText optional initially
   id: 'agree-tenant1-current',
   tenantId: 'tenant-portal-user',
   tenantName: 'Portal User Tenant',
   spaceId: 'space-portal-unit',
   spaceDescription: 'Unit P1, Portal View Residences',
-  agreementText: 'STANDARD LEASE AGREEMENT...\n\nThis agreement, made on [Start Date], between Landlord and Portal User Tenant for the premises located at Unit P1, Portal View Residences.\n\n1. Term: The term of this lease shall be for 12 months, commencing on [Start Date].\n2. Rent: Tenant shall pay Landlord monthly rent of $1500.00, due on the 1st day of each month.\n3. Security Deposit: A security deposit of $1500.00 has been paid.\n...',
+  // agreementText: "STANDARD LEASE AGREEMENT...\n\nThis agreement, made on [Start Date], between Landlord and Portal User Tenant for the premises located at Unit P1, Portal View Residences.\n\n1. Term: The term of this lease shall be for 12 months, commencing on [Start Date].\n2. Rent: Tenant shall pay Landlord monthly rent of $1500.00, due on the 1st day of each month.\n3. Security Deposit: A security deposit of $1500.00 has been paid.\n...",
   startDate: new Date(2024, 0, 15).toISOString(), 
   monthlyRentalPrice: 1500,
   paymentTermMonths: 12,
@@ -124,6 +125,8 @@ export default function CustomerDashboardPage() {
   const [agreement, setAgreement] = useState<Agreement | null>(null);
   const [bills, setBills] = useState<Bill[]>(initialMockTenantBills);
   const [isMounted, setIsMounted] = useState(false);
+  const [isGeneratingAgreement, setIsGeneratingAgreement] = useState(false);
+  const [agreementGenerationError, setAgreementGenerationError] = useState<string | null>(null);
   const { toast } = useToast();
   const [today, setToday] = useState(startOfDay(new Date()));
 
@@ -137,7 +140,52 @@ export default function CustomerDashboardPage() {
   useEffect(() => {
     setIsMounted(true);
     setToday(startOfDay(new Date()));
-  }, []);
+
+    const fetchAgreement = async () => {
+      setIsGeneratingAgreement(true);
+      setAgreementGenerationError(null);
+      
+      // Use details from initialMockTenantAgreement to form the input for AI
+      const buildingNameFromMock = initialMockTenantAgreement.spaceDescription.split(', ')[1] || 'Unknown Building';
+      const spaceIdNameFromMock = initialMockTenantAgreement.spaceDescription.split(', ')[0] || 'Unknown Space';
+      // For area and floor, we'd ideally get this from a Space object if available,
+      // but for this portal, we'll use placeholders if not directly in agreement mock.
+      // A real app would fetch the full Space details.
+      const placeholderArea = 1000; // Placeholder if not derivable
+      const placeholderFloor = "N/A"; // Placeholder if not derivable
+
+      const agreementInput: AgreementInput = {
+        tenantName: initialMockTenantAgreement.tenantName,
+        building: buildingNameFromMock,
+        spaceId: spaceIdNameFromMock,
+        spaceArea: placeholderArea, // This would ideally come from full space details
+        floor: placeholderFloor,   // This would ideally come from full space details
+        monthlyRentalPrice: initialMockTenantAgreement.monthlyRentalPrice,
+        paymentTermMonths: initialMockTenantAgreement.paymentTermMonths,
+        initialPaymentMonths: initialMockTenantAgreement.initialPaymentMonths,
+        additionalTerms: initialMockTenantAgreement.additionalTerms || "",
+      };
+
+      const result = await generateAgreementAction(agreementInput);
+
+      if ('error' in result) {
+        setAgreementGenerationError(result.error);
+        toast({ title: "Agreement Generation Failed", description: result.error, variant: "destructive" });
+        // Set agreement with initial data but no AI text if generation fails
+        setAgreement({ ...initialMockTenantAgreement, agreementText: "Error generating agreement text. Please contact support." });
+      } else if (result.agreementText) {
+        setAgreement({ ...initialMockTenantAgreement, agreementText: result.agreementText });
+      } else {
+        setAgreementGenerationError("AI returned no content for the agreement.");
+        setAgreement({ ...initialMockTenantAgreement, agreementText: "Could not generate agreement text." });
+      }
+      setIsGeneratingAgreement(false);
+    };
+
+    fetchAgreement();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
 
   const calculatePenaltyForTenant = useCallback((bill: Bill, currentStatus: Bill['status']): number => {
     if (!mockPortalBuilding.penaltyPolicyTiers || mockPortalBuilding.penaltyPolicyTiers.length === 0) return 0;
@@ -148,8 +196,8 @@ export default function CustomerDashboardPage() {
     if (daysOverdue <= 0) return 0;
 
     let applicableTiersForScope: PenaltyTier[] = [];
-    const spaceIdNameFromAgreement = mockTenantAgreement?.spaceDescription.split(',')[0].trim();
-    const floorFromAgreement = mockTenantAgreement?.spaceDescription.includes(',') && mockTenantAgreement?.spaceDescription.split(',')[1] ? mockTenantAgreement?.spaceDescription.split(',')[1].trim().split(' ')[0] : undefined;
+    const spaceIdNameFromAgreement = agreement?.spaceDescription.split(',')[0].trim();
+    const floorFromAgreement = agreement?.spaceDescription.includes(',') && agreement?.spaceDescription.split(',')[1] ? agreement?.spaceDescription.split(',')[1].trim().split(' ')[0] : undefined;
 
 
     const spaceSpecificTiers = mockPortalBuilding.penaltyPolicyTiers.filter(
@@ -184,7 +232,7 @@ export default function CustomerDashboardPage() {
       }
     }
     return parseFloat(calculatedPenalty.toFixed(2));
-  }, [today]);
+  }, [today, agreement]);
 
 
   const processedBills = useMemo(() => {
@@ -211,13 +259,11 @@ export default function CustomerDashboardPage() {
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
   }, [bills, today, calculatePenaltyForTenant]);
-
-  useEffect(() => {
-    setAgreement(mockTenantAgreement);
-  }, []);
   
   useEffect(() => {
-    if (bills === initialMockTenantBills) { 
+    // This ensures that bills are processed with penalties when the page loads or dependencies change.
+    // However, we only want to setBills if the source was the initialMockTenantBills to avoid loops.
+    if (bills === initialMockTenantBills && processedBills.length > 0) { 
         setBills(processedBills);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -343,9 +389,19 @@ export default function CustomerDashboardPage() {
             )}
           </CardContent>
           <CardFooter>
-            <Button variant="outline" size="sm" onClick={() => toast({title: "Full Agreement", description: "This is a mock full agreement text: " + agreement.agreementText, duration: 10000})}>
-              <FileText className="mr-2 h-4 w-4" /> View Full Agreement (Text)
-            </Button>
+            {isGeneratingAgreement ? (
+              <Button variant="outline" size="sm" disabled>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Agreement...
+              </Button>
+            ) : agreementGenerationError ? (
+              <Button variant="outline" size="sm" disabled className="text-destructive">
+                <AlertTriangle className="mr-2 h-4 w-4" /> Error Loading Agreement
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => toast({title: "Full Agreement", description: agreement.agreementText || "Agreement text not available.", duration: 10000})}>
+                <FileText className="mr-2 h-4 w-4" /> View Full Agreement (Text)
+              </Button>
+            )}
           </CardFooter>
         </Card>
       )}
@@ -508,3 +564,4 @@ export default function CustomerDashboardPage() {
     </div>
   );
 }
+
