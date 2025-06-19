@@ -24,7 +24,7 @@ async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?
 
   if (buildingIdParam) {
     const buildingToEdit = await databaseService.getBuildingById(buildingIdParam, {
-      include: { penaltyPolicyTiers: true }
+      penaltyPolicyTiers: true // Corrected: Pass the Prisma.BuildingInclude object directly
     });
     if (buildingToEdit) {
       formMode = 'edit';
@@ -56,9 +56,9 @@ async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?
             </Link>
         }
       />
-      <BuildingUpsertFormInternal 
-        initialBuildingData={initialBuildingDataSerializable} 
-        formMode={formMode} 
+      <BuildingUpsertFormInternal
+        initialBuildingData={initialBuildingDataSerializable}
+        formMode={formMode}
       />
     </div>
   );
