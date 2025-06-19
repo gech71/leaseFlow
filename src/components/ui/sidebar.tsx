@@ -537,34 +537,40 @@ const sidebarMenuButtonVariants = cva(
 const SidebarMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> & {
-    asChild?: boolean
+    asChild?: boolean // This is SidebarMenuButton's own asChild, determines if it renders Slot or button
     isActive?: boolean
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>
 >(
   (
     {
-      asChild: useSlot = false, // Renamed for clarity: this is SidebarMenuButton's own asChild prop
+      asChild: useSlot = false, // SidebarMenuButton's own asChild prop, aliased to useSlot
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
-      children, // Explicitly destructure children
-      ...restProps // All other props passed from parent (e.g., Link)
+      children,
+      ...restProps // Contains all other props, *including* `asChild` if passed from a parent Link
     },
     ref
   ) => {
-    const Comp = useSlot ? Slot : "button"
-    const { isMobile, state } = useSidebar()
+    const Comp = useSlot ? Slot : "button";
+    const { isMobile, state } = useSidebar();
 
-    // If Comp is a DOM button, we must ensure 'asChild' is not in restProps to avoid the warning.
-    // If useSlot is true, Comp is Slot, and Slot handles its own 'asChild' prop correctly if present in restProps.
-    let finalProps = restProps
+    // Props that will be passed to Comp. Start with restProps.
+    let propsForComp = { ...restProps };
+
     if (Comp === "button") {
-      // Explicitly remove 'asChild' from restProps if it exists
-      const { asChild: _ignored, ...validRestProps } = restProps as any
-      finalProps = validRestProps
+      // If SidebarMenuButton is rendering a DOM button (because its own useSlot is false),
+      // it should not pass down an `asChild` prop to the DOM button, as DOM buttons don't understand it.
+      // Any `asChild` in `restProps` at this point would have come from a parent like `next/link`
+      // (if `Link` incorrectly passes it down, or if `SidebarMenuButton` was used directly with an `asChild` prop
+      // that wasn't meant for its own `useSlot` behavior).
+      // We delete it from the props that will be spread onto the DOM button.
+      if ('asChild' in propsForComp) {
+        delete (propsForComp as { asChild?: unknown }).asChild;
+      }
     }
 
     const buttonElement = (
@@ -574,21 +580,21 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        {...finalProps} // Spread the cleaned props
+        {...propsForComp} // Use the potentially modified props
       >
         {children}
       </Comp>
-    )
+    );
 
     if (!tooltip) {
-      return buttonElement
+      return buttonElement;
     }
 
-    let tooltipProps: React.ComponentProps<typeof TooltipContent> = {}
+    let tooltipProps: React.ComponentProps<typeof TooltipContent> = {};
     if (typeof tooltip === "string") {
-      tooltipProps.children = tooltip
+      tooltipProps.children = tooltip;
     } else {
-      tooltipProps = tooltip
+      tooltipProps = tooltip;
     }
 
     return (
@@ -601,10 +607,10 @@ const SidebarMenuButton = React.forwardRef<
           {...tooltipProps}
         />
       </Tooltip>
-    )
+    );
   }
-)
-SidebarMenuButton.displayName = "SidebarMenuButton"
+);
+SidebarMenuButton.displayName = "SidebarMenuButton";
 
 const SidebarMenuAction = React.forwardRef<
   HTMLButtonElement,
@@ -775,3 +781,4 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
