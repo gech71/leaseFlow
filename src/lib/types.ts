@@ -1,5 +1,8 @@
 
 
+// This file defines shared data structures, especially for client-side representations
+// where Date objects from Prisma are typically serialized to strings (ISO format).
+
 export interface PenaltyTier {
   id?: string; 
   fromDay: number;
@@ -7,26 +10,26 @@ export interface PenaltyTier {
   feeType: 'Fixed' | 'Percentage';
   feeValue: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
-  applicableFloor?: string | null; // Prisma schema allows null
-  applicableSpaceIdNames?: string[] | null; // Prisma schema allows null for the array itself
-  buildingId?: string; // Foreign key to Building
+  applicableFloor?: string | null;
+  applicableSpaceIdNames?: string[] | null;
+  buildingId?: string; 
 }
 
 export interface Building {
   id: string;
   name: string;
-  address?: string | null; // Prisma schema allows null
-  penaltyPolicyTiers: PenaltyTier[]; // Relation, should be array of PenaltyTier objects
-  createdAt: string; 
-  updatedAt?: string;
-  spaces?: Space[]; // Relation
-  buildingMonthlyUtilities?: BuildingMonthlyUtilities[]; // Relation
+  address?: string | null;
+  penaltyPolicyTiers: PenaltyTier[];
+  createdAt: string; // ISO Date String
+  updatedAt?: string | null; // ISO Date String
+  spaces?: Space[]; 
+  buildingMonthlyUtilities?: BuildingMonthlyUtilities[];
 }
 
 export interface Space {
   id: string;
   buildingId: string; 
-  buildingName: string; // Denormalized
+  buildingName: string; 
   spaceIdName: string; 
   area: number; 
   floor: string; 
@@ -34,11 +37,11 @@ export interface Space {
   monthlyRentalPrice: number;
   isOccupied: boolean;
   tenantId?: string | null; 
-  createdAt: string; 
-  updatedAt?: string;
+  createdAt: string; // ISO Date String
+  updatedAt?: string | null; // ISO Date String
   tenant?: Tenant | null; 
-  building?: Building; // Relation
-  agreements?: Agreement[]; // Relation
+  building?: Building; 
+  agreements?: Agreement[];
 }
 
 export interface Tenant {
@@ -50,12 +53,12 @@ export interface Tenant {
   nationalId?: string | null;
   representativeName?: string | null;
   representativePhone?: string | null;
-  rentedSpaceId?: string | null; // Prisma schema allows null
-  createdAt: string; 
-  updatedAt?: string;
+  rentedSpaceId?: string | null;
+  createdAt: string; // ISO Date String
+  updatedAt?: string | null; // ISO Date String
   rentedSpace?: Space | null; 
   agreements?: Agreement[]; 
-  bills?: Bill[]; // Relation
+  bills?: Bill[];
 }
 
 export interface Agreement {
@@ -63,39 +66,39 @@ export interface Agreement {
   tenantId: string;
   spaceId: string;
   agreementText: string;
-  startDate: string; 
+  startDate: string; // ISO Date String
   monthlyRentalPrice: number;
   additionalTerms?: string | null; 
-  createdAt: string; 
-  updatedAt?: string; 
+  createdAt: string; // ISO Date String
+  updatedAt?: string | null; // ISO Date String
   paymentTermMonths: number;
   initialPaymentMonths: number;
-  nextPaymentDueDate: string; 
+  nextPaymentDueDate: string; // ISO Date String
 
   initialPaymentAmount?: number | null;
   initialPaymentMethod?: string | null;
   initialPaymentReference?: string | null;
   initialPaymentBankOrWalletName?: string | null;
-  initialPaymentDate?: string | null; 
-  endDate?: string | null; 
+  initialPaymentDate?: string | null; // ISO Date String
+  endDate?: string | null; // ISO Date String (calculated if needed)
 
-  tenant: Tenant; // Relation - assuming always included when needed
-  space: Space;   // Relation - assuming always included when needed
+  tenant?: Tenant; // Optional on base type, usually included where needed
+  space?: Space;   // Optional on base type, usually included where needed
   bills?: Bill[]; 
 }
 
 export interface UtilityBreakdownItem {
-  id?: string;
+  id?: string; // Present if from DB
   name: string;
   amount: number;
-  billId?: string; // Foreign key
+  billId?: string;
 }
 
 export interface BuildingUtilityItem {
   id?: string; 
   name: string;
   totalCost: number;
-  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces'; // Matches Prisma Enum
+  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string | null; 
   applicableSpaceIdNames?: string[] | null; 
   monthlyUtilitiesId?: string | null; 
@@ -104,40 +107,41 @@ export interface BuildingUtilityItem {
 export interface BuildingMonthlyUtilities {
   id: string;
   buildingId: string; 
-  buildingName: string; // Denormalized
+  buildingName: string; 
   year: number;
-  month: number; // 0-11
+  month: number; 
   utilities: BuildingUtilityItem[];
-  createdAt: string;
-  updatedAt?: string; 
+  createdAt: string; // ISO Date String
+  updatedAt?: string | null; // ISO Date String
   building?: Building; 
 }
 
 export interface Bill {
   id: string;
   agreementId: string;
-  tenantId: string; // Prisma schema has this
-  billDate: string;
-  dueDate: string;
+  tenantId: string; 
+  billDate: string; // ISO Date String
+  dueDate: string; // ISO Date String
   rentAmount: number;
-  utilityBreakdown: UtilityBreakdownItem[]; // This is a relation, client type might be flat array
-  penaltyAmount?: number | null; // Prisma schema allows null
+  utilityBreakdown: UtilityBreakdownItem[];
+  penaltyAmount?: number | null;
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue' | 'PendingVerification'; // Prisma Enum BillStatus
-  paymentDate?: string | null;
+  status: 'Pending' | 'Paid' | 'Overdue' | 'PendingVerification';
+  paymentDate?: string | null; // ISO Date String
   paymentMethod?: string | null;
   paymentReference?: string | null;
   bankOrWalletName?: string | null;
   paymentProofUrl?: string | null;
-  adminVerifiedPayment?: boolean | null; // Prisma schema allows null
+  adminVerifiedPayment?: boolean | null;
   tenantPaymentNotes?: string | null;
   adminVerificationNotes?: string | null;
-  createdAt: string; 
-  updatedAt: string; 
+  createdAt: string; // ISO Date String
+  updatedAt?: string | null; // ISO Date String
 
-  agreement: Agreement; // Relation, assuming always included
+  agreement?: Agreement; // Optional on base type, usually included where needed
 }
 
+// Input type for the AI agreement generation flow
 export interface AgreementInput {
   tenantName: string;
   building: string;
