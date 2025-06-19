@@ -522,44 +522,30 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-// Simplified SidebarMenuButtonProps: removed 'asChild' and 'tooltip'
-type SidebarMenuButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'asChild'> & {
+type SidebarMenuButtonProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'asChild'> & {
   isActive?: boolean;
   variant?: VariantProps<typeof sidebarMenuButtonVariants>["variant"];
   size?: VariantProps<typeof sidebarMenuButtonVariants>["size"];
 } & Omit<VariantProps<typeof sidebarMenuButtonVariants>, "variant" | "size">;
 
 
-const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
-  (
-    {
-      isActive = false,
-      variant = "default",
-      size = "default",
-      className,
-      children,
-      ...restProps // Props from parent like Link (href, onClick) or TooltipTrigger
-    },
-    ref
-  ) => {
-    // Explicitly remove 'asChild' from restProps if it exists,
-    // as it's not a valid attribute for a DOM <button>.
-    // The 'asChild' from a parent <Link asChild...> or <TooltipTrigger asChild...>
-    // has already served its purpose by targeting this SidebarMenuButton
-    // to receive the parent's other props (e.g., href, aria-attributes).
-    const { asChild, ...buttonEffectiveProps } = restProps as any;
+const SidebarMenuButton = React.forwardRef<HTMLAnchorElement, SidebarMenuButtonProps>(
+  ({ className, variant, size, isActive, children, href, ...restProps }, ref) => {
+    // Explicitly remove asChild from restProps before spreading, as it's not a valid attribute for <a> if passed down.
+    const { asChild: _asChild, ...anchorEffectiveProps } = restProps as any;
 
     return (
-      <button
+      <a
         ref={ref}
+        href={href} // Use the href passed from Link
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
-        {...buttonEffectiveProps} // Spread the cleaned props
+        {...anchorEffectiveProps} // Spread other props (like onClick from Link, or TooltipTrigger props)
       >
-        {children} {/* children here are the icon and the span */}
-      </button>
+        {children}
+      </a>
     );
   }
 );
@@ -735,3 +721,4 @@ export {
 }
 
     
+

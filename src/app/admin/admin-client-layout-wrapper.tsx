@@ -3,6 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from 'react'; // Added useState and useEffect
 import {
   SidebarProvider,
   Sidebar,
@@ -46,7 +47,6 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from '@/components/ui/tooltip';
-import type React from 'react';
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -80,7 +80,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href));
               
-              // The component that SidebarMenuButton will render as (Link or div)
               const MenuButtonWrapper = ({ children: buttonChildren }: {children: React.ReactNode}) => (
                 <Link 
                   href={item.href} 
@@ -88,14 +87,14 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                   legacyBehavior={false} 
                   target={item.label === 'Tenant Portal (View)' ? '_blank' : undefined}
                   rel={item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined}
-                  className="block" // Ensure Link takes full width for click area
+                  className="block"
                 >
                   {buttonChildren}
                 </Link>
               );
 
               const menuItemCore = (
-                <SidebarMenuButton isActive={isActive}>
+                <SidebarMenuButton isActive={isActive} href={item.href}> {/* Pass href for the <a> tag */}
                   <item.icon />
                   <span>{item.label}</span>
                 </SidebarMenuButton>
@@ -170,10 +169,16 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminClientLayoutWrapper({ children }: { children: React.ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <SidebarProvider defaultOpen>
-      <TooltipProvider> {/* TooltipProvider wraps components using tooltips */}
-        <ActualAdminLayout>{children}</ActualAdminLayout>
+      <TooltipProvider>
+        {isMounted ? <ActualAdminLayout>{children}</ActualAdminLayout> : null}
       </TooltipProvider>
     </SidebarProvider>
   );
