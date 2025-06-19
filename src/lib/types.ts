@@ -1,34 +1,40 @@
 
+
 export interface PenaltyTier {
+  id?: string; // Optional ID if fetched from DB
   fromDay: number;
-  toDay?: number | null; // null means it's the last, ongoing tier in its sequence for the scope
+  toDay?: number | null; 
   feeType: 'Fixed' | 'Percentage';
   feeValue: number;
-  // Scope fields
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
-  applicableFloor?: string; // Used if scope is 'Floor'
-  applicableSpaceIdNames?: string[]; // Used if scope is 'SpecificSpaces', stores Space.spaceIdName
+  applicableFloor?: string; 
+  applicableSpaceIdNames?: string[]; 
 }
 
 export interface Building {
   id: string;
   name: string;
   address?: string;
-  penaltyPolicyTiers?: PenaltyTier[]; // A flat list of all tiers, each with its scope
-  createdAt: string; // ISO date string
+  penaltyPolicyTiers?: PenaltyTier[]; 
+  createdAt: string; 
+  updatedAt?: string;
 }
 
 export interface Space {
   id: string;
+  buildingId: string; // Added foreign key
   buildingName: string;
-  spaceIdName: string; // Unique identifier for the space within the building, e.g., "Unit 10A", "Office 201"
-  area: number; // sq ft
-  floor: string; // e.g., "1st", "Ground", "10"
-  utilityProrationShare: number; // Space's share of *building-wide* utilities (e.g., 0.1 for 10%)
+  spaceIdName: string; 
+  area: number; 
+  floor: string; 
+  utilityProrationShare: number; 
   monthlyRentalPrice: number;
   isOccupied: boolean;
-  tenantId?: string;
-  createdAt: string; // ISO date string
+  tenantId?: string | null; 
+  createdAt: string; 
+  updatedAt?: string;
+  tenant?: Tenant | null; 
+  building: Building; // Added relation to Building
 }
 
 export interface Tenant {
@@ -41,67 +47,93 @@ export interface Tenant {
   representativeName?: string;
   representativePhone?: string;
   rentedSpaceId: string | null;
-  createdAt: string; // ISO date string
+  createdAt: string; 
+  updatedAt?: string;
+  rentedSpace?: Space | null; 
+  agreements?: Agreement[]; // Added for checking active agreements
 }
 
 export interface Agreement {
   id:string;
   tenantId: string;
-  tenantName: string;
   spaceId: string;
-  spaceDescription: string;
   agreementText: string;
-  startDate: string;
+  startDate: string; 
   monthlyRentalPrice: number;
-  additionalTerms?: string;
-  createdAt: string;
+  additionalTerms?: string | null; 
+  createdAt: string; 
+  updatedAt?: string; 
   paymentTermMonths: number;
   initialPaymentMonths: number;
-  nextPaymentDueDate: string;
+  nextPaymentDueDate: string; 
 
-  initialPaymentAmount?: number;
-  initialPaymentMethod?: string;
-  initialPaymentReference?: string;
-  initialPaymentBankOrWalletName?: string;
-  initialPaymentDate?: string;
+  initialPaymentAmount?: number | null;
+  initialPaymentMethod?: string | null;
+  initialPaymentReference?: string | null;
+  initialPaymentBankOrWalletName?: string | null;
+  initialPaymentDate?: string | null; 
+  endDate?: string | null; // Added for checking active agreements
+
+  tenant?: Tenant | null; // Made optional, as it might not always be included
+  space?: Space | null;   // Made optional
+  bills?: Bill[]; // For checking associated bills
 }
 
 export interface BuildingUtilityItem {
+  id?: string; // Optional: useful if managing items individually, but not strictly needed for createMany
   name: string;
   totalCost: number;
   appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
-  applicableFloor?: string;
-  applicableSpaceIdNames?: string[];
+  applicableFloor?: string | null; // Made nullable to match Prisma
+  applicableSpaceIdNames?: string[] | null; // Made nullable to match Prisma
+  monthlyUtilitiesId?: string | null; // Added foreign key
 }
 
 export interface BuildingMonthlyUtilities {
   id: string;
+  buildingId: string; // Added foreign key
   buildingName: string;
   year: number;
-  month: number;
+  month: number; // 0-11
   utilities: BuildingUtilityItem[];
   createdAt: string;
+  updatedAt?: string; // Added updatedAt
+  building?: Building; // Added relation to Building
 }
 
 export interface Bill {
   id: string;
   agreementId: string;
   tenantId: string;
-  spaceDescription: string;
   billDate: string;
   dueDate: string;
   rentAmount: number;
   utilityBreakdown: Array<{ name: string; amount: number }>;
   penaltyAmount?: number;
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue' | 'Pending Verification'; // Added 'Pending Verification'
+  status: 'Pending' | 'Paid' | 'Overdue' | 'Pending Verification';
   paymentDate?: string;
   paymentMethod?: string;
   paymentReference?: string;
   bankOrWalletName?: string;
-  paymentProofUrl?: string; // For tenant uploaded proof
-  adminVerifiedPayment?: boolean; // Flag for admin confirmation
-  tenantPaymentNotes?: string; // Notes from tenant during proof submission
-  adminVerificationNotes?: string; // Notes from admin during verification
+  paymentProofUrl?: string;
+  adminVerifiedPayment?: boolean;
+  tenantPaymentNotes?: string;
+  adminVerificationNotes?: string;
+  createdAt?: string; // Added createdAt for recent activity
+  updatedAt?: string; // Added updatedAt
+
+  agreement?: Agreement | null; // Relation for tenant/space info
 }
 
+export interface AgreementInput {
+  tenantName: string;
+  building: string;
+  spaceId: string; 
+  spaceArea: number;
+  floor: string;
+  monthlyRentalPrice: number;
+  paymentTermMonths: number;
+  initialPaymentMonths: number;
+  additionalTerms?: string;
+}
