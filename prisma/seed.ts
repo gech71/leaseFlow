@@ -154,24 +154,31 @@ async function main() {
   const space1_B1 = await prisma.space.create({ // Alice's space in Sunrise Tower
     data: {
       buildingId: building1.id,
-      buildingName: building1.name, // Added buildingName
+      buildingName: building1.name,
       spaceIdName: 'Unit 101',
       area: 1200,
       floor: '10th',
       utilityProrationShare: 0.15,
       monthlyRentalPrice: 2500,
       isOccupied: true,
-      tenantId: tenant1.id, // Link tenant to space
+      tenantId: tenant1.id, 
     },
   });
   // Link space back to tenant
-  await prisma.tenant.update({ where: { id: tenant1.id }, data: { rentedSpaceId: space1_B1.id } });
+  await prisma.tenant.update({
+    where: { id: tenant1.id },
+    data: {
+      rentedSpace: {
+        connect: { id: space1_B1.id }
+      }
+    }
+  });
 
 
   const space2_B1 = await prisma.space.create({ // Vacant space in Sunrise Tower
     data: {
       buildingId: building1.id,
-      buildingName: building1.name, // Added buildingName
+      buildingName: building1.name,
       spaceIdName: 'Unit 102',
       area: 900,
       floor: '10th',
@@ -184,39 +191,53 @@ async function main() {
   const space1_B2 = await prisma.space.create({ // Bob's space in Ocean View Plaza
     data: {
       buildingId: building2.id,
-      buildingName: building2.name, // Added buildingName
+      buildingName: building2.name,
       spaceIdName: 'Suite 20A',
       area: 800,
       floor: '2nd',
       utilityProrationShare: 0.20,
       monthlyRentalPrice: 1950,
       isOccupied: true,
-      tenantId: tenant2.id, // Link tenant to space
+      tenantId: tenant2.id, 
     },
   });
    // Link space back to tenant
-  await prisma.tenant.update({ where: { id: tenant2.id }, data: { rentedSpaceId: space1_B2.id } });
+  await prisma.tenant.update({
+    where: { id: tenant2.id },
+    data: {
+      rentedSpace: {
+        connect: { id: space1_B2.id }
+      }
+    }
+  });
 
   const space2_B2 = await prisma.space.create({ // Carol's Penthouse in Ocean View Plaza
     data: {
         buildingId: building2.id,
-        buildingName: building2.name, // Added buildingName
+        buildingName: building2.name,
         spaceIdName: 'Penthouse Suite',
         area: 2500,
         floor: 'Penthouse',
         utilityProrationShare: 0.40,
         monthlyRentalPrice: 5500,
         isOccupied: true,
-        tenantId: tenant3.id, // Link tenant to space
+        tenantId: tenant3.id, 
     }
   });
    // Link space back to tenant
-  await prisma.tenant.update({ where: { id: tenant3.id }, data: { rentedSpaceId: space2_B2.id } });
+  await prisma.tenant.update({
+    where: { id: tenant3.id },
+    data: {
+      rentedSpace: {
+        connect: { id: space2_B2.id }
+      }
+    }
+  });
   
   const space1_B3 = await prisma.space.create({ // Vacant space in Tech Park One
     data: {
         buildingId: building3.id,
-        buildingName: building3.name, // Added buildingName
+        buildingName: building3.name,
         spaceIdName: 'Lab A1',
         area: 1500,
         floor: '1st',
@@ -304,7 +325,7 @@ async function main() {
       tenantId: tenant1.id,
       spaceDescription: agreement1.spaceDescription,
       billDate: formatISO(bill1_billDate),
-      dueDate: formatISO(addMonths(bill1_billDate, 0, {days: 14})), // Using addMonths with 0 months to add days
+      dueDate: formatISO(addMonths(bill1_billDate, 0, {days: 14})), 
       rentAmount: agreement1.monthlyRentalPrice,
       totalAmount: agreement1.monthlyRentalPrice + 50 + 20,
       status: 'Paid',
@@ -344,7 +365,7 @@ async function main() {
   
   // Bill for Bob (current month, overdue)
   const bill3_billDate = addMonths(parseISO(agreement2.startDate), 1); // Bill for month after initial payment
-  const bobBillDueDate = addMonths(bill3_billDate, 0, {days: 5}); // Bob pays early in the month after initial
+  const bobBillDueDate = addMonths(bill3_billDate, 0, {days: 5}); 
   await prisma.bill.create({
     data: {
       agreementId: agreement2.id,
@@ -388,14 +409,14 @@ async function main() {
   // 7. Create BuildingMonthlyUtilities (with nested BuildingUtilityItems)
   console.log('Creating BuildingMonthlyUtilities...');
   const todayDate = new Date();
-  const lastMonthDate = subDays(todayDate, todayDate.getDate()); // Gets the last day of the previous month
-  const lastMonth = lastMonthDate.getMonth(); // 0-11
+  const lastMonthDate = subDays(todayDate, todayDate.getDate()); 
+  const lastMonth = lastMonthDate.getMonth(); 
   const lastMonthYear = lastMonthDate.getFullYear();
 
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building1.id,
-      buildingName: building1.name, // Added buildingName
+      buildingName: building1.name,
       year: lastMonthYear,
       month: lastMonth, 
       utilities: {
@@ -411,7 +432,7 @@ async function main() {
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building2.id,
-      buildingName: building2.name, // Added buildingName
+      buildingName: building2.name,
       year: lastMonthYear,
       month: lastMonth,
       utilities: {
