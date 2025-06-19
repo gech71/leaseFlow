@@ -31,3 +31,4 @@ export default async function BuildingsPage() {
 
   return <BuildingsClientPage initialBuildings={serializableBuildings} />;
 }
+

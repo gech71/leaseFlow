@@ -181,3 +181,4 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     </div>
   );
 }
+
