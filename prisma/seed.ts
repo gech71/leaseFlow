@@ -154,6 +154,7 @@ async function main() {
   const space1_B1 = await prisma.space.create({ // Alice's space in Sunrise Tower
     data: {
       buildingId: building1.id,
+      buildingName: building1.name, // Added buildingName
       spaceIdName: 'Unit 101',
       area: 1200,
       floor: '10th',
@@ -170,6 +171,7 @@ async function main() {
   const space2_B1 = await prisma.space.create({ // Vacant space in Sunrise Tower
     data: {
       buildingId: building1.id,
+      buildingName: building1.name, // Added buildingName
       spaceIdName: 'Unit 102',
       area: 900,
       floor: '10th',
@@ -182,6 +184,7 @@ async function main() {
   const space1_B2 = await prisma.space.create({ // Bob's space in Ocean View Plaza
     data: {
       buildingId: building2.id,
+      buildingName: building2.name, // Added buildingName
       spaceIdName: 'Suite 20A',
       area: 800,
       floor: '2nd',
@@ -197,6 +200,7 @@ async function main() {
   const space2_B2 = await prisma.space.create({ // Carol's Penthouse in Ocean View Plaza
     data: {
         buildingId: building2.id,
+        buildingName: building2.name, // Added buildingName
         spaceIdName: 'Penthouse Suite',
         area: 2500,
         floor: 'Penthouse',
@@ -212,6 +216,7 @@ async function main() {
   const space1_B3 = await prisma.space.create({ // Vacant space in Tech Park One
     data: {
         buildingId: building3.id,
+        buildingName: building3.name, // Added buildingName
         spaceIdName: 'Lab A1',
         area: 1500,
         floor: '1st',
@@ -390,6 +395,7 @@ async function main() {
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building1.id,
+      buildingName: building1.name, // Added buildingName
       year: lastMonthYear,
       month: lastMonth, 
       utilities: {
@@ -405,6 +411,7 @@ async function main() {
   await prisma.buildingMonthlyUtilities.create({
     data: {
       buildingId: building2.id,
+      buildingName: building2.name, // Added buildingName
       year: lastMonthYear,
       month: lastMonth,
       utilities: {
@@ -429,3 +436,4 @@ main()
     await prisma.$disconnect();
     console.log('Prisma client disconnected.');
   });
+
