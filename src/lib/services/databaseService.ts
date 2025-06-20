@@ -247,11 +247,11 @@ export class DatabaseService {
     return prisma.user.create({ data });
   }
 
-  async getUserById(id: string, include?: Prisma.UserInclude): Promise<User | null> { // Changed parameter from userId to id (cuid)
+  async getUserById(id: string, include?: Prisma.UserInclude): Promise<User | null> { 
     return prisma.user.findUnique({ where: { id }, include });
   }
   
-  async getUserByExternalId(userId: string, include?: Prisma.UserInclude): Promise<User | null> { // New method to find by external userId
+  async getUserByExternalId(userId: string, include?: Prisma.UserInclude): Promise<User | null> { 
     return prisma.user.findUnique({ where: { userId }, include });
   }
 
@@ -267,26 +267,24 @@ export class DatabaseService {
     return prisma.user.findMany(params);
   }
 
-  async updateUser(id: string, data: Prisma.UserUpdateInput): Promise<User> { // Changed parameter from userId to id (cuid)
+  async updateUser(id: string, data: Prisma.UserUpdateInput): Promise<User> { 
     return prisma.user.update({ where: { id }, data });
   }
   
-  async updateUserByExternalId(userId: string, data: Prisma.UserUpdateInput): Promise<User> { // New method to update by external userId
+  async updateUserByExternalId(userId: string, data: Prisma.UserUpdateInput): Promise<User> { 
     return prisma.user.update({ where: { userId }, data });
   }
 
 
-  async deleteUser(id: string): Promise<User> { // Changed parameter from userId to id (cuid)
-    // Before deleting a user, ensure they are not managing any buildings
+  async deleteUser(id: string): Promise<User> { 
     const userWithBuildings = await prisma.user.findUnique({
       where: { id },
       include: { managedBuildings: { select: { id: true } } },
     });
 
     if (userWithBuildings && userWithBuildings.managedBuildings.length > 0) {
-      // Disconnect user from all managed buildings by setting their managedByUserId to null
       await prisma.building.updateMany({
-        where: { managedByUserId: userWithBuildings.userId }, // Use the external identity ID here
+        where: { managedByUserId: userWithBuildings.userId }, 
         data: { managedByUserId: null },
       });
     }
@@ -294,6 +292,10 @@ export class DatabaseService {
   }
 
   // --- Role ---
+  async createRole(data: Prisma.RoleCreateInput): Promise<Role> {
+    return prisma.role.create({ data });
+  }
+
   async getRoleById(id: string): Promise<Role | null> {
     return prisma.role.findUnique({ where: { id }});
   }
@@ -311,6 +313,19 @@ export class DatabaseService {
     include?: Prisma.RoleInclude;
   }): Promise<Role[]> {
     return prisma.role.findMany(params);
+  }
+
+  async updateRole(id: string, data: Prisma.RoleUpdateInput): Promise<Role> {
+    return prisma.role.update({ where: { id }, data });
+  }
+
+  async deleteRole(id: string): Promise<Role> {
+    // Optional: Check if role is in use before deleting
+    const usersWithRole = await prisma.user.count({ where: { roles: { some: { id } } } });
+    if (usersWithRole > 0) {
+      throw new Error("Cannot delete role as it is currently assigned to one or more users.");
+    }
+    return prisma.role.delete({ where: { id } });
   }
 }
 
