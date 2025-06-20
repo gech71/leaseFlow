@@ -156,9 +156,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         <SidebarHeader className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
             <AppLogo />
-            <div className="md:hidden">
-              <SidebarTrigger />
-            </div>
+            {/* This trigger is for mobile, and for desktop when expanded */}
+            <SidebarTrigger className="md:group-data-[state=collapsed]/sidebar-wrapper:hidden" />
           </div>
         </SidebarHeader>
         <SidebarContent className="p-2">
@@ -261,12 +260,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
         <div className="md:flex items-center justify-start mb-6 h-[3.7rem]">
-            <SidebarTrigger className={cn(
-              // Hide on mobile as it's in the sheet, hide on desktop when expanded
-              'md:hidden', 
-              (!isMobile && sidebarState === 'expanded') && 'md:hidden',
-              (!isMobile && sidebarState === 'collapsed') && 'md:flex'
-            )} />
+            {/* This trigger is for desktop only, and only when collapsed */}
+            <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
         </div>
         <div className="p-4 sm:p-6 lg:p-8 pt-0 md:pt-8">
           {children}
