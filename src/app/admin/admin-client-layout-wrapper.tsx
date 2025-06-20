@@ -86,8 +86,10 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                   <item.icon />
                   <span
                     className={cn(
-                      "flex-1 min-w-0", // Allow text to take space and wrap if needed
-                      (!isMobile && sidebarState === "collapsed") && "hidden" // Hide if collapsed on non-mobile desktop
+                      "flex-1 min-w-0", // Base layout for the span
+                      // If not mobile AND sidebar is collapsed, hide the text.
+                      // Otherwise (if mobile OR sidebar is expanded), truncate the text to match image.
+                      (!isMobile && sidebarState === "collapsed") ? "hidden" : "truncate"
                     )}
                   >
                     {item.label}
@@ -98,7 +100,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               const commonButtonProps = {
                 isActive: isActive,
                 className: cn(
-                  "block", // Link component needs block or similar for full width
                   item.label === 'Tenant Portal (View)' && 'mt-auto border-t border-sidebar-border pt-2'
                 ),
                 target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
@@ -143,7 +144,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                   <AvatarImage src="https://placehold.co/100x100.png" alt="Admin User" data-ai-hint="user avatar"/>
                   <AvatarFallback>AU</AvatarFallback>
                 </Avatar>
-                <div className={cn("text-left", sidebarState === "collapsed" && !isMobile ? "hidden" : "")}>
+                <div className={cn("text-left", (!isMobile && sidebarState === "collapsed") ? "hidden" : "")}>
                   <p className="text-sm font-medium">Admin User</p>
                   <p className="text-xs text-sidebar-foreground/70">admin@leaseflow.com</p>
                 </div>
@@ -189,6 +190,8 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
+    // Return null or a basic loader to prevent flash of unstyled content or hydration errors
+    // For this specific case, returning null ensures client-side logic dependent on window/document is safe
     return null; 
   }
 
