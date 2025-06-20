@@ -80,9 +80,14 @@ export async function saveBuildingUtilitiesAction(
       // buildingName could also be updated here if it can change, though less likely for this entity
     };
 
-    const result = await databaseService.upsertBuildingMonthlyUtilities(where, createData, updateData, {
-      include: { utilities: true },
-    });
+    const result = await databaseService.upsertBuildingMonthlyUtilities(
+      where, 
+      createData, 
+      updateData, 
+      { // Corrected: Pass include options directly
+        utilities: true 
+      }
+    );
 
     revalidatePath('/admin/building-utilities');
     revalidatePath('/admin/billing'); // Billing page might depend on this data
