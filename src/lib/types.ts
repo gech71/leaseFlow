@@ -273,6 +273,13 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: 'settings:role_management:manage', label: 'Manage Roles (CUD)' },
     ],
   },
+  {
+    resourceId: 'portal',
+    resourceLabel: 'Tenant Portal Link',
+    permissions: [
+      { id: 'portal:view', label: 'View Link in Sidebar' },
+    ],
+  },
 ];
 
 // Flattened list for convenience, though direct iteration over structured list is often better.
