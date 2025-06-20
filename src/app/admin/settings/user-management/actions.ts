@@ -10,7 +10,7 @@ export async function getUserManagementPageData() {
     const users = await databaseService.getAllUsers({
       include: { 
         roles: true, 
-        managedBuildings: true // Buildings directly managed by this user
+        managedBuildings: true
       },
       orderBy: { name: 'asc' }
     });
@@ -25,47 +25,41 @@ export async function getUserManagementPageData() {
 }
 
 export async function updateUserAssignments(
-  targetUserId: string, // This is the User.id (cuid), not User.userId (from identity)
-  selectedRoleIds: string[],
+  targetUserId: string,
+  selectedRoleId: string | null, // Changed from string[] to string | null
   selectedManagedBuildingIds: string[]
 ) {
   try {
-    // 1. Update roles for the user
-    await databaseService.updateUser(targetUserId, { // Assuming updateUser uses the User.id (cuid)
-      roles: {
-        set: selectedRoleIds.map(id => ({ id })),
-      },
+    // 1. Update role for the user
+    await databaseService.updateUser(targetUserId, {
+      roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] }, // Handle single role or no role
     });
 
     // 2. Update managed buildings
-    // First, find all buildings currently managed by this user
-    const currentlyManagedBuildings = await databaseService.getAllBuildings({
-      where: { managedByUserId: targetUserId } // Assuming managedByUserId refers to User.userId (identity ID)
-    });
-    
-    const userToUpdate = await databaseService.getUserById(targetUserId); // Fetch user by CUID
+    const userToUpdate = await databaseService.getUserById(targetUserId);
     if (!userToUpdate) {
         throw new Error("User not found with internal ID.");
     }
-    const identityUserId = userToUpdate.userId; // This is the User.userId (from identity provider)
+    const identityUserId = userToUpdate.userId;
 
-    // Buildings to remove user from (uncheck)
+    const currentlyManagedBuildings = await databaseService.getAllBuildings({
+      where: { managedByUserId: identityUserId }
+    });
+
     const buildingsToUnassign = currentlyManagedBuildings.filter(
       b => !selectedManagedBuildingIds.includes(b.id)
     );
     for (const building of buildingsToUnassign) {
       await databaseService.updateBuilding(building.id, {
-        manager: { disconnect: true } // This should set managedByUserId to null
+        manager: { disconnect: true }
       });
     }
 
-    // Buildings to assign user to (check)
     for (const buildingId of selectedManagedBuildingIds) {
-      // Check if this building is already managed by this user to avoid redundant updates
       const isAlreadyManaged = currentlyManagedBuildings.some(b => b.id === buildingId && b.managedByUserId === identityUserId);
       if (!isAlreadyManaged) {
         await databaseService.updateBuilding(buildingId, {
-          manager: { connect: { userId: identityUserId } } // Connect using the User.userId (identity ID)
+          manager: { connect: { userId: identityUserId } }
         });
       }
     }

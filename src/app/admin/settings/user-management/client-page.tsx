@@ -12,7 +12,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { User, Building, ShieldCheck, Edit, Loader2, AlertTriangle } from 'lucide-react';
 import { updateUserAssignments } from './actions';
-import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client'; // Import Prisma types for base structure
+import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Client-side types with serialized dates
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
@@ -53,31 +54,23 @@ export function UserManagementClientPage({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const [currentUserToEdit, setCurrentUserToEdit] = useState<ClientUserWithAssignments | null>(null);
-  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set());
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null); // Changed from Set to string|null
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setIsMounted(true);
-    setUsers(initialUsers); // Re-sync if initialUsers prop changes (e.g., after server revalidation)
+    setUsers(initialUsers);
   }, [initialUsers]);
 
   const handleEditUser = (user: ClientUserWithAssignments) => {
     setCurrentUserToEdit(user);
-    setSelectedRoleIds(new Set(user.roles.map(role => role.id)));
+    setSelectedRoleId(user.roles[0]?.id || null); // Assign first role ID or null
     setSelectedBuildingIds(new Set(user.managedBuildings.map(building => building.id)));
     setIsDialogOpen(true);
   };
 
-  const handleRoleToggle = (roleId: string) => {
-    setSelectedRoleIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(roleId)) {
-        newSet.delete(roleId);
-      } else {
-        newSet.add(roleId);
-      }
-      return newSet;
-    });
+  const handleRoleSelect = (roleId: string) => { // New handler for RadioGroup
+    setSelectedRoleId(roleId);
   };
 
   const handleBuildingToggle = (buildingId: string) => {
@@ -97,8 +90,8 @@ export function UserManagementClientPage({
     setIsSaving(true);
 
     const result = await updateUserAssignments(
-      currentUserToEdit.id, // Pass the internal CUID of the user
-      Array.from(selectedRoleIds),
+      currentUserToEdit.id,
+      selectedRoleId, // Pass single role ID
       Array.from(selectedBuildingIds)
     );
 
@@ -106,14 +99,11 @@ export function UserManagementClientPage({
     if (result.success) {
       toast({ title: "Success", description: result.message });
       setIsDialogOpen(false);
-      // Refresh users from props by triggering a re-fetch on the parent server component if needed
-      // For now, assume parent handles revalidation and prop update.
-      // Or, optimistically update client state:
       setUsers(prevUsers => prevUsers.map(u => {
         if (u.id === currentUserToEdit.id) {
           return {
             ...u,
-            roles: allRoles.filter(r => selectedRoleIds.has(r.id)),
+            roles: selectedRoleId ? allRoles.filter(r => r.id === selectedRoleId) : [],
             managedBuildings: allBuildings.filter(b => selectedBuildingIds.has(b.id)),
           };
         }
@@ -147,7 +137,7 @@ export function UserManagementClientPage({
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Roles</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead className="hidden md:table-cell">Managed Buildings</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -158,7 +148,7 @@ export function UserManagementClientPage({
                     <TableCell className="font-medium">{user.name || `${user.firstName} ${user.lastName}`.trim() || 'N/A'}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell className="text-xs">
-                      {user.roles.length > 0 ? user.roles.map(role => role.name).join(', ') : <span className="italic text-muted-foreground">No roles</span>}
+                      {user.roles.length > 0 ? user.roles[0].name : <span className="italic text-muted-foreground">No role</span>}
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-xs">
                       {user.managedBuildings.length > 0 ? user.managedBuildings.map(b => b.name).join(', ') : <span className="italic text-muted-foreground">No buildings</span>}
@@ -187,23 +177,23 @@ export function UserManagementClientPage({
             <ScrollArea className="flex-grow py-4 pr-2 -mr-2">
                 <div className="space-y-6">
                     <section>
-                        <h3 className="text-md font-semibold mb-2 flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary"/>Assign Roles</h3>
-                        <div className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-48 overflow-y-auto">
-                        {allRoles.length === 0 && <p className="text-sm text-muted-foreground">No roles available to assign.</p>}
-                        {allRoles.map(role => (
-                            <div key={role.id} className="flex items-center space-x-2">
-                            <Checkbox
-                                id={`role-${currentUserToEdit.id}-${role.id}`}
-                                checked={selectedRoleIds.has(role.id)}
-                                onCheckedChange={() => handleRoleToggle(role.id)}
-                                disabled={isSaving}
-                            />
-                            <Label htmlFor={`role-${currentUserToEdit.id}-${role.id}`} className="text-sm font-normal cursor-pointer">
-                                {role.name} <span className="text-xs text-muted-foreground">({role.description || 'No description'})</span>
-                            </Label>
-                            </div>
-                        ))}
-                        </div>
+                        <h3 className="text-md font-semibold mb-2 flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary"/>Assign Role</h3>
+                        <RadioGroup
+                          value={selectedRoleId || ""}
+                          onValueChange={handleRoleSelect}
+                          className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-48 overflow-y-auto"
+                          disabled={isSaving}
+                        >
+                          {allRoles.length === 0 && <p className="text-sm text-muted-foreground">No roles available to assign.</p>}
+                          {allRoles.map(role => (
+                              <div key={role.id} className="flex items-center space-x-2">
+                                <RadioGroupItem value={role.id} id={`role-${currentUserToEdit.id}-${role.id}`} disabled={isSaving} />
+                                <Label htmlFor={`role-${currentUserToEdit.id}-${role.id}`} className="text-sm font-normal cursor-pointer">
+                                    {role.name} <span className="text-xs text-muted-foreground">({role.description || 'No description'})</span>
+                                </Label>
+                              </div>
+                          ))}
+                        </RadioGroup>
                     </section>
 
                     <section>
@@ -230,7 +220,7 @@ export function UserManagementClientPage({
             
             <DialogFooter className="pt-4 border-t">
               <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
-              <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button onClick={handleSaveChanges} disabled={isSaving || !selectedRoleId} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                 Save Changes
               </Button>
