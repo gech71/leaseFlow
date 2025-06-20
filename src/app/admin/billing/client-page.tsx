@@ -37,96 +37,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { getBillingPageDataAction, generateBillAndUpdateAgreementAction, recordPaymentOrVerificationAction, deleteBillAction, type BillingPageData as ServerBillingPageData } from './actions'; // Renamed BillingPageData import
-
-// Client-side representation types, dates as strings
-interface ClientTenant extends Omit<TenantPrismaOriginal, 'createdAt' | 'updatedAt' | 'rentedSpaceId' | 'agreements' | 'bills'> {
-  createdAt: string;
-  updatedAt: string;
-  rentedSpaceId?: string | null;
-}
-
-interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id' | 'buildingId'> { 
-  id?: string; 
-  buildingId?: string | null;
-}
-
-interface ClientSpaceForBuilding extends Omit<SpacePrisma, 'createdAt' | 'updatedAt' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant' | 'building'> {
-  createdAt: string;
-  updatedAt: string;
-  tenantId?: string | null;
-  buildingId: string;
-}
-
-interface ClientBuilding extends Omit<BuildingPrisma, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers' | 'spaces' | 'buildingMonthlyUtilities'> {
-  createdAt: string;
-  updatedAt: string;
-  penaltyPolicyTiers: ClientPenaltyTier[];
-  spaces: ClientSpaceForBuilding[];
-}
-
-
-interface ClientSpaceForAgreement extends Omit<SpacePrisma, 'createdAt' | 'updatedAt' | 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant'> {
-  createdAt: string;
-  updatedAt: string;
-  building: ClientBuilding;
-  tenantId?: string | null;
-  buildingId: string;
-}
-
-interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space' | 'bills' | 'tenantId' | 'spaceId'> {
-  createdAt: string;
-  updatedAt: string;
-  startDate: string;
-  nextPaymentDueDate: string;
-  initialPaymentDate?: string | null;
-  endDate?: string | null; 
-  tenant: ClientTenant;
-  space: ClientSpaceForAgreement;
-  tenantId: string;
-  spaceId: string;
-  // bills are part of ClientBill, which references this ClientAgreement type to avoid full circular definitions here
-}
-
-// Simplified utility item for client-side, matching parsed JSON structure
-interface ClientUtilityBreakdownItem {
-  id?: string;
-  name: string;
-  amount: number;
-}
-
-interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId'> {
-  createdAt: string;
-  updatedAt: string;
-  billDate: string;
-  dueDate: string;
-  paymentDate?: string | null;
-  agreement: ClientAgreement; 
-  utilityBreakdown: ClientUtilityBreakdownItem[];
-  tenantId: string;
-  agreementId: string;
-  // Added for client-side processing
-  tenantName?: string; 
-  currentStatus?: BillPrismaOriginal['status'];
-  calculatedPenalty?: number | null;
-  calculatedTotal?: number;
-}
-
-interface ClientBuildingMonthlyUtilities extends Omit<BuildingMonthlyUtilitiesPrisma, 'createdAt' | 'updatedAt' | 'utilities' | 'buildingId' | 'building'> {
-    createdAt: string;
-    updatedAt: string;
-    utilities: Prisma.BuildingUtilityItemGetPayload<{}>[]; // Keep original Prisma type for items here
-    buildingId: string;
-}
-
-// This type matches the structure of BillingPageData but with dates as strings
-export interface SerializedBillingPageData {
-  agreements: ClientAgreement[];
-  spaces: (Omit<SpacePrisma, 'createdAt' | 'updatedAt'| 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant'> & { createdAt: string; updatedAt: string; building: ClientBuilding, tenantId?: string | null, buildingId: string; })[];
-  buildings: ClientBuilding[];
-  bills: ClientBill[];
-  buildingMonthlyUtilities: ClientBuildingMonthlyUtilities[];
-}
+import { getBillingPageDataAction, generateBillAndUpdateAgreementAction, recordPaymentOrVerificationAction, deleteBillAction } from './actions';
+import type { SerializedBillingPageData, ClientBill, ClientAgreement, ClientBuilding } from './page'; // Import Serialized types from page.tsx
 
 
 const paymentFormSchema = z.object({
@@ -153,6 +65,7 @@ interface BillingClientPageProps {
 export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [agreements, setAgreements] = useState<ClientAgreement[]>(initialData.agreements);
   const [bills, setBills] = useState<ClientBill[]>(initialData.bills);
+  const [allBuildings, setAllBuildings] = useState<ClientBuilding[]>(initialData.buildings); // Store all buildings for penalty calculation
   
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<ClientBill | null>(null);
@@ -177,98 +90,18 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setIsMounted(true);
     setAgreements(initialData.agreements);
     setBills(initialData.bills);
+    setAllBuildings(initialData.buildings);
     setToday(startOfDay(new Date()));
   }, [initialData]);
 
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetching new data (ServerBillingPageData)
-      const newData = await getBillingPageDataAction();
-      
-      // Serializing this new data to match SerializedBillingPageData structure
-      const serializedNewData: SerializedBillingPageData = {
-        agreements: newData.agreements.map(ag => ({
-            ...ag,
-            createdAt: ag.createdAt.toISOString(),
-            updatedAt: ag.updatedAt.toISOString(),
-            startDate: ag.startDate.toISOString(),
-            nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
-            initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
-            endDate: ag.endDate?.toISOString() || null,
-            tenant: { ...ag.tenant, createdAt: ag.tenant.createdAt.toISOString(), updatedAt: ag.tenant.updatedAt.toISOString() } as ClientTenant,
-            space: { 
-                ...ag.space, 
-                createdAt: ag.space.createdAt.toISOString(), 
-                updatedAt: ag.space.updatedAt.toISOString(),
-                building: {
-                    ...ag.space.building, 
-                    createdAt: ag.space.building.createdAt.toISOString(),
-                    updatedAt: ag.space.building.updatedAt.toISOString(),
-                    penaltyPolicyTiers: (ag.space.building.penaltyPolicyTiers || []).map(pt => ({...pt}) as ClientPenaltyTier),
-                    spaces: (ag.space.building.spaces || []).map(s => ({...s, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt.toISOString()}) as ClientSpaceForBuilding),
-                } as ClientBuilding,
-            } as ClientSpaceForAgreement,
-        })),
-        spaces: newData.spaces.map(s => ({ 
-            ...s, 
-            createdAt: s.createdAt.toISOString(), 
-            updatedAt: s.updatedAt.toISOString(),
-            building: {
-                ...s.building,
-                createdAt: s.building.createdAt.toISOString(),
-                updatedAt: s.building.updatedAt.toISOString(),
-                penaltyPolicyTiers: (s.building.penaltyPolicyTiers || []).map(pt => ({...pt}) as ClientPenaltyTier),
-                 spaces: (s.building.spaces || []).map(sp => ({...sp, createdAt: sp.createdAt.toISOString(), updatedAt: sp.updatedAt.toISOString()}) as ClientSpaceForBuilding),
-            } as ClientBuilding,
-        })),
-        buildings: newData.buildings.map(b => ({ 
-            ...b, 
-            createdAt: b.createdAt.toISOString(), 
-            updatedAt: b.updatedAt.toISOString(),
-            penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(pt => ({...pt}) as ClientPenaltyTier),
-            spaces: (b.spaces || []).map(s => ({...s, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt.toISOString() }) as ClientSpaceForBuilding),
-        })),
-        bills: newData.bills.map(b => ({
-            ...b,
-            createdAt: b.createdAt.toISOString(),
-            updatedAt: b.updatedAt.toISOString(),
-            billDate: b.billDate.toISOString(),
-            dueDate: b.dueDate.toISOString(),
-            paymentDate: b.paymentDate?.toISOString() || null,
-            utilityBreakdown: (b.utilityBreakdown || []).map(ub => ({...ub}) as ClientUtilityBreakdownItem),
-            agreement: {
-                ...b.agreement,
-                createdAt: b.agreement.createdAt.toISOString(),
-                updatedAt: b.agreement.updatedAt.toISOString(),
-                startDate: b.agreement.startDate.toISOString(),
-                nextPaymentDueDate: b.agreement.nextPaymentDueDate.toISOString(),
-                initialPaymentDate: b.agreement.initialPaymentDate?.toISOString() || null,
-                endDate: b.agreement.endDate?.toISOString() || null,
-                tenant: { ...b.agreement.tenant, createdAt: b.agreement.tenant.createdAt.toISOString(), updatedAt: b.agreement.tenant.updatedAt.toISOString() } as ClientTenant,
-                space: { 
-                    ...b.agreement.space, 
-                    createdAt: b.agreement.space.createdAt.toISOString(), 
-                    updatedAt: b.agreement.space.updatedAt.toISOString(),
-                    building: {
-                        ...b.agreement.space.building,
-                         createdAt: b.agreement.space.building.createdAt.toISOString(),
-                         updatedAt: b.agreement.space.building.updatedAt.toISOString(),
-                         penaltyPolicyTiers: (b.agreement.space.building.penaltyPolicyTiers || []).map(pt => ({...pt}) as ClientPenaltyTier),
-                         spaces: (b.agreement.space.building.spaces || []).map(s => ({...s, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt.toISOString()}) as ClientSpaceForBuilding),
-                    } as ClientBuilding,
-                } as ClientSpaceForAgreement,
-            } as ClientAgreement,
-        })),
-        buildingMonthlyUtilities: newData.buildingMonthlyUtilities.map(bu => ({
-            ...bu,
-            createdAt: bu.createdAt.toISOString(),
-            updatedAt: bu.updatedAt.toISOString(),
-            utilities: (bu.utilities || []).map(u => ({...u})), // These are already simple Prisma.BuildingUtilityItemGetPayload
-        })),
-      };
+      // getBillingPageDataAction now returns SerializedBillingPageData
+      const serializedNewData = await getBillingPageDataAction();
       setAgreements(serializedNewData.agreements);
       setBills(serializedNewData.bills);
+      setAllBuildings(serializedNewData.buildings);
     } catch (error) {
       toast({ title: "Error Refreshing Data", description: (error as Error).message, variant: "destructive" });
     }
@@ -281,7 +114,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     if (!agreementForBill || !agreementForBill.space || !agreementForBill.space.building) return 0;
     
     const space = agreementForBill.space;
-    const building = initialData.buildings.find(b => b.id === space.buildingId); 
+    const building = allBuildings.find(b => b.id === space.buildingId); 
     if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
 
     const dueDate = parseISO(bill.dueDate);
@@ -290,7 +123,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const daysOverdue = differenceInDays(today, dueDate);
     if (daysOverdue <= 0) return 0;
 
-    let applicableTiers: ClientPenaltyTier[] = [];
+    let applicableTiers = [];
     const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
       t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
     );
@@ -307,18 +140,18 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
     let calculatedPenalty = 0;
     for (const tier of sortedTiers) {
-      if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
+      if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
         if (tier.feeType === 'Fixed') calculatedPenalty = tier.feeValue;
         else if (tier.feeType === 'Percentage') calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
         break;
       }
     }
     return parseFloat(calculatedPenalty.toFixed(2));
-  }, [agreements, initialData.buildings, today]);
+  }, [agreements, allBuildings, today]);
 
   const processedClientBills = useMemo(() => {
     return bills.map(bill => {
-      let currentStatus = bill.status as BillPrismaOriginal['status']; // Start with DB status
+      let currentStatus = bill.status as BillPrismaOriginal['status']; 
       if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
         currentStatus = 'Overdue';
       }
@@ -332,7 +165,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       
       return {
         ...bill,
-        currentStatus: currentStatus, // Store the derived status for display
+        currentStatus: currentStatus, 
         penaltyAmount: penalty > 0 ? penalty : undefined,
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
         tenantName: bill.agreement?.tenant?.name || 'N/A',
@@ -382,7 +215,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setIsLoading(false);
 
     if (result.success && result.bill) {
-      toast({ title: "Bill Generated", description: `New bill for ${agreement.tenant.name} (Due: ${format(parseISO(result.bill.dueDate.toISOString()), 'PP')}) created. Total: $${result.bill.totalAmount.toFixed(2)}` });
+      toast({ title: "Bill Generated", description: `New bill for ${agreement.tenant?.name} (Due: ${format(parseISO(result.bill.dueDate.toISOString()), 'PP')}) created. Total: $${result.bill.totalAmount.toFixed(2)}` });
       await refreshBillingData();
     } else {
       toast({ title: "Bill Generation Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
@@ -395,6 +228,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const errorMessages: string[] = [];
 
     for (const agreement of agreements) {
+        if (!agreement.tenant) { // Skip if tenant data is missing on agreement
+             skippedCount++;
+             continue;
+        }
         const agreementStartDate = parseISO(agreement.startDate);
         const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
         if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) { skippedCount++; continue; }
@@ -426,7 +263,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const handleOpenVerificationDialog = (bill: ClientBill) => { setBillForVerification(bill); setIsVerificationDialogOpen(true); };
   
   const handleRecordPaymentSubmit = async (values: PaymentFormValues) => {
-    if (!billForPayment) return;
+    if (!billForPayment || !billForPayment.agreement) return;
     setIsLoading(true);
     const adminProofUrl = adminSelectedProofFile ? `admin_simulated_slip_${adminSelectedProofFile.name}` : billForPayment.paymentProofUrl;
 
@@ -448,7 +285,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   };
   
   const handleVerificationSubmit = async (values: PaymentFormValues, action: 'confirmVerification' | 'rejectVerification') => {
-    if (!billForVerification) return;
+    if (!billForVerification || !billForVerification.agreement) return;
     setIsLoading(true);
     const adminProofUrl = adminSelectedProofFile ? `admin_sim_replaced_slip_${adminSelectedProofFile.name}` : billForVerification.paymentProofUrl;
 
@@ -520,6 +357,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {agreements.map(agreement => {
+            if (!agreement.tenant || !agreement.space) return null; // Skip if essential data missing
             const agreementStartDate = parseISO(agreement.startDate);
             const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
             const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
@@ -547,7 +385,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <DialogContent className="sm:max-w-md">
               <DialogHeader>
                   <DialogTitle className="font-headline text-xl">{billForPayment?.status === 'Paid' ? 'Update Payment Details' : 'Record Payment'}</DialogTitle>
-                  {billForPayment && <DialogDescription>For {billForPayment.agreement.space.spaceIdName} - Total: ${processedClientBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)}</DialogDescription>}
+                  {billForPayment && billForPayment.agreement && billForPayment.agreement.space && <DialogDescription>For {billForPayment.agreement.space.spaceIdName} - Total: ${processedClientBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)}</DialogDescription>}
               </DialogHeader>
               <Form {...paymentForm}>
                   <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
@@ -567,7 +405,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                   <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
-                  {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: ${processedClientBills.find(pb => pb.id === billForVerification.id)?.calculatedTotal?.toFixed(2)}</DialogDescription>}
+                  {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: ${processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount?.toFixed(2)}</DialogDescription>}
               </DialogHeader>
               {billForVerification && ( <div className="text-sm space-y-2 py-2"> <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p> <p><strong>Submitted Proof:</strong> {billForVerification.paymentProofUrl ? <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}> {billForVerification.paymentProofUrl} (Click to view - simulated) </Button> : <span className="italic text-muted-foreground">No proof URL found.</span>} </p> </div> )}
               <Form {...paymentForm}>
@@ -614,7 +452,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                 {processedClientBills.map((bill) => (
                   <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
                     <TableCell className="font-medium">{bill.tenantName}</TableCell>
-                    <TableCell className="hidden md:table-cell text-xs">{bill.agreement.space.spaceIdName}, {bill.agreement.space.buildingName}</TableCell>
+                    <TableCell className="hidden md:table-cell text-xs">{bill.agreement?.space?.spaceIdName}, {bill.agreement?.space?.buildingName}</TableCell>
                     <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
                     <TableCell className={bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
                     <TableCell className="hidden lg:table-cell text-right">${bill.rentAmount.toFixed(2)}</TableCell>

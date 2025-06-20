@@ -3,34 +3,15 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrisma, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal } from '@prisma/client';
+import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal } from '@prisma/client';
 import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, isSameDay, setMonth, setYear, parseISO, format } from 'date-fns';
+import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 
-// Define a simpler type for utility items if they are stored as JSON
-interface ParsedUtilityItem {
-  id?: string; // Optional, if JSON contains it
-  name: string;
-  amount: number;
-}
+const EPOCH_ISO_STRING = new Date(0).toISOString();
 
-// Adjusted types to use ParsedUtilityItem for bill.utilityBreakdown
-export interface BillingPageData {
-  agreements: (AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } } })[];
-  spaces: (SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } })[];
-  buildings: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] })[];
-  bills: (Omit<BillPrisma, 'utilityBreakdown'> & { 
-    utilityBreakdown: ParsedUtilityItem[]; 
-    agreement: AgreementPrismaOriginal & { 
-      tenant: TenantPrismaOriginal; 
-      space: SpacePrismaOriginal & { 
-        building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } 
-      } 
-    } 
-  })[]; 
-  buildingMonthlyUtilities: (BuildingMonthlyUtilitiesPrisma & { utilities: Prisma.BuildingUtilityItemGetPayload<{}>[] })[];
-}
+// Original data structure from DB (BillingPageData definition removed as action now returns SerializedBillingPageData)
 
-export async function getBillingPageDataAction(): Promise<BillingPageData> {
+export async function getBillingPageDataAction(): Promise<SerializedBillingPageData> {
   const today = new Date();
   const currentMonth = getMonth(today);
   const currentYear = getYear(today);
@@ -67,7 +48,6 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
             }
           }
         }
-        // utilityBreakdown is NOT included here if it's a scalar JSON field (Bill model limitation)
       },
       orderBy: { billDate: 'desc' }
     }),
@@ -82,14 +62,70 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
     })
   ]);
 
-  const agreements = agreementsData as BillingPageData['agreements'];
-  const spaces = spacesData as BillingPageData['spaces'];
-  const buildings = buildingsData as BillingPageData['buildings'];
-  
-  const bills = billsDataRaw.map(billRaw => {
-    let parsedUtilityBreakdown: ParsedUtilityItem[] = [];
-    const rawUtilityData = (billRaw as any).utilityBreakdown; 
+  // Serialization logic moved here
+  const serializedAgreements = agreementsData.map(ag => ({
+    ...(ag as AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } } }),
+    createdAt: ag.createdAt ? ag.createdAt.toISOString() : EPOCH_ISO_STRING,
+    updatedAt: ag.updatedAt ? ag.updatedAt.toISOString() : (ag.createdAt ? ag.createdAt.toISOString() : EPOCH_ISO_STRING),
+    startDate: ag.startDate ? ag.startDate.toISOString() : EPOCH_ISO_STRING,
+    nextPaymentDueDate: ag.nextPaymentDueDate ? ag.nextPaymentDueDate.toISOString() : EPOCH_ISO_STRING,
+    initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
+    endDate: ag.endDate?.toISOString() || null,
+    tenant: ag.tenant ? {
+      ...(ag.tenant as TenantPrismaOriginal),
+      createdAt: ag.tenant.createdAt ? ag.tenant.createdAt.toISOString() : EPOCH_ISO_STRING,
+      updatedAt: ag.tenant.updatedAt ? ag.tenant.updatedAt.toISOString() : (ag.tenant.createdAt ? ag.tenant.createdAt.toISOString() : EPOCH_ISO_STRING)
+    } : null,
+    space: ag.space ? {
+        ...(ag.space as SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } }),
+        createdAt: ag.space.createdAt ? ag.space.createdAt.toISOString() : EPOCH_ISO_STRING,
+        updatedAt: ag.space.updatedAt ? ag.space.updatedAt.toISOString() : (ag.space.createdAt ? ag.space.createdAt.toISOString() : EPOCH_ISO_STRING),
+        building: ag.space.building ? {
+            ...(ag.space.building as BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }),
+            createdAt: ag.space.building.createdAt ? ag.space.building.createdAt.toISOString() : EPOCH_ISO_STRING,
+            updatedAt: ag.space.building.updatedAt ? ag.space.building.updatedAt.toISOString() : (ag.space.building.createdAt ? ag.space.building.createdAt.toISOString() : EPOCH_ISO_STRING),
+            penaltyPolicyTiers: (ag.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
+            spaces: (ag.space.building.spaces || []).map(s => ({
+                ...s,
+                createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
+                updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
+            }))
+        } : null
+    } : null,
+  })) as SerializedBillingPageData['agreements']; // Cast to ensure type match
 
+  const serializedSpaces = spacesData.map(s => ({
+    ...(s as SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } }),
+    createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
+    updatedAt: s.updatedAt ? s.updatedAt.toISOString() : (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING),
+    building: s.building ? {
+        ...(s.building as BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }),
+        createdAt: s.building.createdAt ? s.building.createdAt.toISOString() : EPOCH_ISO_STRING,
+        updatedAt: s.building.updatedAt ? s.building.updatedAt.toISOString() : (s.building.createdAt ? s.building.createdAt.toISOString() : EPOCH_ISO_STRING),
+        penaltyPolicyTiers: (s.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
+          spaces: (s.building.spaces || []).map(sp => ({
+            ...sp,
+            createdAt: sp.createdAt ? sp.createdAt.toISOString() : EPOCH_ISO_STRING,
+            updatedAt: sp.updatedAt?.toISOString() || (sp.createdAt ? sp.createdAt.toISOString() : EPOCH_ISO_STRING)
+        }))
+    } : null
+  })) as SerializedBillingPageData['spaces'];
+
+  const serializedBuildings = buildingsData.map(b => ({
+    ...(b as BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }),
+    createdAt: b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING,
+    updatedAt: b.updatedAt ? b.updatedAt.toISOString() : (b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING),
+    penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(pt => ({...pt})),
+    spaces: (b.spaces || []).map(s => ({
+        ...s,
+        createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
+        updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
+    }))
+  })) as SerializedBillingPageData['buildings'];
+  
+  const serializedBills = billsDataRaw.map(billRaw => {
+    let parsedUtilityBreakdown: SerializedParsedUtilityItem[] = [];
+    const rawUtilityData = (billRaw as any).utilityBreakdown; 
     if (typeof rawUtilityData === 'string') {
       try {
         const jsonData = JSON.parse(rawUtilityData);
@@ -101,8 +137,6 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
               amount: item.amount,
               id: typeof item.id === 'string' ? item.id : undefined 
             }));
-        } else {
-          console.warn(`Parsed utilityBreakdown for bill ${billRaw.id} is not an array:`, jsonData);
         }
       } catch (e) {
         console.error(`Failed to parse utilityBreakdown JSON for bill ${billRaw.id}:`, e, rawUtilityData);
@@ -117,25 +151,71 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
             }));
     }
     
-    const agreementForBill = billRaw.agreement as unknown as BillingPageData['bills'][number]['agreement'];
+    const billCreatedAt = billRaw.createdAt ? billRaw.createdAt.toISOString() : EPOCH_ISO_STRING;
+    const billUpdatedAt = billRaw.updatedAt ? billRaw.updatedAt.toISOString() : billCreatedAt;
+    const agreementForBill = billRaw.agreement as (AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } } });
 
     return {
-      ...billRaw,
-      agreement: agreementForBill, 
+      ...(billRaw as BillPrismaOriginal),
+      createdAt: billCreatedAt,
+      updatedAt: billUpdatedAt,
+      billDate: billRaw.billDate ? billRaw.billDate.toISOString() : EPOCH_ISO_STRING,
+      dueDate: billRaw.dueDate ? billRaw.dueDate.toISOString() : EPOCH_ISO_STRING,
+      paymentDate: billRaw.paymentDate?.toISOString() || null,
       utilityBreakdown: parsedUtilityBreakdown,
+      agreement: agreementForBill ? {
+          ...(agreementForBill),
+          createdAt: agreementForBill.createdAt ? agreementForBill.createdAt.toISOString() : EPOCH_ISO_STRING,
+          updatedAt: agreementForBill.updatedAt ? agreementForBill.updatedAt.toISOString() : (agreementForBill.createdAt ? agreementForBill.createdAt.toISOString() : EPOCH_ISO_STRING),
+          startDate: agreementForBill.startDate ? agreementForBill.startDate.toISOString() : EPOCH_ISO_STRING,
+          nextPaymentDueDate: agreementForBill.nextPaymentDueDate ? agreementForBill.nextPaymentDueDate.toISOString() : EPOCH_ISO_STRING,
+          initialPaymentDate: agreementForBill.initialPaymentDate?.toISOString() || null,
+          endDate: agreementForBill.endDate?.toISOString() || null,
+          tenant: agreementForBill.tenant ? {
+            ...(agreementForBill.tenant),
+            createdAt: agreementForBill.tenant.createdAt ? agreementForBill.tenant.createdAt.toISOString() : EPOCH_ISO_STRING,
+            updatedAt: agreementForBill.tenant.updatedAt ? agreementForBill.tenant.updatedAt.toISOString() : (agreementForBill.tenant.createdAt ? agreementForBill.tenant.createdAt.toISOString() : EPOCH_ISO_STRING)
+          } : null,
+          space: agreementForBill.space ? {
+              ...(agreementForBill.space),
+              createdAt: agreementForBill.space.createdAt ? agreementForBill.space.createdAt.toISOString() : EPOCH_ISO_STRING,
+              updatedAt: agreementForBill.space.updatedAt ? agreementForBill.space.updatedAt.toISOString() : (agreementForBill.space.createdAt ? agreementForBill.space.createdAt.toISOString() : EPOCH_ISO_STRING),
+              building: agreementForBill.space.building ? {
+                    ...(agreementForBill.space.building),
+                    createdAt: agreementForBill.space.building.createdAt ? agreementForBill.space.building.createdAt.toISOString() : EPOCH_ISO_STRING,
+                    updatedAt: agreementForBill.space.building.updatedAt ? agreementForBill.space.building.updatedAt.toISOString() : (agreementForBill.space.building.createdAt ? agreementForBill.space.building.createdAt.toISOString() : EPOCH_ISO_STRING),
+                    penaltyPolicyTiers: (agreementForBill.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
+                    spaces: (agreementForBill.space.building.spaces || []).map(s => ({
+                      ...s,
+                      createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
+                      updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
+                  }))
+              } : null
+          } : null,
+      } : null,
     };
-  }) as BillingPageData['bills'];
+  }) as SerializedBillingPageData['bills'];
 
+  const serializedBuildingMonthlyUtilities = buildingMonthlyUtilitiesData.map(bu => ({
+    ...(bu as BuildingMonthlyUtilitiesPrisma & { utilities: Prisma.BuildingUtilityItemGetPayload<{}>[] }),
+    createdAt: bu.createdAt ? bu.createdAt.toISOString() : EPOCH_ISO_STRING,
+    updatedAt: bu.updatedAt ? bu.updatedAt.toISOString() : (bu.createdAt ? bu.createdAt.toISOString() : EPOCH_ISO_STRING),
+    utilities: (bu.utilities || []).map(u => ({...u})) 
+  })) as SerializedBillingPageData['buildingMonthlyUtilities'];
 
-  const buildingMonthlyUtilities = buildingMonthlyUtilitiesData as BillingPageData['buildingMonthlyUtilities'];
-
-  return { agreements, spaces, buildings, bills, buildingMonthlyUtilities };
+  return { 
+    agreements: serializedAgreements, 
+    spaces: serializedSpaces, 
+    buildings: serializedBuildings, 
+    bills: serializedBills, 
+    buildingMonthlyUtilities: serializedBuildingMonthlyUtilities 
+  };
 }
 
 function calculateIndividualPenalty(
   billAmount: number, 
   daysOverdue: number,
-  building: BuildingPrismaOriginal & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[]; spaces: SpacePrismaOriginal[] }, // Added spaces
+  building: BuildingPrismaOriginal & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[]; spaces: SpacePrismaOriginal[] },
   space: SpacePrismaOriginal
 ): number {
   if (daysOverdue <= 0 || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) {
@@ -221,7 +301,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       agreement.space.building.id,
       billMonth,
       billYear,
-      { utilities: true } // Corrected: Pass include options directly
+      { utilities: true } 
     );
 
     if (monthlyBuildingUtilityData?.utilities.length) {
@@ -286,7 +366,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 export async function recordPaymentOrVerificationAction(
   billId: string,
   paymentData: {
-    paymentDate: string; // ISO string
+    paymentDate: string; 
     paymentMethod: string;
     paymentReference?: string | null;
     bankOrWalletName?: string | null;
@@ -316,7 +396,7 @@ export async function recordPaymentOrVerificationAction(
     if (!bill) throw new Error("Bill not found.");
     if (!bill.agreement?.space?.building) throw new Error("Building details for bill not found for penalty check.");
 
-    let utilityBreakdownItems: ParsedUtilityItem[] = [];
+    let utilityBreakdownItems: SerializedParsedUtilityItem[] = [];
     if (typeof (bill as any).utilityBreakdown === 'string') {
         try {
             const parsed = JSON.parse((bill as any).utilityBreakdown);
@@ -327,6 +407,10 @@ export async function recordPaymentOrVerificationAction(
         } catch (e) {
             console.error("Error parsing utilityBreakdown for penalty calculation in recordPayment:", e);
         }
+    } else if (Array.isArray((bill as any).utilityBreakdown)) {
+        utilityBreakdownItems = ((bill as any).utilityBreakdown as any[])
+            .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
+            .map(item => ({ name: item.name, amount: item.amount, id: item.id }));
     }
 
 
@@ -413,6 +497,6 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
+    
+    
 
-    
-    
