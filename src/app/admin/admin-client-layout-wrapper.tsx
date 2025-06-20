@@ -60,7 +60,8 @@ const navItems = [
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList },
-  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink },
+  { href: '/admin/settings', label: 'Settings', icon: Settings }, // New Settings Link
+  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true },
 ];
 
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
@@ -69,11 +70,21 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { isMobile, state: sidebarState } = useSidebar();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // Client-side role check could be added here if token was accessible and decodable client-side
+  // For HttpOnly, this state would likely come from a context populated after login/session check
+  const [userRole, setUserRole] = useState<string | null>(null); // Example: 'Admin', 'SUPPORT_STAFF'
+
+  useEffect(() => {
+    // In a real app, fetch user role from a secure endpoint or decode from a context
+    // For prototype, we can simulate or leave it as null (meaning all items visible)
+    // e.g., fetch('/api/user/me').then(res => res.json()).then(data => setUserRole(data.role));
+    // For now, all links are visible and security is at API/page level.
+  }, []);
+
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Call the Next.js API route for logout
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
       });
@@ -88,7 +99,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         toast({
             title: "Logout Issue",
             description: data.errors?.join(', ') || "Could not fully complete server logout. Local session cleared.",
-            variant: "default", // Not destructive as local session is cleared
+            variant: "default", 
         });
       }
     } catch (error) {
@@ -99,11 +110,19 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
           variant: "default"
       });
     } finally {
-      // Always redirect to login page
       router.push('/auth/login');
       setIsLoggingOut(false);
     }
   };
+  
+  const displayedNavItems = navItems.filter(item => {
+    // Example of role-based link visibility if userRole was available
+    // if (item.href === '/admin/settings' && userRole !== 'Admin') { // Assuming "Admin" is SUPER_ADMIN role
+    //   return false;
+    // }
+    return true;
+  });
+
 
   return (
     <>
@@ -118,8 +137,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
-            {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href));
+            {displayedNavItems.map((item) => {
+              const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.isPortal && pathname.startsWith(item.href));
               
               const sidebarButtonContent = (
                 <>
@@ -137,14 +156,14 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 
               const commonLinkProps = {
                 href: item.href,
-                target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
-                rel: item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined,
+                target: item.isPortal ? '_blank' : undefined,
+                rel: item.isPortal ? 'noopener noreferrer' : undefined,
               };
               
               const sidebarMenuButtonProps = {
                 isActive: isActive,
                 className: cn(
-                  item.label === 'Tenant Portal (View)' && 'mt-auto border-t border-sidebar-border pt-2'
+                  item.isPortal && 'mt-auto border-t border-sidebar-border pt-2'
                 ),
               };
 
@@ -187,8 +206,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                   <AvatarFallback>AU</AvatarFallback>
                 </Avatar>
                 <div className={cn("text-left", (!isMobile && sidebarState === "collapsed") ? "hidden" : "")}>
-                  <p className="text-sm font-medium">Admin User</p>
-                  <p className="text-xs text-sidebar-foreground/70">admin@leaseflow.com</p>
+                  <p className="text-sm font-medium">Admin User</p> {/* Replace with dynamic user name */}
+                  <p className="text-xs text-sidebar-foreground/70">admin@leaseflow.com</p> {/* Replace with dynamic user email */}
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -199,7 +218,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 <UserCircle className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => router.push('/admin/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
@@ -232,11 +251,12 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
+    // Optional: render a basic skeleton or loader if full layout flash is an issue
     return null; 
   }
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen> {/* `defaultOpen` controls initial state on desktop */}
       <TooltipProvider>
         <ActualAdminLayout>{children}</ActualAdminLayout>
       </TooltipProvider>

@@ -10,10 +10,9 @@ async function main() {
   // 1. Clear existing data
   console.log('Clearing existing data...');
   try {
-    // Order of deletion matters due to foreign key constraints
-    await prisma.user.deleteMany({}); // Clear users first if they might reference roles
+    await prisma.user.deleteMany({}); 
     console.log('Deleted Users');
-    await prisma.role.deleteMany({}); // Clear roles
+    await prisma.role.deleteMany({}); 
     console.log('Deleted Roles');
 
     await prisma.bill.deleteMany({});
@@ -90,7 +89,7 @@ async function main() {
         permissions: ['billing:manage', 'agreement:read', 'tenant:read', 'reports:view_financial'],
     }
   });
-  const supportStaffRole = await prisma.role.create({
+  const supportStaffRole = await prisma.role.create({ // Ensure SUPPORT_STAFF role exists
     data: {
       name: 'SUPPORT_STAFF',
       description: 'Assists users and views data with limited modification rights.',
@@ -104,7 +103,7 @@ async function main() {
   console.log('Creating Users...');
   const user1 = await prisma.user.create({
     data: {
-      userId: 'auth0|user123_superadmin', // Ensure unique for testing
+      userId: 'auth0|user123_superadmin', 
       email: 'super.admin@leaseflow.com',
       name: 'Super Admin',
       firstName: 'Super',
@@ -115,7 +114,7 @@ async function main() {
   });
   const user2 = await prisma.user.create({
     data: {
-      userId: 'google|user456_manager', // Ensure unique
+      userId: 'google|user456_manager', 
       email: 'manager.user@leaseflow.com',
       name: 'Property Manager User',
       firstName: 'Manager',
@@ -126,7 +125,7 @@ async function main() {
   });
    const user3 = await prisma.user.create({
     data: {
-      userId: 'firebase|user789_support', // Ensure unique
+      userId: 'firebase|user789_support', 
       email: 'support.staff@leaseflow.com',
       name: 'Support Staff User',
       firstName: 'Support',
@@ -137,7 +136,7 @@ async function main() {
   });
    const user4 = await prisma.user.create({
     data: {
-      userId: 'local|user000_accountant', // Ensure unique
+      userId: 'local|user000_accountant', 
       email: 'accountant.user@leaseflow.com',
       name: 'Accountant User',
       firstName: 'Accy',
@@ -155,7 +154,7 @@ async function main() {
     data: {
       name: 'Sunrise Tower',
       address: '123 Sunrise Ave, Metro City',
-      managedByUserId: user1.userId, // Super Admin manages Sunrise Tower
+      managedByUserId: user1.userId, 
       penaltyPolicyTiers: {
         create: [
           { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 50, scope: 'Building' },
@@ -170,7 +169,7 @@ async function main() {
     data: {
       name: 'Ocean View Plaza',
       address: '456 Ocean Dr, Pacifica',
-      managedByUserId: user2.userId, // Property Manager User manages Ocean View Plaza
+      managedByUserId: user2.userId, 
       penaltyPolicyTiers: {
         create: [
           { fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 1, scope: 'Building' },
@@ -186,7 +185,6 @@ async function main() {
     data: {
         name: 'Tech Park One',
         address: '789 Innovation Rd, Silicon Valley',
-        // No specific manager initially, or can be assigned to user1 for testing
         managedByUserId: user1.userId,
     }
   });
@@ -225,7 +223,7 @@ async function main() {
 
   // 6. Create Spaces (linking to Buildings and some to Tenants)
   console.log('Creating Spaces...');
-  const space1_B1 = await prisma.space.create({ // Alice's space in Sunrise Tower
+  const space1_B1 = await prisma.space.create({ 
     data: {
       buildingId: building1.id,
       buildingName: building1.name,
@@ -239,7 +237,7 @@ async function main() {
     },
   });
 
-  const space2_B1 = await prisma.space.create({ // Vacant space in Sunrise Tower
+  const space2_B1 = await prisma.space.create({ 
     data: {
       buildingId: building1.id,
       buildingName: building1.name,
@@ -252,7 +250,7 @@ async function main() {
     },
   });
 
-  const space1_B2 = await prisma.space.create({ // Bob's space in Ocean View Plaza
+  const space1_B2 = await prisma.space.create({ 
     data: {
       buildingId: building2.id,
       buildingName: building2.name,
@@ -266,7 +264,7 @@ async function main() {
     },
   });
 
-  const space2_B2 = await prisma.space.create({ // Carol's Penthouse in Ocean View Plaza
+  const space2_B2 = await prisma.space.create({ 
     data: {
         buildingId: building2.id,
         buildingName: building2.name,
@@ -280,7 +278,7 @@ async function main() {
     }
   });
   
-  const space1_B3 = await prisma.space.create({ // Vacant space in Tech Park One
+  const space1_B3 = await prisma.space.create({ 
     data: {
         buildingId: building3.id,
         buildingName: building3.name,
@@ -298,7 +296,7 @@ async function main() {
   // 7. Create Agreements
   console.log('Creating Agreements...');
   const agreement1_startDate_obj = subDays(new Date(), 60);
-  const agreement1 = await prisma.agreement.create({ // Alice's agreement
+  const agreement1 = await prisma.agreement.create({ 
     data: {
       tenantId: tenant1.id,
       spaceId: space1_B1.id,
@@ -307,7 +305,7 @@ async function main() {
       monthlyRentalPrice: space1_B1.monthlyRentalPrice,
       paymentTermMonths: 12,
       initialPaymentMonths: 1,
-      nextPaymentDueDate: addMonths(agreement1_startDate_obj, 1), // Next payment is 1 month after start (initial covers 1st)
+      nextPaymentDueDate: addMonths(agreement1_startDate_obj, 1), 
       initialPaymentAmount: space1_B1.monthlyRentalPrice * 1,
       initialPaymentMethod: 'Bank Transfer',
       initialPaymentBankOrWalletName: 'Metro Bank',
@@ -317,7 +315,7 @@ async function main() {
   });
 
   const agreement2_startDate_obj = subDays(new Date(), 30);
-  const agreement2 = await prisma.agreement.create({ // Bob's agreement
+  const agreement2 = await prisma.agreement.create({ 
     data: {
       tenantId: tenant2.id,
       spaceId: space1_B2.id,
@@ -326,7 +324,7 @@ async function main() {
       monthlyRentalPrice: space1_B2.monthlyRentalPrice,
       paymentTermMonths: 6,
       initialPaymentMonths: 2,
-      nextPaymentDueDate: addMonths(agreement2_startDate_obj, 2), // Next payment is 2 months after start (initial covers first 2)
+      nextPaymentDueDate: addMonths(agreement2_startDate_obj, 2), 
       initialPaymentAmount: space1_B2.monthlyRentalPrice * 2,
       initialPaymentMethod: 'Credit Card',
       initialPaymentReference: 'INITPAY002',
@@ -335,7 +333,7 @@ async function main() {
   });
   
   const agreement3_startDate_obj = new Date();
-  const agreement3 = await prisma.agreement.create({ // Carol's agreement
+  const agreement3 = await prisma.agreement.create({ 
     data: {
         tenantId: tenant3.id,
         spaceId: space2_B2.id,
@@ -344,7 +342,7 @@ async function main() {
         monthlyRentalPrice: space2_B2.monthlyRentalPrice,
         paymentTermMonths: 24,
         initialPaymentMonths: 3,
-        nextPaymentDueDate: addMonths(agreement3_startDate_obj, 3), // Next payment is 3 months after start
+        nextPaymentDueDate: addMonths(agreement3_startDate_obj, 3), 
         additionalTerms: "Access to rooftop pool and gym included. Bi-weekly cleaning service.",
         initialPaymentAmount: space2_B2.monthlyRentalPrice * 3,
         initialPaymentMethod: 'Wallet',
@@ -357,7 +355,6 @@ async function main() {
 
   // 8. Create Bills (with nested UtilityBreakdownItems)
   console.log('Creating Bills...');
-  // Bill for Alice (last month, paid) - Assuming initial payment covered month 1, this is for month 2
   const bill1_billDate = addMonths(agreement1.startDate, 1); 
   await prisma.bill.create({
     data: {
@@ -379,7 +376,6 @@ async function main() {
     },
   });
 
-  // Bill for Alice (current month, pending) - This is for month 3
   const bill2_billDate = addMonths(agreement1.startDate, 2);
   await prisma.bill.create({
     data: {
@@ -397,9 +393,8 @@ async function main() {
     },
   });
   
-  // Bill for Bob (current month, overdue) - Initial payment covered month 1 & 2, this is for month 3
   const bill3_billDate = addMonths(agreement2.startDate, 2); 
-  const bobBillDueDate = addMonths(bill3_billDate, 0, {days: 5}); // Due 5 days after bill date, for testing overdue
+  const bobBillDueDate = addMonths(bill3_billDate, 0, {days: 5}); 
   await prisma.bill.create({
     data: {
       agreementId: agreement2.id,
@@ -415,7 +410,6 @@ async function main() {
     },
   });
   
-  // Bill for Carol (for month 4, pending, as initial payment covers first 3 months)
   const bill4_billDate = addMonths(agreement3.startDate, 3); 
   await prisma.bill.create({
     data: {
