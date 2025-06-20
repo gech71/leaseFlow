@@ -18,7 +18,7 @@ const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
   lastName: z.string().min(1, { message: "Last name is required." }),
   phoneNumber: z.string().min(1, { message: "Phone number is required." })
-                 .regex(/^\+?[1-9]\d{1,14}$/, { message: "Invalid phone number format (e.g., +251912345678)."}), // Basic E.164-like regex
+                 .regex(/^(09|07)\d{8}$/, { message: "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678)."}),
   email: z.string().email({ message: "Invalid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
@@ -111,7 +111,7 @@ export default function UserRegistrationPage() {
               <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name</FormLabel> <FormControl><Input placeholder="Doe" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
             </div>
             <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address</FormLabel> <FormControl><Input type="email" placeholder="user@example.com" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number</FormLabel> <FormControl><Input type="tel" placeholder="+251912345678" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number</FormLabel> <FormControl><Input type="tel" placeholder="0912345678" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={form.control} name="password" render={({ field }) => ( <FormItem> <FormLabel>Password</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
           </CardContent>
           <CardFooter>
