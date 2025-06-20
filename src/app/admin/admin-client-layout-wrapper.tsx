@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react'; // useMemo removed from destructuring
 import {
   SidebarProvider,
   Sidebar,
@@ -50,7 +50,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { PermissionProvider, usePermissions } from '@/contexts/PermissionContext'; // Import PermissionProvider
+import { PermissionProvider, usePermissions } from '@/contexts/PermissionContext';
 import type { PermissionId } from '@/lib/types';
 
 interface NavItem {
@@ -58,7 +58,7 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   isPortal?: boolean;
-  requiredPermissions?: PermissionId | PermissionId[]; // Permissions to view this link
+  requiredPermissions?: PermissionId | PermissionId[];
 }
 
 const allNavItems: NavItem[] = [
@@ -71,7 +71,7 @@ const allNavItems: NavItem[] = [
   { href: '/admin/billing', label: 'Billing', icon: DollarSign, requiredPermissions: ['billing:read', 'billing:manage'] },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['billing:read', 'reports:view_financial'] },
   { href: '/admin/settings', label: 'Settings', icon: Settings, requiredPermissions: ['user:manage', 'role:manage', 'settings:manage'] },
-  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true }, // No specific app permission, portal has its own auth
+  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true },
 ];
 
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
@@ -111,18 +111,18 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
           variant: "default"
       });
     } finally {
-      router.push('/auth/login'); // Redirect to login after attempting logout
+      router.push('/auth/login');
       setIsLoggingOut(false);
     }
   };
   
-  const navItems = useMemo(() => {
-    if (permissionsLoading || !currentUser) return []; // Or show skeleton links
+  const navItems = React.useMemo(() => { // Changed to React.useMemo
+    if (permissionsLoading || !currentUser) return [];
     
     return allNavItems.filter(item => {
-      if (item.isPortal) return true; // Portal link is always visible
-      if (isSuperAdmin) return true; // Super admin sees all
-      if (!item.requiredPermissions) return true; // No permissions defined, assume public within admin
+      if (item.isPortal) return true;
+      if (isSuperAdmin) return true;
+      if (!item.requiredPermissions) return true;
       
       if (Array.isArray(item.requiredPermissions)) {
         return hasAnyPermission(item.requiredPermissions);
@@ -231,7 +231,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             <DropdownMenuContent side="top" align="start" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled> {/* Profile page not implemented */}
+              <DropdownMenuItem disabled>
                 <UserCircle className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
@@ -278,7 +278,7 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }
 
   return (
-    <PermissionProvider> {/* Wrap with PermissionProvider */}
+    <PermissionProvider>
       <SidebarProvider defaultOpen>
         <TooltipProvider>
           <ActualAdminLayout>{children}</ActualAdminLayout>

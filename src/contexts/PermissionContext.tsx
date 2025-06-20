@@ -2,7 +2,7 @@
 "use client";
 
 import type { CurrentUser, PermissionId } from '@/lib/types';
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react'; // useMemo removed from destructuring
 import { Loader2 } from 'lucide-react';
 
 interface PermissionContextType {
@@ -41,13 +41,12 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
         if (data.isSuccess && data.user) {
           setCurrentUser(data.user);
         } else {
-          setCurrentUser(null); // Or handle error state
+          setCurrentUser(null);
           console.error("Failed to fetch user or user data missing:", data.errors || "No user data");
         }
       } else {
         setCurrentUser(null);
         console.error("Failed to fetch user, status:", response.status);
-         // If 401/403, redirect to login? This can be handled by middleware too.
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -74,12 +73,11 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     return permissions.some(p => currentUser.effectivePermissions.includes(p));
   };
   
-  const isSuperAdmin = useMemo(() => {
+  const isSuperAdmin = React.useMemo(() => { // Changed to React.useMemo
     return currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') || false;
   }, [currentUser]);
 
 
-  // Display a loading spinner while fetching user data
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
