@@ -26,10 +26,18 @@ export default async function ViewAgreementPage({ params }: PageParams) {
       startDate: agreementData.startDate.toISOString(),
       nextPaymentDueDate: agreementData.nextPaymentDueDate.toISOString(),
       createdAt: agreementData.createdAt.toISOString(),
-      updatedAt: agreementData.updatedAt.toISOString(),
+      updatedAt: agreementData.updatedAt?.toISOString() || agreementData.createdAt.toISOString(), // Safe serialization
       initialPaymentDate: agreementData.initialPaymentDate?.toISOString() || undefined,
-      tenant: agreementData.tenant ? { ...agreementData.tenant, createdAt: agreementData.tenant.createdAt.toISOString(), updatedAt: agreementData.tenant.updatedAt.toISOString() } : null,
-      space: agreementData.space ? { ...agreementData.space, createdAt: agreementData.space.createdAt.toISOString(), updatedAt: agreementData.space.updatedAt.toISOString() } : null,
+      tenant: agreementData.tenant ? { 
+        ...agreementData.tenant, 
+        createdAt: agreementData.tenant.createdAt.toISOString(), 
+        updatedAt: agreementData.tenant.updatedAt?.toISOString() || agreementData.tenant.createdAt.toISOString() // Safe serialization
+      } : null,
+      space: agreementData.space ? { 
+        ...agreementData.space, 
+        createdAt: agreementData.space.createdAt.toISOString(), 
+        updatedAt: agreementData.space.updatedAt?.toISOString() || agreementData.space.createdAt.toISOString() // Safe serialization
+      } : null,
     } as AgreementWithRelations;
   }
   
@@ -39,3 +47,4 @@ export default async function ViewAgreementPage({ params }: PageParams) {
     </Suspense>
   );
 }
+

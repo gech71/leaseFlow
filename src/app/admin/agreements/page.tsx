@@ -19,10 +19,18 @@ export default async function AgreementsListPage() {
     startDate: ag.startDate.toISOString(),
     nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
     createdAt: ag.createdAt.toISOString(),
-    updatedAt: ag.updatedAt.toISOString(),
+    updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Safe serialization
     initialPaymentDate: ag.initialPaymentDate?.toISOString() || undefined,
-    tenant: ag.tenant ? { ...ag.tenant, createdAt: ag.tenant.createdAt.toISOString(), updatedAt: ag.tenant.updatedAt.toISOString() } : null,
-    space: ag.space ? { ...ag.space, createdAt: ag.space.createdAt.toISOString(), updatedAt: ag.space.updatedAt.toISOString() } : null,
+    tenant: ag.tenant ? { 
+      ...ag.tenant, 
+      createdAt: ag.tenant.createdAt.toISOString(), 
+      updatedAt: ag.tenant.updatedAt?.toISOString() || ag.tenant.createdAt.toISOString() // Safe serialization
+    } : null,
+    space: ag.space ? { 
+      ...ag.space, 
+      createdAt: ag.space.createdAt.toISOString(), 
+      updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString() // Safe serialization
+    } : null,
   })) as AgreementWithRelations[];
 
   return (
@@ -31,3 +39,4 @@ export default async function AgreementsListPage() {
     </Suspense>
   );
 }
+
