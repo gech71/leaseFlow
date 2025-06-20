@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
     const externalUserId = externalTokenPayload.sub;
 
     try {
-      const localUser = await databaseService.getUserByExternalId(externalUserId, { include: { roles: true } });
+      // Corrected the structure of the include object here
+      const localUser = await databaseService.getUserByExternalId(externalUserId, { roles: true });
 
       if (!localUser) {
         console.warn(`User ${externalUserId} authenticated externally but not found in local database.`);
