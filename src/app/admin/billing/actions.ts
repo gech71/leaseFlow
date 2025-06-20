@@ -15,15 +15,15 @@ interface ParsedUtilityItem {
 
 // Adjusted types to use ParsedUtilityItem for bill.utilityBreakdown
 export interface BillingPageData {
-  agreements: (AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] } } })[];
-  spaces: (SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] } })[];
-  buildings: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] })[];
+  agreements: (AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } } })[];
+  spaces: (SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } })[];
+  buildings: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] })[];
   bills: (Omit<BillPrisma, 'utilityBreakdown'> & { 
     utilityBreakdown: ParsedUtilityItem[]; 
     agreement: AgreementPrismaOriginal & { 
       tenant: TenantPrismaOriginal; 
       space: SpacePrismaOriginal & { 
-        building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] } 
+        building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } 
       } 
     } 
   })[]; 
@@ -43,7 +43,7 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
         tenant: true,
         space: {
           include: {
-            building: { include: { penaltyPolicyTiers: true, spaces: true } } // Added spaces include for building
+            building: { include: { penaltyPolicyTiers: true, spaces: true } } 
           }
         }
       },
@@ -51,10 +51,10 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
     }),
     databaseService.getAllSpaces({
       include: {
-        building: { include: { penaltyPolicyTiers: true, spaces: true } } // Added spaces include for building
+        building: { include: { penaltyPolicyTiers: true, spaces: true } } 
       }
     }),
-    databaseService.getAllBuildings({ include: { penaltyPolicyTiers: true, spaces: true } }), // Added spaces include
+    databaseService.getAllBuildings({ include: { penaltyPolicyTiers: true, spaces: true } }), 
     databaseService.getAllBills({ 
       include: {
         agreement: {
@@ -62,12 +62,12 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
             tenant: true,
             space: {
               include: {
-                building: { include: { penaltyPolicyTiers: true, spaces: true } } // Added spaces include
+                building: { include: { penaltyPolicyTiers: true, spaces: true } } 
               }
             }
           }
         }
-        // utilityBreakdown is NOT included here if it's a scalar JSON field
+        // utilityBreakdown is NOT included here if it's a scalar JSON field (Bill model limitation)
       },
       orderBy: { billDate: 'desc' }
     }),
@@ -88,19 +88,18 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
   
   const bills = billsDataRaw.map(billRaw => {
     let parsedUtilityBreakdown: ParsedUtilityItem[] = [];
-    const rawUtilityData = (billRaw as any).utilityBreakdown; // Accessing potentially JSON field
+    const rawUtilityData = (billRaw as any).utilityBreakdown; 
 
     if (typeof rawUtilityData === 'string') {
       try {
         const jsonData = JSON.parse(rawUtilityData);
         if (Array.isArray(jsonData)) {
-          // Filter and map to ensure items have at least name and amount
           parsedUtilityBreakdown = jsonData
             .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
             .map(item => ({ 
               name: item.name, 
               amount: item.amount,
-              id: typeof item.id === 'string' ? item.id : undefined // include id if present
+              id: typeof item.id === 'string' ? item.id : undefined 
             }));
         } else {
           console.warn(`Parsed utilityBreakdown for bill ${billRaw.id} is not an array:`, jsonData);
@@ -109,8 +108,6 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
         console.error(`Failed to parse utilityBreakdown JSON for bill ${billRaw.id}:`, e, rawUtilityData);
       }
     } else if (Array.isArray(rawUtilityData)) {
-      // This case handles if it's already an array (e.g., from direct assignment or if schema/client was fixed)
-      // Ensure it conforms to ParsedUtilityItem structure
        parsedUtilityBreakdown = rawUtilityData
             .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
             .map(item => ({ 
@@ -120,12 +117,11 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
             }));
     }
     
-    // Ensure the rest of the bill structure matches BillingPageData['bills'] element type
     const agreementForBill = billRaw.agreement as unknown as BillingPageData['bills'][number]['agreement'];
 
     return {
       ...billRaw,
-      agreement: agreementForBill, // Use the correctly typed agreement
+      agreement: agreementForBill, 
       utilityBreakdown: parsedUtilityBreakdown,
     };
   }) as BillingPageData['bills'];
@@ -139,7 +135,7 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
 function calculateIndividualPenalty(
   billAmount: number, 
   daysOverdue: number,
-  building: BuildingPrismaOriginal & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[] },
+  building: BuildingPrismaOriginal & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[]; spaces: SpacePrismaOriginal[] }, // Added spaces
   space: SpacePrismaOriginal
 ): number {
   if (daysOverdue <= 0 || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) {
@@ -186,7 +182,19 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const targetBillDate = startOfDay(parseISO(targetBillDateStr));
     const today = startOfDay(new Date());
 
-    const agreement = await databaseService.getAgreementById(agreementId, { include: { space: { include: { building: { include: { penaltyPolicyTiers: true, spaces: true } } } }, tenant: true } });
+    const agreement = await databaseService.getAgreementById(agreementId, { 
+      space: { 
+        include: { 
+          building: { 
+            include: { 
+              penaltyPolicyTiers: true, 
+              spaces: true 
+            } 
+          } 
+        } 
+      }, 
+      tenant: true 
+    });
     if (!agreement) throw new Error("Agreement not found.");
     if (!agreement.space) throw new Error("Space details for agreement not found.");
     if (!agreement.space.building) throw new Error("Building details for space not found.");
@@ -203,7 +211,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     }
 
     const rentAmount = agreement.monthlyRentalPrice;
-    const utilityItemsForJson: {name: string; amount: number}[] = []; // For storing in JSON field
+    const utilityItemsForJson: {name: string; amount: number}[] = []; 
     let totalUtilityCostForBill = 0;
 
     const billYear = getYear(targetBillDate);
@@ -250,7 +258,6 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 
     const totalAmount = rentAmount + totalUtilityCostForBill + initialPenalty;
     
-    // Assuming utilityBreakdown is a Json field on Bill model
     const utilityBreakdownJson = utilityItemsForJson.length > 0 ? JSON.stringify(utilityItemsForJson) : Prisma.JsonNull;
 
     const billCreateInput: Prisma.BillCreateInput = {
@@ -259,7 +266,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       billDate: targetBillDate,
       dueDate: targetBillDate, 
       rentAmount,
-      utilityBreakdown: utilityBreakdownJson, // Store as JSON
+      utilityBreakdown: utilityBreakdownJson, 
       penaltyAmount: initialPenalty > 0 ? initialPenalty : undefined,
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       status: isBefore(targetBillDate, today) && initialPenalty > 0 ? 'Overdue' : 'Pending',
@@ -292,25 +299,23 @@ export async function recordPaymentOrVerificationAction(
     const bill = await databaseService.getBillById(billId, { 
       agreement: {                                       
         include: {                                       
+          tenant: true,
           space: {                                       
             include: {                                   
               building: {                                
                 include: {                               
                   penaltyPolicyTiers: true,
-                  spaces: true // Ensure spaces are included here for penalty calculation context
+                  spaces: true 
                 }
               }
             }
-          },
-          tenant: true // Include tenant if needed, though not directly used in current logic
+          }
         }
       }
-      // utilityBreakdown is not included if it's a scalar JSON field
     });
     if (!bill) throw new Error("Bill not found.");
     if (!bill.agreement?.space?.building) throw new Error("Building details for bill not found for penalty check.");
 
-    // Parse utilityBreakdown if it's a JSON string
     let utilityBreakdownItems: ParsedUtilityItem[] = [];
     if (typeof (bill as any).utilityBreakdown === 'string') {
         try {
