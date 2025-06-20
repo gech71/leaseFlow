@@ -51,10 +51,9 @@ export async function updateSpaceAction(id: string, data: Prisma.SpaceUpdateInpu
 export async function deleteSpaceAction(id: string) {
   try {
     const space = await databaseService.getSpaceById(id, { 
-      include: { 
-        agreements: { where: { endDate: { gte: new Date() } } }, // Check for active/future agreements
-        tenant: true 
-      } 
+      // Corrected: Pass the include object directly
+      agreements: { where: { endDate: { gte: new Date() } } }, 
+      tenant: true 
     });
 
     if (space?.isOccupied) {
