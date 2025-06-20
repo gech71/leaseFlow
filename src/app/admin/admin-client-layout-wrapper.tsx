@@ -12,7 +12,7 @@ import {
   SidebarFooter,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton,
+  SidebarMenuButton, // This component now renders a <button>
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
@@ -81,14 +81,12 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.href.startsWith('/portal') && pathname.startsWith(item.href));
               
-              const menuItemContent = (
+              const sidebarButtonContent = (
                 <>
                   <item.icon />
                   <span
                     className={cn(
-                      "flex-1 min-w-0", // Base layout for the span
-                      // If not mobile AND sidebar is collapsed, hide the text.
-                      // Otherwise (if mobile OR sidebar is expanded), truncate the text to match image.
+                      "flex-1 min-w-0",
                       (!isMobile && sidebarState === "collapsed") ? "hidden" : "truncate"
                     )}
                   >
@@ -97,23 +95,29 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 </>
               );
 
-              const commonButtonProps = {
+              const commonLinkProps = {
+                href: item.href,
+                target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
+                rel: item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined,
+              };
+              
+              const sidebarMenuButtonProps = {
                 isActive: isActive,
                 className: cn(
                   item.label === 'Tenant Portal (View)' && 'mt-auto border-t border-sidebar-border pt-2'
                 ),
-                target: item.label === 'Tenant Portal (View)' ? '_blank' : undefined,
-                rel: item.label === 'Tenant Portal (View)' ? 'noopener noreferrer' : undefined,
               };
+
 
               if (!isMobile && sidebarState === "collapsed") {
                 return (
                   <SidebarMenuItem key={item.href}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Link href={item.href} asChild>
-                           <SidebarMenuButton {...commonButtonProps}>
-                            {menuItemContent}
+                        {/* Link does not use asChild. SidebarMenuButton is a button inside the Link's anchor. */}
+                        <Link {...commonLinkProps}>
+                           <SidebarMenuButton {...sidebarMenuButtonProps}>
+                            {sidebarButtonContent}
                            </SidebarMenuButton>
                         </Link>
                       </TooltipTrigger>
@@ -126,9 +130,10 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               }
               return (
                 <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} asChild>
-                     <SidebarMenuButton {...commonButtonProps}>
-                       {menuItemContent}
+                   {/* Link does not use asChild. SidebarMenuButton is a button inside the Link's anchor. */}
+                  <Link {...commonLinkProps}>
+                     <SidebarMenuButton {...sidebarMenuButtonProps}>
+                       {sidebarButtonContent}
                      </SidebarMenuButton>
                   </Link>
                 </SidebarMenuItem>
@@ -190,13 +195,13 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
-    // Return null or a basic loader to prevent flash of unstyled content or hydration errors
-    // For this specific case, returning null ensures client-side logic dependent on window/document is safe
+    // Ensures client-side logic dependent on window/document is safe
+    // and avoids flash of unstyled content or hydration errors related to mismatched initial render.
     return null; 
   }
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen> {/* Consider if defaultOpen should be based on cookie */}
       <TooltipProvider>
         <ActualAdminLayout>{children}</ActualAdminLayout>
       </TooltipProvider>
