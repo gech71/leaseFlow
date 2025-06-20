@@ -11,12 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { User, Building, ShieldCheck, Edit, Loader2, Search } from 'lucide-react';
+import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff } from 'lucide-react';
 import { updateUserAssignments } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { usePermissions } from '@/contexts/PermissionContext';
 
-// Client-side types with serialized dates
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
   createdAt: string;
   updatedAt?: string | null;
@@ -59,6 +59,9 @@ export function UserManagementClientPage({
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
   const [buildingSearchTerm, setBuildingSearchTerm] = useState('');
 
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canManageUserAssignments = isSuperAdmin || hasPermission('user:manage');
+
   useEffect(() => {
     setIsMounted(true);
     setUsers(initialUsers);
@@ -68,12 +71,12 @@ export function UserManagementClientPage({
     setCurrentUserToEdit(user);
     setSelectedRoleId(user.roles[0]?.id || null);
     setSelectedBuildingIds(new Set(user.managedBuildings.map(building => building.id)));
-    setBuildingSearchTerm(''); // Reset search term when opening dialog
+    setBuildingSearchTerm(''); 
     setIsDialogOpen(true);
   };
 
   const handleRoleSelect = (roleId: string) => {
-    setSelectedRoleId(roleId === "null" ? null : roleId); // Handle "No Role" selection
+    setSelectedRoleId(roleId === "null" ? null : roleId); 
   };
 
   const handleBuildingToggle = (buildingId: string) => {
@@ -97,6 +100,10 @@ export function UserManagementClientPage({
 
   const handleSaveChanges = async () => {
     if (!currentUserToEdit) return;
+    if (!canManageUserAssignments) {
+      toast({ title: "Permission Denied", description: "You do not have permission to modify user assignments.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
 
     const result = await updateUserAssignments(
@@ -126,6 +133,15 @@ export function UserManagementClientPage({
   
   if (!isMounted && users.length === 0 && allRoles.length === 0 && allBuildings.length === 0) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+  
+  if (!isMounted && !canManageUserAssignments) {
+     return (
+      <Card className="shadow-lg">
+        <CardHeader><CardTitle className="text-destructive flex items-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to manage user assignments.</p></CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -165,7 +181,7 @@ export function UserManagementClientPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="outline" size="sm" onClick={() => handleEditUser(user)} disabled={isSaving}>
-                        <Edit className="mr-1 h-3.5 w-3.5" /> Edit
+                        <Edit className="mr-1 h-3.5 w-3.5" /> {canManageUserAssignments ? 'Edit' : 'View'}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -180,7 +196,7 @@ export function UserManagementClientPage({
         <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) setCurrentUserToEdit(null); setIsDialogOpen(open); }}>
           <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle className="font-headline text-xl">Edit User: {currentUserToEdit.name || currentUserToEdit.email}</DialogTitle>
+              <DialogTitle className="font-headline text-xl">{canManageUserAssignments ? 'Edit User' : 'View User'}: {currentUserToEdit.name || currentUserToEdit.email}</DialogTitle>
               <DialogDescription>Manage roles and building assignments for this user.</DialogDescription>
             </DialogHeader>
             
@@ -190,7 +206,7 @@ export function UserManagementClientPage({
                 <Select
                   value={selectedRoleId || "null"}
                   onValueChange={handleRoleSelect}
-                  disabled={isSaving}
+                  disabled={isSaving || !canManageUserAssignments}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a role" />
@@ -217,7 +233,7 @@ export function UserManagementClientPage({
                         value={buildingSearchTerm}
                         onChange={(e) => setBuildingSearchTerm(e.target.value)}
                         className="pl-8 h-9"
-                        disabled={isSaving}
+                        disabled={isSaving || !canManageUserAssignments}
                     />
                 </div>
                 <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-60">
@@ -228,7 +244,7 @@ export function UserManagementClientPage({
                         id={`building-${currentUserToEdit.id}-${building.id}`}
                         checked={selectedBuildingIds.has(building.id)}
                         onCheckedChange={() => handleBuildingToggle(building.id)}
-                        disabled={isSaving}
+                        disabled={isSaving || !canManageUserAssignments}
                       />
                       <Label htmlFor={`building-${currentUserToEdit.id}-${building.id}`} className="text-sm font-normal cursor-pointer">
                         {building.name}
@@ -241,10 +257,12 @@ export function UserManagementClientPage({
             
             <DialogFooter className="pt-4 border-t mt-auto">
               <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
-              <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                Save Changes
-              </Button>
+              {canManageUserAssignments && (
+                <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                  Save Changes
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

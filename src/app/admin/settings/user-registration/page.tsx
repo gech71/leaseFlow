@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Loader2, AlertTriangle } from 'lucide-react';
+import { UserPlus, Loader2, AlertTriangle, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { usePermissions } from '@/contexts/PermissionContext';
 
 const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -31,6 +32,9 @@ export default function UserRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canManageUsers = isSuperAdmin || hasPermission('user:manage');
+
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationFormSchema),
     defaultValues: {
@@ -43,6 +47,10 @@ export default function UserRegistrationPage() {
   });
 
   const handleRegisterUser = async (values: RegistrationFormValues) => {
+    if (!canManageUsers) {
+      toast({ title: "Permission Denied", description: "You do not have permission to register users.", variant: "destructive" });
+      return;
+    }
     setIsLoading(true);
     setApiError(null);
 
@@ -60,9 +68,7 @@ export default function UserRegistrationPage() {
           title: "User Registered Successfully",
           description: `User ${values.email} (ID: ${data.userId}) has been created.`,
         });
-        form.reset(); // Reset form after successful registration
-        // Optionally, redirect or refresh data
-        // router.push('/admin/users'); // If you have a user list page
+        form.reset(); 
       } else {
         const errorMessages = data.errors?.join(', ') || "Failed to register user.";
         setApiError(errorMessages);
@@ -85,6 +91,22 @@ export default function UserRegistrationPage() {
       setIsLoading(false);
     }
   };
+  
+  if (!canManageUsers) {
+    return (
+      <Card className="w-full max-w-2xl mx-auto shadow-lg">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl flex items-center text-destructive">
+            <EyeOff className="mr-2 h-6 w-6" /> Access Denied
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>You do not have permission to register new users.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
@@ -94,7 +116,7 @@ export default function UserRegistrationPage() {
         </CardTitle>
         <CardDescription>
           Enter the details for the new user. They will be registered with the external identity provider and a local record will be created.
-          New users are assigned the 'SUPPORT_STAFF' role by default.
+          New users are created without any roles by default.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -107,15 +129,15 @@ export default function UserRegistrationPage() {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem> <FormLabel>First Name</FormLabel> <FormControl><Input placeholder="John" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name</FormLabel> <FormControl><Input placeholder="Doe" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem> <FormLabel>First Name</FormLabel> <FormControl><Input placeholder="John" {...field} disabled={isLoading || !canManageUsers} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name</FormLabel> <FormControl><Input placeholder="Doe" {...field} disabled={isLoading || !canManageUsers} /></FormControl> <FormMessage /> </FormItem> )}/>
             </div>
-            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address</FormLabel> <FormControl><Input type="email" placeholder="user@example.com" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number</FormLabel> <FormControl><Input type="tel" placeholder="0912345678" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={form.control} name="password" render={({ field }) => ( <FormItem> <FormLabel>Password</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isLoading} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address</FormLabel> <FormControl><Input type="email" placeholder="user@example.com" {...field} disabled={isLoading || !canManageUsers} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number</FormLabel> <FormControl><Input type="tel" placeholder="0912345678" {...field} disabled={isLoading || !canManageUsers} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="password" render={({ field }) => ( <FormItem> <FormLabel>Password</FormLabel> <FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isLoading || !canManageUsers} /></FormControl> <FormMessage /> </FormItem> )}/>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>
+            <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading || !canManageUsers}>
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (

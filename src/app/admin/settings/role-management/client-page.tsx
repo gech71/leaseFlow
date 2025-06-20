@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldCheck, Edit, Trash2, PlusCircle, Loader2, AlertTriangle, BadgeAlert, ListChecks } from 'lucide-react';
+import { ShieldCheck, Edit, Trash2, PlusCircle, Loader2, AlertTriangle, BadgeAlert, ListChecks, EyeOff } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,40 +21,19 @@ import type { Role } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { AVAILABLE_PERMISSIONS } from '@/lib/types'; // Import centralized permissions
+import { usePermissions } from '@/contexts/PermissionContext';
 
-
-// Client-side Role type with serialized dates
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
   createdAt: string;
   updatedAt?: string | null;
 }
 
-const AVAILABLE_PERMISSIONS = [
-  { id: 'user:manage', label: 'Manage Users & Registration' },
-  { id: 'role:manage', label: 'Manage Roles & Permissions' },
-  { id: 'building:manage', label: 'Manage Buildings (Create, Edit, Delete)' },
-  { id: 'building:read', label: 'View Buildings' },
-  { id: 'space:manage', label: 'Manage Spaces (Create, Edit, Delete)' },
-  { id: 'space:read', label: 'View Spaces' },
-  { id: 'tenant:manage', label: 'Manage Tenants (Create, Edit, Delete)' },
-  { id: 'tenant:read', label: 'View Tenants' },
-  { id: 'agreement:manage', label: 'Manage Agreements (Create, Edit, Delete)' },
-  { id: 'agreement:read', label: 'View Agreements' },
-  { id: 'billing:manage', label: 'Manage Billing (Generate Bills, Record Payments)' },
-  { id: 'billing:read', label: 'View Billing Information' },
-  { id: 'building_utilities:manage', label: 'Manage Building Utilities' },
-  { id: 'reports:view_all', label: 'View All Reports / Full Dashboard' },
-  { id: 'reports:view_financial', label: 'View Financial Reports' },
-  { id: 'reports:view_operational', label: 'View Operational Reports' },
-  { id: 'settings:manage', label: 'Manage System Settings (subset of Super Admin)' },
-] as const;
-
-
 const roleFormSchema = z.object({
   name: z.string().min(2, "Role name must be at least 2 characters.").max(50, "Role name cannot exceed 50 characters.")
     .regex(/^[A-Z_]+$/, "Role name must be uppercase and can include underscores (e.g., PROPERTY_MANAGER)."),
   description: z.string().max(255, "Description cannot exceed 255 characters.").optional().or(z.literal('')),
-  permissions: z.array(z.string()).optional().default([]),
+  permissions: z.array(z.string()).min(1, "At least one permission must be selected.").optional().default([]),
 });
 
 type RoleFormValues = z.infer<typeof roleFormSchema>;
@@ -71,6 +51,9 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [currentRoleForForm, setCurrentRoleForForm] = useState<ClientRole | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<ClientRole | null>(null);
+
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canManageRoles = isSuperAdmin || hasPermission('role:manage');
 
   const form = useForm<RoleFormValues>({
     resolver: zodResolver(roleFormSchema),
@@ -96,6 +79,10 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   };
 
   const handleOpenAddForm = () => {
+    if (!canManageRoles) {
+      toast({ title: "Permission Denied", description: "You do not have permission to add roles.", variant: "destructive" });
+      return;
+    }
     setFormMode('add');
     setCurrentRoleForForm(null);
     form.reset({ name: "", description: "", permissions: [] });
@@ -114,6 +101,10 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   };
 
   const handleFormSubmit = async (values: RoleFormValues) => {
+    if (!canManageRoles) {
+      toast({ title: "Permission Denied", description: "You do not have permission to save roles.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     
     const roleData: RoleUpsertData = {
@@ -145,6 +136,10 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
 
   const handleDeleteRole = async () => {
     if (!roleToDelete) return;
+    if (!canManageRoles) {
+      toast({ title: "Permission Denied", description: "You do not have permission to delete roles.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     const result = await deleteRoleAction(roleToDelete.id);
     setIsSaving(false);
@@ -160,6 +155,16 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   if (!isMounted && roles.length === 0) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
+  
+  if (!isMounted && !canManageRoles) { // Check if mounted before showing permission denied for initial load
+    return (
+      <Card className="shadow-lg">
+        <CardHeader><CardTitle className="text-destructive flex items-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to manage roles.</p></CardContent>
+      </Card>
+    );
+  }
+
 
   return (
     <Card className="shadow-lg">
@@ -168,15 +173,17 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
           <CardTitle className="font-headline text-xl">Manage Roles</CardTitle>
           <CardDescription>Define user roles and their permissions within the application.</CardDescription>
         </div>
-        <Button onClick={handleOpenAddForm} disabled={isSaving}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add New Role
-        </Button>
+        {canManageRoles && (
+          <Button onClick={handleOpenAddForm} disabled={isSaving}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add New Role
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {roles.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
             <ShieldCheck className="mx-auto h-12 w-12 mb-4" />
-            <p>No roles defined yet. Click "Add New Role" to get started.</p>
+            <p>No roles defined yet. {canManageRoles ? 'Click "Add New Role" to get started.' : 'Contact an administrator to add roles.'}</p>
           </div>
         ) : (
           <ScrollArea className="max-h-[60vh]">
@@ -206,12 +213,21 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                       ) : <span className="text-xs text-muted-foreground italic">No permissions</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
-                        <Edit className="h-4 w-4 text-blue-600" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || role.name === 'SUPER_ADMIN' || role.name === 'PROPERTY_MANAGER' || role.name === 'ACCOUNTANT' || role.name === 'SUPPORT_STAFF'}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {canManageRoles && (
+                        <>
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
+                            <Edit className="h-4 w-4 text-blue-600" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || role.name === 'SUPER_ADMIN' || role.name === 'PROPERTY_MANAGER' || role.name === 'ACCOUNTANT' || role.name === 'SUPPORT_STAFF'}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                      {!canManageRoles && (
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" title="View Details">
+                          <EyeOff className="h-4 w-4 text-blue-600" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -224,9 +240,9 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) setCurrentRoleForForm(null); setIsFormOpen(open); }}>
         <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="font-headline text-xl">{formMode === 'add' ? 'Add New Role' : 'Edit Role'}</DialogTitle>
+            <DialogTitle className="font-headline text-xl">{formMode === 'add' ? 'Add New Role' : (canManageRoles ? 'Edit Role' : 'View Role Details')}</DialogTitle>
             <DialogDescription>
-              {formMode === 'add' ? 'Create a new role and define its permissions.' : `Update the role "${currentRoleForForm?.name.replace(/_/g, ' ')}".`}
+              {formMode === 'add' ? 'Create a new role and define its permissions.' : (canManageRoles ? `Update the role "${currentRoleForForm?.name.replace(/_/g, ' ')}".` : `Viewing details for role "${currentRoleForForm?.name.replace(/_/g, ' ')}".`)}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -234,7 +250,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               <div>
                 <FormLabel htmlFor="roleName">Role Name</FormLabel>
                 <FormControl>
-                  <Input id="roleName" {...form.register("name")} placeholder="E.g., PROPERTY_MANAGER" className="mt-1" disabled={isSaving || (formMode === 'edit' && (currentRoleForForm?.name === 'SUPER_ADMIN' || currentRoleForForm?.name === 'PROPERTY_MANAGER' || currentRoleForForm?.name === 'ACCOUNTANT' || currentRoleForForm?.name === 'SUPPORT_STAFF'))} />
+                  <Input id="roleName" {...form.register("name")} placeholder="E.g., PROPERTY_MANAGER" className="mt-1" disabled={isSaving || !canManageRoles || (formMode === 'edit' && (currentRoleForForm?.name === 'SUPER_ADMIN' || currentRoleForForm?.name === 'PROPERTY_MANAGER' || currentRoleForForm?.name === 'ACCOUNTANT' || currentRoleForForm?.name === 'SUPPORT_STAFF'))} />
                 </FormControl>
                 <FormMessage>{form.formState.errors.name?.message}</FormMessage>
                 <p className="text-xs text-muted-foreground mt-1">Must be uppercase with underscores (e.g., BILLING_CLERK). System roles (SUPER_ADMIN, PROPERTY_MANAGER, ACCOUNTANT, SUPPORT_STAFF) cannot have their names changed.</p>
@@ -242,7 +258,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               <div>
                 <FormLabel htmlFor="roleDescription">Description (Optional)</FormLabel>
                 <FormControl>
-                  <Textarea id="roleDescription" {...form.register("description")} placeholder="Briefly describe this role's purpose" className="mt-1" rows={2} disabled={isSaving}/>
+                  <Textarea id="roleDescription" {...form.register("description")} placeholder="Briefly describe this role's purpose" className="mt-1" rows={2} disabled={isSaving || !canManageRoles}/>
                 </FormControl>
                 <FormMessage>{form.formState.errors.description?.message}</FormMessage>
               </div>
@@ -273,6 +289,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                                     <Checkbox
                                       checked={field.value?.includes(item.id)}
                                       onCheckedChange={(checked) => {
+                                        if (!canManageRoles) return; // Prevent change if not allowed
                                         return checked
                                           ? field.onChange([...(field.value || []), item.id])
                                           : field.onChange(
@@ -281,7 +298,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                                               )
                                             )
                                       }}
-                                      disabled={isSaving}
+                                      disabled={isSaving || !canManageRoles}
                                     />
                                   </FormControl>
                                   <FormLabel className="text-sm font-normal cursor-pointer">
@@ -294,16 +311,18 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                         ))}
                       </div>
                     </ScrollArea>
-                    <FormMessage />
+                    <FormMessage>{form.formState.errors.permissions?.message}</FormMessage>
                   </FormItem>
                 )}
               />
             <DialogFooter className="pt-4 mt-auto border-t">
               <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
-              <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {formMode === 'add' ? 'Create Role' : 'Save Changes'}
-              </Button>
+              {canManageRoles && (
+                <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {formMode === 'add' ? 'Create Role' : 'Save Changes'}
+                </Button>
+              )}
             </DialogFooter>
             </form>
           </Form>
@@ -321,7 +340,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setRoleToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteRole} className="bg-destructive hover:bg-destructive/90" disabled={isSaving}>
+            <AlertDialogAction onClick={handleDeleteRole} className="bg-destructive hover:bg-destructive/90" disabled={isSaving || !canManageRoles}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Role
             </AlertDialogAction>
           </AlertDialogFooter>

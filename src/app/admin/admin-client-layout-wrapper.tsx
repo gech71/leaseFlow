@@ -2,8 +2,8 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
-import React, { useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   SidebarProvider,
   Sidebar,
@@ -31,7 +31,7 @@ import {
   ClipboardList,
   Building,
   ExternalLink,
-  Loader2, 
+  Loader2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -50,18 +50,28 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { PermissionProvider, usePermissions } from '@/contexts/PermissionContext'; // Import PermissionProvider
+import type { PermissionId } from '@/lib/types';
 
-const navItems = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/buildings', label: 'Buildings', icon: Building },
-  { href: '/admin/spaces', label: 'Spaces', icon: Building2 },
-  { href: '/admin/tenants', label: 'Tenants', icon: Users },
-  { href: '/admin/agreements', label: 'Agreements', icon: FileText },
-  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench },
-  { href: '/admin/billing', label: 'Billing', icon: DollarSign },
-  { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList },
-  { href: '/admin/settings', label: 'Settings', icon: Settings }, // New Settings Link
-  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  isPortal?: boolean;
+  requiredPermissions?: PermissionId | PermissionId[]; // Permissions to view this link
+}
+
+const allNavItems: NavItem[] = [
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermissions: ['reports:view_all', 'reports:view_financial', 'reports:view_operational'] },
+  { href: '/admin/buildings', label: 'Buildings', icon: Building, requiredPermissions: ['building:read', 'building:manage'] },
+  { href: '/admin/spaces', label: 'Spaces', icon: Building2, requiredPermissions: ['space:read', 'space:manage'] },
+  { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:read', 'tenant:manage'] },
+  { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:read', 'agreement:manage'] },
+  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: 'building_utilities:manage' },
+  { href: '/admin/billing', label: 'Billing', icon: DollarSign, requiredPermissions: ['billing:read', 'billing:manage'] },
+  { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['billing:read', 'reports:view_financial'] },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, requiredPermissions: ['user:manage', 'role:manage', 'settings:manage'] },
+  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true }, // No specific app permission, portal has its own auth
 ];
 
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
@@ -70,17 +80,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { isMobile, state: sidebarState } = useSidebar();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  // Client-side role check could be added here if token was accessible and decodable client-side
-  // For HttpOnly, this state would likely come from a context populated after login/session check
-  const [userRole, setUserRole] = useState<string | null>(null); // Example: 'Admin', 'SUPPORT_STAFF'
-
-  useEffect(() => {
-    // In a real app, fetch user role from a secure endpoint or decode from a context
-    // For prototype, we can simulate or leave it as null (meaning all items visible)
-    // e.g., fetch('/api/user/me').then(res => res.json()).then(data => setUserRole(data.role));
-    // For now, all links are visible and security is at API/page level.
-  }, []);
-
+  
+  const { currentUser, hasPermission, hasAnyPermission, isLoading: permissionsLoading, isSuperAdmin } = usePermissions();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -99,7 +100,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         toast({
             title: "Logout Issue",
             description: data.errors?.join(', ') || "Could not fully complete server logout. Local session cleared.",
-            variant: "default", 
+            variant: "default",
         });
       }
     } catch (error) {
@@ -110,18 +111,34 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
           variant: "default"
       });
     } finally {
-      router.push('/auth/login');
+      router.push('/auth/login'); // Redirect to login after attempting logout
       setIsLoggingOut(false);
     }
   };
   
-  const displayedNavItems = navItems.filter(item => {
-    // Example of role-based link visibility if userRole was available
-    // if (item.href === '/admin/settings' && userRole !== 'Admin') { // Assuming "Admin" is SUPER_ADMIN role
-    //   return false;
-    // }
-    return true;
-  });
+  const navItems = useMemo(() => {
+    if (permissionsLoading || !currentUser) return []; // Or show skeleton links
+    
+    return allNavItems.filter(item => {
+      if (item.isPortal) return true; // Portal link is always visible
+      if (isSuperAdmin) return true; // Super admin sees all
+      if (!item.requiredPermissions) return true; // No permissions defined, assume public within admin
+      
+      if (Array.isArray(item.requiredPermissions)) {
+        return hasAnyPermission(item.requiredPermissions);
+      }
+      return hasPermission(item.requiredPermissions);
+    });
+  }, [currentUser, permissionsLoading, hasPermission, hasAnyPermission, isSuperAdmin]);
+
+
+  if (permissionsLoading) {
+     return (
+      <div className="flex justify-center items-center h-screen w-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
 
   return (
@@ -137,7 +154,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         </SidebarHeader>
         <SidebarContent className="p-2">
           <SidebarMenu>
-            {displayedNavItems.map((item) => {
+            {navItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && !item.isPortal && pathname.startsWith(item.href));
               
               const sidebarButtonContent = (
@@ -202,26 +219,28 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center justify-start gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://placehold.co/100x100.png" alt="Admin User" data-ai-hint="user avatar"/>
-                  <AvatarFallback>AU</AvatarFallback>
+                  <AvatarImage src="https://placehold.co/100x100.png" alt={currentUser?.name || "User"} data-ai-hint="user avatar"/>
+                  <AvatarFallback>{currentUser?.name?.substring(0,2).toUpperCase() || 'AU'}</AvatarFallback>
                 </Avatar>
                 <div className={cn("text-left", (!isMobile && sidebarState === "collapsed") ? "hidden" : "")}>
-                  <p className="text-sm font-medium">Admin User</p> {/* Replace with dynamic user name */}
-                  <p className="text-xs text-sidebar-foreground/70">admin@leaseflow.com</p> {/* Replace with dynamic user email */}
+                  <p className="text-sm font-medium">{currentUser?.name || "User"}</p>
+                  <p className="text-xs text-sidebar-foreground/70">{currentUser?.email || "user@example.com"}</p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled> {/* Profile page not implemented */}
                 <UserCircle className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => router.push('/admin/settings')}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
+              {hasAnyPermission(['user:manage', 'role:manage', 'settings:manage']) && (
+                <DropdownMenuItem onSelect={() => router.push('/admin/settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout} disabled={isLoggingOut}>
                 {isLoggingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
@@ -251,15 +270,20 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
-    // Optional: render a basic skeleton or loader if full layout flash is an issue
-    return null; 
+    return (
+      <div className="flex justify-center items-center h-screen w-screen">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
-    <SidebarProvider defaultOpen> {/* `defaultOpen` controls initial state on desktop */}
-      <TooltipProvider>
-        <ActualAdminLayout>{children}</ActualAdminLayout>
-      </TooltipProvider>
-    </SidebarProvider>
+    <PermissionProvider> {/* Wrap with PermissionProvider */}
+      <SidebarProvider defaultOpen>
+        <TooltipProvider>
+          <ActualAdminLayout>{children}</ActualAdminLayout>
+        </TooltipProvider>
+      </SidebarProvider>
+    </PermissionProvider>
   );
 }

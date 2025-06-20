@@ -4,15 +4,15 @@
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
 export interface PenaltyTier {
-  id?: string; 
+  id?: string;
   fromDay: number;
-  toDay?: number | null; 
+  toDay?: number | null;
   feeType: 'Fixed' | 'Percentage';
   feeValue: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
-  buildingId?: string; 
+  buildingId?: string;
 }
 
 export interface Building {
@@ -22,25 +22,25 @@ export interface Building {
   penaltyPolicyTiers: PenaltyTier[];
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
-  spaces?: Space[]; 
+  spaces?: Space[];
   buildingMonthlyUtilities?: BuildingMonthlyUtilities[];
 }
 
 export interface Space {
   id: string;
-  buildingId: string; 
-  buildingName: string; 
-  spaceIdName: string; 
-  area: number; 
-  floor: string; 
-  utilityProrationShare: number; 
+  buildingId: string;
+  buildingName: string;
+  spaceIdName: string;
+  area: number;
+  floor: string;
+  utilityProrationShare: number;
   monthlyRentalPrice: number;
   isOccupied: boolean;
-  tenantId?: string | null; 
+  tenantId?: string | null;
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
-  tenant?: Tenant | null; 
-  building?: Building; 
+  tenant?: Tenant | null;
+  building?: Building;
   agreements?: Agreement[];
 }
 
@@ -56,8 +56,8 @@ export interface Tenant {
   rentedSpaceId?: string | null;
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
-  rentedSpace?: Space | null; 
-  agreements?: Agreement[]; 
+  rentedSpace?: Space | null;
+  agreements?: Agreement[];
   bills?: Bill[];
 }
 
@@ -68,7 +68,7 @@ export interface Agreement {
   agreementText: string;
   startDate: string; // ISO Date String
   monthlyRentalPrice: number;
-  additionalTerms?: string | null; 
+  additionalTerms?: string | null;
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
   paymentTermMonths: number;
@@ -84,7 +84,7 @@ export interface Agreement {
 
   tenant?: Tenant; // Optional on base type, usually included where needed
   space?: Space;   // Optional on base type, usually included where needed
-  bills?: Bill[]; 
+  bills?: Bill[];
 }
 
 export interface UtilityBreakdownItem {
@@ -95,31 +95,31 @@ export interface UtilityBreakdownItem {
 }
 
 export interface BuildingUtilityItem {
-  id?: string; 
+  id?: string;
   name: string;
   totalCost: number;
   appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
-  applicableFloor?: string | null; 
-  applicableSpaceIdNames?: string[] | null; 
-  monthlyUtilitiesId?: string | null; 
+  applicableFloor?: string | null;
+  applicableSpaceIdNames?: string[] | null;
+  monthlyUtilitiesId?: string | null;
 }
 
 export interface BuildingMonthlyUtilities {
   id: string;
-  buildingId: string; 
-  buildingName: string; 
+  buildingId: string;
+  buildingName: string;
   year: number;
-  month: number; 
+  month: number;
   utilities: BuildingUtilityItem[];
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
-  building?: Building; 
+  building?: Building;
 }
 
 export interface Bill {
   id: string;
   agreementId: string;
-  tenantId: string; 
+  tenantId: string;
   billDate: string; // ISO Date String
   dueDate: string; // ISO Date String
   rentAmount: number;
@@ -145,7 +145,7 @@ export interface Bill {
 export interface AgreementInput {
   tenantName: string;
   building: string;
-  spaceId: string; 
+  spaceId: string;
   spaceArea: number;
   floor: string;
   monthlyRentalPrice: number;
@@ -153,3 +153,46 @@ export interface AgreementInput {
   initialPaymentMonths: number;
   additionalTerms?: string;
 }
+
+// --- RBAC Types ---
+export interface UserRole {
+  id: string;
+  name: string;
+  permissions: string[];
+}
+
+export interface CurrentUser {
+  id: string;
+  userId: string; // External ID
+  email: string;
+  name: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phoneNumber?: string | null;
+  roles: UserRole[];
+  // Calculated effective permissions from all assigned roles
+  effectivePermissions: string[];
+}
+
+// Centralized list of available permissions
+export const AVAILABLE_PERMISSIONS = [
+  { id: 'user:manage', label: 'Manage Users & Registration' },
+  { id: 'role:manage', label: 'Manage Roles & Permissions' },
+  { id: 'building:manage', label: 'Manage Buildings (Full CUD)' },
+  { id: 'building:read', label: 'View Buildings' },
+  { id: 'space:manage', label: 'Manage Spaces (Full CUD)' },
+  { id: 'space:read', label: 'View Spaces' },
+  { id: 'tenant:manage', label: 'Manage Tenants (Full CUD)' },
+  { id: 'tenant:read', label: 'View Tenants' },
+  { id: 'agreement:manage', label: 'Manage Agreements (Full CUD)' },
+  { id: 'agreement:read', label: 'View Agreements' },
+  { id: 'billing:manage', label: 'Manage Billing (Generate, Record Payments)' },
+  { id: 'billing:read', label: 'View Billing Info' },
+  { id: 'building_utilities:manage', label: 'Manage Building Utilities' },
+  { id: 'reports:view_all', label: 'View Full Dashboard & All Reports' },
+  { id: 'reports:view_financial', label: 'View Financial Reports' },
+  { id: 'reports:view_operational', label: 'View Operational Reports' },
+  { id: 'settings:manage', label: 'Manage System-wide Settings' }, // General settings permission
+] as const;
+
+export type PermissionId = typeof AVAILABLE_PERMISSIONS[number]['id'];
