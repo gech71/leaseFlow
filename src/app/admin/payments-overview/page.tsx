@@ -8,42 +8,48 @@ import { format, parseISO } from 'date-fns'; // parseISO might be needed in seri
 import { getPaymentsOverviewDataAction, type PaymentsOverviewData, type PaymentsOverviewBill } from './actions';
 import { PaymentsOverviewClientPage, type ClientBill, type ClientSpaceForPotentialRevenue, type ClientPenaltyTier, type ClientBuilding, type ClientSpaceForAgreement, type ClientTenant, type ClientAgreementForBill, type ClientUtilityBreakdownItem } from './client-page'; // Import client page and its types
 
+const EPOCH_ISO_STRING = new Date(0).toISOString();
 
 // Helper function to serialize a single bill with deep relations
 const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
+  const agreement = bill.agreement;
+  const tenant = agreement?.tenant;
+  const space = agreement?.space;
+  const building = space?.building;
+
   return {
     ...bill,
-    createdAt: bill.createdAt.toISOString(),
-    updatedAt: bill.updatedAt.toISOString(),
-    billDate: bill.billDate.toISOString(),
-    dueDate: bill.dueDate.toISOString(),
+    createdAt: bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
+    updatedAt: bill.updatedAt?.toISOString() || bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
+    billDate: bill.billDate?.toISOString() || EPOCH_ISO_STRING,
+    dueDate: bill.dueDate?.toISOString() || EPOCH_ISO_STRING,
     paymentDate: bill.paymentDate?.toISOString() || null,
-    agreement: {
-      ...bill.agreement,
-      createdAt: bill.agreement.createdAt.toISOString(),
-      updatedAt: bill.agreement.updatedAt.toISOString(),
-      startDate: bill.agreement.startDate.toISOString(),
-      nextPaymentDueDate: bill.agreement.nextPaymentDueDate.toISOString(),
-      initialPaymentDate: bill.agreement.initialPaymentDate?.toISOString() || null,
-      endDate: bill.agreement.endDate?.toISOString() || null,
-      tenant: {
-        ...bill.agreement.tenant,
-        createdAt: bill.agreement.tenant.createdAt.toISOString(),
-        updatedAt: bill.agreement.tenant.updatedAt.toISOString(),
-      },
-      space: {
-        ...bill.agreement.space,
-        createdAt: bill.agreement.space.createdAt.toISOString(),
-        updatedAt: bill.agreement.space.updatedAt.toISOString(),
-        building: {
-          ...bill.agreement.space.building,
-          createdAt: bill.agreement.space.building.createdAt.toISOString(),
-          updatedAt: bill.agreement.space.building.updatedAt.toISOString(),
-          penaltyPolicyTiers: bill.agreement.space.building.penaltyPolicyTiers.map(pt => ({ ...pt })),
-        }
-      }
-    },
-    utilityBreakdown: bill.utilityBreakdown.map(ub => ({ ...ub })),
+    agreement: agreement ? {
+      ...agreement,
+      createdAt: agreement.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      updatedAt: agreement.updatedAt?.toISOString() || agreement.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      startDate: agreement.startDate?.toISOString() || EPOCH_ISO_STRING,
+      nextPaymentDueDate: agreement.nextPaymentDueDate?.toISOString() || EPOCH_ISO_STRING,
+      initialPaymentDate: agreement.initialPaymentDate?.toISOString() || null,
+      endDate: agreement.endDate?.toISOString() || null,
+      tenant: tenant ? {
+        ...tenant,
+        createdAt: tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
+        updatedAt: tenant.updatedAt?.toISOString() || tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      } : ({} as ClientTenant), // Provide a default empty object if tenant is null
+      space: space ? {
+        ...space,
+        createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
+        updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || EPOCH_ISO_STRING,
+        building: building ? {
+          ...building,
+          createdAt: building.createdAt?.toISOString() || EPOCH_ISO_STRING,
+          updatedAt: building.updatedAt?.toISOString() || building.createdAt?.toISOString() || EPOCH_ISO_STRING,
+          penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt })) || [],
+        } : ({} as ClientBuilding), // Default empty object
+      } : ({} as ClientSpaceForAgreement), // Default empty object
+    } : ({} as ClientAgreementForBill), // Default empty object
+    utilityBreakdown: bill.utilityBreakdown?.map(ub => ({ ...ub })) || [],
   };
 };
 
@@ -51,8 +57,8 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
 const serializeSpace = (space: SpacePrisma): ClientSpaceForPotentialRevenue => {
   return {
     ...space,
-    createdAt: space.createdAt.toISOString(),
-    updatedAt: space.updatedAt.toISOString(),
+    createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
+    updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || EPOCH_ISO_STRING,
   };
 };
 
