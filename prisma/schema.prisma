@@ -1,254 +1,234 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+datasource db {
+  provider = "postgresql" // Changed from "sqlite"
+  url      = env("DATABASE_URL")
+}
 
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql" // Changed from "sqlite"
-  url      = env("DATABASE_URL") // Standard environment variable for PostgreSQL
-}
-
-// --- User Authentication and Authorization ---
 model User {
-  id        String   @id @default(cuid()) // Internal CUID for relations
-  userId    String   @unique // User ID from the external identity provider (e.g., sub from JWT)
+  id        String   @id @default(cuid())
+  userId    String   @unique // External User ID from Identity Provider (e.g., Auth0 sub, Firebase UID)
   email     String   @unique
   name      String?
   firstName String?
   lastName  String?
-  phoneNumber String? 
+  phoneNumber String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  roles             Role[]   @relation("UserRoles")
-  managedBuildings  Building[] @relation("ManagedBy") // Buildings directly managed by this user
+  roles             Role[]     @relation("UserRoles")
+  managedBuildings  Building[] @relation("ManagedBuildings") // Buildings managed by this user
 
-  // Relationships to other models where user might be a creator/modifier, if needed
-  // e.g., createdAgreements Agreement[] @relation("CreatedBy")
+  @@map("users")
 }
 
 model Role {
-  id          String @id @default(cuid())
-  name        String @unique // e.g., SUPER_ADMIN, PROPERTY_MANAGER, ACCOUNTANT, SUPPORT_STAFF
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., SUPER_ADMIN, PROPERTY_MANAGER, ACCOUNTANT, SUPPORT_STAFF
   description String?
   permissions String[] // List of permission strings
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   users User[] @relation("UserRoles")
+
+  @@map("roles")
 }
 
-// --- Property Management Core ---
+
 model Building {
   id        String   @id @default(cuid())
-  name      String   @unique // Make building name unique
+  name      String   @unique
   address   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  spaces                   Space[]
+  spaces                  Space[]
+  penaltyPolicyTiers      PenaltyTier[]
   buildingMonthlyUtilities BuildingMonthlyUtilities[]
-  penaltyPolicyTiers       PenaltyTier[]
 
-  // Link to the User who manages this building
-  managedByUserId String? // This will store the User.userId (external identity ID)
-  manager         User?   @relation("ManagedBy", fields: [managedByUserId], references: [userId])
+  managedByUserId String? // Foreign key to User.userId (external ID)
+  manager         User?   @relation("ManagedBuildings", fields: [managedByUserId], references: [userId])
 
-  @@index([managedByUserId])
+
+  @@map("buildings")
 }
 
-model Space {
-  id           String  @id @default(cuid())
-  buildingId   String
-  buildingName String // Denormalized for easier display
+model PenaltyTier {
+  id                      String   @id @default(cuid())
+  buildingId              String
+  building                Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  
+  fromDay                 Int // e.g., 1 (penalty starts from day 1 overdue)
+  toDay                   Int? // e.g., 5 (penalty applies up to day 5). Null means indefinite.
+  
+  feeType                 String   // "Fixed" or "Percentage"
+  feeValue                Float    // Actual amount or percentage value
+  
+  scope                   String   // "Building", "Floor", "SpecificSpaces"
+  applicableFloor         String?  // Relevant if scope is "Floor"
+  applicableSpaceIdNames  String[] // Relevant if scope is "SpecificSpaces" (list of Space.spaceIdName)
 
-  spaceIdName  String  // User-defined ID/name for the space, e.g., "Unit 10A", "Office 202"
-  area         Float   // e.g., in square feet or meters
-  floor        String  // e.g., "1st", "Ground Floor", "Penthouse"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("penalty_tiers")
+}
+
+
+model Space {
+  id           String   @id @default(cuid())
+  buildingId   String
+  buildingName String   // Denormalized for easier querying/display
+  spaceIdName  String   // User-defined ID/Name for the space, e.g., "Unit 101", "Office A"
+  area         Float    // Square footage or meters
+  floor        String   // e.g., "1st", "Ground Floor", "Penthouse"
   
   utilityProrationShare Float // e.g., 0.15 for 15% of applicable building/floor utilities
   monthlyRentalPrice    Float
 
-  isOccupied Boolean  @default(false)
-  tenantId   String?  // If occupied, links to the Tenant. This is now optional at DB level.
-                      // The application logic ensures consistency with rentedSpace on Tenant.
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  building   Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  tenant     Tenant?     @relation("TenantSpaces", fields: [tenantId], references: [id], onDelete: SetNull) // If tenant is deleted, space becomes vacant
-  agreements Agreement[]
-
-  @@unique([buildingId, spaceIdName]) // A space ID must be unique within its building
-  @@index([tenantId])
-}
-
-model Tenant {
-  id                String   @id @default(cuid())
-  name              String
-  email             String   @unique
-  phone             String?
-  alternativePhone  String?  // New field
-  nationalId        String?  // New field
-  representativeName String? // New field
-  representativePhone String? // New field
+  isOccupied Boolean     @default(false)
+  tenantId   String?     @unique // Foreign key to Tenant; @unique makes it one-to-one with Tenant
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // A tenant can be associated with one primary rented space.
-  // This helps quickly identify the main space a tenant occupies.
-  rentedSpaceId String?  @unique // Tenant can only rent one space at a time via this direct link
-  rentedSpace   Space?   @relation("TenantSpaces", fields: [rentedSpaceId], references: [id], onDelete: SetNull) // If space is deleted, this link is nullified
+  building   Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  tenant     Tenant?     @relation("SpaceToTenant", fields: [tenantId], references: [id], onDelete: SetNull) // If tenant is deleted, space becomes vacant
+  
+  agreements Agreement[] @relation("SpaceAgreements")
 
-  agreements Agreement[]
-  bills      Bill[]
+  @@unique([buildingId, spaceIdName]) // Ensure spaceIdName is unique within a building
+  @@map("spaces")
 }
 
+model Tenant {
+  id                 String   @id @default(cuid())
+  name               String
+  email              String   @unique
+  phone              String?
+  alternativePhone   String?  // New field
+  nationalId         String?  // National ID or other identifier
+  representativeName String?
+  representativePhone String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // This is the back-relation to Space.tenant. No fields/references here.
+  rentedSpace   Space?   @relation("SpaceToTenant") 
 
-// --- Agreements & Billing ---
+  agreements  Agreement[] @relation("TenantAgreements")
+  bills       Bill[] // All bills associated with this tenant
+
+  @@map("tenants")
+}
+
 model Agreement {
   id                 String   @id @default(cuid())
   tenantId           String
   spaceId            String
-  agreementText      String   @db.Text // For potentially long agreement text
+  agreementText      String   @db.Text 
   startDate          DateTime
   monthlyRentalPrice Float
-
-  paymentTermMonths  Int      // e.g., 12 for a 12-month contract
-  initialPaymentMonths Int    // e.g., 1 or 2 months paid upfront
-  nextPaymentDueDate DateTime // Tracks when the next regular lease payment is due
-
+  paymentTermMonths  Int      // e.g., 12 for a 12-month lease
+  initialPaymentMonths Int    // e.g., 1 or 2 months rent paid upfront
+  nextPaymentDueDate DateTime // Calculated: startDate + initialPaymentMonths
+  
   additionalTerms    String?  @db.Text
 
-  // Details for the initial payment made when signing the agreement
-  initialPaymentAmount         Float?
-  initialPaymentMethod         String?  // e.g., "Bank Transfer", "Cash", "Card", "Wallet"
-  initialPaymentReference      String?  // e.g., Transaction ID, Check No.
-  initialPaymentBankOrWalletName String? // Name of Bank or Digital Wallet if applicable
-  initialPaymentDate           DateTime? // Date the initial payment was made
-
+  // Initial Payment Details (captured at agreement creation)
+  initialPaymentAmount          Float?
+  initialPaymentMethod          String? // e.g., "Bank Transfer", "Credit Card", "Cash", "Wallet"
+  initialPaymentReference       String? // e.g., Transaction ID, Check No.
+  initialPaymentBankOrWalletName String? // Name of the bank or digital wallet used
+  initialPaymentDate            DateTime? // When the initial payment was made
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  // Derived field, application logic can calculate this.
-  // endDate DateTime? // Calculated as startDate + paymentTermMonths
+  endDate   DateTime? // Calculated: startDate + paymentTermMonths. Can be denormalized or calculated on read.
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade) // If tenant is deleted, their agreements are too.
-  space  Space  @relation(fields: [spaceId], references: [id], onDelete: Restrict) // Prevent space deletion if it has agreements.
-  bills  Bill[]
+  tenant   Tenant @relation("TenantAgreements", fields: [tenantId], references: [id], onDelete: Cascade) // If tenant is deleted, their agreements are deleted
+  space    Space  @relation("SpaceAgreements", fields: [spaceId], references: [id], onDelete: Cascade)  // If space is deleted, agreements for it are deleted
+  bills    Bill[] // All bills generated for this agreement
 
-  @@index([tenantId])
-  @@index([spaceId])
+  @@map("agreements")
 }
 
-model Bill {
-  id               String    @id @default(cuid())
-  agreementId      String
-  tenantId         String    // Denormalized for easier querying, references Tenant via Agreement
-  
-  billDate         DateTime  // Date the bill was generated
-  dueDate          DateTime  // Date the payment for this bill is due
-  
-  rentAmount       Float     // Base rent for the period
-  utilityBreakdown Json?     // Store as JSON: [{ name: "Electricity", amount: 50.00 }, { name: "Water", amount: 20.00 }]
-  penaltyAmount    Float?    // Any penalties applied (e.g., late fees)
-  totalAmount      Float     // rentAmount + sum(utilityBreakdown amounts) + penaltyAmount
-  
-  status           BillStatus @default(Pending) // Enum: Pending, Paid, Overdue, PendingVerification
-  
-  paymentDate      DateTime? // Date the payment was made/confirmed
-  paymentMethod    String?   // e.g., "Bank Transfer", "Cash", "Card", "Wallet"
-  paymentReference String?   // e.g., Transaction ID, Check No.
-  bankOrWalletName String?   // Name of Bank or Digital Wallet if applicable
-  paymentProofUrl  String?   // URL to the uploaded payment proof (if any)
-  adminVerifiedPayment Boolean? // True if an admin has verified a tenant-uploaded proof
+// Represents an individual item within a Bill's utility breakdown
+// This structure will be stored as JSON in the Bill model
+// It's not a separate Prisma model unless complex querying on these items is needed.
+// type UtilityBreakdownItem {
+//   name: String // e.g., "Electricity", "Water", "Gas", "CAM Fee"
+//   amount: Float
+// }
 
-  tenantPaymentNotes    String? @db.Text // Notes from tenant when submitting proof
+model Bill {
+  id        String   @id @default(cuid())
+  agreementId String
+  tenantId  String   // Denormalized for easier querying if needed, though can get from agreement
+  
+  billDate  DateTime // Date the bill was generated
+  dueDate   DateTime // Date the bill is due
+
+  rentAmount  Float
+  // Store utility breakdown as a JSON array of objects: [{ name: "Electricity", amount: 50.00 }, { name: "Water", amount: 20.00 }]
+  utilityBreakdown Json @default("[]") // Store as JSON string or Prisma JSON type
+  
+  penaltyAmount      Float?   // Calculated if payment is late
+  totalAmount        Float    // rentAmount + sum(utilityBreakdown.amount) + penaltyAmount
+
+  status             String   // e.g., "Pending", "Paid", "Overdue", "PendingVerification"
+  paymentDate        DateTime?// Date payment was made/verified
+  paymentMethod      String?  // e.g., "Bank Transfer", "Credit Card", "Cash"
+  paymentReference   String?  // Transaction ID, check number, etc.
+  bankOrWalletName   String?  // For bank transfers or wallet payments
+  
+  paymentProofUrl    String?  // URL to tenant-uploaded payment proof (if any)
+  adminVerifiedPayment Boolean? @default(false) // True if admin confirmed the payment
+  tenantPaymentNotes String?  @db.Text // Notes from tenant when submitting proof
   adminVerificationNotes String? @db.Text // Notes from admin during verification
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade) // If agreement deleted, bills are too.
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade) // Ensures tenant reference integrity for bills.
+  agreement Agreement @relation(fields: [agreementId], references: [id], onDelete:Restrict) // Prevent deleting agreement if bills exist
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete:Restrict) // Prevent deleting tenant if bills exist
 
-  @@index([agreementId])
-  @@index([tenantId])
-  @@index([status])
-  @@index([dueDate])
-}
-
-enum BillStatus {
-  Pending
-  Paid
-  Overdue
-  PendingVerification // Tenant has submitted proof, awaiting admin confirmation
+  @@map("bills")
 }
 
 
-// --- Utilities & Penalties ---
 model BuildingMonthlyUtilities {
   id            String   @id @default(cuid())
   buildingId    String
   buildingName  String   // Denormalized for easier display
-  year          Int      // e.g., 2024
-  month         Int      // 0 for January, 11 for December (Date-fns/JS standard)
+  year          Int      // e.g., 2023
+  month         Int      // e.g., 0 for January, 1 for February ... 11 for December
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   building  Building                @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  utilities BuildingUtilityItem[] // One-to-many relation for individual utility items
+  utilities BuildingUtilityItem[]
 
   @@unique([buildingId, year, month]) // Ensure only one entry per building per month/year
+  @@map("building_monthly_utilities")
 }
 
 model BuildingUtilityItem {
-  id            String  @id @default(cuid())
-  name          String  // e.g., "Building Electricity", "10th Floor Cleaning", "Security Services"
-  totalCost     Float   // Total cost for this utility for the month
+  id            String    @id @default(cuid())
+  monthlyUtilitiesId String
+  monthlyUtilities   BuildingMonthlyUtilities @relation(fields: [monthlyUtilitiesId], references: [id], onDelete: Cascade)
+
+  name          String    // e.g., "Common Area Electricity", "Water Treatment"
+  totalCost     Float     // Total cost for this utility for the period
   
-  appliesToScope UtilityScope // Building, Floor, SpecificSpaces
-  applicableFloor String? // e.g., "10th" (if appliesToScope is Floor)
-  applicableSpaceIdNames String[] // List of Space.spaceIdName (if appliesToScope is SpecificSpaces)
+  appliesToScope  String    // "Building", "Floor", "SpecificSpaces"
+  applicableFloor String?   // Relevant if scope is "Floor"
+  applicableSpaceIdNames String[] // Relevant if scope is "SpecificSpaces" (list of Space.spaceIdName)
 
-  monthlyUtilitiesId String?
-  monthlyUtilities   BuildingMonthlyUtilities? @relation(fields: [monthlyUtilitiesId], references: [id], onDelete: Cascade)
-}
-
-enum UtilityScope {
-  Building        // Applies to all spaces in the building, prorated by Space.utilityProrationShare
-  Floor           // Applies to all spaces on a specific floor, divided equally or by area (TBD by logic)
-  SpecificSpaces  // Applies only to listed specific spaces, divided equally or by specific shares (TBD by logic)
-}
-
-model PenaltyTier {
-  id            String  @id @default(cuid())
-  buildingId    String
-  
-  fromDay       Int     // Penalty starts from this day after due date (e.g., 1 for day after due date)
-  toDay         Int?    // Penalty ends on this day (inclusive). Null means it applies indefinitely after fromDay.
-  feeType       PenaltyFeeType // Fixed, Percentage
-  feeValue      Float   // Actual amount if Fixed, or percentage value (e.g., 2.5 for 2.5%)
-  
-  scope         PenaltyScope @default(Building) // Building, Floor, SpecificSpaces
-  applicableFloor String? // e.g., "10th" (if scope is Floor)
-  applicableSpaceIdNames String[] // List of Space.spaceIdName (if scope is SpecificSpaces)
-
-  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-}
-
-enum PenaltyFeeType {
-  Fixed
-  Percentage // Percentage of the bill's rentAmount or totalAmount (configurable by application logic)
-}
-
-enum PenaltyScope {
-  Building        // Default policy for the entire building
-  Floor           // Specific policy for a floor
-  SpecificSpaces  // Specific policy for one or more spaces
+  @@map("building_utility_items")
 }
