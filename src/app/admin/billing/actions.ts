@@ -3,15 +3,31 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type Agreement, type Bill, type Space, type Building, type BuildingMonthlyUtilities, type UtilityBreakdownItem as PrismaUtilityBreakdownItem, type PenaltyTier } from '@prisma/client';
+import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrisma, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal } from '@prisma/client';
 import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, isSameDay, setMonth, setYear, parseISO, format } from 'date-fns';
 
+// Define a simpler type for utility items if they are stored as JSON
+interface ParsedUtilityItem {
+  id?: string; // Optional, if JSON contains it
+  name: string;
+  amount: number;
+}
+
+// Adjusted types to use ParsedUtilityItem for bill.utilityBreakdown
 export interface BillingPageData {
-  agreements: (Agreement & { tenant: Prisma.TenantGetPayload<{}>; space: Prisma.SpaceGetPayload<{ include: { building: Prisma.BuildingGetPayload<{ include: { penaltyPolicyTiers: true } }> } }> })[];
-  spaces: (Space & { building: Prisma.BuildingGetPayload<{ include: { penaltyPolicyTiers: true } }> })[];
-  buildings: (Building & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[] })[];
-  bills: (Bill & { agreement: Agreement & { tenant: Prisma.TenantGetPayload<{}>; space: Space & { building: Building & { penaltyPolicyTiers: PenaltyTier[] } } } })[]; 
-  buildingMonthlyUtilities: (BuildingMonthlyUtilities & { utilities: Prisma.BuildingUtilityItemGetPayload<{}>[] })[];
+  agreements: (AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] } } })[];
+  spaces: (SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] } })[];
+  buildings: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] })[];
+  bills: (Omit<BillPrisma, 'utilityBreakdown'> & { 
+    utilityBreakdown: ParsedUtilityItem[]; 
+    agreement: AgreementPrismaOriginal & { 
+      tenant: TenantPrismaOriginal; 
+      space: SpacePrismaOriginal & { 
+        building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[] } 
+      } 
+    } 
+  })[]; 
+  buildingMonthlyUtilities: (BuildingMonthlyUtilitiesPrisma & { utilities: Prisma.BuildingUtilityItemGetPayload<{}>[] })[];
 }
 
 export async function getBillingPageDataAction(): Promise<BillingPageData> {
@@ -27,7 +43,7 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
         tenant: true,
         space: {
           include: {
-            building: { include: { penaltyPolicyTiers: true } }
+            building: { include: { penaltyPolicyTiers: true, spaces: true } } // Added spaces include for building
           }
         }
       },
@@ -35,10 +51,10 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
     }),
     databaseService.getAllSpaces({
       include: {
-        building: { include: { penaltyPolicyTiers: true } }
+        building: { include: { penaltyPolicyTiers: true, spaces: true } } // Added spaces include for building
       }
     }),
-    databaseService.getAllBuildings({ include: { penaltyPolicyTiers: true } }),
+    databaseService.getAllBuildings({ include: { penaltyPolicyTiers: true, spaces: true } }), // Added spaces include
     databaseService.getAllBills({ 
       include: {
         agreement: {
@@ -46,11 +62,12 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
             tenant: true,
             space: {
               include: {
-                building: { include: { penaltyPolicyTiers: true } }
+                building: { include: { penaltyPolicyTiers: true, spaces: true } } // Added spaces include
               }
             }
           }
         }
+        // utilityBreakdown is NOT included here if it's a scalar JSON field
       },
       orderBy: { billDate: 'desc' }
     }),
@@ -65,16 +82,56 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
     })
   ]);
 
-  // Ensure type assertions are safe or data structure matches BillingPageData
   const agreements = agreementsData as BillingPageData['agreements'];
   const spaces = spacesData as BillingPageData['spaces'];
   const buildings = buildingsData as BillingPageData['buildings'];
-  const bills = billsDataRaw.map(bill => ({
-    ...bill,
-    utilityBreakdown: (bill as any).utilityBreakdown || [] 
-  })) as BillingPageData['bills'];
-  const buildingMonthlyUtilities = buildingMonthlyUtilitiesData as BillingPageData['buildingMonthlyUtilities'];
+  
+  const bills = billsDataRaw.map(billRaw => {
+    let parsedUtilityBreakdown: ParsedUtilityItem[] = [];
+    const rawUtilityData = (billRaw as any).utilityBreakdown; // Accessing potentially JSON field
 
+    if (typeof rawUtilityData === 'string') {
+      try {
+        const jsonData = JSON.parse(rawUtilityData);
+        if (Array.isArray(jsonData)) {
+          // Filter and map to ensure items have at least name and amount
+          parsedUtilityBreakdown = jsonData
+            .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
+            .map(item => ({ 
+              name: item.name, 
+              amount: item.amount,
+              id: typeof item.id === 'string' ? item.id : undefined // include id if present
+            }));
+        } else {
+          console.warn(`Parsed utilityBreakdown for bill ${billRaw.id} is not an array:`, jsonData);
+        }
+      } catch (e) {
+        console.error(`Failed to parse utilityBreakdown JSON for bill ${billRaw.id}:`, e, rawUtilityData);
+      }
+    } else if (Array.isArray(rawUtilityData)) {
+      // This case handles if it's already an array (e.g., from direct assignment or if schema/client was fixed)
+      // Ensure it conforms to ParsedUtilityItem structure
+       parsedUtilityBreakdown = rawUtilityData
+            .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
+            .map(item => ({ 
+              name: item.name, 
+              amount: item.amount,
+              id: typeof item.id === 'string' ? item.id : undefined
+            }));
+    }
+    
+    // Ensure the rest of the bill structure matches BillingPageData['bills'] element type
+    const agreementForBill = billRaw.agreement as unknown as BillingPageData['bills'][number]['agreement'];
+
+    return {
+      ...billRaw,
+      agreement: agreementForBill, // Use the correctly typed agreement
+      utilityBreakdown: parsedUtilityBreakdown,
+    };
+  }) as BillingPageData['bills'];
+
+
+  const buildingMonthlyUtilities = buildingMonthlyUtilitiesData as BillingPageData['buildingMonthlyUtilities'];
 
   return { agreements, spaces, buildings, bills, buildingMonthlyUtilities };
 }
@@ -82,8 +139,8 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
 function calculateIndividualPenalty(
   billAmount: number, 
   daysOverdue: number,
-  building: Building & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[] },
-  space: Space
+  building: BuildingPrismaOriginal & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[] },
+  space: SpacePrismaOriginal
 ): number {
   if (daysOverdue <= 0 || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) {
     return 0;
@@ -146,7 +203,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     }
 
     const rentAmount = agreement.monthlyRentalPrice;
-    const utilityBreakdownItemsCreate: Prisma.UtilityBreakdownItemCreateManyWithoutBillInput[] = [];
+    const utilityItemsForJson: {name: string; amount: number}[] = []; // For storing in JSON field
     let totalUtilityCostForBill = 0;
 
     const billYear = getYear(targetBillDate);
@@ -178,28 +235,31 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         }
         if (costForThisUtility > 0) {
           const roundedCost = parseFloat(costForThisUtility.toFixed(2));
-          utilityBreakdownItemsCreate.push({ name: utilItem.name, amount: roundedCost } as unknown as Prisma.UtilityBreakdownItemCreateManyWithoutBillInput);
+          utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
           totalUtilityCostForBill += roundedCost;
         }
       });
     }
 
     let initialPenalty = 0;
-    const dueDate = targetBillDate; // Due date is the bill date itself
-    if (isBefore(dueDate, today)) { // If bill date is in the past, it's immediately overdue
-        const daysOverdue = differenceInDays(today, dueDate); // Days since bill date
+    const dueDate = targetBillDate; 
+    if (isBefore(dueDate, today)) { 
+        const daysOverdue = differenceInDays(today, dueDate); 
         initialPenalty = calculateIndividualPenalty(rentAmount, daysOverdue, agreement.space.building, agreement.space);
     }
 
     const totalAmount = rentAmount + totalUtilityCostForBill + initialPenalty;
+    
+    // Assuming utilityBreakdown is a Json field on Bill model
+    const utilityBreakdownJson = utilityItemsForJson.length > 0 ? JSON.stringify(utilityItemsForJson) : Prisma.JsonNull;
 
     const billCreateInput: Prisma.BillCreateInput = {
       agreement: { connect: { id: agreement.id } },
       tenant: { connect: { id: agreement.tenantId } },
       billDate: targetBillDate,
-      dueDate: targetBillDate, // Due on bill date
+      dueDate: targetBillDate, 
       rentAmount,
-      utilityBreakdown: { create: utilityBreakdownItemsCreate as Prisma.UtilityBreakdownItemCreateWithoutBillInput[] },
+      utilityBreakdown: utilityBreakdownJson, // Store as JSON
       penaltyAmount: initialPenalty > 0 ? initialPenalty : undefined,
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       status: isBefore(targetBillDate, today) && initialPenalty > 0 ? 'Overdue' : 'Pending',
@@ -229,24 +289,41 @@ export async function recordPaymentOrVerificationAction(
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
   try {
-    const bill = await databaseService.getBillById(billId, { // This is Prisma.BillInclude
-      agreement: {                                       // Relation on Bill
-        include: {                                       // Prisma.AgreementInclude
-          space: {                                       // Relation on Agreement
-            include: {                                   // Prisma.SpaceInclude
-              building: {                                // Relation on Space
-                include: {                               // Prisma.BuildingInclude
-                  penaltyPolicyTiers: true
+    const bill = await databaseService.getBillById(billId, { 
+      agreement: {                                       
+        include: {                                       
+          space: {                                       
+            include: {                                   
+              building: {                                
+                include: {                               
+                  penaltyPolicyTiers: true,
+                  spaces: true // Ensure spaces are included here for penalty calculation context
                 }
               }
             }
-          }
+          },
+          tenant: true // Include tenant if needed, though not directly used in current logic
         }
-      },
-      utilityBreakdown: true, 
+      }
+      // utilityBreakdown is not included if it's a scalar JSON field
     });
     if (!bill) throw new Error("Bill not found.");
     if (!bill.agreement?.space?.building) throw new Error("Building details for bill not found for penalty check.");
+
+    // Parse utilityBreakdown if it's a JSON string
+    let utilityBreakdownItems: ParsedUtilityItem[] = [];
+    if (typeof (bill as any).utilityBreakdown === 'string') {
+        try {
+            const parsed = JSON.parse((bill as any).utilityBreakdown);
+            if (Array.isArray(parsed)) {
+                utilityBreakdownItems = parsed.filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
+                                             .map(item => ({ name: item.name, amount: item.amount, id: item.id }));
+            }
+        } catch (e) {
+            console.error("Error parsing utilityBreakdown for penalty calculation in recordPayment:", e);
+        }
+    }
+
 
     const today = startOfDay(new Date());
     let newStatus: Prisma.BillStatus = bill.status;
@@ -262,7 +339,6 @@ export async function recordPaymentOrVerificationAction(
         }
     }
 
-
     const billUpdateData: Prisma.BillUpdateInput = {
       paymentMethod: paymentData.paymentMethod,
       paymentReference: paymentData.paymentReference,
@@ -271,7 +347,7 @@ export async function recordPaymentOrVerificationAction(
       penaltyAmount: currentPenalty > 0 ? currentPenalty : null,
     };
 
-    const baseAmount = bill.rentAmount + (bill.utilityBreakdown?.reduce((sum, util) => sum + util.amount, 0) || 0);
+    const baseAmount = bill.rentAmount + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
     billUpdateData.totalAmount = parseFloat((baseAmount + (currentPenalty > 0 ? currentPenalty : 0)).toFixed(2));
 
 
@@ -289,8 +365,8 @@ export async function recordPaymentOrVerificationAction(
       billUpdateData.paymentMethod = null;
       billUpdateData.paymentReference = null;
       billUpdateData.bankOrWalletName = null;
-      if (newStatus === 'Pending') billUpdateData.penaltyAmount = null;
-      const rejectedBaseAmount = bill.rentAmount + (bill.utilityBreakdown?.reduce((sum, util) => sum + util.amount, 0) || 0);
+      
+      const rejectedBaseAmount = bill.rentAmount + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
       let rejectedPenalty = 0;
       if (newStatus === 'Overdue') {
           const daysOverdueNow = differenceInDays(today, parseISO(bill.dueDate.toISOString()));
@@ -333,3 +409,5 @@ export async function deleteBillAction(billId: string) {
     }
 }
 
+    
+    
