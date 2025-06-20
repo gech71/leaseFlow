@@ -115,12 +115,12 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const billMonth = getMonth(targetBillDate);
 
     const monthlyBuildingUtilityData = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(
-      agreement.space.building.id, 
+      agreement.space.building.id,
       billMonth,
       billYear,
       { include: { utilities: true } }
     );
-    
+
     if (monthlyBuildingUtilityData?.utilities.length) {
       monthlyBuildingUtilityData.utilities.forEach(utilItem => {
         let costForThisUtility = 0;
@@ -140,14 +140,14 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         }
         if (costForThisUtility > 0) {
           const roundedCost = parseFloat(costForThisUtility.toFixed(2));
-          utilityBreakdownItemsCreate.push({ name: utilItem.name, amount: roundedCost } as unknown as Prisma.UtilityBreakdownItemCreateManyWithoutBillInput); 
+          utilityBreakdownItemsCreate.push({ name: utilItem.name, amount: roundedCost } as unknown as Prisma.UtilityBreakdownItemCreateManyWithoutBillInput);
           totalUtilityCostForBill += roundedCost;
         }
       });
     }
 
     let initialPenalty = 0;
-    const dueDate = targetBillDate; 
+    const dueDate = targetBillDate;
     if (isBefore(dueDate, today)) {
         const daysOverdue = differenceInDays(today, dueDate);
         initialPenalty = calculateIndividualPenalty(rentAmount, daysOverdue, agreement.space.building, agreement.space);
@@ -159,7 +159,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       agreement: { connect: { id: agreement.id } },
       tenant: { connect: { id: agreement.tenantId } },
       billDate: targetBillDate,
-      dueDate: targetBillDate, 
+      dueDate: targetBillDate,
       rentAmount,
       utilityBreakdown: { create: utilityBreakdownItemsCreate as Prisma.UtilityBreakdownItemCreateWithoutBillInput[] },
       penaltyAmount: initialPenalty > 0 ? initialPenalty : undefined,
@@ -169,7 +169,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 
     const newBill = await databaseService.createBill(billCreateInput);
     await databaseService.updateAgreement(agreement.id, { nextPaymentDueDate: addMonths(targetBillDate, 1) });
-    
+
     revalidatePath('/admin/billing');
     return { success: true, bill: newBill };
   } catch (error: any) {
@@ -186,26 +186,40 @@ export async function recordPaymentOrVerificationAction(
     paymentReference?: string | null;
     bankOrWalletName?: string | null;
     adminVerificationNotes?: string | null;
-    adminProofUrl?: string | null; 
+    adminProofUrl?: string | null;
   },
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
   try {
-    const bill = await databaseService.getBillById(billId, { include: { agreement: { include: { space: { include: { building: {include: {penaltyPolicyTiers: true}}}}}}}} });
+    const bill = await databaseService.getBillById(billId, {
+      agreement: {
+        include: {
+          space: {
+            include: {
+              building: {
+                include: {
+                  penaltyPolicyTiers: true
+                }
+              }
+            }
+          }
+        }
+      }
+    });
     if (!bill) throw new Error("Bill not found.");
     if (!bill.agreement?.space?.building) throw new Error("Building details for bill not found for penalty check.");
 
     const today = startOfDay(new Date());
     let newStatus: Prisma.BillStatus = bill.status;
     let finalPaymentDate = paymentData.paymentDate ? parseISO(paymentData.paymentDate) : new Date();
-    
+
     let currentPenalty = bill.penaltyAmount || 0;
     if ((bill.status === 'Overdue' || (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate.toISOString()), today))) && actionType !== 'rejectVerification') {
-        const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString())); 
+        const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString()));
         if (daysOverdue > 0) {
              currentPenalty = calculateIndividualPenalty(bill.rentAmount, daysOverdue, bill.agreement.space.building, bill.agreement.space);
         } else {
-            currentPenalty = 0; 
+            currentPenalty = 0;
         }
     }
 
@@ -217,7 +231,7 @@ export async function recordPaymentOrVerificationAction(
       adminVerificationNotes: paymentData.adminVerificationNotes,
       penaltyAmount: currentPenalty > 0 ? currentPenalty : null,
     };
-    
+
     const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
     billUpdateData.totalAmount = parseFloat((baseAmount + (currentPenalty > 0 ? currentPenalty : 0)).toFixed(2));
 
@@ -227,7 +241,7 @@ export async function recordPaymentOrVerificationAction(
       billUpdateData.paymentDate = finalPaymentDate;
       billUpdateData.adminVerifiedPayment = true;
       if (paymentData.adminProofUrl) {
-        billUpdateData.paymentProofUrl = paymentData.adminProofUrl; 
+        billUpdateData.paymentProofUrl = paymentData.adminProofUrl;
       }
     } else if (actionType === 'rejectVerification') {
       newStatus = isBefore(parseISO(bill.dueDate.toISOString()), today) ? 'Overdue' : 'Pending';
