@@ -221,7 +221,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       agreement.space.building.id,
       billMonth,
       billYear,
-      { include: { utilities: true } }
+      { utilities: true } // Corrected: Pass include options directly
     );
 
     if (monthlyBuildingUtilityData?.utilities.length) {
