@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. Verify requester is SUPER_ADMIN
-  const cookieStore = await cookies(); // Await cookies() as per user instruction
+  const cookieStore = await cookies();
   const adminAccessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
 
   if (!adminAccessToken) {
@@ -44,7 +44,6 @@ export async function POST(request: NextRequest) {
   }
 
   const adminPayload = decodeJwtPayload(adminAccessToken);
-  // Assuming the role claim in your JWT is "Admin" for super admins
   if (!adminPayload || adminPayload.role !== "Admin") { 
     return NextResponse.json({ isSuccess: false, errors: ["Unauthorized: Only Super Admins can register users."] }, { status: 403 });
   }
@@ -66,11 +65,11 @@ export async function POST(request: NextRequest) {
   // 3. Call external identity server to register the user
   let externalRegisterResponse: Response;
   try {
-    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/register`, { // Ensure /api/ is included
+    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminAccessToken}` // Send admin's token for authorization
+        'Authorization': `Bearer ${adminAccessToken}` // Send admin's token
       },
       body: JSON.stringify({ firstName, lastName, phoneNumber, email, password }),
     });
@@ -94,24 +93,21 @@ export async function POST(request: NextRequest) {
       if (!externalRegisterResponse.ok) {
         return NextResponse.json({ isSuccess: false, errors: [`Registration service responded with status: ${externalRegisterResponse.status} and an invalid JSON: ${externalResponseText.substring(0,100)}...`] }, { status: externalRegisterResponse.status });
       }
-      // If response was OK but JSON is malformed (unlikely for successful registration)
       return NextResponse.json({ isSuccess: false, errors: ["Received an invalid JSON response from registration service despite OK status."] }, { status: 500 });
     }
   } else if (!externalRegisterResponse.ok) {
-      // If response text is empty and not OK
       return NextResponse.json({ isSuccess: false, errors: [`Registration service responded with status: ${externalRegisterResponse.status} and an empty response.`] }, { status: externalRegisterResponse.status });
   }
-
 
   if (!externalRegisterResponse.ok || !externalResponseData?.isSuccess) {
     const errorMessages = externalResponseData?.errors && Array.isArray(externalResponseData.errors) && externalResponseData.errors.length > 0
       ? externalResponseData.errors
-      : externalResponseData?.message ? [externalResponseData.message] // Handle single message error
+      : externalResponseData?.message ? [externalResponseData.message]
+      : externalResponseData?.detail ? [externalResponseData.detail] // Handle cases where error might be in 'detail'
       : [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status || 400 });
   }
 
-  // 4. If external registration is successful, get new user's ID and details from their token
   const newUserAccessToken = externalResponseData.accessToken;
   if (!newUserAccessToken) {
     return NextResponse.json({ isSuccess: false, errors: ["Identity server did not return an access token for the new user."] }, { status: 500 });
@@ -128,13 +124,8 @@ export async function POST(request: NextRequest) {
   const newUserLastName = newUserPayload.lastName || lastName;
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
-  // 5. Store new user in local Prisma database
+  // 5. Store new user in local Prisma database without assigning any default role
   try {
-    const defaultRole = await databaseService.getAllRoles({ where: { name: "SUPPORT_STAFF" } });
-    if (!defaultRole || defaultRole.length === 0) {
-        console.warn("SUPPORT_STAFF role not found for new user. The user will be created without a role.");
-    }
-    
     const userCreateInput: Prisma.UserCreateInput = {
       userId: newUserId,
       email: newUserEmail,
@@ -142,12 +133,12 @@ export async function POST(request: NextRequest) {
       firstName: newUserFirstName,
       lastName: newUserLastName,
       phoneNumber: newUserPhoneNumber,
-      roles: defaultRole && defaultRole.length > 0 ? { connect: { id: defaultRole[0].id } } : undefined,
+      // roles field is omitted, so the user will have no roles by default
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
     
-    return NextResponse.json({ isSuccess: true, message: "User registered successfully and created locally.", userId: localUser.userId });
+    return NextResponse.json({ isSuccess: true, message: "User registered successfully and created locally without a default role.", userId: localUser.userId });
 
   } catch (dbError: any) {
     console.error("Error creating user in local database:", dbError);
@@ -157,4 +148,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["User registered on identity server, but failed to create local record.", dbError.message] }, { status: 500 });
   }
 }
+    
+
     
