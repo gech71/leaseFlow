@@ -12,10 +12,6 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { AppLogo } from '@/components/custom/AppLogo';
 
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
-const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
-
 export default function AdminLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -27,18 +23,9 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!AUTH_API_BASE_URL) {
-      toast({
-        title: "Configuration Error",
-        description: "Authentication service URL is not configured.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch(`${AUTH_API_BASE_URL}/auth/login`, {
+      // Call the Next.js API route for login
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,9 +35,7 @@ export default function AdminLoginPage() {
 
       const data = await response.json();
 
-      if (response.ok && data.isSuccess && data.accessToken && data.refreshToken) {
-        localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-        localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+      if (response.ok && data.isSuccess) {
         toast({
           title: "Login Successful",
           description: "Welcome!",
@@ -81,7 +66,9 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
         <CardHeader className="text-center space-y-3 pt-8">
           <div className="mx-auto">
-            <Link href="/" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
+            {/* AppLogo can be used if it's purely visual or if Link works for current context */}
+            {/* For direct text and icon: */}
+            <Link href="/" className="flex items-center justify-center gap-2 text-foreground hover:text-primary transition-colors">
               <Building className="h-10 w-10 text-primary" />
               <h1 className="text-3xl font-headline font-bold">LeaseFlow</h1>
             </Link>

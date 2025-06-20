@@ -31,7 +31,7 @@ import {
   ClipboardList,
   Building,
   ExternalLink,
-  Loader2, // Added Loader2 for logout
+  Loader2, 
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -49,7 +49,7 @@ import {
   TooltipProvider
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { useToast } from '@/hooks/use-toast';
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -63,10 +63,6 @@ const navItems = [
   { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink },
 ];
 
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
-const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
-
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -76,44 +72,38 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+    try {
+      // Call the Next.js API route for logout
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+      const data = await response.json();
 
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-
-    if (AUTH_API_BASE_URL && accessToken && refreshToken) {
-      try {
-        await fetch(`${AUTH_API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: accessToken, refreshToken }),
-        });
-        // We don't strictly need to check the response for logout
-        // Client-side cleanup will happen regardless
-      } catch (error) {
-        console.error("Logout API call error:", error);
-        // Optionally, inform the user the server-side logout might have failed,
-        // but still proceed with client-side cleanup.
+      if (response.ok && data.isSuccess) {
         toast({
-            title: "Logout Notice",
-            description: "Could not reach logout service. Cleared local session.",
-            variant: "default"
+            title: "Logged Out",
+            description: "You have been successfully logged out.",
+        });
+      } else {
+        toast({
+            title: "Logout Issue",
+            description: data.errors?.join(', ') || "Could not fully complete server logout. Local session cleared.",
+            variant: "default", // Not destructive as local session is cleared
         });
       }
+    } catch (error) {
+      console.error("Logout API call error:", error);
+      toast({
+          title: "Logout Error",
+          description: "Could not connect to the logout service. Cleared local session.",
+          variant: "default"
+      });
+    } finally {
+      // Always redirect to login page
+      router.push('/auth/login');
+      setIsLoggingOut(false);
     }
-
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    
-    toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out.",
-    });
-    router.push('/auth/login');
-    setIsLoggingOut(false);
   };
-
 
   return (
     <>
@@ -225,7 +215,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="md:flex items-center justify-start mb-6 h-[3.7rem]">
-            <SidebarTrigger />
+            <SidebarTrigger /> 
           </div>
           {children}
         </div>
