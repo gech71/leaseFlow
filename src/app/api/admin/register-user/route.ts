@@ -2,7 +2,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client'; // Import Prisma namespace for error types
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   const adminPayload = decodeJwtPayload(adminAccessToken);
+  // Check for "Admin" role based on the provided token structure
   if (!adminPayload || adminPayload.role !== "Admin") { 
     return NextResponse.json({ isSuccess: false, errors: ["Unauthorized: Only Super Admins can register users."] }, { status: 403 });
   }
@@ -103,7 +104,8 @@ export async function POST(request: NextRequest) {
     const errorMessages = externalResponseData?.errors && Array.isArray(externalResponseData.errors) && externalResponseData.errors.length > 0
       ? externalResponseData.errors
       : externalResponseData?.message ? [externalResponseData.message]
-      : externalResponseData?.detail ? [externalResponseData.detail] // Handle cases where error might be in 'detail'
+      : externalResponseData?.detail ? [externalResponseData.detail] 
+      : externalResponseText ? [externalResponseText.substring(0, 200)] // Fallback to raw text if parsing fails but text exists
       : [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status || 400 });
   }
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest) {
   const newUserEmail = newUserPayload.email || email; 
   const newUserFirstName = newUserPayload.firstName || firstName;
   const newUserLastName = newUserPayload.lastName || lastName;
+  // Extract phone number from the specific claim
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
   // 5. Store new user in local Prisma database without assigning any default role
