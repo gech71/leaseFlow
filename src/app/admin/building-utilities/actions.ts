@@ -20,8 +20,9 @@ export async function getBuildingUtilitiesAction(
   month: number
 ): Promise<BuildingMonthlyUtilities | null> {
   try {
+    // Corrected: Pass the include options directly
     return await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(buildingId, month, year, {
-      include: { utilities: true },
+      utilities: true,
     });
   } catch (error: any) {
     console.error("Error fetching building utilities:", error);
