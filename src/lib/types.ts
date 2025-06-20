@@ -1,5 +1,4 @@
 
-
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
@@ -174,25 +173,116 @@ export interface CurrentUser {
   effectivePermissions: string[];
 }
 
-// Centralized list of available permissions
-export const AVAILABLE_PERMISSIONS = [
+// Defines actions for a resource
+export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete'] as const;
+export type PermissionAction = typeof PERMISSION_ACTIONS[number];
+
+// Defines a single permission
+export interface PermissionItem {
+  id: string; // e.g., "building:view"
+  label: string; // e.g., "View Buildings"
+}
+
+// Defines a resource and its associated permissions
+export interface ResourcePermissionGroup {
+  resourceId: string; // e.g., "building"
+  resourceLabel: string; // e.g., "Buildings"
+  permissions: PermissionItem[]; // Array of specific permissions for this resource
+}
+
+// New structured permissions list
+export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
+  {
+    resourceId: 'dashboard',
+    resourceLabel: 'Dashboard',
+    permissions: [{ id: 'dashboard:view', label: 'View Dashboard' }],
+  },
+  {
+    resourceId: 'building',
+    resourceLabel: 'Buildings',
+    permissions: [
+      { id: 'building:view', label: 'View Buildings' },
+      { id: 'building:create', label: 'Create Buildings' },
+      { id: 'building:edit', label: 'Edit Buildings' },
+      { id: 'building:delete', label: 'Delete Buildings' },
+    ],
+  },
+  {
+    resourceId: 'space',
+    resourceLabel: 'Spaces',
+    permissions: [
+      { id: 'space:view', label: 'View Spaces' },
+      { id: 'space:create', label: 'Create Spaces' },
+      { id: 'space:edit', label: 'Edit Spaces' },
+      { id: 'space:delete', label: 'Delete Spaces' },
+    ],
+  },
+  {
+    resourceId: 'tenant',
+    resourceLabel: 'Tenants',
+    permissions: [
+      { id: 'tenant:view', label: 'View Tenants' },
+      { id: 'tenant:create', label: 'Create Tenants' },
+      { id: 'tenant:edit', label: 'Edit Tenants' },
+      { id: 'tenant:delete', label: 'Delete Tenants' },
+    ],
+  },
+  {
+    resourceId: 'agreement',
+    resourceLabel: 'Agreements',
+    permissions: [
+      { id: 'agreement:view', label: 'View Agreements' },
+      { id: 'agreement:create', label: 'Create Agreements' },
+      { id: 'agreement:edit', label: 'Edit Agreements' }, // Note: Editing agreements might be complex.
+      { id: 'agreement:delete', label: 'Delete Agreements' },
+    ],
+  },
+  {
+    resourceId: 'building_utility',
+    resourceLabel: 'Building Utilities',
+    permissions: [
+      { id: 'building_utility:view', label: 'View Building Utilities' },
+      { id: 'building_utility:manage', label: 'Manage Building Utilities (CUD)' },
+    ],
+  },
+  {
+    resourceId: 'billing',
+    resourceLabel: 'Billing',
+    permissions: [
+      { id: 'billing:view', label: 'View Bills & Billing Info' },
+      { id: 'billing:generate', label: 'Generate Bills' },
+      { id: 'billing:manage_payments', label: 'Record/Verify Payments' },
+      { id: 'billing:delete', label: 'Delete Bills' },
+    ],
+  },
+  {
+    resourceId: 'payment_overview',
+    resourceLabel: 'Payments Overview',
+    permissions: [
+      { id: 'payment_overview:view', label: 'View Payments Overview Report' },
+    ],
+  },
+  {
+    resourceId: 'settings',
+    resourceLabel: 'Settings Area', // This is a general category for settings sub-modules
+    permissions: [
+      { id: 'settings:user_registration:manage', label: 'Register New Users' },
+      { id: 'settings:user_management:view', label: 'View User Management (Roles/Buildings)' },
+      { id: 'settings:user_management:assign', label: 'Assign Roles/Buildings to Users' },
+      { id: 'settings:role_management:view', label: 'View Role Management' },
+      { id: 'settings:role_management:manage', label: 'Manage Roles (CUD Permissions)' },
+    ],
+  },
+];
+
+// Flattened list for convenience, though direct iteration over structured list is often better.
+export const AVAILABLE_PERMISSIONS: PermissionItem[] = ALL_RESOURCE_PERMISSIONS.flatMap(group => group.permissions);
+export type PermissionId = typeof AVAILABLE_PERMISSIONS[number]['id'];
+
+// Old list - to be deprecated/removed after refactor
+export const OLD_AVAILABLE_PERMISSIONS = [
   { id: 'user:manage', label: 'Manage Users & Registration' },
   { id: 'role:manage', label: 'Manage Roles & Permissions' },
-  { id: 'building:manage', label: 'Manage Buildings (Full CUD)' },
-  { id: 'building:read', label: 'View Buildings' },
-  { id: 'space:manage', label: 'Manage Spaces (Full CUD)' },
-  { id: 'space:read', label: 'View Spaces' },
-  { id: 'tenant:manage', label: 'Manage Tenants (Full CUD)' },
-  { id: 'tenant:read', label: 'View Tenants' },
-  { id: 'agreement:manage', label: 'Manage Agreements (Full CUD)' },
-  { id: 'agreement:read', label: 'View Agreements' },
-  { id: 'billing:manage', label: 'Manage Billing (Generate, Record Payments)' },
-  { id: 'billing:read', label: 'View Billing Info' },
-  { id: 'building_utilities:manage', label: 'Manage Building Utilities' },
-  { id: 'reports:view_all', label: 'View Full Dashboard & All Reports' },
-  { id: 'reports:view_financial', label: 'View Financial Reports' },
-  { id: 'reports:view_operational', label: 'View Operational Reports' },
-  { id: 'settings:manage', label: 'Manage System-wide Settings' }, // General settings permission
+  // ... other old permissions
 ] as const;
 
-export type PermissionId = typeof AVAILABLE_PERMISSIONS[number]['id'];

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, DollarSign as DollarSignLucide, AlertTriangle, Layers, HomeIcon, EyeOff } from 'lucide-react';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, DollarSign as DollarSignLucide, AlertTriangle, Layers, HomeIcon, Eye, EyeOff } from 'lucide-react'; // Added Eye
 import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { deleteBuildingAction } from './actions';
-import { usePermissions } from '@/contexts/PermissionContext'; // Import usePermissions
+import { usePermissions } from '@/contexts/PermissionContext'; 
 
 export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
@@ -32,10 +32,12 @@ export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
 interface BuildingCardProps {
   building: BuildingWithPenaltyTiers;
   onDelete: (building: BuildingWithPenaltyTiers) => void;
-  canManage: boolean; // New prop
+  canEdit: boolean;
+  canDelete: boolean;
+  canViewDetails: boolean; // To determine if "View Details" or "Edit" should be shown
 }
 
-function BuildingCard({ building, onDelete, canManage }: BuildingCardProps) {
+function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }: BuildingCardProps) {
   const policiesByScopeGroup: Record<string, PenaltyTierTypePrisma[]> = {};
   (building.penaltyPolicyTiers || []).forEach(tier => {
     let key = tier.scope;
@@ -87,24 +89,23 @@ function BuildingCard({ building, onDelete, canManage }: BuildingCardProps) {
            )}
         </CardContent>
       <CardFooter className="border-t pt-4 flex justify-end gap-2">
-        {canManage && (
-          <>
-            <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
+        {canEdit ? (
+          <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
+            <Button variant="outline" size="sm">
+              <Edit3 className="mr-1 h-4 w-4" /> Edit
+            </Button>
+          </Link>
+        ) : canViewDetails ? (
+           <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref>
               <Button variant="outline" size="sm">
-                <Edit3 className="mr-1 h-4 w-4" /> Edit
+                <Eye className="mr-1 h-4 w-4" /> View Details
               </Button>
             </Link>
+        ) : null }
+        {canDelete && (
             <Button variant="destructive" size="sm" onClick={() => onDelete(building)}>
               <Trash2 className="mr-1 h-4 w-4" /> Delete
             </Button>
-          </>
-        )}
-        {!canManage && (
-           <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref> {/* Consider a view-only page or disable form */}
-              <Button variant="outline" size="sm">
-                <EyeOff className="mr-1 h-4 w-4" /> View Details
-              </Button>
-            </Link>
         )}
       </CardFooter>
     </Card>
@@ -114,11 +115,13 @@ function BuildingCard({ building, onDelete, canManage }: BuildingCardProps) {
 export function BuildingsClientPage({ initialBuildings }: { initialBuildings: BuildingWithPenaltyTiers[] }) {
   const [buildings, setBuildings] = useState<BuildingWithPenaltyTiers[]>(initialBuildings);
   const { toast } = useToast();
-  const router = useRouter(); 
   const [buildingToDelete, setBuildingToDelete] = useState<BuildingWithPenaltyTiers | null>(null);
-  const { hasPermission, isSuperAdmin } = usePermissions(); // Get permissions
+  const { hasPermission, isSuperAdmin } = usePermissions(); 
 
-  const canManageBuildings = isSuperAdmin || hasPermission('building:manage');
+  const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
+  const canEditBuildings = isSuperAdmin || hasPermission('building:edit');
+  const canDeleteBuildings = isSuperAdmin || hasPermission('building:delete');
+  const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings; // If can do anything, can view
 
   useEffect(() => {
     setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
@@ -126,7 +129,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   
   const handleDeleteBuilding = async () => {
     if (!buildingToDelete) return;
-    if (!canManageBuildings) {
+    if (!canDeleteBuildings) {
       toast({ title: "Permission Denied", description: "You do not have permission to delete buildings.", variant: "destructive" });
       return;
     }
@@ -142,6 +145,15 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     setBuildingToDelete(null);
   };
 
+  if (!canViewBuildings) {
+     return (
+      <Card className="shadow-lg text-center py-12">
+        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to view buildings.</p></CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="animate-fadeIn">
       <PageHeader
@@ -149,7 +161,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
         icon={BuildingIcon}
         description="Add, view, and edit buildings and their late fee penalty policies."
         actions={
-          canManageBuildings && (
+          canCreateBuildings && (
             <Link href="/admin/buildings/upsert" passHref>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 <PlusCircle className="mr-2 h-5 w-5" /> Add New Building
@@ -170,7 +182,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setBuildingToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteBuilding} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+            <AlertDialogAction onClick={handleDeleteBuilding} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={!canDeleteBuildings}>
               Delete Building
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -183,7 +195,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
             <BuildingIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2 font-headline">No Buildings Yet</h3>
             <p className="text-muted-foreground mb-4">Get started by adding your first building.</p>
-            {canManageBuildings && (
+            {canCreateBuildings && (
               <Link href="/admin/buildings/upsert" passHref>
                   <Button>
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Building
@@ -195,7 +207,14 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {buildings.map((building) => (
-            <BuildingCard key={building.id} building={building} onDelete={setBuildingToDelete} canManage={canManageBuildings} />
+            <BuildingCard 
+              key={building.id} 
+              building={building} 
+              onDelete={setBuildingToDelete} 
+              canEdit={canEditBuildings}
+              canDelete={canDeleteBuildings}
+              canViewDetails={canViewBuildings}
+            />
           ))}
         </div>
       )}

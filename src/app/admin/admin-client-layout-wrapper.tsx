@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import React, { useState, useEffect } from 'react'; // useMemo removed from destructuring
+import React, { useState, useEffect } from 'react';
 import {
   SidebarProvider,
   Sidebar,
@@ -58,20 +58,31 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   isPortal?: boolean;
-  requiredPermissions?: PermissionId | PermissionId[];
+  requiredPermissions?: PermissionId[]; // Now expects an array of granular permissions
 }
 
 const allNavItems: NavItem[] = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermissions: ['reports:view_all', 'reports:view_financial', 'reports:view_operational'] },
-  { href: '/admin/buildings', label: 'Buildings', icon: Building, requiredPermissions: ['building:read', 'building:manage'] },
-  { href: '/admin/spaces', label: 'Spaces', icon: Building2, requiredPermissions: ['space:read', 'space:manage'] },
-  { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:read', 'tenant:manage'] },
-  { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:read', 'agreement:manage'] },
-  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: 'building_utilities:manage' },
-  { href: '/admin/billing', label: 'Billing', icon: DollarSign, requiredPermissions: ['billing:read', 'billing:manage'] },
-  { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['billing:read', 'reports:view_financial'] },
-  { href: '/admin/settings', label: 'Settings', icon: Settings, requiredPermissions: ['user:manage', 'role:manage', 'settings:manage'] },
-  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true },
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermissions: ['dashboard:view'] },
+  { href: '/admin/buildings', label: 'Buildings', icon: Building, requiredPermissions: ['building:view', 'building:create', 'building:edit', 'building:delete'] },
+  { href: '/admin/spaces', label: 'Spaces', icon: Building2, requiredPermissions: ['space:view', 'space:create', 'space:edit', 'space:delete'] },
+  { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:view', 'tenant:create', 'tenant:edit', 'tenant:delete'] },
+  { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:view', 'agreement:create', 'agreement:edit', 'agreement:delete'] },
+  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: ['building_utility:view', 'building_utility:manage'] },
+  { href: '/admin/billing', label: 'Billing', icon: DollarSign, requiredPermissions: ['billing:view', 'billing:generate', 'billing:manage_payments', 'billing:delete'] },
+  { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['payment_overview:view'] },
+  { 
+    href: '/admin/settings', 
+    label: 'Settings', 
+    icon: Settings, 
+    requiredPermissions: [ // Show "Settings" if user can do ANY of these
+      'settings:user_registration:manage', 
+      'settings:user_management:view', 
+      'settings:user_management:assign',
+      'settings:role_management:view',
+      'settings:role_management:manage',
+    ] 
+  },
+  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true }, // Portal link doesn't require admin perms
 ];
 
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
@@ -81,7 +92,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, state: sidebarState } = useSidebar();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
-  const { currentUser, hasPermission, hasAnyPermission, isLoading: permissionsLoading, isSuperAdmin } = usePermissions();
+  const { currentUser, hasAnyPermission, isLoading: permissionsLoading, isSuperAdmin } = usePermissions();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -116,20 +127,17 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const navItems = React.useMemo(() => { // Changed to React.useMemo
+  const navItems = React.useMemo(() => {
     if (permissionsLoading || !currentUser) return [];
     
     return allNavItems.filter(item => {
-      if (item.isPortal) return true;
-      if (isSuperAdmin) return true;
-      if (!item.requiredPermissions) return true;
+      if (item.isPortal) return true; // Tenant portal link always shown
+      if (isSuperAdmin) return true; // Super admin sees all admin links
+      if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true; // No specific permissions needed
       
-      if (Array.isArray(item.requiredPermissions)) {
-        return hasAnyPermission(item.requiredPermissions);
-      }
-      return hasPermission(item.requiredPermissions);
+      return hasAnyPermission(item.requiredPermissions); // User needs at least one of the listed permissions
     });
-  }, [currentUser, permissionsLoading, hasPermission, hasAnyPermission, isSuperAdmin]);
+  }, [currentUser, permissionsLoading, hasAnyPermission, isSuperAdmin]);
 
 
   if (permissionsLoading) {
@@ -235,7 +243,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 <UserCircle className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              {hasAnyPermission(['user:manage', 'role:manage', 'settings:manage']) && (
+              {hasAnyPermission(['settings:user_registration:manage', 'settings:user_management:view', 'settings:role_management:view']) && ( // Check if user can access any settings page
                 <DropdownMenuItem onSelect={() => router.push('/admin/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>

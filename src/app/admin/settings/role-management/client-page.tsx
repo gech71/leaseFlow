@@ -21,7 +21,7 @@ import type { Role } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { AVAILABLE_PERMISSIONS } from '@/lib/types'; // Import centralized permissions
+import { ALL_RESOURCE_PERMISSIONS, type PermissionItem } from '@/lib/types'; // Import new structured permissions
 import { usePermissions } from '@/contexts/PermissionContext';
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
@@ -33,7 +33,7 @@ const roleFormSchema = z.object({
   name: z.string().min(2, "Role name must be at least 2 characters.").max(50, "Role name cannot exceed 50 characters.")
     .regex(/^[A-Z_]+$/, "Role name must be uppercase and can include underscores (e.g., PROPERTY_MANAGER)."),
   description: z.string().max(255, "Description cannot exceed 255 characters.").optional().or(z.literal('')),
-  permissions: z.array(z.string()).min(1, "At least one permission must be selected.").optional().default([]),
+  permissions: z.array(z.string()).min(0, "Select at least one permission or none if applicable.").optional().default([]), // Changed min to 0
 });
 
 type RoleFormValues = z.infer<typeof roleFormSchema>;
@@ -52,13 +52,17 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const [currentRoleForForm, setCurrentRoleForForm] = useState<ClientRole | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<ClientRole | null>(null);
 
-  const { hasPermission, isSuperAdmin } = usePermissions();
-  const canManageRoles = isSuperAdmin || hasPermission('role:manage');
+  const { hasPermission: contextHasPermission, isSuperAdmin } = usePermissions(); // Renamed to avoid conflict
+  const canManageRoles = isSuperAdmin || contextHasPermission('settings:role_management:manage');
+  const canViewRoles = isSuperAdmin || contextHasPermission('settings:role_management:view') || canManageRoles;
+
 
   const form = useForm<RoleFormValues>({
     resolver: zodResolver(roleFormSchema),
     defaultValues: { name: "", description: "", permissions: [] },
   });
+
+  const selectedPermissions = form.watch('permissions');
 
   useEffect(() => {
     setIsMounted(true);
@@ -90,6 +94,11 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   };
 
   const handleOpenEditForm = (role: ClientRole) => {
+    // View details if cannot manage, otherwise allow edit
+    if (!canViewRoles) {
+         toast({ title: "Permission Denied", description: "You do not have permission to view or edit roles.", variant: "destructive" });
+         return;
+    }
     setFormMode('edit');
     setCurrentRoleForForm(role);
     form.reset({
@@ -152,19 +161,43 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
     }
   };
 
-  if (!isMounted && roles.length === 0) {
+  const handleResourceGroupToggle = (group: typeof ALL_RESOURCE_PERMISSIONS[0], isChecked: boolean) => {
+    const currentPermissions = form.getValues('permissions') || [];
+    const groupPermissionIds = group.permissions.map(p => p.id);
+    let newPermissions: string[];
+
+    if (isChecked) {
+      newPermissions = Array.from(new Set([...currentPermissions, ...groupPermissionIds]));
+    } else {
+      newPermissions = currentPermissions.filter(pId => !groupPermissionIds.includes(pId));
+    }
+    form.setValue('permissions', newPermissions, { shouldValidate: true, shouldDirty: true });
+  };
+
+  const handlePermissionToggle = (permissionId: string, isChecked: boolean) => {
+    const currentPermissions = form.getValues('permissions') || [];
+    let newPermissions: string[];
+
+    if (isChecked) {
+      newPermissions = Array.from(new Set([...currentPermissions, permissionId]));
+    } else {
+      newPermissions = currentPermissions.filter(pId => pId !== permissionId);
+    }
+    form.setValue('permissions', newPermissions, { shouldValidate: true, shouldDirty: true });
+  };
+
+  if (!isMounted && roles.length === 0 && !canViewRoles) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
-  if (!isMounted && !canManageRoles) { // Check if mounted before showing permission denied for initial load
+  if (!canViewRoles && isMounted) { // Check if mounted before showing permission denied
     return (
       <Card className="shadow-lg">
         <CardHeader><CardTitle className="text-destructive flex items-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
-        <CardContent><p>You do not have permission to manage roles.</p></CardContent>
+        <CardContent><p>You do not have permission to view or manage roles.</p></CardContent>
       </Card>
     );
   }
-
 
   return (
     <Card className="shadow-lg">
@@ -180,7 +213,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
         )}
       </CardHeader>
       <CardContent>
-        {roles.length === 0 ? (
+        {roles.length === 0 && canViewRoles ? (
           <div className="text-center py-10 text-muted-foreground">
             <ShieldCheck className="mx-auto h-12 w-12 mb-4" />
             <p>No roles defined yet. {canManageRoles ? 'Click "Add New Role" to get started.' : 'Contact an administrator to add roles.'}</p>
@@ -192,7 +225,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="hidden md:table-cell">Description</TableHead>
-                  <TableHead>Permissions</TableHead>
+                  <TableHead>Permissions Count</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -203,30 +236,17 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-xs truncate">{role.description || "-"}</TableCell>
                     <TableCell>
                       {role.permissions.length > 0 ? (
-                        <div className="flex flex-wrap gap-1 max-w-md">
-                          {role.permissions.slice(0, 3).map(permission => {
-                             const permLabel = AVAILABLE_PERMISSIONS.find(p => p.id === permission)?.label || permission;
-                             return <Badge key={permission} variant="secondary" className="text-xs">{permLabel}</Badge>;
-                          })}
-                          {role.permissions.length > 3 && <Badge variant="outline" className="text-xs">+{role.permissions.length - 3} more</Badge>}
-                        </div>
-                      ) : <span className="text-xs text-muted-foreground italic">No permissions</span>}
+                        <Badge variant="secondary" className="text-xs">{role.permissions.length} assigned</Badge>
+                      ) : <span className="text-xs text-muted-foreground italic">None</span>}
                     </TableCell>
                     <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
+                          {canManageRoles ? <Edit className="h-4 w-4 text-blue-600" /> : <EyeOff className="h-4 w-4 text-blue-600" />}
+                        </Button>
                       {canManageRoles && (
-                        <>
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
-                            <Edit className="h-4 w-4 text-blue-600" />
-                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || role.name === 'SUPER_ADMIN' || role.name === 'PROPERTY_MANAGER' || role.name === 'ACCOUNTANT' || role.name === 'SUPPORT_STAFF'}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </>
-                      )}
-                      {!canManageRoles && (
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" title="View Details">
-                          <EyeOff className="h-4 w-4 text-blue-600" />
-                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -238,7 +258,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
       </CardContent>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) setCurrentRoleForForm(null); setIsFormOpen(open); }}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="font-headline text-xl">{formMode === 'add' ? 'Add New Role' : (canManageRoles ? 'Edit Role' : 'View Role Details')}</DialogTitle>
             <DialogDescription>
@@ -263,62 +283,62 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                 <FormMessage>{form.formState.errors.description?.message}</FormMessage>
               </div>
               
-              <FormField
-                control={form.control}
-                name="permissions"
-                render={() => (
-                  <FormItem>
-                    <div className="mb-2">
-                      <FormLabel className="text-base flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Permissions</FormLabel>
-                      <p className="text-sm text-muted-foreground">Select the permissions for this role.</p>
-                    </div>
-                    <ScrollArea className="max-h-60 w-full rounded-md border p-3 bg-secondary/20">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                        {AVAILABLE_PERMISSIONS.map((item) => (
-                          <FormField
-                            key={item.id}
-                            control={form.control}
-                            name="permissions"
-                            render={({ field }) => {
-                              return (
-                                <FormItem
-                                  key={item.id}
-                                  className="flex flex-row items-center space-x-2 space-y-0"
-                                >
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={field.value?.includes(item.id)}
-                                      onCheckedChange={(checked) => {
-                                        if (!canManageRoles) return; // Prevent change if not allowed
-                                        return checked
-                                          ? field.onChange([...(field.value || []), item.id])
-                                          : field.onChange(
-                                              (field.value || []).filter(
-                                                (value) => value !== item.id
-                                              )
-                                            )
-                                      }}
-                                      disabled={isSaving || !canManageRoles}
-                                    />
-                                  </FormControl>
-                                  <FormLabel className="text-sm font-normal cursor-pointer">
-                                    {item.label}
-                                  </FormLabel>
-                                </FormItem>
-                              )
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </ScrollArea>
-                    <FormMessage>{form.formState.errors.permissions?.message}</FormMessage>
-                  </FormItem>
-                )}
-              />
+              <FormItem>
+                <div className="mb-2">
+                  <FormLabel className="text-base flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Permissions</FormLabel>
+                  <p className="text-sm text-muted-foreground">Select the permissions for this role. Checking the resource name (e.g., "Buildings") will toggle all its sub-permissions.</p>
+                </div>
+                <ScrollArea className="max-h-72 w-full rounded-md border p-4 bg-secondary/20">
+                  <div className="space-y-4">
+                    {ALL_RESOURCE_PERMISSIONS.map((group) => {
+                      const groupPermissionIds = group.permissions.map(p => p.id);
+                      const isGroupChecked = groupPermissionIds.every(pId => selectedPermissions?.includes(pId));
+                      const isGroupIndeterminate = !isGroupChecked && groupPermissionIds.some(pId => selectedPermissions?.includes(pId));
+
+                      return (
+                        <div key={group.resourceId} className="space-y-2 pb-2 border-b border-border last:border-b-0">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`group-${group.resourceId}`}
+                              checked={isGroupChecked}
+                              onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
+                              aria-label={`Toggle all ${group.resourceLabel} permissions`}
+                              data-indeterminate={isGroupIndeterminate ? "true" : undefined}
+                              className="data-[indeterminate=true]:bg-primary/50"
+                              disabled={isSaving || !canManageRoles}
+                            />
+                            <Label htmlFor={`group-${group.resourceId}`} className="text-md font-semibold text-foreground cursor-pointer">
+                              {group.resourceLabel}
+                            </Label>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 pl-6">
+                            {group.permissions.map((permission) => (
+                              <FormItem key={permission.id} className="flex flex-row items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={selectedPermissions?.includes(permission.id)}
+                                    onCheckedChange={(checked) => handlePermissionToggle(permission.id, !!checked)}
+                                    disabled={isSaving || !canManageRoles}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal cursor-pointer">
+                                  {permission.label}
+                                </FormLabel>
+                              </FormItem>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+                <FormMessage>{form.formState.errors.permissions?.message}</FormMessage>
+              </FormItem>
+
             <DialogFooter className="pt-4 mt-auto border-t">
               <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
               {canManageRoles && (
-                <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button type="submit" disabled={isSaving || !canManageRoles} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {formMode === 'add' ? 'Create Role' : 'Save Changes'}
                 </Button>

@@ -60,7 +60,8 @@ export function UserManagementClientPage({
   const [buildingSearchTerm, setBuildingSearchTerm] = useState('');
 
   const { hasPermission, isSuperAdmin } = usePermissions();
-  const canManageUserAssignments = isSuperAdmin || hasPermission('user:manage');
+  const canManageUserAssignments = isSuperAdmin || hasPermission('settings:user_management:assign');
+  const canViewUserManagement = isSuperAdmin || hasPermission('settings:user_management:view') || canManageUserAssignments;
 
   useEffect(() => {
     setIsMounted(true);
@@ -68,6 +69,10 @@ export function UserManagementClientPage({
   }, [initialUsers]);
 
   const handleEditUser = (user: ClientUserWithAssignments) => {
+    if (!canViewUserManagement && !canManageUserAssignments) {
+         toast({ title: "Permission Denied", description: "You do not have permission to view or edit user assignments.", variant: "destructive" });
+         return;
+    }
     setCurrentUserToEdit(user);
     setSelectedRoleId(user.roles[0]?.id || null);
     setSelectedBuildingIds(new Set(user.managedBuildings.map(building => building.id)));
@@ -131,11 +136,11 @@ export function UserManagementClientPage({
     }
   };
   
-  if (!isMounted && users.length === 0 && allRoles.length === 0 && allBuildings.length === 0) {
+  if (!isMounted && users.length === 0 && allRoles.length === 0 && allBuildings.length === 0 && !canViewUserManagement) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
-  if (!isMounted && !canManageUserAssignments) {
+  if (!canViewUserManagement && isMounted) {
      return (
       <Card className="shadow-lg">
         <CardHeader><CardTitle className="text-destructive flex items-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
@@ -151,7 +156,7 @@ export function UserManagementClientPage({
         <CardDescription>View users and manage their roles and building assignments.</CardDescription>
       </CardHeader>
       <CardContent>
-        {users.length === 0 ? (
+        {users.length === 0 && canViewUserManagement ? (
           <div className="text-center py-10 text-muted-foreground">
             <User className="mx-auto h-12 w-12 mb-4" />
             <p>No users found. You can register new users via the "User Registration" settings.</p>
@@ -180,7 +185,7 @@ export function UserManagementClientPage({
                       {user.managedBuildings.length > 0 ? user.managedBuildings.map(b => b.name).join(', ') : <span className="italic text-muted-foreground">No buildings</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleEditUser(user)} disabled={isSaving}>
+                      <Button variant="outline" size="sm" onClick={() => handleEditUser(user)} disabled={isSaving || !canViewUserManagement}>
                         <Edit className="mr-1 h-3.5 w-3.5" /> {canManageUserAssignments ? 'Edit' : 'View'}
                       </Button>
                     </TableCell>
@@ -196,8 +201,8 @@ export function UserManagementClientPage({
         <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) setCurrentUserToEdit(null); setIsDialogOpen(open); }}>
           <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle className="font-headline text-xl">{canManageUserAssignments ? 'Edit User' : 'View User'}: {currentUserToEdit.name || currentUserToEdit.email}</DialogTitle>
-              <DialogDescription>Manage roles and building assignments for this user.</DialogDescription>
+              <DialogTitle className="font-headline text-xl">{canManageUserAssignments ? 'Edit User Assignments' : 'View User Assignments'}: {currentUserToEdit.name || currentUserToEdit.email}</DialogTitle>
+              <DialogDescription>{canManageUserAssignments ? 'Manage roles and building assignments for this user.' : 'Viewing roles and building assignments for this user.'}</DialogDescription>
             </DialogHeader>
             
             <div className="space-y-6 py-4 overflow-y-auto flex-grow pr-2">

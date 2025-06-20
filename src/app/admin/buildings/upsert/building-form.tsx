@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation'; 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link'; 
 import { createBuildingAction, updateBuildingAction } from '../actions';
-import { usePermissions } from '@/contexts/PermissionContext'; // Import usePermissions
+import { usePermissions } from '@/contexts/PermissionContext'; 
 
 interface UIPenaltyRule {
   id: string; 
@@ -47,12 +47,24 @@ export interface BuildingUpsertFormInternalProps {
 
 export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: BuildingUpsertFormInternalProps) {
   const router = useRouter();
-  const searchParams = useSearchParams(); // For checking 'view' mode
+  const searchParams = useSearchParams(); 
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin } = usePermissions(); // Get permissions
+  const { hasPermission, isSuperAdmin } = usePermissions(); 
 
-  const isViewOnly = searchParams.get('view') === 'true';
-  const canManage = (isSuperAdmin || hasPermission('building:manage')) && !isViewOnly;
+  const isViewOnlyMode = searchParams.get('view') === 'true';
+  
+  // Determine manage permission based on formMode and user's capabilities
+  let canManageThisForm: boolean;
+  if (formMode === 'add') {
+    canManageThisForm = isSuperAdmin || hasPermission('building:create');
+  } else { // edit mode
+    canManageThisForm = isSuperAdmin || hasPermission('building:edit');
+  }
+  // If it's view-only mode, then cannot manage, regardless of other perms
+  if (isViewOnlyMode) {
+    canManageThisForm = false;
+  }
+
 
   const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', uiPenaltyRules: [] });
   const [isSaving, setIsSaving] = useState(false);
@@ -99,7 +111,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
 
 
   const handleAddUIPenaltyRule = () => {
-    if (!canManage) return;
+    if (!canManageThisForm) return;
     const newRule: UIPenaltyRule = {
       id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       scope: 'Building',
@@ -114,7 +126,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
   };
 
   const handleRemoveUIPenaltyRule = (ruleId: string) => {
-    if (!canManage) return;
+    if (!canManageThisForm) return;
     setCurrentBuildingForm(prev => ({
       ...prev,
       uiPenaltyRules: (prev.uiPenaltyRules || []).filter(rule => rule.id !== ruleId)
@@ -122,7 +134,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
   };
 
   const handleUIPenaltyRuleChange = (ruleId: string, field: keyof UIPenaltyRule, value: any) => {
-    if (!canManage) return;
+    if (!canManageThisForm) return;
     setCurrentBuildingForm(prev => ({
       ...prev,
       uiPenaltyRules: (prev.uiPenaltyRules || []).map(rule => {
@@ -145,7 +157,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!canManage) {
+    if (!canManageThisForm) {
       toast({ title: "Permission Denied", description: "You do not have permission to save building details.", variant: "destructive" });
       return;
     }
@@ -261,7 +273,10 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
     }
   };
   
-  if (!isSuperAdmin && !hasPermission('building:read') && !hasPermission('building:manage')) {
+  // Check overall view permission for the page
+  const canViewPage = isSuperAdmin || hasPermission('building:view') || hasPermission('building:create') || hasPermission('building:edit');
+
+  if (!canViewPage) {
     return (
       <Card className="shadow-lg">
         <CardHeader>
@@ -282,7 +297,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
       <Card className="shadow-lg">
         <form onSubmit={handleFormSubmit}>
           <CardContent className="p-6 space-y-6">
-             {isViewOnly && (
+             {isViewOnlyMode && (
               <div className="p-3 bg-yellow-50 border border-yellow-300 text-yellow-700 text-sm rounded-md flex items-center">
                 <EyeOff className="h-5 w-5 mr-2 shrink-0" />
                 You are in view-only mode. Editing is disabled.
@@ -300,7 +315,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                   placeholder="e.g., Sunrise Tower"
                   required
                   className="mt-1"
-                  disabled={isSaving || !canManage}
+                  disabled={isSaving || !canManageThisForm}
                 />
               </div>
               <div>
@@ -314,7 +329,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                   placeholder="e.g., 123 Main St, Anytown, USA"
                   rows={2}
                   className="mt-1"
-                  disabled={isSaving || !canManage}
+                  disabled={isSaving || !canManageThisForm}
                 />
               </div>
             </div>
@@ -322,7 +337,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-foreground">Late Fee Penalty Rules</h3>
-                  {canManage && (
+                  {canManageThisForm && (
                     <Button type="button" variant="outline" size="sm" onClick={handleAddUIPenaltyRule} disabled={isSaving}>
                         <PlusCircle className="mr-1.5 h-4 w-4"/> Add Rule
                     </Button>
@@ -331,7 +346,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
               <CardDescription>
                 Define sequential penalty rules for each scope (Building, specific Floor, or specific Spaces). The last rule defined for a given scope will apply indefinitely if no duration (blank or zero days) is set.
               </CardDescription>
-              {currentBuildingForm.uiPenaltyRules.length === 0 && <p className="text-sm text-muted-foreground text-center py-3">No penalty rules defined. Click "Add Rule" to begin.</p>}
+              {currentBuildingForm.uiPenaltyRules.length === 0 && <p className="text-sm text-muted-foreground text-center py-3">No penalty rules defined. {canManageThisForm ? 'Click "Add Rule" to begin.' : ''}</p>}
 
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {currentBuildingForm.uiPenaltyRules.map((uiRule, ruleIndex) => (
@@ -339,7 +354,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                     <CardHeader className="p-0 pb-3">
                       <div className="flex justify-between items-center">
                         <CardTitle className="text-md font-medium">Rule {ruleIndex + 1}</CardTitle>
-                        {canManage && (
+                        {canManageThisForm && (
                           <Button type="button" variant="ghost" size="icon"
                                   onClick={() => handleRemoveUIPenaltyRule(uiRule.id)}
                                   className="h-7 w-7 text-destructive hover:bg-destructive/10"
@@ -356,12 +371,12 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                               <Input id={`ruleDuration-${uiRule.id}`} type="number" min="1" placeholder="e.g., 5"
                                       value={uiRule.durationDays ?? ''} 
                                       onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)}
-                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManage}/>
+                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManageThisForm}/>
                               <p className="text-xs text-muted-foreground mt-0.5">For last rule in scope, leave blank/0 for indefinite.</p>
                           </div>
                           <div>
                               <Label htmlFor={`ruleFeeType-${uiRule.id}`} className="text-xs">Fee Type</Label>
-                              <Select value={uiRule.feeType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as UIPenaltyRule['feeType'])} disabled={isSaving || !canManage}>
+                              <Select value={uiRule.feeType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as UIPenaltyRule['feeType'])} disabled={isSaving || !canManageThisForm}>
                                   <SelectTrigger id={`ruleFeeType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue /></SelectTrigger>
                                   <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
                               </Select>
@@ -371,13 +386,13 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                               <Input id={`ruleFeeValue-${uiRule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5"
                                       value={uiRule.feeValue ?? ''} 
                                       onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'feeValue', e.target.value)}
-                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManage}/>
+                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManageThisForm}/>
                           </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                               <Label htmlFor={`scopeType-${uiRule.id}`} className="text-xs flex items-center"><Layers className="mr-1 h-3 w-3"/>Scope</Label>
-                              <Select value={uiRule.scope} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'scope', value as UIPenaltyRule['scope'])} disabled={isSaving || !canManage}>
+                              <Select value={uiRule.scope} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'scope', value as UIPenaltyRule['scope'])} disabled={isSaving || !canManageThisForm}>
                                   <SelectTrigger id={`scopeType-${uiRule.id}`} className="mt-1 h-9"><SelectValue /></SelectTrigger>
                                   <SelectContent>
                                       <SelectItem value="Building">Entire Building</SelectItem>
@@ -390,7 +405,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                               <div>
                                   <Label htmlFor={`applicableFloor-${uiRule.id}`} className="text-xs">Floor Name</Label>
                                   <Input id={`applicableFloor-${uiRule.id}`} placeholder="e.g., 5th Floor" value={uiRule.applicableFloor || ''}
-                                          onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableFloor', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManage}/>
+                                          onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableFloor', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
                               </div>
                           )}
                       </div>
@@ -398,7 +413,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                           <div>
                               <Label htmlFor={`applicableSpaces-${uiRule.id}`} className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)</Label>
                               <Input id={`applicableSpaces-${uiRule.id}`} placeholder="e.g., Unit 10A, Office 202B" value={uiRule.applicableSpaceIdNamesStr || ''}
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableSpaceIdNamesStr', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManage}/>
+                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableSpaceIdNamesStr', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
                               <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>
                           </div>
                       )}
@@ -409,13 +424,13 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
             </div>
           </CardContent>
           <CardFooter className="border-t p-6 flex justify-end gap-2">
-            {canManage && (
+            {canManageThisForm && (
               <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                 {isSaving ? 'Saving...' : (formMode === 'add' ? 'Add Building' : 'Save Changes')}
               </Button>
             )}
-            {!canManage && isViewOnly && (
+            {isViewOnlyMode && !canManageThisForm && (
                  <p className="text-sm text-muted-foreground">Viewing details. No edit permission.</p>
             )}
           </CardFooter>
