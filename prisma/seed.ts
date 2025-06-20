@@ -12,61 +12,40 @@ async function main() {
   try {
     // Order of deletion matters due to foreign key constraints
 
-    // Start with models that don't have direct dependencies on others,
-    // or whose deletion will cascade appropriately.
-
-    // User is new, ensure it's cleared
     await prisma.user.deleteMany({});
     console.log('Deleted Users');
 
-    // Bill depends on Agreement
     await prisma.bill.deleteMany({});
     console.log('Deleted Bills');
 
-    // Agreement depends on Tenant and Space
     await prisma.agreement.deleteMany({});
     console.log('Deleted Agreements');
     
-    // BuildingUtilityItem depends on BuildingMonthlyUtilities
     await prisma.buildingUtilityItem.deleteMany({});
     console.log('Deleted BuildingUtilityItems');
 
-    // BuildingMonthlyUtilities depends on Building
     await prisma.buildingMonthlyUtilities.deleteMany({});
     console.log('Deleted BuildingMonthlyUtilities');
 
-    // PenaltyTier depends on Building
     await prisma.penaltyTier.deleteMany({});
     console.log('Deleted PenaltyTiers');
 
-    // Before deleting Tenants and Spaces, ensure their links are cleared if not handled by onDelete: SetNull
-    // For Tenant.rentedSpaceId -> Space.id (SetNull on Space deletion)
-    // For Space.tenantId -> Tenant.id (SetNull on Tenant deletion)
-    // However, to be safe and explicit, especially if onDelete behavior changes:
-
-    const tenantsToClearLink = await prisma.tenant.findMany({
-      where: { rentedSpaceId: { not: null } },
-      select: { id: true }
-    });
-    for (const tenant of tenantsToClearLink) {
-      await prisma.tenant.update({
-        where: { id: tenant.id },
-        data: { rentedSpace: { disconnect: true } }
-      });
-    }
-    console.log('Cleared rentedSpace link from Tenants');
-
-    const spacesToClearLink = await prisma.space.findMany({
+    // Clear tenant link from Spaces and set isOccupied to false
+    // This handles unlinking tenants from spaces before deleting tenants or spaces.
+    const spacesWithTenants = await prisma.space.findMany({
       where: { tenantId: { not: null } },
       select: { id: true }
     });
-    for (const space of spacesToClearLink) {
+    for (const space of spacesWithTenants) {
       await prisma.space.update({
         where: { id: space.id },
-        data: { tenant: { disconnect: true }, isOccupied: false }
+        data: {
+          tenant: { disconnect: true }, // This sets tenantId to null on the Space
+          isOccupied: false
+        }
       });
     }
-    console.log('Cleared tenant link from Spaces and set isOccupied to false');
+    console.log('Cleared tenant links from Spaces and set isOccupied to false.');
 
     // Now delete Tenants and Spaces
     await prisma.tenant.deleteMany({});
@@ -156,7 +135,6 @@ async function main() {
     data: {
         name: 'Tech Park One',
         address: '789 Innovation Rd, Silicon Valley',
-        // No specific penalty policy tiers initially, can be added later
     }
   });
   console.log(`Created Buildings: ${building1.name}, ${building2.name}, ${building3.name}`);
@@ -207,16 +185,8 @@ async function main() {
       tenantId: tenant1.id, 
     },
   });
-  // Link space back to tenant
-  await prisma.tenant.update({
-    where: { id: tenant1.id },
-    data: {
-      rentedSpace: {
-        connect: { id: space1_B1.id }
-      }
-    }
-  });
-
+  // Linking tenant to space is done by setting tenantId on Space.
+  // The Tenant.rentedSpace field will be automatically queryable.
 
   const space2_B1 = await prisma.space.create({ // Vacant space in Sunrise Tower
     data: {
@@ -244,15 +214,6 @@ async function main() {
       tenantId: tenant2.id, 
     },
   });
-   // Link space back to tenant
-  await prisma.tenant.update({
-    where: { id: tenant2.id },
-    data: {
-      rentedSpace: {
-        connect: { id: space1_B2.id }
-      }
-    }
-  });
 
   const space2_B2 = await prisma.space.create({ // Carol's Penthouse in Ocean View Plaza
     data: {
@@ -265,15 +226,6 @@ async function main() {
         monthlyRentalPrice: 5500,
         isOccupied: true,
         tenantId: tenant3.id, 
-    }
-  });
-   // Link space back to tenant
-  await prisma.tenant.update({
-    where: { id: tenant3.id },
-    data: {
-      rentedSpace: {
-        connect: { id: space2_B2.id }
-      }
     }
   });
   
@@ -289,7 +241,7 @@ async function main() {
         isOccupied: false,
     }
   });
-  console.log('Created Spaces and linked occupied ones to tenants.');
+  console.log('Created Spaces and linked occupied ones to tenants via tenantId on Space.');
 
 
   // 6. Create Agreements
@@ -369,7 +321,7 @@ async function main() {
       paymentMethod: 'Bank Transfer',
       paymentReference: 'BILLPAY001',
       bankOrWalletName: 'Metro Bank',
-      utilityBreakdown: [ // Corrected: This should be an array of objects
+      utilityBreakdown: [ 
           { name: 'Electricity', amount: 50 },
           { name: 'Water', amount: 20 },
         ],
@@ -482,3 +434,4 @@ main()
     await prisma.$disconnect();
     console.log('Prisma client disconnected.');
   });
+
