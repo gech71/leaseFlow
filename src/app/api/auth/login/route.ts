@@ -1,6 +1,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
+import { databaseService } from '@/lib/services/databaseService'; // Import databaseService
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
@@ -8,6 +9,28 @@ const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
 
 const ACCESS_TOKEN_MAX_AGE = 60 * 60; // 1 hour in seconds
 const REFRESH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
+
+// Insecure JWT payload decoder for prototype purposes ONLY.
+// DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   if (!AUTH_API_BASE_URL) {
@@ -47,7 +70,6 @@ export async function POST(request: NextRequest) {
     responseText = await externalApiResponse.text();
   } catch (textError: any) {
     console.error("Error reading response text from external auth service:", textError.message);
-    // If reading text itself fails, it's a severe issue with the response.
     return NextResponse.json(
       { isSuccess: false, errors: [`Authentication failed. Server responded with an unreadable body (Status: ${externalApiResponse.status}).`] },
       { status: externalApiResponse.status || 500 }
@@ -69,7 +91,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isSuccess: false, errors: ["Received an invalid JSON response format from authentication service."] }, { status: 500 });
     }
   } else {
-    // Handle empty response body based on status
     if (!externalApiResponse.ok) {
       console.warn(`External auth service returned status ${externalApiResponse.status} with an empty body.`);
       return NextResponse.json(
@@ -77,7 +98,6 @@ export async function POST(request: NextRequest) {
         { status: externalApiResponse.status }
       );
     }
-    // If OK but empty, this is unusual for a login response with tokens
     console.warn("External auth service returned an OK status with an empty body for login.");
     return NextResponse.json(
       { isSuccess: false, errors: ["Received an unexpected empty response from authentication service."] },
@@ -86,8 +106,27 @@ export async function POST(request: NextRequest) {
   }
 
   if (externalApiResponse.ok && responseData && responseData.isSuccess && responseData.accessToken && responseData.refreshToken) {
+    // External authentication successful, now fetch user from local DB
+    const externalTokenPayload = decodeJwtPayload(responseData.accessToken);
+    if (!externalTokenPayload || !externalTokenPayload.sub) {
+      console.error("Failed to decode external access token or 'sub' claim is missing.");
+      return NextResponse.json({ isSuccess: false, errors: ["Authentication process error: Invalid token structure from identity provider."] }, { status: 500 });
+    }
+
+    const externalUserId = externalTokenPayload.sub;
+
     try {
-      const cookieStore = await cookies(); // As per user instruction
+      const localUser = await databaseService.getUserByExternalId(externalUserId, { include: { roles: true } });
+
+      if (!localUser) {
+        console.warn(`User ${externalUserId} authenticated externally but not found in local database.`);
+        return NextResponse.json({ isSuccess: false, errors: ["User not provisioned in this system. Please contact support."] }, { status: 403 });
+      }
+
+      // User found locally, proceed to set cookies
+      // console.log("Local user found:", localUser.email, "Roles:", localUser.roles.map(r => r.name)); // For debugging
+
+      const cookieStore = await cookies();
       
       cookieStore.set(ACCESS_TOKEN_KEY, responseData.accessToken, {
         httpOnly: true,
@@ -106,10 +145,12 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json({ isSuccess: true, message: "Login successful" });
-    } catch (cookieError: any) {
-      console.error("Error setting cookies:", cookieError.message);
-      return NextResponse.json({ isSuccess: false, errors: ["Login succeeded but failed to set session cookies."] }, { status: 500 });
+
+    } catch (dbError: any) {
+      console.error("Database error during login user retrieval:", dbError.message);
+      return NextResponse.json({ isSuccess: false, errors: ["Login process error: Could not verify user against local system."] }, { status: 500 });
     }
+
   } else {
     const errorMessages = responseData?.errors && Array.isArray(responseData.errors) && responseData.errors.length > 0
       ? responseData.errors
