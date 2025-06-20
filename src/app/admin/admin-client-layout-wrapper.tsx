@@ -70,8 +70,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       <Sidebar collapsible="icon" side="left" variant="sidebar">
         <SidebarHeader className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
-            <AppLogo />
-            <div className="md:hidden">
+            <AppLogo /> {/* AppLogo contains Home icon and "LeaseFlow" text. It's not explicitly hidden here. */}
+            <div className="md:hidden"> {/* Mobile-only trigger for opening the sheet */}
               <SidebarTrigger />
             </div>
           </div>
@@ -177,7 +177,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
         <div className="p-4 sm:p-6 lg:p-8">
-          <div className="hidden md:flex items-center justify-start mb-6 h-[3.7rem]">
+          {/* Sidebar trigger in main content area, now always flex on md screens and up */}
+          <div className="md:flex items-center justify-start mb-6 h-[3.7rem]">
             <SidebarTrigger />
           </div>
           {children}
