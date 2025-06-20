@@ -260,10 +260,15 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
-        <div className="p-4 sm:p-6 lg:p-8">
-          <div className="md:flex items-center justify-start mb-6 h-[3.7rem]">
-            <SidebarTrigger /> 
-          </div>
+        <div className="md:flex items-center justify-start mb-6 h-[3.7rem]">
+            <SidebarTrigger className={cn(
+              // Hide on mobile as it's in the sheet, hide on desktop when expanded
+              'md:hidden', 
+              (!isMobile && sidebarState === 'expanded') && 'md:hidden',
+              (!isMobile && sidebarState === 'collapsed') && 'md:flex'
+            )} />
+        </div>
+        <div className="p-4 sm:p-6 lg:p-8 pt-0 md:pt-8">
           {children}
         </div>
       </main>
@@ -272,9 +277,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminClientLayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [isMounted, setIsMounted] = React.useState(false); // Changed to React.useState
+  const [isMounted, setIsMounted] = React.useState(false);
 
-  React.useEffect(() => { // Changed to React.useEffect
+  React.useEffect(() => {
     setIsMounted(true);
   }, []);
 
