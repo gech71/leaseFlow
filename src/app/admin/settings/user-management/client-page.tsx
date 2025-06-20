@@ -199,7 +199,7 @@ export function UserManagementClientPage({
                     <SelectItem value="null">No Role</SelectItem>
                     {allRoles.map(role => (
                       <SelectItem key={role.id} value={role.id}>
-                        {role.name.replace(/_/g, ' ')} <span className="text-xs text-muted-foreground">({role.description || 'No description'})</span>
+                        {role.name.replace(/_/g, ' ')}
                       </SelectItem>
                     ))}
                   </SelectContent>
