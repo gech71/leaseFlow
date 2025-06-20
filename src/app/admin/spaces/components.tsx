@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2 } from 'lucide-react';
+import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff } from 'lucide-react';
 import type { Building as BuildingTypePrisma, Space as SpaceTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -31,12 +31,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createSpaceAction, updateSpaceAction, deleteSpaceAction } from './actions';
-// Removed: import { databaseService } from '@/lib/services/databaseService'; // Prisma should not be in client components
+import { usePermissions } from '@/contexts/PermissionContext';
 
 export interface SpaceWithBuildingName extends SpaceTypePrisma {
   buildingName: string; 
-  createdAt: string; // Ensure this is string if serialized
-  updatedAt: string; // Ensure this is string if serialized
+  createdAt: string; 
+  updatedAt: string; 
 }
 
 export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialSpaces: SpaceWithBuildingName[], initialBuildings: BuildingTypePrisma[] }) {
@@ -51,9 +51,15 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [spaceToDelete, setSpaceToDelete] = useState<SpaceWithBuildingName | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canCreateSpaces = isSuperAdmin || hasPermission('space:create');
+  const canEditSpaces = isSuperAdmin || hasPermission('space:edit');
+  const canDeleteSpaces = isSuperAdmin || hasPermission('space:delete');
+  const canViewSpaces = isSuperAdmin || hasPermission('space:view') || canCreateSpaces || canEditSpaces || canDeleteSpaces;
+
+
   useEffect(() => {
     setIsMounted(true);
-    // Update client state if initial props change (e.g., after server action revalidation)
     setSpaces(initialSpaces); 
     setBuildings(initialBuildings);
   }, [initialSpaces, initialBuildings]);
@@ -61,6 +67,10 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if ((formMode === 'add' && !canCreateSpaces) || (formMode === 'edit' && !canEditSpaces)) {
+      toast({ title: "Permission Denied", description: "You do not have permission to save space details.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
 
     if (!currentSpaceData.buildingId) {
@@ -130,15 +140,16 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       toast({ title: `Space ${formMode === 'add' ? 'Added' : 'Updated'}`, description: `${result.space?.spaceIdName} has been saved.` });
       setIsFormOpen(false);
       setCurrentSpaceData({});
-      // Data refresh will be handled by revalidatePath in server actions.
-      // For immediate client-side update, you might optimistically update `spaces` state
-      // or wait for Next.js to re-render with fresh props from revalidation.
     } else {
       toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Space`, description: result.error, variant: "destructive" });
     }
   };
   
   const openAddForm = () => {
+    if (!canCreateSpaces) {
+       toast({ title: "Permission Denied", description: "You do not have permission to add spaces.", variant: "destructive" });
+       return;
+    }
     if (buildings.length === 0) {
       toast({ title: "No Buildings Found", description: "Please add a building first before adding spaces.", variant: "destructive"});
       return;
@@ -149,10 +160,13 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   };
 
   const openEditForm = (space: SpaceWithBuildingName) => {
+    if (!canEditSpaces && !canViewSpaces) {
+      toast({ title: "Permission Denied", description: "You do not have permission to view or edit spaces.", variant: "destructive" });
+      return;
+    }
     setFormMode('edit');
     setCurrentSpaceData({
       ...space,
-      // Ensure all fields expected by the form are present, converting types if necessary
       utilityProrationShare: Number(space.utilityProrationShare), 
       area: Number(space.area),
       monthlyRentalPrice: Number(space.monthlyRentalPrice),
@@ -162,13 +176,16 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
 
   const handleDeleteSpace = async () => {
     if (!spaceToDelete) return;
+    if (!canDeleteSpaces) {
+      toast({ title: "Permission Denied", description: "You do not have permission to delete spaces.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     const result = await deleteSpaceAction(spaceToDelete.id);
     setIsSaving(false);
     if (result.success) {
       toast({ title: "Space Deleted", description: "The space has been removed."});
       setSpaceToDelete(null);
-      // Data refresh handled by revalidatePath.
     } else {
       toast({ title: "Error Deleting Space", description: result.error, variant: "destructive" });
     }
@@ -178,6 +195,15 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
   }
 
+  if (!canViewSpaces && isMounted) {
+    return (
+      <Card className="shadow-lg text-center py-12">
+        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to view spaces.</p></CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="animate-fadeIn">
       <PageHeader
@@ -185,12 +211,14 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
         icon={Building2}
         description="Add, view, and manage rental spaces."
         actions={
-          <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={buildings.length === 0 || isSaving}>
-            <PlusCircle className="mr-2 h-5 w-5" /> Add New Space
-          </Button>
+          canCreateSpaces && (
+            <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={buildings.length === 0 || isSaving}>
+              <PlusCircle className="mr-2 h-5 w-5" /> Add New Space
+            </Button>
+          )
         }
       />
-       {buildings.length === 0 && isMounted && ( // Check isMounted here too
+       {buildings.length === 0 && isMounted && (
         <Card className="mb-6 bg-yellow-50 border-yellow-300">
           <CardHeader>
             <CardTitle className="text-yellow-700">No Buildings Found</CardTitle>
@@ -207,9 +235,9 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Space' : 'Edit Space'}</DialogTitle>
+            <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Space' : (canEditSpaces ? 'Edit Space' : 'View Space')}</DialogTitle>
             <DialogDescription>
-              Fill in the details for the rental space. Click save when you're done.
+              {formMode === 'add' ? "Fill in the details for the rental space." : (canEditSpaces ? "Update the space details." : "Viewing space details.")}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit}>
@@ -220,7 +248,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                   value={currentSpaceData.buildingId || ""}
                   onValueChange={(value) => setCurrentSpaceData(prev => ({...prev, buildingId: value}))}
                   required
-                  disabled={isSaving}
+                  disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}
                 >
                   <SelectTrigger id="buildingId" className="mt-1">
                     <SelectValue placeholder="Select a building" />
@@ -236,15 +264,15 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
               </div>
               <div>
                 <Label htmlFor="spaceIdName">Space ID/Name</Label>
-                <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required disabled={isSaving}/>
+                <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="area">Area (sq ft)</Label>
-                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required disabled={isSaving}/>
+                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="floor">Floor</Label>
-                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" disabled={isSaving}/>
+                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="utilityProrationShare">Proration Share (e.g., 10 for 10%)</Label>
@@ -265,22 +293,24 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                     className="mt-1" 
                     placeholder="e.g., 10 for 10%" 
                     required 
-                    disabled={isSaving}
+                    disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}
                 />
               </div>
               <div>
                 <Label htmlFor="monthlyRentalPrice">Monthly Rent</Label>
-                <Input id="monthlyRentalPrice" type="number" value={currentSpaceData.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 2500" required disabled={isSaving}/>
+                <Input id="monthlyRentalPrice" type="number" value={currentSpaceData.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 2500" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline" disabled={isSaving}>Cancel</Button>
               </DialogClose>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {formMode === 'add' ? 'Add Space' : 'Save Changes'}
-              </Button>
+              {((formMode === 'add' && canCreateSpaces) || (formMode === 'edit' && canEditSpaces)) && (
+                <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {formMode === 'add' ? 'Add Space' : 'Save Changes'}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -297,7 +327,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSpaceToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSpace} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isSaving}>
+            <AlertDialogAction onClick={handleDeleteSpace} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isSaving || !canDeleteSpaces}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Delete Space
             </AlertDialogAction>
@@ -305,7 +335,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
         </AlertDialogContent>
       </AlertDialog>
 
-      {spaces.length === 0 && isMounted ? ( // Check isMounted
+      {spaces.length === 0 && isMounted ? ( 
         <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Building2 className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -313,7 +343,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
             <p className="text-muted-foreground mb-4">
               {buildings.length > 0 ? "Get started by adding your first rental space." : "Please add buildings first."}
             </p>
-            {buildings.length > 0 && (
+            {buildings.length > 0 && canCreateSpaces && (
                 <Button onClick={openAddForm} disabled={isSaving}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Add Space
                 </Button>
@@ -342,12 +372,16 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${Number(space.monthlyRentalPrice).toLocaleString()}/month</div>
               </CardContent>
               <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto" disabled={isSaving}>
-                  <Edit3 className="mr-1 h-4 w-4" /> Edit
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving} className="w-full sm:w-auto">
-                  <Trash2 className="mr-1 h-4 w-4" /> Delete
-                </Button>
+                {(canEditSpaces || canViewSpaces) && (
+                  <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto" disabled={isSaving}>
+                    {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <EyeOff className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}
+                  </Button>
+                )}
+                {canDeleteSpaces && (
+                  <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving} className="w-full sm:w-auto">
+                    <Trash2 className="mr-1 h-4 w-4" /> Delete
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}

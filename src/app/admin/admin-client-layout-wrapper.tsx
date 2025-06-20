@@ -32,6 +32,7 @@ import {
   Building,
   ExternalLink,
   Loader2,
+  EyeOff,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -58,7 +59,7 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   isPortal?: boolean;
-  requiredPermissions?: PermissionId[]; // Now expects an array of granular permissions
+  requiredPermissions?: PermissionId[]; 
 }
 
 const allNavItems: NavItem[] = [
@@ -74,7 +75,7 @@ const allNavItems: NavItem[] = [
     href: '/admin/settings', 
     label: 'Settings', 
     icon: Settings, 
-    requiredPermissions: [ // Show "Settings" if user can do ANY of these
+    requiredPermissions: [ 
       'settings:user_registration:manage', 
       'settings:user_management:view', 
       'settings:user_management:assign',
@@ -82,7 +83,7 @@ const allNavItems: NavItem[] = [
       'settings:role_management:manage',
     ] 
   },
-  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true }, // Portal link doesn't require admin perms
+  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true }, 
 ];
 
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
@@ -131,11 +132,11 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
     if (permissionsLoading || !currentUser) return [];
     
     return allNavItems.filter(item => {
-      if (item.isPortal) return true; // Tenant portal link always shown
-      if (isSuperAdmin) return true; // Super admin sees all admin links
-      if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true; // No specific permissions needed
+      if (item.isPortal) return true; 
+      if (isSuperAdmin) return true; 
+      if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true; 
       
-      return hasAnyPermission(item.requiredPermissions); // User needs at least one of the listed permissions
+      return hasAnyPermission(item.requiredPermissions); 
     });
   }, [currentUser, permissionsLoading, hasAnyPermission, isSuperAdmin]);
 
@@ -243,7 +244,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 <UserCircle className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              {hasAnyPermission(['settings:user_registration:manage', 'settings:user_management:view', 'settings:role_management:view']) && ( // Check if user can access any settings page
+              {hasAnyPermission(['settings:user_registration:manage', 'settings:user_management:view', 'settings:user_management:assign', 'settings:role_management:view', 'settings:role_management:manage']) && ( 
                 <DropdownMenuItem onSelect={() => router.push('/admin/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
@@ -271,9 +272,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminClientLayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [isMounted, setIsMounted] = useState(false);
+  const [isMounted, setIsMounted] = React.useState(false); // Changed to React.useState
 
-  useEffect(() => {
+  React.useEffect(() => { // Changed to React.useEffect
     setIsMounted(true);
   }, []);
 

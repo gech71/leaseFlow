@@ -21,7 +21,7 @@ import type { Role } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ALL_RESOURCE_PERMISSIONS, type PermissionItem } from '@/lib/types'; // Import new structured permissions
+import { ALL_RESOURCE_PERMISSIONS, type PermissionItem } from '@/lib/types'; 
 import { usePermissions } from '@/contexts/PermissionContext';
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
@@ -33,7 +33,7 @@ const roleFormSchema = z.object({
   name: z.string().min(2, "Role name must be at least 2 characters.").max(50, "Role name cannot exceed 50 characters.")
     .regex(/^[A-Z_]+$/, "Role name must be uppercase and can include underscores (e.g., PROPERTY_MANAGER)."),
   description: z.string().max(255, "Description cannot exceed 255 characters.").optional().or(z.literal('')),
-  permissions: z.array(z.string()).min(0, "Select at least one permission or none if applicable.").optional().default([]), // Changed min to 0
+  permissions: z.array(z.string()).min(0, "Select at least one permission or none if applicable.").optional().default([]),
 });
 
 type RoleFormValues = z.infer<typeof roleFormSchema>;
@@ -52,7 +52,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const [currentRoleForForm, setCurrentRoleForForm] = useState<ClientRole | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<ClientRole | null>(null);
 
-  const { hasPermission: contextHasPermission, isSuperAdmin } = usePermissions(); // Renamed to avoid conflict
+  const { hasPermission: contextHasPermission, isSuperAdmin } = usePermissions(); 
   const canManageRoles = isSuperAdmin || contextHasPermission('settings:role_management:manage');
   const canViewRoles = isSuperAdmin || contextHasPermission('settings:role_management:view') || canManageRoles;
 
@@ -94,7 +94,6 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   };
 
   const handleOpenEditForm = (role: ClientRole) => {
-    // View details if cannot manage, otherwise allow edit
     if (!canViewRoles) {
          toast({ title: "Permission Denied", description: "You do not have permission to view or edit roles.", variant: "destructive" });
          return;
@@ -190,7 +189,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
-  if (!canViewRoles && isMounted) { // Check if mounted before showing permission denied
+  if (!canViewRoles && isMounted) { 
     return (
       <Card className="shadow-lg">
         <CardHeader><CardTitle className="text-destructive flex items-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>

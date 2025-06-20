@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2 } from 'lucide-react';
+import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2, EyeOff } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Space as SpacePrismaOriginal, Bill as BillPrismaOriginal, Agreement as AgreementPrismaOriginal, Tenant as TenantPrismaOriginal, Building as BuildingPrismaTypeOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
@@ -20,10 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
-// getPaymentsOverviewDataAction removed, data is passed via props
+import { usePermissions } from '@/contexts/PermissionContext';
 
 // Client-side representation types, ensuring dates are strings (ISO format)
-// These types should match the structure of serialized data passed from Server Components
 export interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id'> { id?: string; } 
 
 export interface ClientBuilding extends Omit<BuildingPrismaTypeOriginal, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers'> {
@@ -74,12 +73,11 @@ export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'upda
   billDate: string;
   dueDate: string;
   paymentDate?: string | null;
-  agreement: ClientAgreementForBill; // Ensure this is not null if accessed directly
+  agreement: ClientAgreementForBill; 
   utilityBreakdown: ClientUtilityBreakdownItem[];
   tenantId: string;
   agreementId: string;
-  // For client-side processing:
-  status: BillPrismaOriginal['status']; // status will be updated client-side
+  status: BillPrismaOriginal['status']; 
 }
 
 
@@ -95,13 +93,16 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   const [selectedMonth, setSelectedMonth] = useState<number>(today.getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(today.getFullYear());
   
-  // State for bills, initialized from props
   const [bills, setBills] = useState<ClientBill[]>(initialBills);
+
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canViewPage = isSuperAdmin || hasPermission('payment_overview:view');
+
 
   useEffect(() => {
     setIsMounted(true);
     setToday(startOfDay(new Date())); 
-    setBills(initialBills); // Update state if props change (e.g., after server revalidation)
+    setBills(initialBills); 
   }, [initialBills]);
 
   const calculatePenalty = useCallback((bill: ClientBill, currentStatus: ClientBill['status']): number => {
@@ -154,7 +155,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   }, [today]);
 
   const processedBills = useMemo(() => {
-    return bills.map(bill => { // Use the 'bills' state here
+    return bills.map(bill => { 
       let currentStatus = bill.status;
       if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
         currentStatus = 'Overdue';
@@ -217,6 +218,10 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   };
 
   const exportToExcel = (data: typeof processedBills, fileNamePrefix: string) => {
+    if (!canViewPage) { // Double check permission before export
+      // toast({ title: "Permission Denied", description: "You do not have permission to export data.", variant: "destructive" });
+      return;
+    }
     const worksheetData = data.map(bill => ({
       'Tenant Name': bill.tenantName, 
       'Space Description': bill.spaceDescription,
@@ -249,6 +254,16 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
         </div>
     );
   }
+  
+  if (!canViewPage && isMounted) {
+    return (
+      <Card className="shadow-lg text-center py-12">
+        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to view payments overview.</p></CardContent>
+      </Card>
+    );
+  }
+
 
   return (
     <div className="animate-fadeIn">
@@ -294,7 +309,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       <section className="mb-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
           <h2 className="text-2xl font-headline font-semibold text-foreground">Upcoming, Overdue & Pending Verification</h2>
-          {upcomingAndPendingBills.length > 0 && (
+          {upcomingAndPendingBills.length > 0 && canViewPage && (
             <Button variant="outline" size="sm" onClick={() => exportToExcel(upcomingAndPendingBills, 'Upcoming_Overdue_Verification_Payments')}>
               <Download className="mr-2 h-4 w-4" /> Export
             </Button>
@@ -378,7 +393,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                         </SelectContent>
                     </Select>
                 </div>
-                {paidBillsInSelectedPeriod.length > 0 && (
+                {paidBillsInSelectedPeriod.length > 0 && canViewPage && (
                   <Button variant="outline" size="sm" onClick={() => exportToExcel(paidBillsInSelectedPeriod, `Payment_History_${monthsForFilter.find(m=>m.value===selectedMonth)?.label}_${selectedYear}`)} className="self-stretch sm:self-end h-9 w-full sm:w-auto">
                     <Download className="mr-2 h-4 w-4" /> Export
                   </Button>

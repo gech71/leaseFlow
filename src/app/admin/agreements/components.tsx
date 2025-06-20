@@ -7,13 +7,12 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw, Trash2, Loader2 } from 'lucide-react';
+import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw, Trash2, Loader2, EyeOff } from 'lucide-react';
 import type { Agreement as AgreementPrisma, Tenant, Space } from '@prisma/client';
 import { Input } from '@/components/ui/input';
 import { addMonths, format, isBefore, startOfDay, subDays, isAfter, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-// Removed: import { databaseService } from '@/lib/services/databaseService'; // No direct DB access
 import { deleteAgreementAction } from './actions';
 import {
   AlertDialog,
@@ -25,12 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePermissions } from '@/contexts/PermissionContext';
 
-// Enhanced Agreement type for client-side use, including populated relations
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
   space: Space | null;
-  // Ensure dates are strings if they come from server serialized
   createdAt: string;
   startDate: string;
   nextPaymentDueDate: string;
@@ -53,15 +51,16 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const [agreementToDelete, setAgreementToDelete] = useState<AgreementWithRelations | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canCreateAgreements = isSuperAdmin || hasPermission('agreement:create');
+  const canEditAgreements = isSuperAdmin || hasPermission('agreement:edit'); // For Renew
+  const canDeleteAgreements = isSuperAdmin || hasPermission('agreement:delete');
+  const canViewAgreements = isSuperAdmin || hasPermission('agreement:view') || canCreateAgreements || canEditAgreements || canDeleteAgreements;
+
   useEffect(() => {
     setIsMounted(true);
-    // Ensure dates are consistently Date objects for client-side logic if needed,
-    // or ensure all date logic uses parseISO if they remain strings.
-    // The props are already serialized to strings.
     setAgreements(initialAgreements.map(ag => ({
         ...ag,
-        // No need to parseISO here again if they are already strings from server
-        // And format function will handle string dates.
     })));
     setToday(startOfDay(new Date())); 
   }, [initialAgreements]);
@@ -82,7 +81,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const isEligibleForRenewal = (agreement: AgreementWithRelations): boolean => {
     const agreementStartDate = startOfDay(parseISO(agreement.startDate));
     const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-    if (isBefore(agreementEndDate, today)) return false; // Already expired
+    if (isBefore(agreementEndDate, today)) return false; 
     const renewalEligibilityStartDate = subDays(agreementEndDate, renewalWindowDays);
     return !isBefore(today, renewalEligibilityStartDate) && !isAfter(today, agreementEndDate);
   };
@@ -92,19 +91,26 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   };
 
   const handleRenewAgreement = (agreement: AgreementWithRelations) => {
+    if (!canEditAgreements) { // Assuming renew is an edit-like operation
+      toast({ title: "Permission Denied", description: "You do not have permission to renew agreements.", variant: "destructive" });
+      return;
+    }
     toast({ title: "Renew Agreement", description: `Initiating renewal for ${agreement.tenant?.name}'s agreement. (This is a placeholder action)`});
-    // router.push(`/admin/agreements/generate?renewFrom=${agreement.id}&tenantId=${agreement.tenantId}&spaceId=${agreement.spaceId}`);
   };
   
   const handleDeleteAgreement = async () => {
     if (!agreementToDelete) return;
+    if (!canDeleteAgreements) {
+       toast({ title: "Permission Denied", description: "You do not have permission to delete agreements.", variant: "destructive" });
+       return;
+    }
     setIsDeleting(true);
     const result = await deleteAgreementAction(agreementToDelete.id);
     setIsDeleting(false);
     if (result.success) {
         toast({title: "Agreement Deleted", description: "The agreement has been removed."});
-        setAgreements(prev => prev.filter(ag => ag.id !== agreementToDelete.id)); // Optimistic update
-        router.refresh(); // Re-fetch data from server
+        setAgreements(prev => prev.filter(ag => ag.id !== agreementToDelete.id)); 
+        router.refresh(); 
     } else {
         toast({title: "Error Deleting Agreement", description: result.error, variant: "destructive"});
     }
@@ -115,13 +121,30 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
   }
 
+  if (!canViewAgreements && isMounted) {
+    return (
+      <Card className="shadow-lg text-center py-12">
+        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to view agreements.</p></CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="animate-fadeIn">
       <PageHeader
         title="Rental Agreements"
         icon={FileText}
         description="Browse and manage all rental agreements from the database."
-        actions={ <Link href="/admin/agreements/generate" passHref> <Button className="bg-primary hover:bg-primary/90 text-primary-foreground"> <PlusCircle className="mr-2 h-5 w-5" /> Create New Agreement </Button> </Link> }
+        actions={ 
+          canCreateAgreements && (
+            <Link href="/admin/agreements/generate" passHref> 
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground"> 
+                <PlusCircle className="mr-2 h-5 w-5" /> Create New Agreement 
+              </Button> 
+            </Link>
+          )
+        }
       />
       <AlertDialog open={!!agreementToDelete} onOpenChange={(open) => { if(!open) setAgreementToDelete(null); }}>
         <AlertDialogContent>
@@ -129,7 +152,12 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
             <AlertDialogDescription>
                 Are you sure you want to delete the agreement for {agreementToDelete?.tenant?.name} at {agreementToDelete?.space?.spaceIdName}? This action cannot be undone. Associated bills might prevent deletion.
             </AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter> <AlertDialogCancel onClick={() => setAgreementToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleDeleteAgreement} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}> {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Agreement </AlertDialogAction> </AlertDialogFooter>
+            <AlertDialogFooter> 
+              <AlertDialogCancel onClick={() => setAgreementToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel> 
+              <AlertDialogAction onClick={handleDeleteAgreement} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting || !canDeleteAgreements}> 
+                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Agreement 
+              </AlertDialogAction> 
+            </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       <Card className="mb-6 shadow-sm">
@@ -142,7 +170,12 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
       </Card>
       {filteredAgreements.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
-          <CardContent> <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" /> <h3 className="text-xl font-semibold mb-2 font-headline">No Agreements Found</h3> <p className="text-muted-foreground mb-4"> {searchTerm ? "No agreements match your search." : "No agreements have been created yet."} </p> {!searchTerm && (<Link href="/admin/agreements/generate" passHref><Button><PlusCircle className="mr-2 h-5 w-5" /> Create Agreement</Button></Link>)} </CardContent>
+          <CardContent> 
+            <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" /> 
+            <h3 className="text-xl font-semibold mb-2 font-headline">No Agreements Found</h3> 
+            <p className="text-muted-foreground mb-4"> {searchTerm ? "No agreements match your search." : "No agreements have been created yet."} </p> 
+            {!searchTerm && canCreateAgreements && (<Link href="/admin/agreements/generate" passHref><Button><PlusCircle className="mr-2 h-5 w-5" /> Create Agreement</Button></Link>)} 
+          </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -168,12 +201,16 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                 </CardContent>
                 <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
                     <div className="flex-grow flex gap-2">
-                        {eligibleForRenewal && ( <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto"> <RefreshCw className="mr-1 h-4 w-4" /> Renew </Button> )}
+                        {eligibleForRenewal && canEditAgreements && ( <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto"> <RefreshCw className="mr-1 h-4 w-4" /> Renew </Button> )}
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
-                        <Link href={`/admin/agreements/${agreement.id}`} passHref className="w-full sm:w-auto"> <Button variant="outline" size="sm" className="w-full"> <Eye className="mr-1 h-4 w-4" /> View </Button> </Link>
+                        {canViewAgreements && (
+                            <Link href={`/admin/agreements/${agreement.id}`} passHref className="w-full sm:w-auto"> <Button variant="outline" size="sm" className="w-full"> <Eye className="mr-1 h-4 w-4" /> View </Button> </Link>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(agreement.id)} className="w-full sm:w-auto"> <Download className="mr-1 h-4 w-4" /> PDF </Button>
-                        <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)} className="w-full sm:w-auto"><Trash2 className="mr-1 h-4 w-4"/>Del</Button>
+                        {canDeleteAgreements && (
+                            <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)} className="w-full sm:w-auto"><Trash2 className="mr-1 h-4 w-4"/>Del</Button>
+                        )}
                     </div>
                 </CardFooter>
               </Card>

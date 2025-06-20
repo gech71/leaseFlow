@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye, CalendarClock, Sigma, CreditCard, Landmark, Wallet, Coins, HelpCircle, Info, CalendarDays } from 'lucide-react';
+import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye, CalendarClock, Sigma, CreditCard, Landmark, Wallet, Coins, HelpCircle, Info, CalendarDays, EyeOff } from 'lucide-react';
 import type { Space as SpacePrismaType, Tenant as TenantPrismaType, Agreement as AgreementPrismaType } from '@prisma/client';
 import type { AgreementInput as AIInputType } from '@/lib/types'; // For AI
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-
+import { usePermissions } from '@/contexts/PermissionContext';
 
 // Client-side representation of Tenant and Space with serialized dates
 interface ClientTenant extends Omit<TenantPrismaType, 'createdAt' | 'updatedAt'> {
@@ -77,6 +77,9 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
   const { toast } = useToast();
   const router = useRouter();
 
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canCreateAgreements = isSuperAdmin || hasPermission('agreement:create');
+
   const form = useForm<AgreementFormValues>({
     resolver: zodResolver(agreementFormSchema),
     defaultValues: {
@@ -110,6 +113,10 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
   useEffect(() => setIsMounted(true), []);
 
   const handleGenerateAIAgreement = async (data: AgreementFormValues) => {
+    if (!canCreateAgreements) {
+      toast({ title: "Permission Denied", description: "You do not have permission to generate agreement text.", variant: "destructive" });
+      return;
+    }
     setIsLoadingAI(true);
     setError(null);
     setGeneratedAgreementText(null);
@@ -153,11 +160,15 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
   };
 
   const handleSaveFullAgreement = async () => {
+    if (!canCreateAgreements) {
+      toast({ title: "Permission Denied", description: "You do not have permission to save agreements.", variant: "destructive" });
+      return;
+    }
     if (!generatedAgreementText) {
         toast({ title: "Error", description: "No agreement text generated to save.", variant: "destructive" });
         return;
     }
-    const formValues = form.getValues(); // Get current form values
+    const formValues = form.getValues(); 
     const selectedTenant = tenants.find(t => t.id === formValues.tenantId);
     const selectedSpace = availableSpaces.find(s => s.id === formValues.selectedSpaceId);
 
@@ -201,6 +212,15 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
   }
 
+  if (!canCreateAgreements && isMounted) {
+    return (
+      <Card className="shadow-lg text-center py-12">
+        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to create agreements.</p></CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
       <Card className="shadow-lg">
@@ -217,7 +237,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" />Select Tenant</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Choose an existing tenant" /></SelectTrigger></FormControl>
                       <SelectContent>
                         {tenants.length > 0 ? tenants.map(tenant => (
@@ -235,7 +255,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center"><Home className="mr-2 h-4 w-4 text-primary" />Select Space</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Choose an available space" /></SelectTrigger></FormControl>
                       <SelectContent>
                         {availableSpaces.length > 0 ? availableSpaces.map(space => (
@@ -261,6 +281,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
                           <Button
                             variant={"outline"}
                             className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                            disabled={!canCreateAgreements}
                           >
                             {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
@@ -276,8 +297,8 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
                 )}
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="paymentTermMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary" />Total Term (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 12" {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                  <FormField control={form.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" />Initial Payment (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                  <FormField control={form.control} name="paymentTermMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary" />Total Term (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 12" {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
+                  <FormField control={form.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" />Initial Payment (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
               </div>
               {calculatedInitialPaymentAmount > 0 && (
                 <div className="p-3 bg-secondary/50 rounded-md border border-border">
@@ -289,7 +310,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
               <FormField control={form.control} name="paymentMethod" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary" />Initial Payment Method</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="Card"><CreditCard className="mr-2 h-4 w-4 inline-block"/>Card</SelectItem>
                         <SelectItem value="Cash"><Coins className="mr-2 h-4 w-4 inline-block"/>Cash</SelectItem>
@@ -304,19 +325,19 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
                  <FormField control={form.control} name="bankOrWalletName" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center"> {paymentMethod === "Bank Transfer" ? <Landmark className="mr-2 h-4 w-4 text-primary"/> : <Wallet className="mr-2 h-4 w-4 text-primary"/>} {paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"} </FormLabel>
-                      <FormControl><Input placeholder={`Enter ${paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"}`} {...field} /></FormControl><FormMessage />
+                      <FormControl><Input placeholder={`Enter ${paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"}`} {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage />
                     </FormItem>
                   )}/>
               )}
-              <FormField control={form.control} name="paymentReference" render={({ field }) => (<FormItem><FormLabel>Payment Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Transaction ID, Check No." {...field} /></FormControl><FormMessage /></FormItem>)}/>
+              <FormField control={form.control} name="paymentReference" render={({ field }) => (<FormItem><FormLabel>Payment Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Transaction ID, Check No." {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
               <FormField control={form.control} name="additionalTerms" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Additional Terms for Agreement (Optional)</FormLabel>
-                    <FormControl><Textarea placeholder="Enter any specific clauses..." className="resize-none" rows={3} {...field}/></FormControl>
+                    <FormControl><Textarea placeholder="Enter any specific clauses..." className="resize-none" rows={3} {...field} disabled={!canCreateAgreements}/></FormControl>
                     <FormDescription>These terms will be appended to the standard agreement clauses by the AI.</FormDescription><FormMessage />
                   </FormItem>
               )}/>
-              <Button type="submit" disabled={isLoadingAI || isSavingToDb || availableSpaces.length === 0 || tenants.length === 0 || !form.formState.isValid} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button type="submit" disabled={isLoadingAI || isSavingToDb || availableSpaces.length === 0 || tenants.length === 0 || !form.formState.isValid || !canCreateAgreements} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isLoadingAI ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating AI Text...</> : "Generate Agreement Text (AI)"}
               </Button>
             </form>
@@ -337,7 +358,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
             <div className="space-y-4">
               <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">AI Agreement text generated!</p></div>
               <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-secondary/30"><pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">{generatedAgreementText}</pre></ScrollArea>
-              <Button onClick={handleSaveFullAgreement} disabled={isSavingToDb || isLoadingAI} className="w-full">
+              <Button onClick={handleSaveFullAgreement} disabled={isSavingToDb || isLoadingAI || !canCreateAgreements} className="w-full">
                 {isSavingToDb ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving to Database...</> : "Finalize & Save Agreement to Database"}
               </Button>
             </div>

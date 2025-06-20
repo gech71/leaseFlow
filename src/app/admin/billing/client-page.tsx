@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon as CalendarLucideIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip } from 'lucide-react';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon as CalendarLucideIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip, EyeOff } from 'lucide-react';
 import type { Agreement as AgreementPrisma, Bill as BillPrismaOriginal, Space as SpacePrisma, Building as BuildingPrisma, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, Prisma, Tenant as TenantPrismaOriginal } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -38,7 +38,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { getBillingPageDataAction, generateBillAndUpdateAgreementAction, recordPaymentOrVerificationAction, deleteBillAction } from './actions';
-import type { SerializedBillingPageData, ClientBill, ClientAgreement, ClientBuilding } from './page'; // Import Serialized types from page.tsx
+import type { SerializedBillingPageData, ClientBill, ClientAgreement, ClientBuilding } from './page'; 
+import { usePermissions } from '@/contexts/PermissionContext';
 
 
 const paymentFormSchema = z.object({
@@ -65,7 +66,7 @@ interface BillingClientPageProps {
 export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [agreements, setAgreements] = useState<ClientAgreement[]>(initialData.agreements);
   const [bills, setBills] = useState<ClientBill[]>(initialData.bills);
-  const [allBuildings, setAllBuildings] = useState<ClientBuilding[]>(initialData.buildings); // Store all buildings for penalty calculation
+  const [allBuildings, setAllBuildings] = useState<ClientBuilding[]>(initialData.buildings); 
   
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<ClientBill | null>(null);
@@ -79,6 +80,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const { toast } = useToast();
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isLoading, setIsLoading] = useState(false);
+
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canGenerateBills = isSuperAdmin || hasPermission('billing:generate');
+  const canManagePayments = isSuperAdmin || hasPermission('billing:manage_payments');
+  const canDeleteBills = isSuperAdmin || hasPermission('billing:delete');
+  const canViewBilling = isSuperAdmin || hasPermission('billing:view') || canGenerateBills || canManagePayments || canDeleteBills;
 
   const paymentForm = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -97,7 +104,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // getBillingPageDataAction now returns SerializedBillingPageData
       const serializedNewData = await getBillingPageDataAction();
       setAgreements(serializedNewData.agreements);
       setBills(serializedNewData.bills);
@@ -199,6 +205,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   }, [isPaymentDialogOpen, billForPayment, isVerificationDialogOpen, billForVerification, paymentForm, processedClientBills]); 
 
   const handleGenerateSingleBill = async (agreementId: string) => {
+    if (!canGenerateBills) {
+      toast({ title: "Permission Denied", description: "You do not have permission to generate bills.", variant: "destructive" });
+      return;
+    }
     const agreement = agreements.find(ag => ag.id === agreementId);
     if (!agreement) { toast({ title: "Error", description: "Agreement not found.", variant: "destructive" }); return; }
     
@@ -223,12 +233,16 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   };
 
   const handleGenerateAllDueBills = async () => {
+    if (!canGenerateBills) {
+      toast({ title: "Permission Denied", description: "You do not have permission to generate bills.", variant: "destructive" });
+      return;
+    }
     setIsLoading(true);
     let generatedCount = 0, skippedCount = 0, errorCount = 0;
     const errorMessages: string[] = [];
 
     for (const agreement of agreements) {
-        if (!agreement.tenant) { // Skip if tenant data is missing on agreement
+        if (!agreement.tenant) { 
              skippedCount++;
              continue;
         }
@@ -264,6 +278,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   
   const handleRecordPaymentSubmit = async (values: PaymentFormValues) => {
     if (!billForPayment || !billForPayment.agreement) return;
+    if (!canManagePayments) {
+      toast({ title: "Permission Denied", description: "You do not have permission to manage payments.", variant: "destructive" });
+      return;
+    }
     setIsLoading(true);
     const adminProofUrl = adminSelectedProofFile ? `admin_simulated_slip_${adminSelectedProofFile.name}` : billForPayment.paymentProofUrl;
 
@@ -286,6 +304,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   
   const handleVerificationSubmit = async (values: PaymentFormValues, action: 'confirmVerification' | 'rejectVerification') => {
     if (!billForVerification || !billForVerification.agreement) return;
+    if (!canManagePayments) {
+      toast({ title: "Permission Denied", description: "You do not have permission to manage payments.", variant: "destructive" });
+      return;
+    }
     setIsLoading(true);
     const adminProofUrl = adminSelectedProofFile ? `admin_sim_replaced_slip_${adminSelectedProofFile.name}` : billForVerification.paymentProofUrl;
 
@@ -327,6 +349,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   };
   
   const handleDeleteBillWithConfirmation = async (billId: string) => {
+    if (!canDeleteBills) {
+      toast({ title: "Permission Denied", description: "You do not have permission to delete bills.", variant: "destructive" });
+      return;
+    }
     setIsLoading(true);
     const result = await deleteBillAction(billId);
     setIsLoading(false);
@@ -343,43 +369,54 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     else setAdminSelectedProofFile(null);
   };
 
-  if (!isMounted && agreements.length === 0) { 
+  if (!isMounted && agreements.length === 0 && !canViewBilling) { 
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
+  }
+
+  if (!canViewBilling && isMounted) {
+     return (
+      <Card className="shadow-lg text-center py-12">
+        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+        <CardContent><p>You do not have permission to view billing information.</p></CardContent>
+      </Card>
+    );
   }
 
   return (
     <div className="animate-fadeIn">
       <PageHeader title="Billing Management" icon={DollarSign} description="Generate and manage bills. Verify tenant-submitted payments." />
 
-      <Card className="mb-6 shadow-sm">
-        <CardHeader> <CardTitle className="font-headline">Generate Bills</CardTitle> <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription> </CardHeader>
-        <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
-        <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {agreements.map(agreement => {
-            if (!agreement.tenant || !agreement.space) return null; // Skip if essential data missing
-            const agreementStartDate = parseISO(agreement.startDate);
-            const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-            const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
-            const nextDueDate = parseISO(agreement.nextPaymentDueDate);
-            const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, today);
-            return (
-              <Card key={agreement.id} className={`bg-secondary/30 shadow-sm hover:shadow-md transition-shadow ${!isAgreementActive ? 'opacity-60' : ''}`}>
-                <CardHeader className="pb-2 pt-3">
-                  <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
-                  <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
-                   <CardDescription className="text-xs pt-1"> Next Due: {format(nextDueDate, 'PP')}
-                    {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive)</span>}
-                    {isAgreementActive && isDueForGeneration && <Badge variant="default" className="ml-1 text-xs bg-green-100 text-green-700">Due for Gen</Badge>}
-                    {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
-                  </CardDescription>
-                </CardHeader>
-                <CardFooter className="pt-2 pb-3"> <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button> </CardFooter>
-              </Card>
-            );
-          })}
-        </CardContent>
-      </Card>
+      {canGenerateBills && (
+        <Card className="mb-6 shadow-sm">
+          <CardHeader> <CardTitle className="font-headline">Generate Bills</CardTitle> <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription> </CardHeader>
+          <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
+          <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {agreements.map(agreement => {
+              if (!agreement.tenant || !agreement.space) return null; 
+              const agreementStartDate = parseISO(agreement.startDate);
+              const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
+              const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
+              const nextDueDate = parseISO(agreement.nextPaymentDueDate);
+              const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, today);
+              return (
+                <Card key={agreement.id} className={`bg-secondary/30 shadow-sm hover:shadow-md transition-shadow ${!isAgreementActive ? 'opacity-60' : ''}`}>
+                  <CardHeader className="pb-2 pt-3">
+                    <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
+                    <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
+                    <CardDescription className="text-xs pt-1"> Next Due: {format(nextDueDate, 'PP')}
+                      {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive)</span>}
+                      {isAgreementActive && isDueForGeneration && <Badge variant="default" className="ml-1 text-xs bg-green-100 text-green-700">Due for Gen</Badge>}
+                      {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter className="pt-2 pb-3"> <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button> </CardFooter>
+                </Card>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
       
       <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
           <DialogContent className="sm:max-w-md">
@@ -389,13 +426,16 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
               </DialogHeader>
               <Form {...paymentForm}>
                   <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
-                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
-                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <div> <Label htmlFor="adminPaymentProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach Payment Slip (Simulated) </Label> <Input id="adminPaymentProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" /> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">Selected: {adminSelectedProofFile.name}</p>} </div>
-                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Confirmed via bank statement." rows={2} {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose><Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}{billForPayment?.status === 'Paid' ? 'Update Payment' : 'Record as Paid'}</Button></DialogFooter>
+                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`} disabled={isLoading || !canManagePayments}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isLoading || !canManagePayments}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} /> )}
+                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+                      {canManagePayments && <div> <Label htmlFor="adminPaymentProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach Payment Slip (Simulated) </Label> <Input id="adminPaymentProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">Selected: {adminSelectedProofFile.name}</p>} </div>}
+                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Confirmed via bank statement." rows={2} {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+                      <DialogFooter className="pt-4">
+                        <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                        {canManagePayments && <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}{billForPayment?.status === 'Paid' ? 'Update Payment' : 'Record as Paid'}</Button>}
+                      </DialogFooter>
                   </form>
               </Form>
           </DialogContent>
@@ -410,17 +450,17 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
               {billForVerification && ( <div className="text-sm space-y-2 py-2"> <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p> <p><strong>Submitted Proof:</strong> {billForVerification.paymentProofUrl ? <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}> {billForVerification.paymentProofUrl} (Click to view - simulated) </Button> : <span className="italic text-muted-foreground">No proof URL found.</span>} </p> </div> )}
               <Form {...paymentForm}>
                   <form className="space-y-4 py-1"> 
-                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
-                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <div> <Label htmlFor="adminVerificationProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated) </Label> <Input id="adminVerificationProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" /> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>} </div>
-                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} /></FormControl><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`} disabled={isLoading || !canManagePayments}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isLoading || !canManagePayments}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} /> )}
+                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+                      {canManagePayments && <div> <Label htmlFor="adminVerificationProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated) </Label> <Input id="adminVerificationProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>} </div>}
+                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
                       <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
-                          <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'rejectVerification'))()} disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}Reject Payment</Button>
+                          {canManagePayments && <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'rejectVerification'))()} disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}Reject Payment</Button>}
                           <div className="flex-grow"></div>
                           <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                          <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirmVerification'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}Confirm Payment</Button>
+                          {canManagePayments && <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirmVerification'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}Confirm Payment</Button>}
                       </DialogFooter>
                   </form>
               </Form>
@@ -464,10 +504,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                     <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span></Badge></TableCell>
                     <TableCell className="text-right pr-2 sm:pr-4">
                       <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">
-                        {bill.currentStatus === 'PendingVerification' && ( <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" disabled={isLoading}><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button> )}
-                        {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && ( <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button> )}
-                         {bill.currentStatus === 'Paid' && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View/Edit</span><span className="sm:hidden">Edit</span></Button> )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 self-center sm:self-auto" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading || bill.status === 'Paid'}><Trash2 className="h-4 w-4"/></Button>
+                        {bill.currentStatus === 'PendingVerification' && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" disabled={isLoading}><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button> )}
+                        {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button> )}
+                         {bill.currentStatus === 'Paid' && canManagePayments && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View/Edit</span><span className="sm:hidden">Edit</span></Button> )}
+                        {canDeleteBills && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 self-center sm:self-auto" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading || bill.status === 'Paid'}><Trash2 className="h-4 w-4"/></Button>}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -481,5 +521,3 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     </div>
   );
 }
-
-    

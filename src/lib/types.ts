@@ -180,7 +180,7 @@ export type PermissionAction = typeof PERMISSION_ACTIONS[number];
 // Defines a single permission
 export interface PermissionItem {
   id: string; // e.g., "building:view"
-  label: string; // e.g., "View Buildings"
+  label: string; // e.g., "View"
 }
 
 // Defines a resource and its associated permissions
@@ -195,61 +195,61 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
   {
     resourceId: 'dashboard',
     resourceLabel: 'Dashboard',
-    permissions: [{ id: 'dashboard:view', label: 'View Dashboard' }],
+    permissions: [{ id: 'dashboard:view', label: 'View' }],
   },
   {
     resourceId: 'building',
     resourceLabel: 'Buildings',
     permissions: [
-      { id: 'building:view', label: 'View Buildings' },
-      { id: 'building:create', label: 'Create Buildings' },
-      { id: 'building:edit', label: 'Edit Buildings' },
-      { id: 'building:delete', label: 'Delete Buildings' },
+      { id: 'building:view', label: 'View' },
+      { id: 'building:create', label: 'Create' },
+      { id: 'building:edit', label: 'Edit' },
+      { id: 'building:delete', label: 'Delete' },
     ],
   },
   {
     resourceId: 'space',
     resourceLabel: 'Spaces',
     permissions: [
-      { id: 'space:view', label: 'View Spaces' },
-      { id: 'space:create', label: 'Create Spaces' },
-      { id: 'space:edit', label: 'Edit Spaces' },
-      { id: 'space:delete', label: 'Delete Spaces' },
+      { id: 'space:view', label: 'View' },
+      { id: 'space:create', label: 'Create' },
+      { id: 'space:edit', label: 'Edit' },
+      { id: 'space:delete', label: 'Delete' },
     ],
   },
   {
     resourceId: 'tenant',
     resourceLabel: 'Tenants',
     permissions: [
-      { id: 'tenant:view', label: 'View Tenants' },
-      { id: 'tenant:create', label: 'Create Tenants' },
-      { id: 'tenant:edit', label: 'Edit Tenants' },
-      { id: 'tenant:delete', label: 'Delete Tenants' },
+      { id: 'tenant:view', label: 'View' },
+      { id: 'tenant:create', label: 'Create' },
+      { id: 'tenant:edit', label: 'Edit' },
+      { id: 'tenant:delete', label: 'Delete' },
     ],
   },
   {
     resourceId: 'agreement',
     resourceLabel: 'Agreements',
     permissions: [
-      { id: 'agreement:view', label: 'View Agreements' },
-      { id: 'agreement:create', label: 'Create Agreements' },
-      { id: 'agreement:edit', label: 'Edit Agreements' }, // Note: Editing agreements might be complex.
-      { id: 'agreement:delete', label: 'Delete Agreements' },
+      { id: 'agreement:view', label: 'View' },
+      { id: 'agreement:create', label: 'Create' },
+      { id: 'agreement:edit', label: 'Edit' }, 
+      { id: 'agreement:delete', label: 'Delete' },
     ],
   },
   {
     resourceId: 'building_utility',
     resourceLabel: 'Building Utilities',
     permissions: [
-      { id: 'building_utility:view', label: 'View Building Utilities' },
-      { id: 'building_utility:manage', label: 'Manage Building Utilities (CUD)' },
+      { id: 'building_utility:view', label: 'View' },
+      { id: 'building_utility:manage', label: 'Manage (CUD)' },
     ],
   },
   {
     resourceId: 'billing',
     resourceLabel: 'Billing',
     permissions: [
-      { id: 'billing:view', label: 'View Bills & Billing Info' },
+      { id: 'billing:view', label: 'View' },
       { id: 'billing:generate', label: 'Generate Bills' },
       { id: 'billing:manage_payments', label: 'Record/Verify Payments' },
       { id: 'billing:delete', label: 'Delete Bills' },
@@ -259,18 +259,18 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceId: 'payment_overview',
     resourceLabel: 'Payments Overview',
     permissions: [
-      { id: 'payment_overview:view', label: 'View Payments Overview Report' },
+      { id: 'payment_overview:view', label: 'View' },
     ],
   },
   {
     resourceId: 'settings',
-    resourceLabel: 'Settings Area', // This is a general category for settings sub-modules
+    resourceLabel: 'Settings Area', 
     permissions: [
       { id: 'settings:user_registration:manage', label: 'Register New Users' },
-      { id: 'settings:user_management:view', label: 'View User Management (Roles/Buildings)' },
-      { id: 'settings:user_management:assign', label: 'Assign Roles/Buildings to Users' },
-      { id: 'settings:role_management:view', label: 'View Role Management' },
-      { id: 'settings:role_management:manage', label: 'Manage Roles (CUD Permissions)' },
+      { id: 'settings:user_management:view', label: 'View User Assignments' },
+      { id: 'settings:user_management:assign', label: 'Assign Roles/Buildings' },
+      { id: 'settings:role_management:view', label: 'View Roles' },
+      { id: 'settings:role_management:manage', label: 'Manage Roles (CUD)' },
     ],
   },
 ];
@@ -286,3 +286,4 @@ export const OLD_AVAILABLE_PERMISSIONS = [
   // ... other old permissions
 ] as const;
 
+    
