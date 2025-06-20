@@ -252,7 +252,10 @@ export class DatabaseService {
   }
   
   async getUserByExternalId(userId: string, include?: Prisma.UserInclude): Promise<User | null> { 
-    return prisma.user.findUnique({ where: { userId }, include });
+    return prisma.user.findUnique({ 
+        where: { userId }, 
+        include // This 'include' comes directly from the method parameter
+    });
   }
 
 
@@ -330,3 +333,4 @@ export class DatabaseService {
 }
 
 export const databaseService = new DatabaseService();
+
