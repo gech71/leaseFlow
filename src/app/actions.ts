@@ -13,8 +13,36 @@ export async function generateAgreementAction(input: AgreementInput): Promise<Ag
     }
     return result;
   } catch (e: any) {
-    console.error("Error in generateAgreementAction:", e);
-    return { error: e.message || 'An unknown error occurred while generating the agreement.' };
+    // Log the full error object for better server-side debugging
+    console.error("Error in generateAgreementAction. Raw error:", e);
+    // Attempt to get a more detailed string representation for logging
+    let detailedErrorString;
+    try {
+      detailedErrorString = JSON.stringify(e, Object.getOwnPropertyNames(e), 2);
+    } catch (stringifyError) {
+      detailedErrorString = "Could not stringify error object. Error keys: " + Object.keys(e || {}).join(', ');
+    }
+    console.error("Error in generateAgreementAction. Stringified error:", detailedErrorString);
+
+    let errorMessage = 'An unknown error occurred while generating the agreement.';
+    if (e instanceof Error && e.message) {
+      errorMessage = e.message;
+    } else if (typeof e === 'string' && e) {
+      errorMessage = e;
+    } else if (e && typeof e.toString === 'function' && e.toString() !== '[object Object]' && e.toString() !== '{}') {
+      errorMessage = e.toString();
+    } else if (e && e.error && typeof e.error === 'string') { // Check for a nested error string
+      errorMessage = e.error;
+    } else if (e && e.details && typeof e.details === 'string') { // Check for Genkit-like error details
+      errorMessage = e.details;
+    } else if (typeof e === 'object' && e !== null) {
+      const keys = Object.keys(e);
+      if (keys.length > 0) {
+        errorMessage = `An error object was caught with keys: ${keys.join(', ')}. Check server logs for details.`;
+      }
+    }
+    
+    return { error: errorMessage };
   }
 }
 
