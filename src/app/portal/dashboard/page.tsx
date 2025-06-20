@@ -7,6 +7,8 @@ import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths } f
 import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from './actions';
 import { CustomerDashboardClientPage } from './client-page'; // Import the new client component
 
+const EPOCH_ISO_STRING = new Date(0).toISOString();
+
 // Serialized types for props passed to Client Component (Dates are strings)
 export interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id'> { id?: string; }
 export interface ClientBuilding extends Omit<BuildingPrisma, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers'> {
@@ -64,64 +66,64 @@ export interface SerializedTenantPortalData {
 
 // Helper function to serialize a single agreement with deep relations
 const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWithRelations): ClientAgreement => {
+  const tenant = agreementWithParsedUtilities.tenant;
+  const space = agreementWithParsedUtilities.space;
+  const building = space?.building;
+
   return {
     ...agreementWithParsedUtilities,
-    createdAt: agreementWithParsedUtilities.createdAt.toISOString(),
-    updatedAt: agreementWithParsedUtilities.updatedAt.toISOString(),
-    startDate: agreementWithParsedUtilities.startDate.toISOString(),
-    nextPaymentDueDate: agreementWithParsedUtilities.nextPaymentDueDate.toISOString(),
+    createdAt: agreementWithParsedUtilities.createdAt?.toISOString() || EPOCH_ISO_STRING,
+    updatedAt: agreementWithParsedUtilities.updatedAt?.toISOString() || agreementWithParsedUtilities.createdAt?.toISOString() || EPOCH_ISO_STRING,
+    startDate: agreementWithParsedUtilities.startDate?.toISOString() || EPOCH_ISO_STRING,
+    nextPaymentDueDate: agreementWithParsedUtilities.nextPaymentDueDate?.toISOString() || EPOCH_ISO_STRING,
     initialPaymentDate: agreementWithParsedUtilities.initialPaymentDate?.toISOString() || null,
     endDate: agreementWithParsedUtilities.endDate?.toISOString() || undefined,
-    tenant: {
-      ...agreementWithParsedUtilities.tenant,
-      createdAt: agreementWithParsedUtilities.tenant.createdAt.toISOString(),
-      updatedAt: agreementWithParsedUtilities.tenant.updatedAt.toISOString(),
-    },
-    space: {
-      ...agreementWithParsedUtilities.space,
-      createdAt: agreementWithParsedUtilities.space.createdAt.toISOString(),
-      updatedAt: agreementWithParsedUtilities.space.updatedAt.toISOString(),
-      building: {
-        ...agreementWithParsedUtilities.space.building,
-        createdAt: agreementWithParsedUtilities.space.building.createdAt.toISOString(),
-        updatedAt: agreementWithParsedUtilities.space.building.updatedAt.toISOString(),
-        penaltyPolicyTiers: agreementWithParsedUtilities.space.building.penaltyPolicyTiers.map(pt => ({ ...pt })),
-      }
-    },
-    bills: agreementWithParsedUtilities.bills.map(bill => ({
+    tenant: tenant ? {
+      ...tenant,
+      createdAt: tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      updatedAt: tenant.updatedAt?.toISOString() || tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
+    } : ({} as ClientTenant), // Provide a default empty object if tenant is null
+    space: space ? {
+      ...space,
+      createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      building: building ? {
+        ...building,
+        createdAt: building.createdAt?.toISOString() || EPOCH_ISO_STRING,
+        updatedAt: building.updatedAt?.toISOString() || building.createdAt?.toISOString() || EPOCH_ISO_STRING,
+        penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt })) || [],
+      } : ({} as ClientBuilding), // Default empty object
+    } : ({} as ClientSpace), // Default empty object
+    bills: (agreementWithParsedUtilities.bills || []).map(bill => ({
       ...bill,
-      createdAt: bill.createdAt.toISOString(),
-      updatedAt: bill.updatedAt.toISOString(),
-      billDate: bill.billDate.toISOString(),
-      dueDate: bill.dueDate.toISOString(),
+      createdAt: bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      updatedAt: bill.updatedAt?.toISOString() || bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
+      billDate: bill.billDate?.toISOString() || EPOCH_ISO_STRING,
+      dueDate: bill.dueDate?.toISOString() || EPOCH_ISO_STRING,
       paymentDate: bill.paymentDate?.toISOString() || null,
-      // utilityBreakdown is already parsed in the action to ParsedUtilityItemForAction[]
-      // which should be compatible with ClientUtilityBreakdownItem[]
-      utilityBreakdown: bill.utilityBreakdown.map(ub => ({ ...ub })), 
+      utilityBreakdown: (bill.utilityBreakdown || []).map(ub => ({ ...ub })), 
     })),
   };
 };
 
 
 async function TenantPortalDataFetcher() {
-  // portalData will now have bills with utilityBreakdown already parsed by the action
   const portalData = await getTenantPortalDashboardDataAction();
   
   let serializedData: SerializedTenantPortalData | null = null;
 
   if (portalData.agreement) {
     serializedData = {
-      // Serialize the rest of the dates
       agreement: serializeAgreementData(portalData.agreement),
       aiGeneratedAgreementText: portalData.aiGeneratedAgreementText,
       error: portalData.error,
     };
-  } else if (portalData.error) {
+  } else { // Handle cases where portalData.agreement is null (e.g., error or no active agreement)
     serializedData = {
         agreement: null,
         aiGeneratedAgreementText: null,
-        error: portalData.error,
-    }
+        error: portalData.error || "No active agreement found or failed to load data.", // Provide a default error if none
+    };
   }
   
   return <CustomerDashboardClientPage initialData={serializedData} />;
