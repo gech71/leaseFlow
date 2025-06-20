@@ -15,8 +15,9 @@ interface PageParams {
 // Server Component to fetch initial data
 export default async function ViewAgreementPage({ params }: PageParams) {
   // Data fetching logic moved here
-  const agreementData = await databaseService.getAgreementById(params.id, {
-    include: { tenant: true, space: true }
+  const agreementData = await databaseService.getAgreementById(params.id, { // Corrected: Pass include options directly
+    tenant: true, 
+    space: true 
   });
 
   let serializableAgreement: AgreementWithRelations | null = null;
