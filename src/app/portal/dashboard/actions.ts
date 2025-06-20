@@ -7,16 +7,23 @@ import { generateAgreementAction, type AgreementInput } from '@/app/actions';
 import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, Prisma } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns';
 
+// Define a simple structure for parsed utility items
+interface ParsedUtilityItemForAction {
+  id?: string;
+  name: string;
+  amount: number;
+}
+
 // Types that match the structure of data fetched with Prisma, including relations
 // These are the rich types returned by Prisma. Serialization to client-friendly types happens in the page component.
-export type PortalAgreementWithRelations = AgreementPrisma & {
+export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
   space: SpacePrisma & {
     building: BuildingPrisma & {
       penaltyPolicyTiers: PenaltyTierPrisma[];
     };
   };
   tenant: TenantPrisma;
-  bills: (BillPrisma & { utilityBreakdown: UtilityBreakdownItemPrisma[] })[];
+  bills: (Omit<BillPrisma, 'utilityBreakdown'> & { utilityBreakdown: ParsedUtilityItemForAction[] })[];
 };
 
 
@@ -41,19 +48,56 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
             },
           },
         },
-        bills: {
-          include: { utilityBreakdown: true },
+        bills: { // Bills are included, but utilityBreakdown within bills will be processed manually
           orderBy: { billDate: 'desc' },
         },
       },
       orderBy: { createdAt: 'asc' } 
     });
+    
+    const processedAgreements = allAgreementsRaw.map(ag => {
+      const processedBills = ag.bills.map(rawBill => {
+        let parsedItems: ParsedUtilityItemForAction[] = [];
+        const rawUtilityData = (rawBill as any).utilityBreakdown; // Access the raw field
+
+        if (typeof rawUtilityData === 'string') {
+          try {
+            const jsonData = JSON.parse(rawUtilityData);
+            if (Array.isArray(jsonData)) {
+              parsedItems = jsonData
+                .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
+                .map(item => ({
+                  name: item.name,
+                  amount: item.amount,
+                  id: typeof item.id === 'string' ? item.id : undefined,
+                }));
+            }
+          } catch (e) {
+            console.error(`Portal Action: Failed to parse utilityBreakdown JSON for bill ${rawBill.id}:`, e);
+          }
+        } else if (Array.isArray(rawUtilityData)) { 
+            parsedItems = rawUtilityData
+                .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
+                .map(item => ({
+                  name: item.name,
+                  amount: item.amount,
+                  id: typeof item.id === 'string' ? item.id : undefined,
+                }));
+        }
+        
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { utilityBreakdown: _originalScalarUtilityData, ...billData } = rawBill;
+        return { ...billData, utilityBreakdown: parsedItems };
+      });
+      return { ...ag, bills: processedBills };
+    });
+
 
     let targetAgreement: PortalAgreementWithRelations | null = null;
-    for (const ag of allAgreementsRaw) {
+    for (const ag of processedAgreements) { // Iterate over processedAgreements
         const agreementEndDate = addMonths(new Date(ag.startDate), ag.paymentTermMonths);
         if (isAfter(agreementEndDate, new Date())) {
-            targetAgreement = ag as PortalAgreementWithRelations; 
+            targetAgreement = ag as PortalAgreementWithRelations; // Cast is now safer
             break;
         }
     }
