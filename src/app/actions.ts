@@ -30,24 +30,26 @@ export async function generateAgreementAction(input: AgreementInput): Promise<Ag
 
     let errorMessage = 'An unknown error occurred while generating the agreement. Please check server logs for details.';
     
-    if (e instanceof Error && e.message) {
+    // Check for GenkitError structure or standard Error properties
+    if (e && typeof e.message === 'string' && e.message.trim() !== '') {
       errorMessage = e.message;
+      if (e.status) { // GenkitError often includes a status
+        errorMessage += ` (Status: ${e.status})`;
+      }
     } else if (typeof e === 'string' && e.trim() !== '') {
       errorMessage = e;
-    } else if (e && typeof e.toString === 'function' && e.toString() !== '[object Object]' && e.toString() !== '{}' && e.toString().trim() !== '') {
-      errorMessage = e.toString();
     } else if (e && e.error && typeof e.error === 'string' && e.error.trim() !== '') { 
       errorMessage = e.error;
     } else if (e && e.details && typeof e.details === 'string' && e.details.trim() !== '') { // Check for Genkit-like error details
       errorMessage = e.details;
-    } else if (e && e.message && typeof e.message === 'string' && e.message.trim() !== '') { // Re-check message if other conditions failed
-      errorMessage = e.message;
+    } else if (e && typeof e.toString === 'function' && e.toString() !== '[object Object]' && e.toString() !== '{}' && e.toString().trim() !== '') {
+      errorMessage = e.toString();
     } else if (typeof e === 'object' && e !== null) {
       const keys = Object.keys(e);
       if (keys.length > 0) {
         errorMessage = `An error object was caught. Keys: ${keys.join(', ')}. Please check server logs for details.`;
-      } else if (detailedErrorString.length > 50 && detailedErrorString !== "Could not stringify error object.") { // If stringified version is more useful than just "{}"
-         errorMessage = `An error occurred: ${detailedErrorString.substring(0, 100)}${detailedErrorString.length > 100 ? '...' : ''}. Check server logs.`;
+      } else if (detailedErrorString.length > 50 && detailedErrorString !== "Could not stringify error object.") { 
+         errorMessage = `An error occurred: ${detailedErrorString.substring(0, 150)}${detailedErrorString.length > 150 ? '...' : ''}. Check server logs.`;
       } else {
         errorMessage = 'An unexpected error without a specific message occurred in the AI flow. Check server logs.';
       }
