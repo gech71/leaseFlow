@@ -10,6 +10,9 @@ async function main() {
   // 1. Clear existing data
   console.log('Clearing existing data...');
   try {
+    await prisma.user.deleteMany({}); // Clear Users
+    console.log('Deleted Users');
+
     // Bill is child of Agreement. UtilityBreakdownItem is child of Bill.
     // Prisma's onDelete: Cascade on UtilityBreakdownItem.billId and Bill.agreementId should handle this.
     await prisma.bill.deleteMany({});
@@ -91,8 +94,41 @@ async function main() {
     throw e; // Re-throw to stop seeding if clearing fails
   }
 
+  // 2. Create Users
+  console.log('Creating Users...');
+  const user1 = await prisma.user.create({
+    data: {
+      userId: 'auth0|user123',
+      email: 'admin.user@leaseflow.com',
+      name: 'Admin User',
+      firstName: 'Admin',
+      lastName: 'User',
+      phoneNumber: '555-0000',
+    },
+  });
+  const user2 = await prisma.user.create({
+    data: {
+      email: 'tenant.user@example.com',
+      name: 'Tenant Portal User',
+      firstName: 'Tenant',
+      lastName: 'PortalUser',
+      phoneNumber: '555-1111',
+    },
+  });
+   const user3 = await prisma.user.create({
+    data: {
+      userId: 'firebase|user789',
+      email: 'another.admin@leaseflow.com',
+      name: 'Support Staff',
+      firstName: 'Support',
+      lastName: 'Staff',
+      phoneNumber: '555-2222',
+    },
+  });
+  console.log(`Created Users: ${user1.email}, ${user2.email}, ${user3.email}`);
 
-  // 2. Create Buildings with Penalty Tiers
+
+  // 3. Create Buildings with Penalty Tiers
   console.log('Creating Buildings...');
   const building1 = await prisma.building.create({
     data: {
@@ -132,7 +168,7 @@ async function main() {
   });
   console.log(`Created Buildings: ${building1.name}, ${building2.name}, ${building3.name}`);
 
-  // 3. Create Tenants
+  // 4. Create Tenants
   console.log('Creating Tenants...');
   const tenant1 = await prisma.tenant.create({
     data: {
@@ -163,7 +199,7 @@ async function main() {
   });
   console.log(`Created Tenants: ${tenant1.name}, ${tenant2.name}, ${tenant3.name}`);
 
-  // 4. Create Spaces (linking to Buildings and some to Tenants)
+  // 5. Create Spaces (linking to Buildings and some to Tenants)
   console.log('Creating Spaces...');
   const space1_B1 = await prisma.space.create({ // Alice's space in Sunrise Tower
     data: {
@@ -263,7 +299,7 @@ async function main() {
   console.log('Created Spaces and linked occupied ones to tenants.');
 
 
-  // 5. Create Agreements
+  // 6. Create Agreements
   console.log('Creating Agreements...');
   const agreement1_startDate_obj = subDays(new Date(), 60);
   const agreement1 = await prisma.agreement.create({ // Alice's agreement
@@ -323,7 +359,7 @@ async function main() {
   });
   console.log(`Created Agreements: ${agreement1.id}, ${agreement2.id}, ${agreement3.id}`);
 
-  // 6. Create Bills (with nested UtilityBreakdownItems)
+  // 7. Create Bills (with nested UtilityBreakdownItems)
   console.log('Creating Bills...');
   // Bill for Alice (last month, paid)
   // agreement1.startDate is already a Date object from Prisma
@@ -341,12 +377,10 @@ async function main() {
       paymentMethod: 'Bank Transfer',
       paymentReference: 'BILLPAY001',
       bankOrWalletName: 'Metro Bank',
-      utilityBreakdown: {
-        create: [
+      utilityBreakdown: [ // Changed to array for JSON field
           { name: 'Electricity', amount: 50 },
           { name: 'Water', amount: 20 },
         ],
-      },
     },
   });
 
@@ -361,12 +395,10 @@ async function main() {
       rentAmount: agreement1.monthlyRentalPrice,
       totalAmount: agreement1.monthlyRentalPrice + 55 + 22, 
       status: 'Pending',
-      utilityBreakdown: {
-        create: [
+      utilityBreakdown: [ // Changed to array for JSON field
           { name: 'Electricity', amount: 55 },
           { name: 'Water', amount: 22 },
         ],
-      },
     },
   });
   
@@ -383,11 +415,9 @@ async function main() {
       rentAmount: agreement2.monthlyRentalPrice,
       totalAmount: agreement2.monthlyRentalPrice + 100, 
       status: 'Overdue', 
-      utilityBreakdown: {
-        create: [
+      utilityBreakdown: [ // Changed to array for JSON field
           { name: 'Common Area Maintenance', amount: 100 },
         ],
-      },
     },
   });
   
@@ -403,17 +433,15 @@ async function main() {
       rentAmount: agreement3.monthlyRentalPrice,
       totalAmount: agreement3.monthlyRentalPrice + 150 + 75, 
       status: 'Pending',
-      utilityBreakdown: {
-        create: [
+      utilityBreakdown: [ // Changed to array for JSON field
           { name: 'Premium Internet', amount: 150 },
           { name: 'Valet Parking', amount: 75 },
         ],
-      },
     },
   });
   console.log('Created Bills.');
 
-  // 7. Create BuildingMonthlyUtilities (with nested BuildingUtilityItems)
+  // 8. Create BuildingMonthlyUtilities (with nested BuildingUtilityItems)
   console.log('Creating BuildingMonthlyUtilities...');
   const todayDate = new Date();
   const lastMonthDate = subDays(todayDate, todayDate.getDate()); 
