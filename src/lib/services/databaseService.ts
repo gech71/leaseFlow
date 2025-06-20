@@ -8,7 +8,9 @@ import type {
   Agreement, 
   Bill, 
   BuildingMonthlyUtilities, 
-  PenaltyTier 
+  PenaltyTier,
+  User, // Added User type
+  Role // Added Role type for user role management if needed later
 } from '@prisma/client';
 
 export class DatabaseService {
@@ -237,6 +239,50 @@ export class DatabaseService {
 
   async deletePenaltyTiersByBuildingId(buildingId: string): Promise<Prisma.BatchPayload> {
     return prisma.penaltyTier.deleteMany({ where: { buildingId } });
+  }
+
+  // --- User ---
+  async createUser(data: Prisma.UserCreateInput): Promise<User> {
+    return prisma.user.create({ data });
+  }
+
+  async getUserById(userId: string, include?: Prisma.UserInclude): Promise<User | null> {
+    return prisma.user.findUnique({ where: { userId }, include });
+  }
+
+  async getAllUsers(params?: {
+    skip?: number;
+    take?: number;
+    cursor?: Prisma.UserWhereUniqueInput;
+    where?: Prisma.UserWhereInput;
+    orderBy?: Prisma.UserOrderByWithRelationInput | Prisma.UserOrderByWithRelationInput[];
+    include?: Prisma.UserInclude;
+  }): Promise<User[]> {
+    return prisma.user.findMany(params);
+  }
+
+  async updateUser(userId: string, data: Prisma.UserUpdateInput): Promise<User> {
+    return prisma.user.update({ where: { userId }, data });
+  }
+
+  async deleteUser(userId: string): Promise<User> {
+    return prisma.user.delete({ where: { userId } });
+  }
+
+  // --- Role ---
+  async getRoleByName(name: string): Promise<Role | null> {
+    return prisma.role.findUnique({ where: { name } });
+  }
+
+  async getAllRoles(params?: {
+    skip?: number;
+    take?: number;
+    cursor?: Prisma.RoleWhereUniqueInput;
+    where?: Prisma.RoleWhereInput;
+    orderBy?: Prisma.RoleOrderByWithRelationInput | Prisma.RoleOrderByWithRelationInput[];
+    include?: Prisma.RoleInclude;
+  }): Promise<Role[]> {
+    return prisma.role.findMany(params);
   }
 }
 
