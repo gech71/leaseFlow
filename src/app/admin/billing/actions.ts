@@ -3,14 +3,14 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type Agreement, type Bill, type Space, type Building, type BuildingMonthlyUtilities, type UtilityBreakdownItem as PrismaUtilityBreakdownItem } from '@prisma/client';
+import { Prisma, type Agreement, type Bill, type Space, type Building, type BuildingMonthlyUtilities, type UtilityBreakdownItem as PrismaUtilityBreakdownItem, type PenaltyTier } from '@prisma/client';
 import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, isSameDay, setMonth, setYear, parseISO, format } from 'date-fns';
 
 export interface BillingPageData {
-  agreements: (Agreement & { tenant: Prisma.TenantGetPayload<{}>; space: Prisma.SpaceGetPayload<{}> })[];
-  spaces: Space[];
+  agreements: (Agreement & { tenant: Prisma.TenantGetPayload<{}>; space: Prisma.SpaceGetPayload<{ include: { building: Prisma.BuildingGetPayload<{ include: { penaltyPolicyTiers: true } }> } }> })[];
+  spaces: (Space & { building: Prisma.BuildingGetPayload<{ include: { penaltyPolicyTiers: true } }> })[];
   buildings: (Building & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[] })[];
-  bills: (Bill & { agreement: Agreement & { tenant: Prisma.TenantGetPayload<{}>; space: Space } })[]; // UtilityBreakdown might not be available here
+  bills: (Bill & { agreement: Agreement & { tenant: Prisma.TenantGetPayload<{}>; space: Space & { building: Building & { penaltyPolicyTiers: PenaltyTier[] } } } })[]; 
   buildingMonthlyUtilities: (BuildingMonthlyUtilities & { utilities: Prisma.BuildingUtilityItemGetPayload<{}>[] })[];
 }
 
@@ -18,18 +18,39 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
   const today = new Date();
   const currentMonth = getMonth(today);
   const currentYear = getYear(today);
-  // Fetch utilities for current and previous month as bills might span these
   const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
   const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
-  const [agreements, spaces, buildings, billsData, buildingMonthlyUtilities] = await Promise.all([
-    databaseService.getAllAgreements({ include: { tenant: true, space: true }, orderBy: { tenant: { name: 'asc' } } }),
-    databaseService.getAllSpaces({ include: { building: true } }), // building needed for penalty policy context
-    databaseService.getAllBuildings({ include: { penaltyPolicyTiers: true } }),
-    databaseService.getAllBills({ // utilityBreakdown: true was removed due to Prisma error. This needs a schema/generation fix.
+  const [agreementsData, spacesData, buildingsData, billsDataRaw, buildingMonthlyUtilitiesData] = await Promise.all([
+    databaseService.getAllAgreements({
       include: {
-        agreement: { include: { tenant: true, space: true } },
-        // utilityBreakdown: true, // Prisma Client doesn't recognize this as a valid relation.
+        tenant: true,
+        space: {
+          include: {
+            building: { include: { penaltyPolicyTiers: true } }
+          }
+        }
+      },
+      orderBy: { tenant: { name: 'asc' } }
+    }),
+    databaseService.getAllSpaces({
+      include: {
+        building: { include: { penaltyPolicyTiers: true } }
+      }
+    }),
+    databaseService.getAllBuildings({ include: { penaltyPolicyTiers: true } }),
+    databaseService.getAllBills({ 
+      include: {
+        agreement: {
+          include: {
+            tenant: true,
+            space: {
+              include: {
+                building: { include: { penaltyPolicyTiers: true } }
+              }
+            }
+          }
+        }
       },
       orderBy: { billDate: 'desc' }
     }),
@@ -44,19 +65,22 @@ export async function getBillingPageDataAction(): Promise<BillingPageData> {
     })
   ]);
 
-  // Manually add an empty utilityBreakdown array to bills if it's expected by downstream components.
-  // This is a temporary measure due to the Prisma issue.
-  const bills = billsData.map(bill => ({
+  // Ensure type assertions are safe or data structure matches BillingPageData
+  const agreements = agreementsData as BillingPageData['agreements'];
+  const spaces = spacesData as BillingPageData['spaces'];
+  const buildings = buildingsData as BillingPageData['buildings'];
+  const bills = billsDataRaw.map(bill => ({
     ...bill,
-    utilityBreakdown: (bill as any).utilityBreakdown || [] // Provide a fallback
-  }));
+    utilityBreakdown: (bill as any).utilityBreakdown || [] 
+  })) as BillingPageData['bills'];
+  const buildingMonthlyUtilities = buildingMonthlyUtilitiesData as BillingPageData['buildingMonthlyUtilities'];
 
 
   return { agreements, spaces, buildings, bills, buildingMonthlyUtilities };
 }
 
 function calculateIndividualPenalty(
-  billAmount: number, // typically rentAmount
+  billAmount: number, 
   daysOverdue: number,
   building: Building & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[] },
   space: Space
@@ -205,13 +229,13 @@ export async function recordPaymentOrVerificationAction(
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
   try {
-    const bill = await databaseService.getBillById(billId, {
-      agreement: {
-        include: {
-          space: {
-            include: {
-              building: {
-                include: {
+    const bill = await databaseService.getBillById(billId, { // This is Prisma.BillInclude
+      agreement: {                                       // Relation on Bill
+        include: {                                       // Prisma.AgreementInclude
+          space: {                                       // Relation on Agreement
+            include: {                                   // Prisma.SpaceInclude
+              building: {                                // Relation on Space
+                include: {                               // Prisma.BuildingInclude
                   penaltyPolicyTiers: true
                 }
               }
@@ -219,7 +243,7 @@ export async function recordPaymentOrVerificationAction(
           }
         }
       },
-      utilityBreakdown: true, // Assuming this relation is correctly defined and client generated
+      utilityBreakdown: true, 
     });
     if (!bill) throw new Error("Bill not found.");
     if (!bill.agreement?.space?.building) throw new Error("Building details for bill not found for penalty check.");
@@ -229,12 +253,11 @@ export async function recordPaymentOrVerificationAction(
     let finalPaymentDate = paymentData.paymentDate ? parseISO(paymentData.paymentDate) : new Date();
 
     let currentPenalty = bill.penaltyAmount || 0;
-    // Recalculate penalty if payment is made after due date, or if confirming a payment that was overdue
     if ( (isBefore(parseISO(bill.dueDate.toISOString()), finalPaymentDate) || bill.status === 'Overdue') && actionType !== 'rejectVerification') {
         const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString()));
         if (daysOverdue > 0) {
              currentPenalty = calculateIndividualPenalty(bill.rentAmount, daysOverdue, bill.agreement.space.building, bill.agreement.space);
-        } else { // Paid on or before due date
+        } else { 
             currentPenalty = 0;
         }
     }
@@ -260,16 +283,13 @@ export async function recordPaymentOrVerificationAction(
         billUpdateData.paymentProofUrl = paymentData.adminProofUrl;
       }
     } else if (actionType === 'rejectVerification') {
-      // If rejecting, status should revert to Overdue if due date passed, otherwise Pending
       newStatus = isBefore(parseISO(bill.dueDate.toISOString()), today) ? 'Overdue' : 'Pending';
       billUpdateData.adminVerifiedPayment = false;
-      billUpdateData.paymentDate = null; // Clear payment details on rejection
+      billUpdateData.paymentDate = null; 
       billUpdateData.paymentMethod = null;
       billUpdateData.paymentReference = null;
       billUpdateData.bankOrWalletName = null;
-      // If status becomes 'Pending' (not overdue), clear any penalty
       if (newStatus === 'Pending') billUpdateData.penaltyAmount = null;
-       // Recalculate total amount based on new status (potentially without penalty if now just 'Pending')
       const rejectedBaseAmount = bill.rentAmount + (bill.utilityBreakdown?.reduce((sum, util) => sum + util.amount, 0) || 0);
       let rejectedPenalty = 0;
       if (newStatus === 'Overdue') {
@@ -278,10 +298,10 @@ export async function recordPaymentOrVerificationAction(
             rejectedPenalty = calculateIndividualPenalty(bill.rentAmount, daysOverdueNow, bill.agreement.space.building, bill.agreement.space);
             billUpdateData.penaltyAmount = rejectedPenalty > 0 ? rejectedPenalty : null;
           } else {
-             billUpdateData.penaltyAmount = null; // Not overdue, no penalty
+             billUpdateData.penaltyAmount = null; 
           }
       } else {
-          billUpdateData.penaltyAmount = null; // Not overdue, no penalty
+          billUpdateData.penaltyAmount = null; 
       }
       billUpdateData.totalAmount = parseFloat((rejectedBaseAmount + rejectedPenalty).toFixed(2));
 
