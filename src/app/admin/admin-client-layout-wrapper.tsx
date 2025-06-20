@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
 import React, { useState, useEffect } from 'react';
 import {
   SidebarProvider,
@@ -12,7 +12,7 @@ import {
   SidebarFooter,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton, // This component now renders a <button>
+  SidebarMenuButton,
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
@@ -31,6 +31,7 @@ import {
   ClipboardList,
   Building,
   ExternalLink,
+  Loader2, // Added Loader2 for logout
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -48,6 +49,7 @@ import {
   TooltipProvider
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast'; // Added useToast
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -61,17 +63,65 @@ const navItems = [
   { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink },
 ];
 
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
+
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
   const { isMobile, state: sidebarState } = useSidebar();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+    if (AUTH_API_BASE_URL && accessToken && refreshToken) {
+      try {
+        await fetch(`${AUTH_API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: accessToken, refreshToken }),
+        });
+        // We don't strictly need to check the response for logout
+        // Client-side cleanup will happen regardless
+      } catch (error) {
+        console.error("Logout API call error:", error);
+        // Optionally, inform the user the server-side logout might have failed,
+        // but still proceed with client-side cleanup.
+        toast({
+            title: "Logout Notice",
+            description: "Could not reach logout service. Cleared local session.",
+            variant: "default"
+        });
+      }
+    }
+
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    
+    toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+    });
+    router.push('/auth/login');
+    setIsLoggingOut(false);
+  };
+
 
   return (
     <>
       <Sidebar collapsible="icon" side="left" variant="sidebar">
         <SidebarHeader className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
-            <AppLogo /> {/* AppLogo contains Home icon and "LeaseFlow" text. It's not explicitly hidden here. */}
-            <div className="md:hidden"> {/* Mobile-only trigger for opening the sheet */}
+            <AppLogo />
+            <div className="md:hidden">
               <SidebarTrigger />
             </div>
           </div>
@@ -108,13 +158,11 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 ),
               };
 
-
               if (!isMobile && sidebarState === "collapsed") {
                 return (
                   <SidebarMenuItem key={item.href}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        {/* Link does not use asChild. SidebarMenuButton is a button inside the Link's anchor. */}
                         <Link {...commonLinkProps}>
                            <SidebarMenuButton {...sidebarMenuButtonProps}>
                             {sidebarButtonContent}
@@ -130,7 +178,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               }
               return (
                 <SidebarMenuItem key={item.href}>
-                   {/* Link does not use asChild. SidebarMenuButton is a button inside the Link's anchor. */}
                   <Link {...commonLinkProps}>
                      <SidebarMenuButton {...sidebarMenuButtonProps}>
                        {sidebarButtonContent}
@@ -167,9 +214,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+              <DropdownMenuItem onSelect={handleLogout} disabled={isLoggingOut}>
+                {isLoggingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+                <span>{isLoggingOut ? 'Logging out...' : 'Log out'}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -177,7 +224,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
         <div className="p-4 sm:p-6 lg:p-8">
-          {/* Sidebar trigger in main content area, now always flex on md screens and up */}
           <div className="md:flex items-center justify-start mb-6 h-[3.7rem]">
             <SidebarTrigger />
           </div>
@@ -196,13 +242,11 @@ export default function AdminClientLayoutWrapper({ children }: { children: React
   }, []);
 
   if (!isMounted) {
-    // Ensures client-side logic dependent on window/document is safe
-    // and avoids flash of unstyled content or hydration errors related to mismatched initial render.
     return null; 
   }
 
   return (
-    <SidebarProvider defaultOpen> {/* Consider if defaultOpen should be based on cookie */}
+    <SidebarProvider defaultOpen>
       <TooltipProvider>
         <ActualAdminLayout>{children}</ActualAdminLayout>
       </TooltipProvider>

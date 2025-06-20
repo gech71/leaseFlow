@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building, LogIn, Phone } from 'lucide-react';
+import { Building, LogIn, Phone, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { AppLogo } from '@/components/custom/AppLogo'; // Using the AppLogo
+import { AppLogo } from '@/components/custom/AppLogo';
+
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -22,33 +26,54 @@ export default function AdminLoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call & authentication
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock credentials - In a real app, this would be a call to your auth backend
-    // Example: Check against seeded admin user
-    if (phoneNumber === "555-0001" && password === "superadminpass") { // Mock credentials for super admin
+
+    if (!AUTH_API_BASE_URL) {
       toast({
-        title: "Login Successful",
-        description: "Welcome, Admin!",
-      });
-      router.push('/admin/dashboard');
-    } else if (phoneNumber === "555-1111" && password === "managerpass") { // Mock credentials for property manager
-       toast({
-        title: "Login Successful",
-        description: "Welcome, Property Manager!",
-      });
-      router.push('/admin/dashboard');
-    }
-    else {
-      toast({
-        title: "Login Failed",
-        description: "Invalid phone number or password. Please try again.",
+        title: "Configuration Error",
+        description: "Authentication service URL is not configured.",
         variant: "destructive",
       });
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    try {
+      const response = await fetch(`${AUTH_API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.isSuccess && data.accessToken && data.refreshToken) {
+        localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+        toast({
+          title: "Login Successful",
+          description: "Welcome!",
+        });
+        router.push('/admin/dashboard');
+      } else {
+        const errorMessages = data.errors?.join(', ') || "Invalid phone number or password. Please try again.";
+        toast({
+          title: "Login Failed",
+          description: errorMessages,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Login API call error:", error);
+      toast({
+        title: "Login Error",
+        description: "Could not connect to the authentication service. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -56,7 +81,6 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
         <CardHeader className="text-center space-y-3 pt-8">
           <div className="mx-auto">
-            {/* Using AppLogo without sidebar-specific colors for a more neutral look */}
             <Link href="/" className="flex items-center gap-2 text-foreground hover:text-primary transition-colors">
               <Building className="h-10 w-10 text-primary" />
               <h1 className="text-3xl font-headline font-bold">LeaseFlow</h1>
@@ -74,11 +98,12 @@ export default function AdminLoginPage() {
               <Input 
                 id="phoneNumber" 
                 type="tel" 
-                placeholder="e.g., 555-123-4567" 
+                placeholder="e.g., 0912345678" 
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 required 
                 className="text-base"
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -91,11 +116,12 @@ export default function AdminLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required 
                 className="text-base"
+                disabled={isLoading}
               />
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base" disabled={isLoading}>
               {isLoading ? (
-                <LogIn className="mr-2 h-5 w-5 animate-spin" />
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : (
                 <LogIn className="mr-2 h-5 w-5" />
               )}
