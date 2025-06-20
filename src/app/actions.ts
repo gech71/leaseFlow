@@ -21,7 +21,24 @@ export async function generateAgreementAction(input: AgreementInput): Promise<Ag
     let detailedErrorString = "Could not stringify error object.";
     try {
       // Using Object.getOwnPropertyNames can reveal non-enumerable properties if 'e' is an object
-      detailedErrorString = JSON.stringify(e, Object.getOwnPropertyNames(e), 2);
+      // Also check if e itself might be a string already (e.g. from some Genkit errors)
+      if (typeof e === 'string') {
+        detailedErrorString = e;
+      } else if (e && typeof e === 'object') {
+        // Attempt to stringify, including potential non-enumerable properties or specific GenkitError fields
+        const errorToSerialize: any = {};
+        if (e.message) errorToSerialize.message = e.message;
+        if (e.status) errorToSerialize.status = e.status; // Common in GenkitError
+        if (e.code) errorToSerialize.code = e.code; // Common in GenkitError / gRPC errors
+        if (e.details) errorToSerialize.details = e.details; // GenkitError detail
+        if (e.source) errorToSerialize.source = e.source; // GenkitError source
+        if (e.traceId) errorToSerialize.traceId = e.traceId; // GenkitError traceId
+        if (Object.keys(errorToSerialize).length > 0) {
+            detailedErrorString = JSON.stringify(errorToSerialize, null, 2);
+        } else {
+            detailedErrorString = JSON.stringify(e, Object.getOwnPropertyNames(e), 2);
+        }
+      }
     } catch (stringifyError) {
       // Fallback if stringification itself fails
       detailedErrorString = `Could not stringify error object (keys: ${Object.keys(e || {}).join(', ')}). Error during stringification: ${stringifyError}`;
@@ -36,6 +53,11 @@ export async function generateAgreementAction(input: AgreementInput): Promise<Ag
       if (e.status) { // GenkitError often includes a status
         errorMessage += ` (Status: ${e.status})`;
       }
+       if (e.code && e.status) { // Add code if status also present
+        errorMessage += ` (Code: ${e.code})`;
+      } else if (e.code) {
+        errorMessage += ` (Code: ${e.code})`;
+      }
     } else if (typeof e === 'string' && e.trim() !== '') {
       errorMessage = e;
     } else if (e && e.error && typeof e.error === 'string' && e.error.trim() !== '') { 
@@ -46,10 +68,10 @@ export async function generateAgreementAction(input: AgreementInput): Promise<Ag
       errorMessage = e.toString();
     } else if (typeof e === 'object' && e !== null) {
       const keys = Object.keys(e);
-      if (keys.length > 0) {
+      if (keys.length > 0 && detailedErrorString !== "Could not stringify error object.") {
+         errorMessage = `An error occurred: ${detailedErrorString.substring(0, 200)}${detailedErrorString.length > 200 ? '...' : ''}. Check server logs.`;
+      } else if (keys.length > 0) {
         errorMessage = `An error object was caught. Keys: ${keys.join(', ')}. Please check server logs for details.`;
-      } else if (detailedErrorString.length > 50 && detailedErrorString !== "Could not stringify error object.") { 
-         errorMessage = `An error occurred: ${detailedErrorString.substring(0, 150)}${detailedErrorString.length > 150 ? '...' : ''}. Check server logs.`;
       } else {
         errorMessage = 'An unexpected error without a specific message occurred in the AI flow. Check server logs.';
       }
@@ -60,4 +82,3 @@ export async function generateAgreementAction(input: AgreementInput): Promise<Ag
 }
 
 // analyzeBillAction removed
-
