@@ -10,70 +10,60 @@ async function main() {
   // 1. Clear existing data
   console.log('Clearing existing data...');
   try {
-    await prisma.user.deleteMany({}); // Clear Users
+    // Order of deletion matters due to foreign key constraints
+
+    // Start with models that don't have direct dependencies on others,
+    // or whose deletion will cascade appropriately.
+
+    // User is new, ensure it's cleared
+    await prisma.user.deleteMany({});
     console.log('Deleted Users');
 
-    // Bill is child of Agreement. UtilityBreakdownItem is child of Bill.
-    // Prisma's onDelete: Cascade on UtilityBreakdownItem.billId and Bill.agreementId should handle this.
+    // Bill depends on Agreement
     await prisma.bill.deleteMany({});
-    console.log('Deleted Bills (and cascaded to UtilityBreakdownItems if schema is set up for it)');
+    console.log('Deleted Bills');
 
-    // Agreement is child of Tenant and Space.
+    // Agreement depends on Tenant and Space
     await prisma.agreement.deleteMany({});
     console.log('Deleted Agreements');
-
-    // BuildingUtilityItem is child of BuildingMonthlyUtilities.
-    // Prisma's onDelete: Cascade on BuildingUtilityItem.monthlyUtilitiesId should handle this.
+    
+    // BuildingUtilityItem depends on BuildingMonthlyUtilities
     await prisma.buildingUtilityItem.deleteMany({});
     console.log('Deleted BuildingUtilityItems');
 
-    // BuildingMonthlyUtilities is child of Building.
+    // BuildingMonthlyUtilities depends on Building
     await prisma.buildingMonthlyUtilities.deleteMany({});
     console.log('Deleted BuildingMonthlyUtilities');
 
-    // PenaltyTier is child of Building.
-    // Prisma's onDelete: Cascade on PenaltyTier.buildingId should handle this.
+    // PenaltyTier depends on Building
     await prisma.penaltyTier.deleteMany({});
     console.log('Deleted PenaltyTiers');
 
-    // Break links between Tenant and Space before deleting them
+    // Before deleting Tenants and Spaces, ensure their links are cleared if not handled by onDelete: SetNull
+    // For Tenant.rentedSpaceId -> Space.id (SetNull on Space deletion)
+    // For Space.tenantId -> Tenant.id (SetNull on Tenant deletion)
+    // However, to be safe and explicit, especially if onDelete behavior changes:
+
     const tenantsToClearLink = await prisma.tenant.findMany({
-      where: {
-        rentedSpace: {
-          isNot: null,
-        },
-      },
+      where: { rentedSpaceId: { not: null } },
       select: { id: true }
     });
     for (const tenant of tenantsToClearLink) {
       await prisma.tenant.update({
         where: { id: tenant.id },
-        data: {
-          rentedSpace: {
-            disconnect: true,
-          },
-        },
+        data: { rentedSpace: { disconnect: true } }
       });
     }
     console.log('Cleared rentedSpace link from Tenants');
 
     const spacesToClearLink = await prisma.space.findMany({
-      where: {
-        tenant: {
-          isNot: null,
-        },
-      },
-      select: {id: true}
+      where: { tenantId: { not: null } },
+      select: { id: true }
     });
     for (const space of spacesToClearLink) {
       await prisma.space.update({
         where: { id: space.id },
-        data: {
-          tenant: {
-            disconnect: true,
-          },
-          isOccupied: false, // Also update isOccupied status
-        },
+        data: { tenant: { disconnect: true }, isOccupied: false }
       });
     }
     console.log('Cleared tenant link from Spaces and set isOccupied to false');
@@ -84,21 +74,21 @@ async function main() {
     await prisma.space.deleteMany({});
     console.log('Deleted Spaces');
 
-    // Finally, delete Buildings (which should cascade to PenaltyTiers if schema is set)
-    await prisma.building.deleteMany({});
+    // Finally, delete Buildings (which should cascade to PenaltyTiers if schema is set correctly)
+    await prisma.building.deleteMany({}); // This will also delete related PenaltyTiers due to onDelete: Cascade
     console.log('Deleted Buildings');
 
     console.log('Finished clearing data.');
   } catch (e: any) {
     console.error('Error during data clearing:', e);
-    throw e; // Re-throw to stop seeding if clearing fails
+    throw e;
   }
 
   // 2. Create Users
   console.log('Creating Users...');
   const user1 = await prisma.user.create({
     data: {
-      userId: 'auth0|user123', // Example external ID
+      userId: 'auth0|user123',
       email: 'admin.user@leaseflow.com',
       name: 'Admin User',
       firstName: 'Admin',
@@ -108,18 +98,18 @@ async function main() {
   });
   const user2 = await prisma.user.create({
     data: {
-      userId: 'google|user456', // Example external ID
-      email: 'tenant.user@example.com',
-      name: 'Tenant Portal User',
-      firstName: 'Tenant',
-      lastName: 'PortalUser',
+      userId: 'google|user456',
+      email: 'manager.user@leaseflow.com',
+      name: 'Property Manager',
+      firstName: 'Manager',
+      lastName: 'User',
       phoneNumber: '555-1111',
     },
   });
    const user3 = await prisma.user.create({
     data: {
-      userId: 'firebase|user789', // Example external ID
-      email: 'another.admin@leaseflow.com',
+      userId: 'firebase|user789',
+      email: 'staff.user@leaseflow.com',
       name: 'Support Staff',
       firstName: 'Support',
       lastName: 'Staff',
@@ -129,12 +119,13 @@ async function main() {
   console.log(`Created Users: ${user1.email}, ${user2.email}, ${user3.email}`);
 
 
-  // 3. Create Buildings with Penalty Tiers
+  // 3. Create Buildings with Penalty Tiers and assign managers
   console.log('Creating Buildings...');
   const building1 = await prisma.building.create({
     data: {
       name: 'Sunrise Tower',
       address: '123 Sunrise Ave, Metro City',
+      managedByUserId: user1.userId, // Admin User manages Sunrise Tower
       penaltyPolicyTiers: {
         create: [
           { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 50, scope: 'Building' },
@@ -149,6 +140,7 @@ async function main() {
     data: {
       name: 'Ocean View Plaza',
       address: '456 Ocean Dr, Pacifica',
+      managedByUserId: user2.userId, // Property Manager manages Ocean View Plaza
       penaltyPolicyTiers: {
         create: [
           { fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 1, scope: 'Building' },
@@ -160,7 +152,7 @@ async function main() {
     },
   });
   
-  const building3 = await prisma.building.create({
+  const building3 = await prisma.building.create({ // No specific manager initially
     data: {
         name: 'Tech Park One',
         address: '789 Innovation Rd, Silicon Valley',
@@ -363,7 +355,6 @@ async function main() {
   // 7. Create Bills (with nested UtilityBreakdownItems)
   console.log('Creating Bills...');
   // Bill for Alice (last month, paid)
-  // agreement1.startDate is already a Date object from Prisma
   const bill1_billDate = addMonths(agreement1.startDate, 1); 
   await prisma.bill.create({
     data: {
@@ -378,7 +369,7 @@ async function main() {
       paymentMethod: 'Bank Transfer',
       paymentReference: 'BILLPAY001',
       bankOrWalletName: 'Metro Bank',
-      utilityBreakdown: [ 
+      utilityBreakdown: [ // Corrected: This should be an array of objects
           { name: 'Electricity', amount: 50 },
           { name: 'Water', amount: 20 },
         ],
@@ -396,7 +387,7 @@ async function main() {
       rentAmount: agreement1.monthlyRentalPrice,
       totalAmount: agreement1.monthlyRentalPrice + 55 + 22, 
       status: 'Pending',
-      utilityBreakdown: [ 
+      utilityBreakdown: [
           { name: 'Electricity', amount: 55 },
           { name: 'Water', amount: 22 },
         ],
@@ -404,7 +395,6 @@ async function main() {
   });
   
   // Bill for Bob (current month, overdue)
-  // agreement2.startDate is already a Date object
   const bill3_billDate = addMonths(agreement2.startDate, 1); 
   const bobBillDueDate = addMonths(bill3_billDate, 0, {days: 5}); 
   await prisma.bill.create({
@@ -423,7 +413,6 @@ async function main() {
   });
   
   // Bill for Carol (next month, pending, as initial payment covers first 3 months)
-  // agreement3.startDate is already a Date object
   const bill4_billDate = addMonths(agreement3.startDate, 3); 
   await prisma.bill.create({
     data: {
@@ -493,4 +482,3 @@ main()
     await prisma.$disconnect();
     console.log('Prisma client disconnected.');
   });
-
