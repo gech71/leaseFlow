@@ -98,7 +98,7 @@ async function main() {
   console.log('Creating Users...');
   const user1 = await prisma.user.create({
     data: {
-      userId: 'auth0|user123',
+      userId: 'auth0|user123', // Example external ID
       email: 'admin.user@leaseflow.com',
       name: 'Admin User',
       firstName: 'Admin',
@@ -108,6 +108,7 @@ async function main() {
   });
   const user2 = await prisma.user.create({
     data: {
+      userId: 'google|user456', // Example external ID
       email: 'tenant.user@example.com',
       name: 'Tenant Portal User',
       firstName: 'Tenant',
@@ -117,7 +118,7 @@ async function main() {
   });
    const user3 = await prisma.user.create({
     data: {
-      userId: 'firebase|user789',
+      userId: 'firebase|user789', // Example external ID
       email: 'another.admin@leaseflow.com',
       name: 'Support Staff',
       firstName: 'Support',
@@ -377,7 +378,7 @@ async function main() {
       paymentMethod: 'Bank Transfer',
       paymentReference: 'BILLPAY001',
       bankOrWalletName: 'Metro Bank',
-      utilityBreakdown: [ // Changed to array for JSON field
+      utilityBreakdown: [ 
           { name: 'Electricity', amount: 50 },
           { name: 'Water', amount: 20 },
         ],
@@ -395,7 +396,7 @@ async function main() {
       rentAmount: agreement1.monthlyRentalPrice,
       totalAmount: agreement1.monthlyRentalPrice + 55 + 22, 
       status: 'Pending',
-      utilityBreakdown: [ // Changed to array for JSON field
+      utilityBreakdown: [ 
           { name: 'Electricity', amount: 55 },
           { name: 'Water', amount: 22 },
         ],
@@ -415,7 +416,7 @@ async function main() {
       rentAmount: agreement2.monthlyRentalPrice,
       totalAmount: agreement2.monthlyRentalPrice + 100, 
       status: 'Overdue', 
-      utilityBreakdown: [ // Changed to array for JSON field
+      utilityBreakdown: [ 
           { name: 'Common Area Maintenance', amount: 100 },
         ],
     },
@@ -433,7 +434,7 @@ async function main() {
       rentAmount: agreement3.monthlyRentalPrice,
       totalAmount: agreement3.monthlyRentalPrice + 150 + 75, 
       status: 'Pending',
-      utilityBreakdown: [ // Changed to array for JSON field
+      utilityBreakdown: [ 
           { name: 'Premium Internet', amount: 150 },
           { name: 'Valet Parking', amount: 75 },
         ],
