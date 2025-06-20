@@ -5,7 +5,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Prisma } from '@prisma/client';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token'; // For the admin making the request
+const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 // DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
@@ -36,11 +36,11 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. Verify requester is SUPER_ADMIN
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Await cookies() as per user instruction
   const adminAccessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
 
   if (!adminAccessToken) {
-    return NextResponse.json({ isSuccess: false, errors: ["Authentication required."] }, { status: 401 });
+    return NextResponse.json({ isSuccess: false, errors: ["Authentication required. Please log in as an administrator."] }, { status: 401 });
   }
 
   const adminPayload = decodeJwtPayload(adminAccessToken);
@@ -66,9 +66,12 @@ export async function POST(request: NextRequest) {
   // 3. Call external identity server to register the user
   let externalRegisterResponse: Response;
   try {
-    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/register`, {
+    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/register`, { // Ensure /api/ is included
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminAccessToken}` // Send admin's token for authorization
+      },
       body: JSON.stringify({ firstName, lastName, phoneNumber, email, password }),
     });
   } catch (networkError: any) {
@@ -91,9 +94,11 @@ export async function POST(request: NextRequest) {
       if (!externalRegisterResponse.ok) {
         return NextResponse.json({ isSuccess: false, errors: [`Registration service responded with status: ${externalRegisterResponse.status} and an invalid JSON: ${externalResponseText.substring(0,100)}...`] }, { status: externalRegisterResponse.status });
       }
-      return NextResponse.json({ isSuccess: false, errors: ["Received an invalid JSON response from registration service."] }, { status: 500 });
+      // If response was OK but JSON is malformed (unlikely for successful registration)
+      return NextResponse.json({ isSuccess: false, errors: ["Received an invalid JSON response from registration service despite OK status."] }, { status: 500 });
     }
   } else if (!externalRegisterResponse.ok) {
+      // If response text is empty and not OK
       return NextResponse.json({ isSuccess: false, errors: [`Registration service responded with status: ${externalRegisterResponse.status} and an empty response.`] }, { status: externalRegisterResponse.status });
   }
 
@@ -101,7 +106,8 @@ export async function POST(request: NextRequest) {
   if (!externalRegisterResponse.ok || !externalResponseData?.isSuccess) {
     const errorMessages = externalResponseData?.errors && Array.isArray(externalResponseData.errors) && externalResponseData.errors.length > 0
       ? externalResponseData.errors
-      : ["User registration failed on the identity server."];
+      : externalResponseData?.message ? [externalResponseData.message] // Handle single message error
+      : [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status || 400 });
   }
 
@@ -117,23 +123,16 @@ export async function POST(request: NextRequest) {
   }
 
   const newUserId = newUserPayload.sub;
-  const newUserEmail = newUserPayload.email || email; // Fallback to input email if not in token
+  const newUserEmail = newUserPayload.email || email; 
   const newUserFirstName = newUserPayload.firstName || firstName;
   const newUserLastName = newUserPayload.lastName || lastName;
-  // The claim name for phone number is "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
   // 5. Store new user in local Prisma database
   try {
-    // Fetch the default role (e.g., "SUPPORT_STAFF")
-    // For simplicity, let's assume "SUPPORT_STAFF" role is seeded and its name is known.
-    // In a real app, you might fetch by a known ID or provide a selection UI.
     const defaultRole = await databaseService.getAllRoles({ where: { name: "SUPPORT_STAFF" } });
     if (!defaultRole || defaultRole.length === 0) {
-        // Fallback to a generic role if SUPPORT_STAFF is not found or create a basic one
-        // This part needs robust handling in a production app.
-        console.warn("SUPPORT_STAFF role not found for new user. Assigning no role or consider creating one.");
-         // Create a user without a role or with a dynamically created basic role
+        console.warn("SUPPORT_STAFF role not found for new user. The user will be created without a role.");
     }
     
     const userCreateInput: Prisma.UserCreateInput = {
@@ -148,17 +147,14 @@ export async function POST(request: NextRequest) {
 
     const localUser = await databaseService.createUser(userCreateInput);
     
-    // Note: The new user's tokens from identity server are NOT set as cookies here.
-    // The new user would have to log in themselves.
     return NextResponse.json({ isSuccess: true, message: "User registered successfully and created locally.", userId: localUser.userId });
 
   } catch (dbError: any) {
     console.error("Error creating user in local database:", dbError);
-    // Potentially try to "rollback" or notify about inconsistency if external registration succeeded but local failed.
-    // For now, return a specific error.
     if (dbError instanceof Prisma.PrismaClientKnownRequestError && dbError.code === 'P2002') {
          return NextResponse.json({ isSuccess: false, errors: [`User registered on identity server, but failed to create local record: A user with this User ID or Email already exists locally. (User ID: ${newUserId})`] }, { status: 409 });
     }
     return NextResponse.json({ isSuccess: false, errors: ["User registered on identity server, but failed to create local record.", dbError.message] }, { status: 500 });
   }
 }
+    
