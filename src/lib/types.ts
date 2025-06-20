@@ -241,8 +241,8 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceId: 'building_utility',
     resourceLabel: 'Building Utilities',
     permissions: [
-      { id: 'building_utility:view', label: 'View' },
-      { id: 'building_utility:manage', label: 'Manage (CUD)' },
+      { id: 'building_utility:view', label: 'View Page' },
+      { id: 'building_utility:save', label: 'Save Costs' },
     ],
   },
   {

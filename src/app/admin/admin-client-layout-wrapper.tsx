@@ -68,7 +68,7 @@ const allNavItems: NavItem[] = [
   { href: '/admin/spaces', label: 'Spaces', icon: Building2, requiredPermissions: ['space:view', 'space:create', 'space:edit', 'space:delete'] },
   { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:view', 'tenant:create', 'tenant:edit', 'tenant:delete'] },
   { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:view', 'agreement:create', 'agreement:edit', 'agreement:delete'] },
-  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: ['building_utility:view', 'building_utility:manage'] },
+  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: ['building_utility:view', 'building_utility:save'] },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign, requiredPermissions: ['billing:view', 'billing:generate', 'billing:manage_payments', 'billing:delete'] },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['payment_overview:view'] },
   { 
@@ -132,10 +132,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
     if (permissionsLoading || !currentUser) return [];
     
     return allNavItems.filter(item => {
-      // Always show portal link for now, could be permission-based
-      // if (item.isPortal) return true; 
       if (isSuperAdmin) return true; 
-      if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true; // Items without required perms are public within admin area
+      if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true;
       
       return hasAnyPermission(item.requiredPermissions); 
     });

@@ -50,8 +50,8 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const [isSaving, setIsSaving] = useState(false);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
-  const canManageUtilities = isSuperAdmin || hasPermission('building_utility:manage');
-  const canViewUtilities = isSuperAdmin || hasPermission('building_utility:view') || canManageUtilities;
+  const canSaveUtilities = isSuperAdmin || hasPermission('building_utility:save');
+  const canViewUtilities = isSuperAdmin || hasPermission('building_utility:view') || canSaveUtilities;
 
   useEffect(() => {
     setIsMounted(true);
@@ -102,17 +102,17 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
 
 
   const handleAddUtilityItem = () => {
-    if (!canManageUtilities) return;
+    if (!canSaveUtilities) return;
     setCurrentUtilityItems([...currentUtilityItems, { uiId: `newItem-${Date.now()}`, name: '', totalCost: 0, appliesToScope: 'Building', applicableFloor: '', applicableSpaceIdNamesStr: '', applicableSpaceIdNames: [] }]);
   };
 
   const handleRemoveUtilityItem = (uiIdToRemove: string) => {
-    if (!canManageUtilities) return;
+    if (!canSaveUtilities) return;
     setCurrentUtilityItems(currentUtilityItems.filter(item => item.uiId !== uiIdToRemove));
   };
 
   const handleUtilityItemChange = (uiIdToChange: string, field: keyof UIUtilityItem, value: string | number | string[]) => {
-    if (!canManageUtilities) return;
+    if (!canSaveUtilities) return;
     setCurrentUtilityItems(prevItems => prevItems.map(item => {
       if (item.uiId !== uiIdToChange) return item;
       
@@ -134,7 +134,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   };
 
   const handleSaveUtilities = async () => {
-    if (!canManageUtilities) {
+    if (!canSaveUtilities) {
       toast({ title: "Permission Denied", description: "You do not have permission to save utilities.", variant: "destructive" });
       return;
     }
@@ -230,21 +230,21 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div>
               <Label htmlFor="buildingName" className="flex items-center mb-1"><BuildingIconLucide className="mr-2 h-4 w-4 text-primary" />Building</Label>
-              <Select value={selectedBuildingId} onValueChange={setSelectedBuildingId} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canManageUtilities}>
+              <Select value={selectedBuildingId} onValueChange={setSelectedBuildingId} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
                 <SelectTrigger id="buildingName"><SelectValue placeholder="Select a building" /></SelectTrigger>
                 <SelectContent>{registeredBuildings.map(building => (<SelectItem key={building.id} value={building.id}>{building.name}</SelectItem>))}</SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="year" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Year</Label>
-              <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canManageUtilities}>
+              <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
                 <SelectTrigger id="year"><SelectValue /></SelectTrigger>
                 <SelectContent>{years.map(year => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="month" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Month</Label>
-              <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canManageUtilities}>
+              <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
                 <SelectTrigger id="month"><SelectValue /></SelectTrigger>
                 <SelectContent>{months.map(month => (<SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>))}</SelectContent>
               </Select>
@@ -257,7 +257,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 <h3 className="font-semibold text-lg text-foreground">
                   Utility Items for {selectedBuildingName} - {format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}
                 </h3>
-                {canManageUtilities && (
+                {canSaveUtilities && (
                   <Button variant="outline" onClick={handleAddUtilityItem} size="sm" disabled={isLoadingData || isSaving}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Item
                   </Button>
@@ -269,25 +269,25 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                   <CardContent className="p-0 space-y-3">
                     <div className="flex justify-between items-start">
                         <Label className="text-base font-medium text-foreground">Utility Item {index + 1}</Label>
-                        {currentUtilityItems.length > 1 && canManageUtilities && (
+                        {currentUtilityItems.length > 1 && canSaveUtilities && (
                           <Button variant="ghost" size="icon" onClick={() => handleRemoveUtilityItem(item.uiId)} className="text-destructive hover:bg-destructive/10 h-7 w-7" disabled={isSaving}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><Label htmlFor={`utilityName-${item.uiId}`}>Type</Label><Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canManageUtilities}/></div>
-                        <div><Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label><Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', e.target.value)} disabled={isSaving || !canManageUtilities}/></div>
+                        <div><Label htmlFor={`utilityName-${item.uiId}`}>Type</Label><Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canSaveUtilities}/></div>
+                        <div><Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label><Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', e.target.value)} disabled={isSaving || !canSaveUtilities}/></div>
                     </div>
                     <div><Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center mb-1"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
-                        <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value)} disabled={isSaving || !canManageUtilities}>
+                        <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value)} disabled={isSaving || !canSaveUtilities}>
                             <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    {item.appliesToScope === 'Floor' && (<div><Label htmlFor={`applicableFloor-${item.uiId}`}>Floor Name</Label><Input id={`applicableFloor-${item.uiId}`} placeholder="e.g., 10th" value={item.applicableFloor || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableFloor', e.target.value)} disabled={isSaving || !canManageUtilities}/></div>)}
+                    {item.appliesToScope === 'Floor' && (<div><Label htmlFor={`applicableFloor-${item.uiId}`}>Floor Name</Label><Input id={`applicableFloor-${item.uiId}`} placeholder="e.g., 10th" value={item.applicableFloor || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableFloor', e.target.value)} disabled={isSaving || !canSaveUtilities}/></div>)}
                     {item.appliesToScope === 'SpecificSpaces' && (<div><Label htmlFor={`applicableSpaces-${item.uiId}`} className="flex items-center"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Space IDs (comma-separated)</Label>
-                        <Textarea id={`applicableSpaces-${item.uiId}`} placeholder="e.g., Unit 10A, Office 201" value={item.applicableSpaceIdNamesStr || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableSpaceIdNamesStr', e.target.value)} rows={2} disabled={isSaving || !canManageUtilities}/>
+                        <Textarea id={`applicableSpaces-${item.uiId}`} placeholder="e.g., Unit 10A, Office 201" value={item.applicableSpaceIdNamesStr || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableSpaceIdNamesStr', e.target.value)} rows={2} disabled={isSaving || !canSaveUtilities}/>
                         <p className="text-xs text-muted-foreground mt-1">Enter exact 'Space ID/Name' from Spaces page.</p></div>)}
                   </CardContent>
                 </Card>
@@ -295,9 +295,9 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
             </div>
           )}
         </CardContent>
-        {canManageUtilities && (
+        {canSaveUtilities && (
           <CardFooter className="border-t pt-6">
-            <Button onClick={handleSaveUtilities} disabled={!selectedBuildingId || currentUtilityItems.length === 0 || registeredBuildings.length === 0 || isLoadingData || isSaving || !canManageUtilities} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={handleSaveUtilities} disabled={!selectedBuildingId || currentUtilityItems.length === 0 || registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
               Save Utilities for {selectedBuildingName ? `${selectedBuildingName} - ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}` : 'Selected Period'}
             </Button>
