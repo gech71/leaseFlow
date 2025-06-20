@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Building, BuildingMonthlyUtilities, Prisma } from '@prisma/client';
+import { Prisma, type Building, type BuildingMonthlyUtilities } from '@prisma/client';
 
 export async function getRegisteredBuildingsAction(): Promise<Building[]> {
   try {
@@ -105,8 +105,9 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMo
       include: { utilities: true, building: { select: { name: true }} },
       orderBy: [{ year: 'desc' }, { month: 'desc' }, { buildingName: 'asc' }],
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching all building utilities:", error);
     return [];
   }
 }
+

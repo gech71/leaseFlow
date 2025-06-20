@@ -3,8 +3,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Prisma, Agreement, Bill, Space, Building, BuildingMonthlyUtilities, UtilityBreakdownItem as PrismaUtilityBreakdownItem } from '@prisma/client';
-import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, isSameDay, setMonth, setYear, parseISO } from 'date-fns';
+import { Prisma, type Agreement, type Bill, type Space, type Building, type BuildingMonthlyUtilities, type UtilityBreakdownItem as PrismaUtilityBreakdownItem } from '@prisma/client';
+import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, isSameDay, setMonth, setYear, parseISO, format } from 'date-fns';
 
 export interface BillingPageData {
   agreements: (Agreement & { tenant: Prisma.TenantGetPayload<{}>; space: Prisma.SpaceGetPayload<{}> })[];
@@ -91,7 +91,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const targetBillDate = startOfDay(parseISO(targetBillDateStr));
     const today = startOfDay(new Date());
 
-    const agreement = await databaseService.getAgreementById(agreementId, { include: { space: { include: { building: { include: { penaltyPolicyTiers: true } } } }, tenant: true } });
+    const agreement = await databaseService.getAgreementById(agreementId, { include: { space: { include: { building: { include: { penaltyPolicyTiers: true, spaces: true } } } }, tenant: true } }); // Added spaces to building include
     if (!agreement) throw new Error("Agreement not found.");
     if (!agreement.space) throw new Error("Space details for agreement not found.");
     if (!agreement.space.building) throw new Error("Building details for space not found.");
@@ -115,7 +115,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const billMonth = getMonth(targetBillDate);
 
     const monthlyBuildingUtilityData = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(
-      agreement.space.building.id, // Use buildingId here
+      agreement.space.building.id, 
       billMonth,
       billYear,
       { include: { utilities: true } }
@@ -128,7 +128,6 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
           case 'Building': costForThisUtility = utilItem.totalCost * agreement.space.utilityProrationShare; break;
           case 'Floor':
             if (utilItem.applicableFloor && agreement.space.floor === utilItem.applicableFloor) {
-              // This is simplified; a more accurate proration would need count of spaces on floor
               const spacesOnFloor = agreement.space.building.spaces?.filter(s => s.floor === utilItem.applicableFloor).length || 1;
               costForThisUtility = spacesOnFloor > 0 ? utilItem.totalCost / spacesOnFloor : 0;
             }
@@ -141,14 +140,14 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         }
         if (costForThisUtility > 0) {
           const roundedCost = parseFloat(costForThisUtility.toFixed(2));
-          utilityBreakdownItemsCreate.push({ name: utilItem.name, amount: roundedCost } as unknown as Prisma.UtilityBreakdownItemCreateManyWithoutBillInput); // Cast needed for createMany structure
+          utilityBreakdownItemsCreate.push({ name: utilItem.name, amount: roundedCost } as unknown as Prisma.UtilityBreakdownItemCreateManyWithoutBillInput); 
           totalUtilityCostForBill += roundedCost;
         }
       });
     }
 
     let initialPenalty = 0;
-    const dueDate = targetBillDate; // For new bills, dueDate is same as billDate, penalty calculation is dynamic
+    const dueDate = targetBillDate; 
     if (isBefore(dueDate, today)) {
         const daysOverdue = differenceInDays(today, dueDate);
         initialPenalty = calculateIndividualPenalty(rentAmount, daysOverdue, agreement.space.building, agreement.space);
@@ -160,7 +159,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       agreement: { connect: { id: agreement.id } },
       tenant: { connect: { id: agreement.tenantId } },
       billDate: targetBillDate,
-      dueDate: targetBillDate, // Due date for new bills is often the bill date or slightly after.
+      dueDate: targetBillDate, 
       rentAmount,
       utilityBreakdown: { create: utilityBreakdownItemsCreate as Prisma.UtilityBreakdownItemCreateWithoutBillInput[] },
       penaltyAmount: initialPenalty > 0 ? initialPenalty : undefined,
@@ -169,7 +168,6 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     };
 
     const newBill = await databaseService.createBill(billCreateInput);
-    // Update agreement's next payment due date
     await databaseService.updateAgreement(agreement.id, { nextPaymentDueDate: addMonths(targetBillDate, 1) });
     
     revalidatePath('/admin/billing');
@@ -188,7 +186,7 @@ export async function recordPaymentOrVerificationAction(
     paymentReference?: string | null;
     bankOrWalletName?: string | null;
     adminVerificationNotes?: string | null;
-    adminProofUrl?: string | null; // If admin uploads a new proof
+    adminProofUrl?: string | null; 
   },
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
@@ -201,14 +199,13 @@ export async function recordPaymentOrVerificationAction(
     let newStatus: Prisma.BillStatus = bill.status;
     let finalPaymentDate = paymentData.paymentDate ? parseISO(paymentData.paymentDate) : new Date();
     
-    // Recalculate penalty if overdue and not already paid/verified
     let currentPenalty = bill.penaltyAmount || 0;
     if ((bill.status === 'Overdue' || (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate.toISOString()), today))) && actionType !== 'rejectVerification') {
-        const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString())); // Use payment date for overdue calculation
+        const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString())); 
         if (daysOverdue > 0) {
              currentPenalty = calculateIndividualPenalty(bill.rentAmount, daysOverdue, bill.agreement.space.building, bill.agreement.space);
         } else {
-            currentPenalty = 0; // If paid on or before due date, no penalty
+            currentPenalty = 0; 
         }
     }
 
@@ -219,7 +216,6 @@ export async function recordPaymentOrVerificationAction(
       bankOrWalletName: (paymentData.paymentMethod === "Bank Transfer" || paymentData.paymentMethod === "Wallet") ? paymentData.bankOrWalletName : null,
       adminVerificationNotes: paymentData.adminVerificationNotes,
       penaltyAmount: currentPenalty > 0 ? currentPenalty : null,
-      // totalAmount will be updated based on rent, utilities, and new penalty
     };
     
     const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
@@ -231,17 +227,15 @@ export async function recordPaymentOrVerificationAction(
       billUpdateData.paymentDate = finalPaymentDate;
       billUpdateData.adminVerifiedPayment = true;
       if (paymentData.adminProofUrl) {
-        billUpdateData.paymentProofUrl = paymentData.adminProofUrl; // Overwrite if admin provides new
+        billUpdateData.paymentProofUrl = paymentData.adminProofUrl; 
       }
     } else if (actionType === 'rejectVerification') {
       newStatus = isBefore(parseISO(bill.dueDate.toISOString()), today) ? 'Overdue' : 'Pending';
       billUpdateData.adminVerifiedPayment = false;
-      // Clear payment details if rejecting
       billUpdateData.paymentDate = null;
       billUpdateData.paymentMethod = null;
       billUpdateData.paymentReference = null;
       billUpdateData.bankOrWalletName = null;
-      // Penalty logic for rejection: if it was overdue, penalty calculated above remains. If pending, it's 0.
       if (newStatus === 'Pending') billUpdateData.penaltyAmount = null;
     }
 
@@ -261,7 +255,8 @@ export async function deleteBillAction(billId: string) {
         await databaseService.deleteBill(billId);
         revalidatePath('/admin/billing');
         return { success: true };
-    } catch (error: any) {
+    } catch (error: any)
+     {
         console.error("Error deleting bill:", error);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
             return { success: false, error: "Bill not found." };
@@ -269,3 +264,4 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
+

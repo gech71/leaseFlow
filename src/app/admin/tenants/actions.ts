@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export async function createTenantAction(
   data: Prisma.TenantCreateInput, // This data comes from the form, excluding relational fields like rentedSpace
@@ -169,3 +169,4 @@ export async function deleteTenantAction(tenantId: string) {
     return { success: false, error: error.message || "Failed to delete tenant." };
   }
 }
+

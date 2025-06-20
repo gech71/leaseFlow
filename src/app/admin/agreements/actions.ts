@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Prisma, Agreement } from '@prisma/client';
+import { Prisma, type Agreement } from '@prisma/client';
 import { addMonths, parseISO } from 'date-fns';
 
 export interface CreateFullAgreementData {
@@ -130,3 +130,4 @@ export async function deleteAgreementAction(agreementId: string) {
         return { success: false, error: error.message || "Failed to delete agreement." };
     }
 }
+

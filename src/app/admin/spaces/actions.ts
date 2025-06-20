@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export async function createSpaceAction(data: Prisma.SpaceCreateInput) {
   try {
@@ -82,3 +82,4 @@ export async function deleteSpaceAction(id: string) {
     return { success: false, error: error.message || "Failed to delete space." };
   }
 }
+
