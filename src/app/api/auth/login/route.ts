@@ -54,13 +54,23 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ isSuccess: true, message: "Login successful" });
     } else {
+      // If the external API response is not OK, or if isSuccess is false,
+      // try to use the errors array from the external API.
+      // The externalApiResponse.status will be used for the response to the client.
+      const errorMessages = data.errors && Array.isArray(data.errors) && data.errors.length > 0
+        ? data.errors
+        : ["Login failed. Please check your credentials or contact support."];
+      
       return NextResponse.json(
-        { isSuccess: false, errors: data.errors || ["Invalid phone number or password."] },
-        { status: externalApiResponse.status }
+        { isSuccess: false, errors: errorMessages, accessToken: null, refreshToken: null },
+        { status: externalApiResponse.status || 401 } // Use external status, or 401 as a default for auth failure
       );
     }
   } catch (error) {
     console.error("API login route error:", error);
-    return NextResponse.json({ isSuccess: false, errors: ["An unexpected error occurred during login."] }, { status: 500 });
+    // This catch block handles network errors or issues with the fetch call itself,
+    // or if externalApiResponse.json() fails.
+    return NextResponse.json({ isSuccess: false, errors: ["An unexpected error occurred during login. Please try again later."] }, { status: 500 });
   }
 }
+
