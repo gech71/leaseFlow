@@ -14,7 +14,7 @@ import Link from 'next/link';
 import {
   Dialog,
   DialogContent,
-  DialogDescription as DialogPrimitiveDescription, 
+  DialogDescription, 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -25,7 +25,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogPrimitiveDescription, 
+  AlertDialogDescription, 
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -286,9 +286,9 @@ export function TenantsClientPage({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Tenant' : (canEditTenants ? 'Edit Tenant' : 'View Tenant')}</DialogTitle>
-            <DialogPrimitiveDescription>
+            <DialogDescription>
               {formMode === 'add' ? "Enter the details for the new tenant." : (canEditTenants ? "Update the tenant's details." : "Viewing tenant details.")}
-            </DialogPrimitiveDescription>
+            </DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-2">
@@ -343,11 +343,11 @@ export function TenantsClientPage({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogPrimitiveDescription>
+            <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the tenant "{tenantToDelete?.name}"
               {tenantToDelete?.rentedSpace ? ` and mark their space (${getSpaceDetails(tenantToDelete.rentedSpace)}) as vacant.` : '.'}
               Check for active agreements before deleting.
-            </AlertDialogPrimitiveDescription>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTenantToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
