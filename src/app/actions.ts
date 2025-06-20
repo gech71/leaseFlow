@@ -9,36 +9,47 @@ export async function generateAgreementAction(input: AgreementInput): Promise<Ag
   try {
     const result = await genAgreementFlow(input);
     if (!result || !result.agreementText) {
+        // This case handles if the flow runs successfully but returns no text.
         return { error: 'Failed to generate agreement: AI returned no content.' };
     }
     return result;
   } catch (e: any) {
     // Log the full error object for better server-side debugging
     console.error("Error in generateAgreementAction. Raw error:", e);
+    
     // Attempt to get a more detailed string representation for logging
-    let detailedErrorString;
+    let detailedErrorString = "Could not stringify error object.";
     try {
+      // Using Object.getOwnPropertyNames can reveal non-enumerable properties if 'e' is an object
       detailedErrorString = JSON.stringify(e, Object.getOwnPropertyNames(e), 2);
     } catch (stringifyError) {
-      detailedErrorString = "Could not stringify error object. Error keys: " + Object.keys(e || {}).join(', ');
+      // Fallback if stringification itself fails
+      detailedErrorString = `Could not stringify error object (keys: ${Object.keys(e || {}).join(', ')}). Error during stringification: ${stringifyError}`;
     }
     console.error("Error in generateAgreementAction. Stringified error:", detailedErrorString);
 
-    let errorMessage = 'An unknown error occurred while generating the agreement.';
+    let errorMessage = 'An unknown error occurred while generating the agreement. Please check server logs for details.';
+    
     if (e instanceof Error && e.message) {
       errorMessage = e.message;
-    } else if (typeof e === 'string' && e) {
+    } else if (typeof e === 'string' && e.trim() !== '') {
       errorMessage = e;
-    } else if (e && typeof e.toString === 'function' && e.toString() !== '[object Object]' && e.toString() !== '{}') {
+    } else if (e && typeof e.toString === 'function' && e.toString() !== '[object Object]' && e.toString() !== '{}' && e.toString().trim() !== '') {
       errorMessage = e.toString();
-    } else if (e && e.error && typeof e.error === 'string') { // Check for a nested error string
+    } else if (e && e.error && typeof e.error === 'string' && e.error.trim() !== '') { 
       errorMessage = e.error;
-    } else if (e && e.details && typeof e.details === 'string') { // Check for Genkit-like error details
+    } else if (e && e.details && typeof e.details === 'string' && e.details.trim() !== '') { // Check for Genkit-like error details
       errorMessage = e.details;
+    } else if (e && e.message && typeof e.message === 'string' && e.message.trim() !== '') { // Re-check message if other conditions failed
+      errorMessage = e.message;
     } else if (typeof e === 'object' && e !== null) {
       const keys = Object.keys(e);
       if (keys.length > 0) {
-        errorMessage = `An error object was caught with keys: ${keys.join(', ')}. Check server logs for details.`;
+        errorMessage = `An error object was caught. Keys: ${keys.join(', ')}. Please check server logs for details.`;
+      } else if (detailedErrorString.length > 50 && detailedErrorString !== "Could not stringify error object.") { // If stringified version is more useful than just "{}"
+         errorMessage = `An error occurred: ${detailedErrorString.substring(0, 100)}${detailedErrorString.length > 100 ? '...' : ''}. Check server logs.`;
+      } else {
+        errorMessage = 'An unexpected error without a specific message occurred in the AI flow. Check server logs.';
       }
     }
     
