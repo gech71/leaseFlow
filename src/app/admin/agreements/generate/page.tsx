@@ -1,395 +1,54 @@
 
 // Main form interaction is client-side, but data fetching for props is server-side.
-// "use client"; directive REMOVED from top level.
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye, CalendarClock, Sigma, CreditCard, Landmark, Wallet, Coins, HelpCircle, Info, CalendarDays } from 'lucide-react';
-import type { Space, Tenant, Agreement } from '@prisma/client'; // Use Prisma types
-import type { AgreementInput as AIInputType } from '@/lib/types'; // For AI
-import { useToast } from '@/hooks/use-toast';
-import { generateAgreementAction } from '@/app/actions';
-import { createFullAgreementAction, type CreateFullAgreementData } from '../actions';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { FileText, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { addMonths, format, parseISO, isValid } from 'date-fns';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
 import { databaseService } from '@/lib/services/databaseService';
+import type { Tenant, Space } from '@prisma/client'; // For server-side fetching
+import { GenerateAgreementClientPage } from './client-page'; // Import the new client component
 
-
-// This Zod schema is for client-side form validation before calling server actions
-const agreementFormSchema = z.object({
-  tenantId: z.string().min(1, { message: "Please select a tenant." }),
-  selectedSpaceId: z.string().min(1, { message: "Please select a space." }),
-  startDate: z.date({ required_error: "Agreement start date is required."}),
-  paymentTermMonths: z.coerce.number().int().positive({ message: "Payment term must be a positive number of months." }).min(1, {message: "Term must be at least 1 month."}),
-  initialPaymentMonths: z.coerce.number().int().positive({ message: "Initial payment must be a positive number of months." }).min(1, {message: "Initial payment must be at least 1 month."}),
-  additionalTerms: z.string().optional(),
-  paymentMethod: z.string().min(1, { message: "Please select a payment method."}),
-  paymentReference: z.string().optional(),
-  bankOrWalletName: z.string().optional(),
-}).refine(data => data.initialPaymentMonths <= data.paymentTermMonths, {
-  message: "Initial payment months cannot exceed total payment term months.",
-  path: ["initialPaymentMonths"],
-}).refine(data => {
-  if ((data.paymentMethod === "Bank Transfer" || data.paymentMethod === "Wallet") && (!data.bankOrWalletName || data.bankOrWalletName.trim() === "")) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Bank/Wallet name is required for Bank Transfer or Wallet payment methods.",
-  path: ["bankOrWalletName"],
-});
-
-type AgreementFormValues = z.infer<typeof agreementFormSchema>;
-
-interface GenerateAgreementClientPageProps {
-  tenants: Tenant[];
-  availableSpaces: Space[];
-}
-
-// Client Component part - This function component uses client hooks.
-function GenerateAgreementClientPage({ tenants, availableSpaces }: GenerateAgreementClientPageProps) {
-  const [isMounted, setIsMounted] = useState(false);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
-  const [isSavingToDb, setIsSavingToDb] = useState(false);
-  const [generatedAgreementText, setGeneratedAgreementText] = useState<string | null>(null);
-  const [finalizedAgreement, setFinalizedAgreement] = useState<Agreement | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-  const router = useRouter();
-
-  const form = useForm<AgreementFormValues>({
-    resolver: zodResolver(agreementFormSchema),
-    defaultValues: {
-      tenantId: "",
-      selectedSpaceId: "",
-      startDate: new Date(),
-      paymentTermMonths: 12,
-      initialPaymentMonths: 1,
-      additionalTerms: "",
-      paymentMethod: "",
-      paymentReference: "",
-      bankOrWalletName: "",
-    },
-  });
-
-  const selectedSpaceId = form.watch("selectedSpaceId");
-  const initialPaymentMonths = form.watch("initialPaymentMonths");
-  const paymentMethod = form.watch("paymentMethod");
-
-  const selectedSpaceDetails = useMemo(() => {
-    return availableSpaces.find(s => s.id === selectedSpaceId);
-  }, [selectedSpaceId, availableSpaces]);
-
-  const calculatedInitialPaymentAmount = useMemo(() => {
-    if (selectedSpaceDetails && initialPaymentMonths > 0) {
-      return selectedSpaceDetails.monthlyRentalPrice * initialPaymentMonths;
-    }
-    return 0;
-  }, [selectedSpaceDetails, initialPaymentMonths]);
-
-  useEffect(() => setIsMounted(true), []);
-
-  const handleGenerateAIAgreement = async (data: AgreementFormValues) => {
-    setIsLoadingAI(true);
-    setError(null);
-    setGeneratedAgreementText(null);
-    setFinalizedAgreement(null);
-
-    const selectedTenant = tenants.find(t => t.id === data.tenantId);
-    const selectedSpace = availableSpaces.find(s => s.id === data.selectedSpaceId);
-
-    if (!selectedTenant || !selectedSpace) {
-      toast({ title: "Error", description: "Selected tenant or space not found.", variant: "destructive" });
-      setIsLoadingAI(false);
-      return;
-    }
-
-    const agreementInputForAI: AIInputType = {
-      tenantName: selectedTenant.name,
-      building: selectedSpace.buildingName,
-      spaceId: selectedSpace.spaceIdName,
-      spaceArea: selectedSpace.area,
-      floor: selectedSpace.floor,
-      monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
-      paymentTermMonths: data.paymentTermMonths,
-      initialPaymentMonths: data.initialPaymentMonths,
-      additionalTerms: data.additionalTerms || "",
-    };
-
-    const result = await generateAgreementAction(agreementInputForAI);
-
-    if ('error' in result) {
-      setError(result.error);
-      toast({ title: "AI Agreement Generation Failed", description: result.error, variant: "destructive" });
-    } else if (result.agreementText) {
-      setGeneratedAgreementText(result.agreementText);
-      toast({ title: "AI Agreement Text Generated!", description: "Review the text and proceed to save." });
-    } else {
-      const aiError = "Received an empty or invalid response from the AI for agreement text.";
-      setError(aiError);
-      toast({ title: "AI Agreement Generation Failed", description: aiError, variant: "destructive" });
-    }
-    setIsLoadingAI(false);
-  };
-
-  const handleSaveFullAgreement = async () => {
-    if (!generatedAgreementText) {
-        toast({ title: "Error", description: "No agreement text generated to save.", variant: "destructive" });
-        return;
-    }
-    const formValues = form.getValues(); // Get current form values
-    const selectedTenant = tenants.find(t => t.id === formValues.tenantId);
-    const selectedSpace = availableSpaces.find(s => s.id === formValues.selectedSpaceId);
-
-    if (!selectedTenant || !selectedSpace || !formValues.startDate) {
-      toast({ title: "Error", description: "Missing required details (tenant, space, or start date) to save agreement.", variant: "destructive" });
-      return;
-    }
-    
-    setIsSavingToDb(true);
-    setError(null);
-
-    const agreementDataForDb: CreateFullAgreementData = {
-      tenantId: selectedTenant.id,
-      spaceId: selectedSpace.id,
-      agreementText: generatedAgreementText,
-      startDate: formValues.startDate.toISOString(),
-      monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
-      paymentTermMonths: formValues.paymentTermMonths,
-      initialPaymentMonths: formValues.initialPaymentMonths,
-      additionalTerms: formValues.additionalTerms,
-      initialPaymentMethod: formValues.paymentMethod,
-      initialPaymentReference: formValues.paymentReference,
-      initialPaymentBankOrWalletName: formValues.bankOrWalletName,
-    };
-    
-    const result = await createFullAgreementAction(agreementDataForDb);
-    setIsSavingToDb(false);
-
-    if (result.success && result.agreement) {
-      setFinalizedAgreement(result.agreement as Agreement); // Cast needed if Prisma types differ slightly
-      toast({ title: "Agreement Saved Successfully!", description: "The agreement is now active." });
-      setGeneratedAgreementText(null); // Clear preview as it's finalized
-      form.reset();
-    } else {
-      setError(result.error || "Failed to save agreement to database.");
-      toast({ title: "Database Save Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
-    }
-  };
-
-  if (!isMounted) {
-    return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
-  }
-
+// Server Component to fetch initial data
+export default function GenerateAgreementPage() {
   return (
     <div className="animate-fadeIn">
-      <PageHeader
+       <PageHeader
         title="Generate Rental Agreement"
         icon={FileText}
         description="Select tenant and space, generate agreement text with AI, then save the complete record."
+        actions={
+            <Link href="/admin/agreements" passHref>
+                <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Agreements
+                </Button>
+            </Link>
+        }
       />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline text-xl">Agreement & Payment Details</CardTitle>
-            <CardDescription>Fill form to create a new agreement and record initial payment.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleGenerateAIAgreement)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="tenantId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" />Select Tenant</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Choose an existing tenant" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {tenants.length > 0 ? tenants.map(tenant => (
-                            <SelectItem key={tenant.id} value={tenant.id}>{tenant.name} ({tenant.email})</SelectItem>
-                          )) : (<SelectItem value="no-tenants" disabled>No tenants found</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="selectedSpaceId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center"><Home className="mr-2 h-4 w-4 text-primary" />Select Space</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Choose an available space" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          {availableSpaces.length > 0 ? availableSpaces.map(space => (
-                            <SelectItem key={space.id} value={space.id}>
-                              {space.spaceIdName} ({space.buildingName}) - ${space.monthlyRentalPrice.toLocaleString()}/month
-                            </SelectItem>
-                          )) : (<SelectItem value="no-spaces" disabled>No available spaces</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary"/>Agreement Start Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                            >
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                              <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="paymentTermMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary" />Total Term (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 12" {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={form.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" />Initial Payment (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                </div>
-                {calculatedInitialPaymentAmount > 0 && (
-                  <div className="p-3 bg-secondary/50 rounded-md border border-border">
-                    <Label className="font-semibold flex items-center text-foreground"><Info className="mr-2 h-4 w-4 text-primary"/>Calculated Initial Payment Amount</Label>
-                    <p className="text-2xl font-bold text-primary mt-1">${calculatedInitialPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    <p className="text-xs text-muted-foreground">({initialPaymentMonths} month(s) upfront based on selected space)</p>
-                  </div>
-                )}
-                <FormField control={form.control} name="paymentMethod" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary" />Initial Payment Method</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="Card"><CreditCard className="mr-2 h-4 w-4 inline-block"/>Card</SelectItem>
-                          <SelectItem value="Cash"><Coins className="mr-2 h-4 w-4 inline-block"/>Cash</SelectItem>
-                          <SelectItem value="Bank Transfer"><Landmark className="mr-2 h-4 w-4 inline-block"/>Bank Transfer</SelectItem>
-                          <SelectItem value="Wallet"><Wallet className="mr-2 h-4 w-4 inline-block"/>Digital Wallet</SelectItem>
-                          <SelectItem value="Other"><HelpCircle className="mr-2 h-4 w-4 inline-block"/>Other</SelectItem>
-                        </SelectContent>
-                      </Select><FormMessage />
-                    </FormItem>
-                )}/>
-                {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
-                   <FormField control={form.control} name="bankOrWalletName" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center"> {paymentMethod === "Bank Transfer" ? <Landmark className="mr-2 h-4 w-4 text-primary"/> : <Wallet className="mr-2 h-4 w-4 text-primary"/>} {paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"} </FormLabel>
-                        <FormControl><Input placeholder={`Enter ${paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"}`} {...field} /></FormControl><FormMessage />
-                      </FormItem>
-                    )}/>
-                )}
-                <FormField control={form.control} name="paymentReference" render={({ field }) => (<FormItem><FormLabel>Payment Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., Transaction ID, Check No." {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                <FormField control={form.control} name="additionalTerms" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Terms for Agreement (Optional)</FormLabel>
-                      <FormControl><Textarea placeholder="Enter any specific clauses..." className="resize-none" rows={3} {...field}/></FormControl>
-                      <FormDescription>These terms will be appended to the standard agreement clauses by the AI.</FormDescription><FormMessage />
-                    </FormItem>
-                )}/>
-                <Button type="submit" disabled={isLoadingAI || isSavingToDb || availableSpaces.length === 0 || tenants.length === 0 || !form.formState.isValid} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                  {isLoadingAI ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating AI Text...</> : "Generate Agreement Text (AI)"}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline text-xl">Generated Agreement & Finalize</CardTitle>
-            <CardDescription>Review the AI-generated text. If satisfied, save the agreement to the database.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingAI && ( <div className="flex flex-col items-center justify-center h-64 text-muted-foreground"> <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /> <p>Generating AI text...</p> </div> )}
-            {error && !isLoadingAI && ( <div className="flex flex-col items-center justify-center h-64 text-destructive-foreground bg-destructive/80 p-6 rounded-md"> <AlertTriangle className="h-12 w-12 mb-4" /> <p className="font-semibold text-lg">Error</p> <p className="text-sm text-center">{error}</p> </div> )}
-            
-            {generatedAgreementText && !finalizedAgreement && !isLoadingAI && !error && (
-              <div className="space-y-4">
-                <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">AI Agreement text generated!</p></div>
-                <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-secondary/30"><pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">{generatedAgreementText}</pre></ScrollArea>
-                <Button onClick={handleSaveFullAgreement} disabled={isSavingToDb || isLoadingAI} className="w-full">
-                  {isSavingToDb ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving to Database...</> : "Finalize & Save Agreement to Database"}
-                </Button>
-              </div>
-            )}
-
-            {finalizedAgreement && !error && (
-                <div className="space-y-4">
-                    <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md border border-green-200"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">Agreement successfully saved to database!</p></div>
-                    <h3 className="text-lg font-semibold font-headline">Agreement ID: {finalizedAgreement.id}</h3>
-                    <p className="text-sm">Tenant: {tenants.find(t => t.id === finalizedAgreement.tenantId)?.name}</p>
-                    <p className="text-sm">Space: {availableSpaces.find(s => s.id === finalizedAgreement.spaceId)?.spaceIdName}</p>
-                    <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-                        <Button onClick={() => { setFinalizedAgreement(null); form.reset(); }} variant="outline" className="w-full sm:w-auto">Create Another Agreement</Button>
-                        <Link href={`/admin/agreements/${finalizedAgreement.id}`} passHref>
-                            <Button className="w-full sm:w-auto"><Eye className="mr-2 h-4 w-4" /> View Saved Agreement</Button>
-                        </Link>
-                    </div>
-                </div>
-            )}
-
-            {!generatedAgreementText && !finalizedAgreement && !isLoadingAI && !error && (
-              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground border-2 border-dashed border-border rounded-md p-6">
-                <FileText className="h-12 w-12 mb-4" />
-                <p className="font-semibold">AI-generated agreement text will appear here.</p>
-                <p className="text-sm text-center">Fill form and click "Generate Agreement Text (AI)".</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
+        <GenerateAgreementDataFetcher />
+      </Suspense>
     </div>
   );
 }
 
-
-// Server Component to fetch initial data
-export default function GenerateAgreementPage() { // This is now a Server Component
-  return (
-    <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-      <GenerateAgreementDataFetcher />
-    </Suspense>
-  );
-}
-
-async function GenerateAgreementDataFetcher() { // This is an async Server Component
+// This is an async Server Component responsible for fetching data
+async function GenerateAgreementDataFetcher() {
   const tenants = await databaseService.getAllTenants({ orderBy: { name: 'asc' }});
   const availableSpaces = await databaseService.getAllSpaces({ where: { isOccupied: false }, orderBy: [{buildingName: 'asc'},{spaceIdName: 'asc'}] });
 
-  const serializableTenants = tenants.map(t => ({...t, createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt?.toISOString() || t.createdAt.toISOString()}));
-  const serializableSpaces = availableSpaces.map(s => ({...s, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString()}));
+  // Serialize dates before passing to client component
+  const serializableTenants = tenants.map(t => ({
+    ...t,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt?.toISOString() || t.createdAt.toISOString() // Fallback for updatedAt
+  }));
+  const serializableSpaces = availableSpaces.map(s => ({
+    ...s,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString() // Fallback for updatedAt
+  }));
   
   return <GenerateAgreementClientPage tenants={serializableTenants} availableSpaces={serializableSpaces} />;
 }
-
