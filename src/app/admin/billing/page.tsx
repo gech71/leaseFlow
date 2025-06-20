@@ -1,609 +1,105 @@
 
-"use client";
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
+import { getBillingPageDataAction, type BillingPageData } from './actions';
+import { BillingClientPage, type SerializedBillingPageData } from './client-page';
+import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, PenaltyTier as PenaltyTierPrisma } from '@prisma/client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
-import { PageHeader } from '@/components/custom/PageHeader';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon as CalendarLucideIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip } from 'lucide-react';
-import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, Prisma } from '@prisma/client';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { addMonths, format, isBefore, startOfDay, isAfter, isSameDay, getYear, getMonth, parseISO, differenceInDays } from 'date-fns';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { getBillingPageDataAction, generateBillAndUpdateAgreementAction, recordPaymentOrVerificationAction, deleteBillAction, type BillingPageData } from './actions';
-
-// Client-side representation types, dates as strings
-interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space'> {
-  createdAt: string;
-  updatedAt: string;
-  startDate: string;
-  nextPaymentDueDate: string;
-  initialPaymentDate?: string | null;
-  endDate?: string | null;
-  tenant: ClientTenant;
-  space: ClientSpace;
-}
-interface ClientTenant extends Omit<TenantPrisma, 'createdAt' | 'updatedAt'> {
-  createdAt: string;
-  updatedAt: string;
-}
-interface ClientSpace extends Omit<SpacePrisma, 'createdAt' | 'updatedAt' | 'building'> {
-  createdAt: string;
-  updatedAt: string;
-  building: ClientBuilding;
-}
-interface ClientBuilding extends Omit<BuildingPrisma, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers'> {
-  createdAt: string;
-  updatedAt: string;
-  penaltyPolicyTiers: ClientPenaltyTier[];
-}
-interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id'> { // id is not guaranteed from client type
-    id?: string;
-}
-
-interface ClientBill extends Omit<BillPrisma, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown'> {
-  createdAt: string;
-  updatedAt: string;
-  billDate: string;
-  dueDate: string;
-  paymentDate?: string | null;
-  agreement: ClientAgreement;
-  utilityBreakdown: UtilityBreakdownItemPrisma[]; // Prisma type is fine here
-  // Added for client-side processing
-  tenantName?: string; 
-}
-interface ClientBuildingMonthlyUtilities extends Omit<BuildingMonthlyUtilitiesPrisma, 'createdAt' | 'updatedAt' | 'utilities'> {
-    createdAt: string;
-    updatedAt: string;
-    utilities: Prisma.BuildingUtilityItemGetPayload<{}>[];
-}
-
-const paymentFormSchema = z.object({
-  paymentDate: z.date({ required_error: "Payment date is required." }),
-  paymentMethod: z.string().min(1, { message: "Payment method is required." }),
-  paymentReference: z.string().optional(),
-  bankOrWalletName: z.string().optional(),
-  adminVerificationNotes: z.string().optional(),
-}).refine(data => {
-  if ((data.paymentMethod === "Bank Transfer" || data.paymentMethod === "Wallet") && (!data.bankOrWalletName || data.bankOrWalletName.trim() === "")) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Bank/Wallet name is required for this payment method.",
-  path: ["bankOrWalletName"],
-});
-type PaymentFormValues = z.infer<typeof paymentFormSchema>;
-
-
-function BillingClientPage({ initialData }: { initialData: BillingPageData }) {
-  const [agreements, setAgreements] = useState<ClientAgreement[]>([]);
-  const [spaces, setSpaces] = useState<ClientSpace[]>([]);
-  const [buildings, setBuildings] = useState<ClientBuilding[]>([]);
-  const [bills, setBills] = useState<ClientBill[]>([]);
-  const [buildingUtilities, setBuildingUtilities] = useState<ClientBuildingMonthlyUtilities[]>([]);
-  
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [billForPayment, setBillForPayment] = useState<ClientBill | null>(null);
-  const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
-  const [billForVerification, setBillForVerification] = useState<ClientBill | null>(null);
-
-  const [adminSelectedProofFile, setAdminSelectedProofFile] = useState<File | null>(null);
-  const adminProofFileInputRef = useRef<HTMLInputElement>(null);
-
-  const [isMounted, setIsMounted] = useState(false);
-  const { toast } = useToast();
-  const [today, setToday] = useState(startOfDay(new Date()));
-  const [isLoading, setIsLoading] = useState(false);
-
-  const paymentForm = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentFormSchema),
-    defaultValues: { paymentDate: new Date(), paymentMethod: "", paymentReference: "", bankOrWalletName: "", adminVerificationNotes: "" }
-  });
-  const paymentMethodWatcher = paymentForm.watch("paymentMethod");
-
-  const serializeData = (data: BillingPageData): typeof initialData => {
-    return {
-        agreements: data.agreements.map(ag => ({
-            ...ag,
-            createdAt: ag.createdAt.toISOString(),
-            updatedAt: ag.updatedAt.toISOString(),
-            startDate: ag.startDate.toISOString(),
-            nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
-            initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
-            endDate: ag.endDate?.toISOString() || null,
-            tenant: { ...ag.tenant, createdAt: ag.tenant.createdAt.toISOString(), updatedAt: ag.tenant.updatedAt.toISOString() },
+// Helper function to serialize the data (convert Dates to ISO strings)
+const serializeBillingPageData = (data: BillingPageData): SerializedBillingPageData => {
+  return {
+    agreements: data.agreements.map(ag => ({
+        ...ag,
+        createdAt: ag.createdAt.toISOString(),
+        updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(),
+        startDate: ag.startDate.toISOString(),
+        nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
+        initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
+        endDate: ag.endDate?.toISOString() || null,
+        tenant: { 
+          ...ag.tenant, 
+          createdAt: ag.tenant.createdAt.toISOString(), 
+          updatedAt: ag.tenant.updatedAt?.toISOString() || ag.tenant.createdAt.toISOString() 
+        },
+        space: { 
+            ...ag.space, 
+            createdAt: ag.space.createdAt.toISOString(), 
+            updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString(),
+            building: {
+                ...(ag.space.building as BuildingPrisma & { penaltyPolicyTiers: PenaltyTierPrisma[] }), 
+                createdAt: (ag.space.building as BuildingPrisma).createdAt.toISOString(),
+                updatedAt: (ag.space.building as BuildingPrisma).updatedAt?.toISOString() || (ag.space.building as BuildingPrisma).createdAt.toISOString(),
+                penaltyPolicyTiers: (ag.space.building as BuildingPrisma & { penaltyPolicyTiers: PenaltyTierPrisma[] }).penaltyPolicyTiers.map(pt => ({...pt}))
+            }
+        },
+    })),
+    spaces: data.spaces.map(s => ({ 
+        ...s, 
+        createdAt: s.createdAt.toISOString(), 
+        updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString(),
+        building: { // Assuming space includes building directly for some use cases. Adjust if not.
+            ...(s.building as BuildingPrisma & { penaltyPolicyTiers: PenaltyTierPrisma[] }), // This might need to be fetched if not already on space
+            createdAt: (s.building as BuildingPrisma)?.createdAt.toISOString() || new Date().toISOString(), // Fallback
+            updatedAt: (s.building as BuildingPrisma)?.updatedAt?.toISOString() || new Date().toISOString(), // Fallback
+            penaltyPolicyTiers: (s.building as BuildingPrisma & { penaltyPolicyTiers: PenaltyTierPrisma[] })?.penaltyPolicyTiers?.map(pt => ({...pt})) || []
+        }
+    })),
+    buildings: data.buildings.map(b => ({ 
+        ...b, 
+        createdAt: b.createdAt.toISOString(), 
+        updatedAt: b.updatedAt?.toISOString() || b.createdAt.toISOString(),
+        penaltyPolicyTiers: b.penaltyPolicyTiers.map(pt => ({...pt})) 
+    })),
+    bills: data.bills.map(b => ({
+        ...b,
+        createdAt: b.createdAt.toISOString(),
+        updatedAt: b.updatedAt?.toISOString() || b.createdAt.toISOString(),
+        billDate: b.billDate.toISOString(),
+        dueDate: b.dueDate.toISOString(),
+        paymentDate: b.paymentDate?.toISOString() || null,
+        utilityBreakdown: b.utilityBreakdown.map(ub => ({...ub})),
+        agreement: { // Ensure deep serialization for agreement within bill
+            ...b.agreement,
+            createdAt: b.agreement.createdAt.toISOString(),
+            updatedAt: b.agreement.updatedAt?.toISOString() || b.agreement.createdAt.toISOString(),
+            startDate: b.agreement.startDate.toISOString(),
+            nextPaymentDueDate: b.agreement.nextPaymentDueDate.toISOString(),
+            initialPaymentDate: b.agreement.initialPaymentDate?.toISOString() || null,
+            endDate: b.agreement.endDate?.toISOString() || null,
+            tenant: { 
+              ...b.agreement.tenant, 
+              createdAt: b.agreement.tenant.createdAt.toISOString(), 
+              updatedAt: b.agreement.tenant.updatedAt?.toISOString() || b.agreement.tenant.createdAt.toISOString() 
+            },
             space: { 
-                ...ag.space, 
-                createdAt: ag.space.createdAt.toISOString(), 
-                updatedAt: ag.space.updatedAt.toISOString(),
+                ...b.agreement.space, 
+                createdAt: b.agreement.space.createdAt.toISOString(), 
+                updatedAt: b.agreement.space.updatedAt?.toISOString() || b.agreement.space.createdAt.toISOString(),
                 building: {
-                    ...(ag.space.building as any), // Cast to any if building is not guaranteed by Prisma type
-                    createdAt: (ag.space.building as any)?.createdAt.toISOString() || new Date().toISOString(),
-                    updatedAt: (ag.space.building as any)?.updatedAt.toISOString() || new Date().toISOString(),
+                     ...(b.agreement.space.building as BuildingPrisma & { penaltyPolicyTiers: PenaltyTierPrisma[] }),
+                     createdAt: (b.agreement.space.building as BuildingPrisma).createdAt.toISOString(),
+                     updatedAt: (b.agreement.space.building as BuildingPrisma).updatedAt?.toISOString() || (b.agreement.space.building as BuildingPrisma).createdAt.toISOString(),
+                     penaltyPolicyTiers: (b.agreement.space.building as BuildingPrisma & { penaltyPolicyTiers: PenaltyTierPrisma[] }).penaltyPolicyTiers.map(pt => ({...pt}))
                 }
             },
-        })),
-        spaces: data.spaces.map(s => ({ 
-            ...s, 
-            createdAt: s.createdAt.toISOString(), 
-            updatedAt: s.updatedAt.toISOString(),
-            building: {
-                ...(s.building as any),
-                createdAt: (s.building as any)?.createdAt.toISOString() || new Date().toISOString(),
-                updatedAt: (s.building as any)?.updatedAt.toISOString() || new Date().toISOString(),
-            }
-        })),
-        buildings: data.buildings.map(b => ({ 
-            ...b, 
-            createdAt: b.createdAt.toISOString(), 
-            updatedAt: b.updatedAt.toISOString(),
-            penaltyPolicyTiers: b.penaltyPolicyTiers.map(pt => ({...pt})) // PenaltyTiers don't have dates
-        })),
-        bills: data.bills.map(b => ({
-            ...b,
-            createdAt: b.createdAt.toISOString(),
-            updatedAt: b.updatedAt.toISOString(),
-            billDate: b.billDate.toISOString(),
-            dueDate: b.dueDate.toISOString(),
-            paymentDate: b.paymentDate?.toISOString() || null,
-            agreement: {
-                ...b.agreement,
-                createdAt: b.agreement.createdAt.toISOString(),
-                updatedAt: b.agreement.updatedAt.toISOString(),
-                startDate: b.agreement.startDate.toISOString(),
-                nextPaymentDueDate: b.agreement.nextPaymentDueDate.toISOString(),
-                initialPaymentDate: b.agreement.initialPaymentDate?.toISOString() || null,
-                endDate: b.agreement.endDate?.toISOString() || null,
-                tenant: { ...b.agreement.tenant, createdAt: b.agreement.tenant.createdAt.toISOString(), updatedAt: b.agreement.tenant.updatedAt.toISOString() },
-                space: { 
-                    ...b.agreement.space, 
-                    createdAt: b.agreement.space.createdAt.toISOString(), 
-                    updatedAt: b.agreement.space.updatedAt.toISOString(),
-                    building: {
-                        ...(b.agreement.space.building as any),
-                         createdAt: (b.agreement.space.building as any)?.createdAt.toISOString() || new Date().toISOString(),
-                         updatedAt: (b.agreement.space.building as any)?.updatedAt.toISOString() || new Date().toISOString(),
-                    }
-                },
-            }
-        })),
-        buildingMonthlyUtilities: data.buildingMonthlyUtilities.map(bu => ({
-            ...bu,
-            createdAt: bu.createdAt.toISOString(),
-            updatedAt: bu.updatedAt.toISOString(),
-        })),
-    };
-  };
-  
-  const processAndSetInitialData = useCallback((data: BillingPageData) => {
-    const clientData = serializeData(data);
-    setAgreements(clientData.agreements as ClientAgreement[]);
-    setSpaces(clientData.spaces as ClientSpace[]);
-    setBuildings(clientData.buildings as ClientBuilding[]);
-    setBills(clientData.bills as ClientBill[]);
-    setBuildingUtilities(clientData.buildingMonthlyUtilities as ClientBuildingMonthlyUtilities[]);
-  }, []);
-
-
-  useEffect(() => {
-    setIsMounted(true);
-    processAndSetInitialData(initialData);
-    setToday(startOfDay(new Date()));
-  }, [initialData, processAndSetInitialData]);
-
-  const refreshBillingData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const newData = await getBillingPageDataAction();
-      processAndSetInitialData(newData);
-    } catch (error) {
-      toast({ title: "Error Refreshing Data", description: (error as Error).message, variant: "destructive" });
-    }
-    setIsLoading(false);
-  }, [processAndSetInitialData, toast]);
-
-
-  const calculatePenalty = useCallback((bill: ClientBill, currentStatus: ClientBill['status']): number => {
-    const agreement = agreements.find(ag => ag.id === bill.agreementId);
-    if (!agreement || !agreement.space || !agreement.space.building) return 0;
-    
-    const space = agreement.space;
-    const building = buildings.find(b => b.id === space.buildingId); // Find building by ID
-    if (!building || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) return 0;
-
-    const dueDate = parseISO(bill.dueDate);
-    if (currentStatus !== 'Overdue') return 0;
-
-    const daysOverdue = differenceInDays(today, dueDate);
-    if (daysOverdue <= 0) return 0;
-
-    let applicableTiers: ClientPenaltyTier[] = [];
-    const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
-      t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
-    );
-    if (spaceSpecificTiers.length > 0) applicableTiers = spaceSpecificTiers;
-    else {
-      const floorSpecificTiers = building.penaltyPolicyTiers.filter(
-        t => t.scope === 'Floor' && t.applicableFloor === space.floor
-      );
-      if (floorSpecificTiers.length > 0) applicableTiers = floorSpecificTiers;
-      else applicableTiers = building.penaltyPolicyTiers.filter(t => t.scope === 'Building');
-    }
-    
-    if (applicableTiers.length === 0) return 0;
-    const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
-    let calculatedPenalty = 0;
-    for (const tier of sortedTiers) {
-      if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
-        if (tier.feeType === 'Fixed') calculatedPenalty = tier.feeValue;
-        else if (tier.feeType === 'Percentage') calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
-        break;
-      }
-    }
-    return parseFloat(calculatedPenalty.toFixed(2));
-  }, [agreements, buildings, today]);
-
-  const processedClientBills = useMemo(() => {
-    return bills.map(bill => {
-      let currentStatus = bill.status;
-      if (bill.status === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
-        currentStatus = 'Overdue';
-      }
-      
-      const penalty = (currentStatus === 'Overdue' && bill.status !== 'Paid' && bill.status !== 'PendingVerification') 
-                      ? calculatePenalty(bill, currentStatus) 
-                      : (bill.penaltyAmount || 0);
-                      
-      const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
-      const newTotalAmount = baseAmount + (penalty || 0);
-      
-      return {
-        ...bill,
-        status: currentStatus,
-        penaltyAmount: penalty > 0 ? penalty : undefined,
-        totalAmount: parseFloat(newTotalAmount.toFixed(2)),
-        tenantName: bill.agreement?.tenant?.name || 'N/A',
-      };
-    }).sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [bills, calculatePenalty, today]);
-
- useEffect(() => {
-    if (isPaymentDialogOpen && billForPayment) {
-      const processedBill = processedClientBills.find(pb => pb.id === billForPayment.id);
-      paymentForm.reset({
-        paymentDate: processedBill?.paymentDate ? parseISO(processedBill.paymentDate) : new Date(),
-        paymentMethod: processedBill?.paymentMethod || "",
-        paymentReference: processedBill?.paymentReference || "",
-        bankOrWalletName: processedBill?.bankOrWalletName || "",
-        adminVerificationNotes: processedBill?.adminVerificationNotes || "",
-      });
-      setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
-    }
-    if (isVerificationDialogOpen && billForVerification) {
-        const processedBill = processedClientBills.find(pb => pb.id === billForVerification.id);
-        paymentForm.reset({
-            paymentDate: processedBill?.paymentDate ? parseISO(processedBill.paymentDate) : new Date(),
-            paymentMethod: processedBill?.paymentMethod || "",
-            paymentReference: processedBill?.paymentReference || "",
-            bankOrWalletName: processedBill?.bankOrWalletName || "",
-            adminVerificationNotes: processedBill?.adminVerificationNotes || "",
-        });
-        setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPaymentDialogOpen, billForPayment, isVerificationDialogOpen, billForVerification, paymentForm]); // processedClientBills removed to avoid loop
-
-  const handleGenerateSingleBill = async (agreementId: string) => {
-    const agreement = agreements.find(ag => ag.id === agreementId);
-    if (!agreement) { toast({ title: "Error", description: "Agreement not found.", variant: "destructive" }); return; }
-    
-    const nextDueDate = parseISO(agreement.nextPaymentDueDate);
-    const agreementStartDate = parseISO(agreement.startDate);
-    const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-
-    if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) {
-      toast({ title: "Info", description: "Agreement not active or expired.", variant: "default" }); return;
-    }
-    
-    setIsLoading(true);
-    const result = await generateBillAndUpdateAgreementAction(agreementId, nextDueDate.toISOString());
-    setIsLoading(false);
-
-    if (result.success && result.bill) {
-      toast({ title: "Bill Generated", description: `New bill for ${agreement.tenant.name} (Due: ${format(parseISO(result.bill.dueDate.toISOString()), 'PP')}) created. Total: $${result.bill.totalAmount.toFixed(2)}` });
-      await refreshBillingData();
-    } else {
-      toast({ title: "Bill Generation Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
-    }
-  };
-
-  const handleGenerateAllDueBills = async () => {
-    setIsLoading(true);
-    let generatedCount = 0, skippedCount = 0, errorCount = 0;
-    const errorMessages: string[] = [];
-
-    for (const agreement of agreements) {
-        const agreementStartDate = parseISO(agreement.startDate);
-        const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-        if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) { skippedCount++; continue; }
-        
-        const nextDueDate = parseISO(agreement.nextPaymentDueDate);
-        if (isAfter(nextDueDate, today)) { skippedCount++; continue; }
-
-        const result = await generateBillAndUpdateAgreementAction(agreement.id, nextDueDate.toISOString());
-        if (result.success) generatedCount++;
-        else {
-            // Skip if error indicates bill already exists
-            if (result.error && result.error.includes("already exists")) skippedCount++;
-            else {
-                errorCount++;
-                errorMessages.push(result.error || `Failed for ${agreement.tenant.name}`);
-            }
         }
-    }
-    setIsLoading(false);
-    let summaryMessage = `${generatedCount} bills generated. ${skippedCount} skipped.`;
-    if (errorCount > 0) summaryMessage += ` ${errorCount} failed.`;
-    toast({ title: "Bulk Bill Generation Complete", description: summaryMessage });
-    if (errorMessages.length > 0) {
-        toast({ title: "Bulk Generation Errors", description: errorMessages.slice(0,3).join('; '), variant: "destructive", duration: 10000});
-    }
-    await refreshBillingData();
+    })),
+    buildingMonthlyUtilities: data.buildingMonthlyUtilities.map(bu => ({
+        ...bu,
+        createdAt: bu.createdAt.toISOString(),
+        updatedAt: bu.updatedAt?.toISOString() || bu.createdAt.toISOString(),
+        utilities: bu.utilities.map(u => ({...u}))
+    })),
   };
-
-  const handleOpenPaymentDialog = (bill: ClientBill) => { setBillForPayment(bill); setIsPaymentDialogOpen(true); };
-  const handleOpenVerificationDialog = (bill: ClientBill) => { setBillForVerification(bill); setIsVerificationDialogOpen(true); };
-  
-  const handleRecordPaymentSubmit = async (values: PaymentFormValues) => {
-    if (!billForPayment) return;
-    setIsLoading(true);
-    // Simulate file upload if a file is selected (not actually uploading in this mock)
-    const adminProofUrl = adminSelectedProofFile ? `admin_simulated_slip_${adminSelectedProofFile.name}` : billForPayment.paymentProofUrl;
-
-    const result = await recordPaymentOrVerificationAction(billForPayment.id, {
-      ...values,
-      paymentDate: values.paymentDate.toISOString(),
-      adminProofUrl: adminProofUrl,
-    }, 'recordPayment');
-    setIsLoading(false);
-
-    if (result.success) {
-      toast({ title: "Payment Recorded", description: `Payment for bill ${billForPayment.id} recorded.` });
-      setIsPaymentDialogOpen(false); setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null);
-      if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
-      await refreshBillingData();
-    } else {
-      toast({ title: "Error Recording Payment", description: result.error, variant: "destructive" });
-    }
-  };
-  
-  const handleVerificationSubmit = async (values: PaymentFormValues, action: 'confirmVerification' | 'rejectVerification') => {
-    if (!billForVerification) return;
-    setIsLoading(true);
-    const adminProofUrl = adminSelectedProofFile ? `admin_sim_replaced_slip_${adminSelectedProofFile.name}` : billForVerification.paymentProofUrl;
-
-    const result = await recordPaymentOrVerificationAction(billForVerification.id, {
-      ...values,
-      paymentDate: values.paymentDate.toISOString(),
-      adminProofUrl: adminProofUrl,
-    }, action);
-    setIsLoading(false);
-
-    if (result.success) {
-      toast({ title: `Payment ${action === 'confirmVerification' ? 'Verified' : 'Rejected'}`, description: `Action for bill ${billForVerification.id} processed.` });
-      setIsVerificationDialogOpen(false); setBillForVerification(null); paymentForm.reset(); setAdminSelectedProofFile(null);
-      if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = "";
-      await refreshBillingData();
-    } else {
-      toast({ title: `Error ${action === 'confirmVerification' ? 'Verifying' : 'Rejecting'} Payment`, description: result.error, variant: "destructive" });
-    }
-  };
-
-  const getStatusBadgeVariant = (status: ClientBill['status']): "default" | "destructive" | "secondary" | "outline" => {
-    switch (status) {
-      case 'Paid': return 'secondary';
-      case 'Pending': return 'default';
-      case 'Overdue': return 'destructive';
-      case 'PendingVerification': return 'outline';
-      default: return 'default';
-    }
-  };
-
-  const getStatusIcon = (status: ClientBill['status']) => {
-    switch (status) {
-      case 'Paid': return <CheckCircle className="mr-1 h-3 w-3 text-green-600" />;
-      case 'Pending': return <InfoIcon className="mr-1 h-3 w-3 text-yellow-600" />;
-      case 'Overdue': return <AlertTriangle className="mr-1 h-3 w-3 text-red-600" />;
-      case 'PendingVerification': return <UploadCloud className="mr-1 h-3 w-3 text-blue-600" />;
-      default: return <InfoIcon className="mr-1 h-3 w-3" />;
-    }
-  };
-  
-  const handleDeleteBillWithConfirmation = async (billId: string) => {
-    setIsLoading(true);
-    const result = await deleteBillAction(billId);
-    setIsLoading(false);
-    if (result.success) {
-      toast({ title: "Bill Deleted", description: "The bill has been removed." });
-      await refreshBillingData();
-    } else {
-      toast({ title: "Error Deleting Bill", description: result.error, variant: "destructive" });
-    }
-  };
-
-
-  const handleAdminFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) setAdminSelectedProofFile(event.target.files[0]);
-    else setAdminSelectedProofFile(null);
-  };
-
-  if (!isMounted && agreements.length === 0) { // Check against agreements as primary data source
-    return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
-  }
-
-  return (
-    <div className="animate-fadeIn">
-      <PageHeader title="Billing Management" icon={DollarSign} description="Generate and manage bills. Verify tenant-submitted payments." />
-
-      <Card className="mb-6 shadow-sm">
-        <CardHeader> <CardTitle className="font-headline">Generate Bills</CardTitle> <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription> </CardHeader>
-        <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
-        <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {agreements.map(agreement => {
-            const agreementStartDate = parseISO(agreement.startDate);
-            const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-            const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
-            const nextDueDate = parseISO(agreement.nextPaymentDueDate);
-            const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, today);
-            return (
-              <Card key={agreement.id} className={`bg-secondary/30 shadow-sm hover:shadow-md transition-shadow ${!isAgreementActive ? 'opacity-60' : ''}`}>
-                <CardHeader className="pb-2 pt-3">
-                  <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
-                  <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
-                   <CardDescription className="text-xs pt-1"> Next Due: {format(nextDueDate, 'PP')}
-                    {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive)</span>}
-                    {isAgreementActive && isDueForGeneration && <Badge variant="default" className="ml-1 text-xs bg-green-100 text-green-700">Due for Gen</Badge>}
-                    {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
-                  </CardDescription>
-                </CardHeader>
-                <CardFooter className="pt-2 pb-3"> <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button> </CardFooter>
-              </Card>
-            );
-          })}
-        </CardContent>
-      </Card>
-      
-      <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
-          <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                  <DialogTitle className="font-headline text-xl">{billForPayment?.status === 'Paid' ? 'Update Payment Details' : 'Record Payment'}</DialogTitle>
-                  {billForPayment && <DialogDescription>For {billForPayment.agreement.space.spaceIdName} - Total: ${processedClientBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)}</DialogDescription>}
-              </DialogHeader>
-              <Form {...paymentForm}>
-                  <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
-                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
-                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <div> <Label htmlFor="adminPaymentProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach Payment Slip (Simulated) </Label> <Input id="adminPaymentProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" /> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">Selected: {adminSelectedProofFile.name}</p>} </div>
-                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Confirmed via bank statement." rows={2} {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <DialogFooter className="pt-4"><DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose><Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}{billForPayment?.status === 'Paid' ? 'Update Payment' : 'Record as Paid'}</Button></DialogFooter>
-                  </form>
-              </Form>
-          </DialogContent>
-      </Dialog>
-
-      <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
-          <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                  <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
-                  {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: ${processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount.toFixed(2)}</DialogDescription>}
-              </DialogHeader>
-              {billForVerification && ( <div className="text-sm space-y-2 py-2"> <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p> <p><strong>Submitted Proof:</strong> {billForVerification.paymentProofUrl ? <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}> {billForVerification.paymentProofUrl} (Click to view - simulated) </Button> : <span className="italic text-muted-foreground">No proof URL found.</span>} </p> </div> )}
-              <Form {...paymentForm}>
-                  <form className="space-y-4 py-1"> 
-                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} /></FormControl><FormMessage /></FormItem>)} /> )}
-                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                      <div> <Label htmlFor="adminVerificationProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated) </Label> <Input id="adminVerificationProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" /> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>} </div>
-                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} /></FormControl><FormMessage /></FormItem>)} />
-                      <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
-                          <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'rejectVerification'))()} disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}Reject Payment</Button>
-                          <div className="flex-grow"></div>
-                          <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                          <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirmVerification'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}Confirm Payment</Button>
-                      </DialogFooter>
-                  </form>
-              </Form>
-          </DialogContent>
-      </Dialog>
-
-      {processedClientBills.length === 0 && !isLoading ? (
-        <Card className="text-center py-12 shadow-sm mt-8"> <CardContent><DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" /><h3 className="text-xl font-semibold mb-2 font-headline">No Bills Yet</h3><p className="text-muted-foreground">Generate bills to see them here.</p></CardContent> </Card>
-      ) : (
-        <div className="space-y-4 mt-8">
-        <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
-        {isLoading && bills.length > 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-        <Card className="shadow-md">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>Tenant</TableHead>
-                <TableHead className="hidden md:table-cell">Space</TableHead>
-                <TableHead>Bill Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="hidden lg:table-cell text-right">Rent</TableHead>
-                <TableHead className="hidden lg:table-cell text-right">Utilities</TableHead>
-                <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right pr-2 sm:pr-4">Actions</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {processedClientBills.map((bill) => (
-                  <TableRow key={bill.id} className={`${bill.status === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.status === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                    <TableCell className="font-medium">{bill.tenantName}</TableCell>
-                    <TableCell className="hidden md:table-cell text-xs">{bill.agreement.space.spaceIdName}, {bill.agreement.space.buildingName}</TableCell>
-                    <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
-                    <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-right">${bill.rentAmount.toFixed(2)}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-right">
-                      {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">${u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('$0.00')}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell text-right text-destructive">{bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize text-xs ${bill.status === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace('Verification', ' Ver.')}</span></Badge></TableCell>
-                    <TableCell className="text-right pr-2 sm:pr-4">
-                      <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">
-                        {bill.status === 'PendingVerification' && ( <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" disabled={isLoading}><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button> )}
-                        {(bill.status === 'Pending' || bill.status === 'Overdue') && ( <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button> )}
-                         {bill.status === 'Paid' && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View/Edit</span><span className="sm:hidden">Edit</span></Button> )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 self-center sm:self-auto" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}><Trash2 className="h-4 w-4"/></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-        </div>
-      )}
-    </div>
-  );
-}
+};
 
 // Server Component to fetch initial data
+async function BillingDataFetcher() {
+  const initialRawData = await getBillingPageDataAction();
+  const serializableData = serializeBillingPageData(initialRawData);
+  return <BillingClientPage initialData={serializableData} />;
+}
+
 export default function BillingPage() {
   return (
     <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>}>
@@ -611,87 +107,3 @@ export default function BillingPage() {
     </Suspense>
   );
 }
-
-async function BillingDataFetcher() {
-  const initialData = await getBillingPageDataAction();
-  // No need to serialize dates here if BillingClientPage handles it with parseISO from string props
-  // However, it's good practice to ensure all Date objects are converted to strings before passing to client.
-  const serializableData = {
-    agreements: initialData.agreements.map(ag => ({
-        ...ag,
-        createdAt: ag.createdAt.toISOString(),
-        updatedAt: ag.updatedAt.toISOString(),
-        startDate: ag.startDate.toISOString(),
-        nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
-        initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
-        endDate: ag.endDate?.toISOString() || null,
-        tenant: { ...ag.tenant, createdAt: ag.tenant.createdAt.toISOString(), updatedAt: ag.tenant.updatedAt.toISOString() },
-        space: { 
-            ...ag.space, 
-            createdAt: ag.space.createdAt.toISOString(), 
-            updatedAt: ag.space.updatedAt.toISOString(),
-            building: { // Ensure building is properly typed and serialized
-                ...(ag.space.building as any),
-                createdAt: (ag.space.building as any).createdAt.toISOString(),
-                updatedAt: (ag.space.building as any).updatedAt.toISOString(),
-                penaltyPolicyTiers: (ag.space.building as any).penaltyPolicyTiers.map((pt: any) => ({...pt}))
-            }
-        },
-    })),
-    spaces: initialData.spaces.map(s => ({ 
-        ...s, 
-        createdAt: s.createdAt.toISOString(), 
-        updatedAt: s.updatedAt.toISOString(),
-        building: {
-            ...(s.building as any),
-            createdAt: (s.building as any).createdAt.toISOString(),
-            updatedAt: (s.building as any).updatedAt.toISOString(),
-            penaltyPolicyTiers: (s.building as any).penaltyPolicyTiers.map((pt: any) => ({...pt}))
-        }
-    })),
-    buildings: initialData.buildings.map(b => ({ 
-        ...b, 
-        createdAt: b.createdAt.toISOString(), 
-        updatedAt: b.updatedAt.toISOString(),
-        penaltyPolicyTiers: b.penaltyPolicyTiers.map(pt => ({...pt})) 
-    })),
-    bills: initialData.bills.map(b => ({
-        ...b,
-        createdAt: b.createdAt.toISOString(),
-        updatedAt: b.updatedAt.toISOString(),
-        billDate: b.billDate.toISOString(),
-        dueDate: b.dueDate.toISOString(),
-        paymentDate: b.paymentDate?.toISOString() || null,
-        utilityBreakdown: b.utilityBreakdown.map(ub => ({...ub})), // Utility items are simple objects
-        agreement: {
-            ...b.agreement,
-            createdAt: b.agreement.createdAt.toISOString(),
-            updatedAt: b.agreement.updatedAt.toISOString(),
-            startDate: b.agreement.startDate.toISOString(),
-            nextPaymentDueDate: b.agreement.nextPaymentDueDate.toISOString(),
-            initialPaymentDate: b.agreement.initialPaymentDate?.toISOString() || null,
-            endDate: b.agreement.endDate?.toISOString() || null,
-            tenant: { ...b.agreement.tenant, createdAt: b.agreement.tenant.createdAt.toISOString(), updatedAt: b.agreement.tenant.updatedAt.toISOString() },
-            space: { 
-                ...b.agreement.space, 
-                createdAt: b.agreement.space.createdAt.toISOString(), 
-                updatedAt: b.agreement.space.updatedAt.toISOString(),
-                building: {
-                     ...(b.agreement.space.building as any),
-                     createdAt: (b.agreement.space.building as any).createdAt.toISOString(),
-                     updatedAt: (b.agreement.space.building as any).updatedAt.toISOString(),
-                     penaltyPolicyTiers: (b.agreement.space.building as any).penaltyPolicyTiers.map((pt: any) => ({...pt}))
-                }
-            },
-        }
-    })),
-    buildingMonthlyUtilities: initialData.buildingMonthlyUtilities.map(bu => ({
-        ...bu,
-        createdAt: bu.createdAt.toISOString(),
-        updatedAt: bu.updatedAt.toISOString(),
-        utilities: bu.utilities.map(u => ({...u}))
-    })),
-  };
-  return <BillingClientPage initialData={serializableData as BillingPageData} />;
-}
-
