@@ -35,8 +35,9 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { submitPaymentProofAction } from './actions';
-import type { ClientAgreement, ClientBill, SerializedTenantPortalData, ClientPenaltyTier } from './page'; // Import serialized types from page.tsx
+import type { ClientAgreement, ClientBill, SerializedTenantPortalData, ClientPenaltyTier } from './page'; 
 import type { BillStatus } from '@prisma/client';
 
 
@@ -351,15 +352,54 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label htmlFor="paymentMethod">Payment Method</Label>
+              <Label htmlFor="paymentMethodDialog">Payment Method</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger id="paymentMethod"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Card">Credit/Debit Card</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Digital Wallet</SelectItem></SelectContent>
+                <SelectTrigger id="paymentMethodDialog"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Card">Credit/Debit Card</SelectItem>
+                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="Wallet">Digital Wallet</SelectItem>
+                </SelectContent>
               </Select>
             </div>
-            <p className="text-sm text-muted-foreground">This is a simulated payment. No actual transaction will occur.</p>
+            {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
+              <div className="text-sm p-3 bg-secondary/50 rounded-md border border-border">
+                <p className="font-semibold">Instructions for {paymentMethod}:</p>
+                {paymentMethod === "Bank Transfer" && (
+                  <>
+                    <p>Bank: LeaseFlow Central Bank</p>
+                    <p>Account: 123-456-7890</p>
+                    <p>Reference: Bill ID {selectedBillForDialog?.id}</p>
+                  </>
+                )}
+                {paymentMethod === "Wallet" && (
+                  <>
+                    <p>Wallet Provider: LFPay</p>
+                    <p>Recipient ID: tenant_payments@leaseflow.com</p>
+                    <p>Reference: Bill ID {selectedBillForDialog?.id}</p>
+                  </>
+                )}
+                <p className="mt-2">After payment, please click <strong>"Submit Proof"</strong> on the dashboard to upload your transaction receipt.</p>
+              </div>
+            )}
+            {paymentMethod === "Card" && (
+                 <p className="text-sm text-muted-foreground">This is a simulated payment. No actual transaction will occur.</p>
+            )}
+
           </div>
-          <DialogFooter><DialogClose asChild><Button variant="outline" disabled={isLoadingAction}>Cancel</Button></DialogClose><Button onClick={handleSimulatedPayment} disabled={isLoadingAction}>{isLoadingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Confirm Payment</Button></DialogFooter>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline" disabled={isLoadingAction}>Cancel</Button></DialogClose>
+            {paymentMethod === "Card" && (
+                <Button onClick={handleSimulatedPayment} disabled={isLoadingAction}>
+                    {isLoadingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Confirm Payment
+                </Button>
+            )}
+             {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
+                <Button onClick={() => { setPayBillDialogOpen(false); if(selectedBillForDialog) handleOpenProofDialog(selectedBillForDialog); }} disabled={isLoadingAction}>
+                   Proceed to Submit Proof
+                </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -381,5 +421,3 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
     </div>
   );
 }
-
-    
