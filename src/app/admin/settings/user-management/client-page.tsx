@@ -1,19 +1,20 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { User, Building, ShieldCheck, Edit, Loader2, AlertTriangle } from 'lucide-react';
+import { User, Building, ShieldCheck, Edit, Loader2, Search } from 'lucide-react';
 import { updateUserAssignments } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Client-side types with serialized dates
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
@@ -54,8 +55,9 @@ export function UserManagementClientPage({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const [currentUserToEdit, setCurrentUserToEdit] = useState<ClientUserWithAssignments | null>(null);
-  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null); // Changed from Set to string|null
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
+  const [buildingSearchTerm, setBuildingSearchTerm] = useState('');
 
   useEffect(() => {
     setIsMounted(true);
@@ -64,13 +66,14 @@ export function UserManagementClientPage({
 
   const handleEditUser = (user: ClientUserWithAssignments) => {
     setCurrentUserToEdit(user);
-    setSelectedRoleId(user.roles[0]?.id || null); // Assign first role ID or null
+    setSelectedRoleId(user.roles[0]?.id || null);
     setSelectedBuildingIds(new Set(user.managedBuildings.map(building => building.id)));
+    setBuildingSearchTerm(''); // Reset search term when opening dialog
     setIsDialogOpen(true);
   };
 
-  const handleRoleSelect = (roleId: string) => { // New handler for RadioGroup
-    setSelectedRoleId(roleId);
+  const handleRoleSelect = (roleId: string) => {
+    setSelectedRoleId(roleId === "null" ? null : roleId); // Handle "No Role" selection
   };
 
   const handleBuildingToggle = (buildingId: string) => {
@@ -85,13 +88,20 @@ export function UserManagementClientPage({
     });
   };
 
+  const filteredBuildings = useMemo(() => {
+    if (!buildingSearchTerm) return allBuildings;
+    return allBuildings.filter(building =>
+      building.name.toLowerCase().includes(buildingSearchTerm.toLowerCase())
+    );
+  }, [allBuildings, buildingSearchTerm]);
+
   const handleSaveChanges = async () => {
     if (!currentUserToEdit) return;
     setIsSaving(true);
 
     const result = await updateUserAssignments(
       currentUserToEdit.id,
-      selectedRoleId, // Pass single role ID
+      selectedRoleId,
       Array.from(selectedBuildingIds)
     );
 
@@ -148,7 +158,7 @@ export function UserManagementClientPage({
                     <TableCell className="font-medium">{user.name || `${user.firstName} ${user.lastName}`.trim() || 'N/A'}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell className="text-xs">
-                      {user.roles.length > 0 ? user.roles[0].name : <span className="italic text-muted-foreground">No role</span>}
+                      {user.roles.length > 0 ? user.roles[0].name.replace(/_/g, ' ') : <span className="italic text-muted-foreground">No role</span>}
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-xs">
                       {user.managedBuildings.length > 0 ? user.managedBuildings.map(b => b.name).join(', ') : <span className="italic text-muted-foreground">No buildings</span>}
@@ -174,53 +184,64 @@ export function UserManagementClientPage({
               <DialogDescription>Manage roles and building assignments for this user.</DialogDescription>
             </DialogHeader>
             
-            <ScrollArea className="flex-grow py-4 pr-2 -mr-2">
-                <div className="space-y-6">
-                    <section>
-                        <h3 className="text-md font-semibold mb-2 flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary"/>Assign Role</h3>
-                        <RadioGroup
-                          value={selectedRoleId || ""}
-                          onValueChange={handleRoleSelect}
-                          className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-48 overflow-y-auto"
-                          disabled={isSaving}
-                        >
-                          {allRoles.length === 0 && <p className="text-sm text-muted-foreground">No roles available to assign.</p>}
-                          {allRoles.map(role => (
-                              <div key={role.id} className="flex items-center space-x-2">
-                                <RadioGroupItem value={role.id} id={`role-${currentUserToEdit.id}-${role.id}`} disabled={isSaving} />
-                                <Label htmlFor={`role-${currentUserToEdit.id}-${role.id}`} className="text-sm font-normal cursor-pointer">
-                                    {role.name} <span className="text-xs text-muted-foreground">({role.description || 'No description'})</span>
-                                </Label>
-                              </div>
-                          ))}
-                        </RadioGroup>
-                    </section>
+            <div className="space-y-6 py-4 overflow-y-auto flex-grow pr-2">
+              <section>
+                <h3 className="text-md font-semibold mb-2 flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary"/>Assign Role</h3>
+                <Select
+                  value={selectedRoleId || "null"}
+                  onValueChange={handleRoleSelect}
+                  disabled={isSaving}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="null">No Role</SelectItem>
+                    {allRoles.map(role => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name.replace(/_/g, ' ')} <span className="text-xs text-muted-foreground">({role.description || 'No description'})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {allRoles.length === 0 && <p className="text-sm text-muted-foreground mt-1">No roles available to assign.</p>}
+              </section>
 
-                    <section>
-                        <h3 className="text-md font-semibold mb-2 flex items-center"><Building className="mr-2 h-5 w-5 text-primary"/>Assign Managed Buildings</h3>
-                        <div className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-60 overflow-y-auto">
-                        {allBuildings.length === 0 && <p className="text-sm text-muted-foreground">No buildings available to assign.</p>}
-                        {allBuildings.map(building => (
-                            <div key={building.id} className="flex items-center space-x-2">
-                            <Checkbox
-                                id={`building-${currentUserToEdit.id}-${building.id}`}
-                                checked={selectedBuildingIds.has(building.id)}
-                                onCheckedChange={() => handleBuildingToggle(building.id)}
-                                disabled={isSaving}
-                            />
-                            <Label htmlFor={`building-${currentUserToEdit.id}-${building.id}`} className="text-sm font-normal cursor-pointer">
-                                {building.name}
-                            </Label>
-                            </div>
-                        ))}
-                        </div>
-                    </section>
+              <section>
+                <h3 className="text-md font-semibold mb-2 flex items-center"><Building className="mr-2 h-5 w-5 text-primary"/>Assign Managed Buildings</h3>
+                <div className="relative mb-2">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Search buildings..."
+                        value={buildingSearchTerm}
+                        onChange={(e) => setBuildingSearchTerm(e.target.value)}
+                        className="pl-8 h-9"
+                        disabled={isSaving}
+                    />
                 </div>
-            </ScrollArea>
+                <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-60">
+                  {filteredBuildings.length === 0 && <p className="text-sm text-muted-foreground text-center py-2">{buildingSearchTerm ? "No buildings match your search." : "No buildings available."}</p>}
+                  {filteredBuildings.map(building => (
+                    <div key={building.id} className="flex items-center space-x-2 py-1">
+                      <Checkbox
+                        id={`building-${currentUserToEdit.id}-${building.id}`}
+                        checked={selectedBuildingIds.has(building.id)}
+                        onCheckedChange={() => handleBuildingToggle(building.id)}
+                        disabled={isSaving}
+                      />
+                      <Label htmlFor={`building-${currentUserToEdit.id}-${building.id}`} className="text-sm font-normal cursor-pointer">
+                        {building.name}
+                      </Label>
+                    </div>
+                  ))}
+                </ScrollArea>
+              </section>
+            </div>
             
-            <DialogFooter className="pt-4 border-t">
+            <DialogFooter className="pt-4 border-t mt-auto">
               <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
-              <Button onClick={handleSaveChanges} disabled={isSaving || !selectedRoleId} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                 Save Changes
               </Button>
