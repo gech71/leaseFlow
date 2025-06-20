@@ -1,5 +1,6 @@
 
-"use client"; // Main form interaction is client-side
+// Main form interaction is client-side, but data fetching for props is server-side.
+// "use client"; directive REMOVED from top level.
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
@@ -59,7 +60,7 @@ interface GenerateAgreementClientPageProps {
   availableSpaces: Space[];
 }
 
-// Client Component part
+// Client Component part - This function component uses client hooks.
 function GenerateAgreementClientPage({ tenants, availableSpaces }: GenerateAgreementClientPageProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -374,7 +375,7 @@ function GenerateAgreementClientPage({ tenants, availableSpaces }: GenerateAgree
 
 
 // Server Component to fetch initial data
-export default function GenerateAgreementPage() {
+export default function GenerateAgreementPage() { // This is now a Server Component
   return (
     <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
       <GenerateAgreementDataFetcher />
@@ -382,12 +383,13 @@ export default function GenerateAgreementPage() {
   );
 }
 
-async function GenerateAgreementDataFetcher() {
+async function GenerateAgreementDataFetcher() { // This is an async Server Component
   const tenants = await databaseService.getAllTenants({ orderBy: { name: 'asc' }});
   const availableSpaces = await databaseService.getAllSpaces({ where: { isOccupied: false }, orderBy: [{buildingName: 'asc'},{spaceIdName: 'asc'}] });
 
-  const serializableTenants = tenants.map(t => ({...t, createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt.toISOString()}));
-  const serializableSpaces = availableSpaces.map(s => ({...s, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt.toISOString()}));
+  const serializableTenants = tenants.map(t => ({...t, createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt?.toISOString() || t.createdAt.toISOString()}));
+  const serializableSpaces = availableSpaces.map(s => ({...s, createdAt: s.createdAt.toISOString(), updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString()}));
   
   return <GenerateAgreementClientPage tenants={serializableTenants} availableSpaces={serializableSpaces} />;
 }
+
