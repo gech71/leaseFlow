@@ -6,7 +6,6 @@ const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
 const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
 
-// Set a reasonable max age for cookies (e.g., access token 1 hour, refresh token 7 days)
 const ACCESS_TOKEN_MAX_AGE = 60 * 60; // 1 hour in seconds
 const REFRESH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
 
@@ -31,7 +30,7 @@ export async function POST(request: NextRequest) {
 
   let externalApiResponse: Response;
   try {
-    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/login`, { // Updated path
+    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/login`, { // Ensure /api/ is included
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -48,13 +47,16 @@ export async function POST(request: NextRequest) {
     const responseText = await externalApiResponse.text();
     if (responseText) {
       responseData = JSON.parse(responseText);
-    } else if (!externalApiResponse.ok) {
-      console.warn(`External auth service returned status ${externalApiResponse.status} with an empty body.`);
-      return NextResponse.json(
-        { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status}.`] },
-        { status: externalApiResponse.status }
-      );
     } else {
+      // Handle empty response body, especially for errors
+      if (!externalApiResponse.ok) {
+        console.warn(`External auth service returned status ${externalApiResponse.status} with an empty body.`);
+        return NextResponse.json(
+          { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status}.`] },
+          { status: externalApiResponse.status }
+        );
+      }
+      // If OK but empty, this is unusual for a login response with tokens
       console.warn("External auth service returned an OK status with an empty body for login.");
       return NextResponse.json(
         { isSuccess: false, errors: ["Received an unexpected empty response from authentication service."] },
@@ -63,17 +65,18 @@ export async function POST(request: NextRequest) {
     }
   } catch (jsonError: any) {
     console.error("Error parsing JSON from external auth service:", jsonError.message);
-    if (!externalApiResponse.ok) {
+     if (!externalApiResponse.ok) { // If parsing failed for an error response
         return NextResponse.json(
           { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status} and an invalid response format.`] },
           { status: externalApiResponse.status }
         );
     }
+    // If parsing failed for a success response (which shouldn't happen if API is correct)
     return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response format from authentication service."] }, { status: 500 });
   }
 
   if (externalApiResponse.ok && responseData && responseData.isSuccess && responseData.accessToken && responseData.refreshToken) {
-    // Use cookies().set() directly from next/headers to set response cookies
+    // Directly use cookies().set()
     cookies().set(ACCESS_TOKEN_KEY, responseData.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -96,6 +99,7 @@ export async function POST(request: NextRequest) {
       ? responseData.errors
       : [`Login failed. Please check your credentials or contact support. (Status: ${externalApiResponse.status})`];
     
+    // Determine status: use external API's status if not ok, otherwise determine from responseData
     const responseStatus = !externalApiResponse.ok ? externalApiResponse.status : (responseData?.isSuccess === false ? 401 : 500);
     
     return NextResponse.json(
