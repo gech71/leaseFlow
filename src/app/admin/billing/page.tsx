@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getBillingPageDataAction, type BillingPageData } from './actions';
 import { BillingClientPage, type SerializedBillingPageData } from './client-page';
-import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrismaType, Tenant as TenantPrismaOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, PenaltyTier as PenaltyTierPrisma } from '@prisma/client';
+import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrismaType, Tenant as TenantPrismaOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, PenaltyTier as PenaltyTierPrisma, Prisma } from '@prisma/client';
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
@@ -21,57 +21,57 @@ const serializeBillingPageData = (data: BillingPageData): SerializedBillingPageD
         ...ag,
         createdAt: ag.createdAt ? ag.createdAt.toISOString() : EPOCH_ISO_STRING,
         updatedAt: ag.updatedAt ? ag.updatedAt.toISOString() : (ag.createdAt ? ag.createdAt.toISOString() : EPOCH_ISO_STRING),
-        startDate: ag.startDate.toISOString(),
-        nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
+        startDate: ag.startDate ? ag.startDate.toISOString() : EPOCH_ISO_STRING,
+        nextPaymentDueDate: ag.nextPaymentDueDate ? ag.nextPaymentDueDate.toISOString() : EPOCH_ISO_STRING,
         initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
         endDate: ag.endDate?.toISOString() || null,
-        tenant: { 
-          ...ag.tenant, 
-          createdAt: ag.tenant.createdAt ? ag.tenant.createdAt.toISOString() : EPOCH_ISO_STRING, 
+        tenant: ag.tenant ? {
+          ...ag.tenant,
+          createdAt: ag.tenant.createdAt ? ag.tenant.createdAt.toISOString() : EPOCH_ISO_STRING,
           updatedAt: ag.tenant.updatedAt ? ag.tenant.updatedAt.toISOString() : (ag.tenant.createdAt ? ag.tenant.createdAt.toISOString() : EPOCH_ISO_STRING)
-        },
-        space: { 
-            ...ag.space, 
-            createdAt: ag.space.createdAt ? ag.space.createdAt.toISOString() : EPOCH_ISO_STRING, 
+        } : null,
+        space: ag.space ? {
+            ...ag.space,
+            createdAt: ag.space.createdAt ? ag.space.createdAt.toISOString() : EPOCH_ISO_STRING,
             updatedAt: ag.space.updatedAt ? ag.space.updatedAt.toISOString() : (ag.space.createdAt ? ag.space.createdAt.toISOString() : EPOCH_ISO_STRING),
             building: ag.space.building ? {
-                ...(ag.space.building as BuildingPrismaType & { penaltyPolicyTiers: PenaltyTierPrisma[], spaces: SpacePrisma[] }), // Added spaces to building type
+                ...(ag.space.building as BuildingPrismaType & { penaltyPolicyTiers: PenaltyTierPrisma[], spaces: SpacePrisma[] }),
                 createdAt: ag.space.building.createdAt ? ag.space.building.createdAt.toISOString() : EPOCH_ISO_STRING,
                 updatedAt: ag.space.building.updatedAt ? ag.space.building.updatedAt.toISOString() : (ag.space.building.createdAt ? ag.space.building.createdAt.toISOString() : EPOCH_ISO_STRING),
                 penaltyPolicyTiers: (ag.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
-                spaces: (ag.space.building.spaces || []).map(s => ({ // Serialize spaces if present
+                spaces: (ag.space.building.spaces || []).map(s => ({
                     ...s,
-                    createdAt: s.createdAt.toISOString(),
-                    updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString()
+                    createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
+                    updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
                 }))
-            } : null // Add null check for ag.space.building
-        },
+            } : null
+        } : null,
     })),
-    spaces: data.spaces.map(s => ({ 
-        ...s, 
-        createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING, 
+    spaces: data.spaces.map(s => ({
+        ...s,
+        createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
         updatedAt: s.updatedAt ? s.updatedAt.toISOString() : (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING),
-        building: s.building ? { 
-            ...(s.building as BuildingPrismaType & { penaltyPolicyTiers: PenaltyTierPrisma[], spaces: SpacePrisma[] }), // Added spaces to building type
+        building: s.building ? {
+            ...(s.building as BuildingPrismaType & { penaltyPolicyTiers: PenaltyTierPrisma[], spaces: SpacePrisma[] }),
             createdAt: s.building.createdAt ? s.building.createdAt.toISOString() : EPOCH_ISO_STRING,
             updatedAt: s.building.updatedAt ? s.building.updatedAt.toISOString() : (s.building.createdAt ? s.building.createdAt.toISOString() : EPOCH_ISO_STRING),
             penaltyPolicyTiers: (s.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
-             spaces: (s.building.spaces || []).map(sp => ({ // Serialize spaces if present
+             spaces: (s.building.spaces || []).map(sp => ({
                 ...sp,
-                createdAt: sp.createdAt.toISOString(),
-                updatedAt: sp.updatedAt?.toISOString() || sp.createdAt.toISOString()
+                createdAt: sp.createdAt ? sp.createdAt.toISOString() : EPOCH_ISO_STRING,
+                updatedAt: sp.updatedAt?.toISOString() || (sp.createdAt ? sp.createdAt.toISOString() : EPOCH_ISO_STRING)
             }))
-        } : null // Add null check for s.building
+        } : null
     })),
-    buildings: data.buildings.map(b => ({ 
-        ...b, 
-        createdAt: b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING, 
+    buildings: data.buildings.map(b => ({
+        ...b,
+        createdAt: b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING,
         updatedAt: b.updatedAt ? b.updatedAt.toISOString() : (b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING),
         penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(pt => ({...pt})),
-        spaces: (b.spaces || []).map(s => ({ // Serialize spaces for top-level buildings too
+        spaces: (b.spaces || []).map(s => ({
             ...s,
-            createdAt: s.createdAt.toISOString(),
-            updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString()
+            createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
+            updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
         }))
     })),
     bills: data.bills.map(b => {
@@ -79,44 +79,43 @@ const serializeBillingPageData = (data: BillingPageData): SerializedBillingPageD
       const billUpdatedAt = b.updatedAt ? b.updatedAt.toISOString() : billCreatedAt;
 
       return {
-        ...b, // Spread all properties from b (which has utilityBreakdown as ParsedUtilityItem[])
+        ...b,
         createdAt: billCreatedAt,
         updatedAt: billUpdatedAt,
-        billDate: b.billDate.toISOString(), 
-        dueDate: b.dueDate.toISOString(),
+        billDate: b.billDate ? b.billDate.toISOString() : EPOCH_ISO_STRING,
+        dueDate: b.dueDate ? b.dueDate.toISOString() : EPOCH_ISO_STRING,
         paymentDate: b.paymentDate?.toISOString() || null,
-        // utilityBreakdown is already ParsedUtilityItem[] from actions.ts, so just spread
-        utilityBreakdown: (b.utilityBreakdown || []).map(ub => ({...ub}) as SerializedParsedUtilityItem), 
-        agreement: { 
+        utilityBreakdown: (b.utilityBreakdown || []).map(ub => ({...ub}) as SerializedParsedUtilityItem),
+        agreement: b.agreement ? {
             ...b.agreement,
             createdAt: b.agreement.createdAt ? b.agreement.createdAt.toISOString() : EPOCH_ISO_STRING,
             updatedAt: b.agreement.updatedAt ? b.agreement.updatedAt.toISOString() : (b.agreement.createdAt ? b.agreement.createdAt.toISOString() : EPOCH_ISO_STRING),
-            startDate: b.agreement.startDate.toISOString(),
-            nextPaymentDueDate: b.agreement.nextPaymentDueDate.toISOString(),
+            startDate: b.agreement.startDate ? b.agreement.startDate.toISOString() : EPOCH_ISO_STRING,
+            nextPaymentDueDate: b.agreement.nextPaymentDueDate ? b.agreement.nextPaymentDueDate.toISOString() : EPOCH_ISO_STRING,
             initialPaymentDate: b.agreement.initialPaymentDate?.toISOString() || null,
             endDate: b.agreement.endDate?.toISOString() || null,
-            tenant: { 
-              ...b.agreement.tenant, 
-              createdAt: b.agreement.tenant.createdAt ? b.agreement.tenant.createdAt.toISOString() : EPOCH_ISO_STRING, 
+            tenant: b.agreement.tenant ? {
+              ...b.agreement.tenant,
+              createdAt: b.agreement.tenant.createdAt ? b.agreement.tenant.createdAt.toISOString() : EPOCH_ISO_STRING,
               updatedAt: b.agreement.tenant.updatedAt ? b.agreement.tenant.updatedAt.toISOString() : (b.agreement.tenant.createdAt ? b.agreement.tenant.createdAt.toISOString() : EPOCH_ISO_STRING)
-            },
-            space: { 
-                ...b.agreement.space, 
-                createdAt: b.agreement.space.createdAt ? b.agreement.space.createdAt.toISOString() : EPOCH_ISO_STRING, 
+            } : null,
+            space: b.agreement.space ? {
+                ...b.agreement.space,
+                createdAt: b.agreement.space.createdAt ? b.agreement.space.createdAt.toISOString() : EPOCH_ISO_STRING,
                 updatedAt: b.agreement.space.updatedAt ? b.agreement.space.updatedAt.toISOString() : (b.agreement.space.createdAt ? b.agreement.space.createdAt.toISOString() : EPOCH_ISO_STRING),
                 building: b.agreement.space.building ? {
-                     ...(b.agreement.space.building as BuildingPrismaType & { penaltyPolicyTiers: PenaltyTierPrisma[], spaces: SpacePrisma[] }), // Added spaces
+                     ...(b.agreement.space.building as BuildingPrismaType & { penaltyPolicyTiers: PenaltyTierPrisma[], spaces: SpacePrisma[] }),
                      createdAt: b.agreement.space.building.createdAt ? b.agreement.space.building.createdAt.toISOString() : EPOCH_ISO_STRING,
                      updatedAt: b.agreement.space.building.updatedAt ? b.agreement.space.building.updatedAt.toISOString() : (b.agreement.space.building.createdAt ? b.agreement.space.building.createdAt.toISOString() : EPOCH_ISO_STRING),
                      penaltyPolicyTiers: (b.agreement.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
-                     spaces: (b.agreement.space.building.spaces || []).map(s => ({ // Serialize spaces
+                     spaces: (b.agreement.space.building.spaces || []).map(s => ({
                         ...s,
-                        createdAt: s.createdAt.toISOString(),
-                        updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString()
+                        createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
+                        updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
                     }))
-                } : null // Add null check for b.agreement.space.building
-            },
-        }
+                } : null
+            } : null,
+        } : null,
       };
     }),
     buildingMonthlyUtilities: data.buildingMonthlyUtilities.map(bu => ({
@@ -142,5 +141,3 @@ export default function BillingPage() {
     </Suspense>
   );
 }
-
-    
