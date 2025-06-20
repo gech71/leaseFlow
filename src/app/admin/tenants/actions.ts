@@ -101,10 +101,9 @@ export async function updateTenantAction(
 export async function deleteTenantAction(tenantId: string) {
   try {
     const tenant = await databaseService.getTenantById(tenantId, {
-      include: {
-        agreements: true, // Fetch all agreements
-        rentedSpace: true
-      }
+      // Pass include options directly, not nested under another 'include' key
+      agreements: true,
+      rentedSpace: true
     });
 
     if (!tenant) {
