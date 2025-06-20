@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
   let externalApiResponse: Response;
   try {
-    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/login`, { // Ensure /api/ is included
+    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,64 +42,79 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Failed to connect to authentication service. Please try again later."] }, { status: 503 });
   }
 
-  let responseData;
+  let responseText;
   try {
-    const responseText = await externalApiResponse.text();
-    if (responseText) {
+    responseText = await externalApiResponse.text();
+  } catch (textError: any) {
+    console.error("Error reading response text from external auth service:", textError.message);
+    // If reading text itself fails, it's a severe issue with the response.
+    return NextResponse.json(
+      { isSuccess: false, errors: [`Authentication failed. Server responded with an unreadable body (Status: ${externalApiResponse.status}).`] },
+      { status: externalApiResponse.status || 500 }
+    );
+  }
+
+  let responseData;
+  if (responseText) {
+    try {
       responseData = JSON.parse(responseText);
-    } else {
-      // Handle empty response body, especially for errors
+    } catch (jsonError: any) {
+      console.error("Error parsing JSON from external auth service:", jsonError.message, "Response text:", responseText);
       if (!externalApiResponse.ok) {
-        console.warn(`External auth service returned status ${externalApiResponse.status} with an empty body.`);
         return NextResponse.json(
-          { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status}.`] },
+          { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status} and an invalid JSON response format.`] },
           { status: externalApiResponse.status }
         );
       }
-      // If OK but empty, this is unusual for a login response with tokens
-      console.warn("External auth service returned an OK status with an empty body for login.");
+      return NextResponse.json({ isSuccess: false, errors: ["Received an invalid JSON response format from authentication service."] }, { status: 500 });
+    }
+  } else {
+    // Handle empty response body based on status
+    if (!externalApiResponse.ok) {
+      console.warn(`External auth service returned status ${externalApiResponse.status} with an empty body.`);
       return NextResponse.json(
-        { isSuccess: false, errors: ["Received an unexpected empty response from authentication service."] },
-        { status: 500 }
+        { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status} and an empty response.`] },
+        { status: externalApiResponse.status }
       );
     }
-  } catch (jsonError: any) {
-    console.error("Error parsing JSON from external auth service:", jsonError.message);
-     if (!externalApiResponse.ok) { // If parsing failed for an error response
-        return NextResponse.json(
-          { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status} and an invalid response format.`] },
-          { status: externalApiResponse.status }
-        );
-    }
-    // If parsing failed for a success response (which shouldn't happen if API is correct)
-    return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response format from authentication service."] }, { status: 500 });
+    // If OK but empty, this is unusual for a login response with tokens
+    console.warn("External auth service returned an OK status with an empty body for login.");
+    return NextResponse.json(
+      { isSuccess: false, errors: ["Received an unexpected empty response from authentication service."] },
+      { status: 500 }
+    );
   }
 
   if (externalApiResponse.ok && responseData && responseData.isSuccess && responseData.accessToken && responseData.refreshToken) {
-    // Directly use cookies().set()
-    cookies().set(ACCESS_TOKEN_KEY, responseData.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
-      maxAge: ACCESS_TOKEN_MAX_AGE,
-    });
+    try {
+      const cookieStore = await cookies(); // As per user instruction
+      
+      cookieStore.set(ACCESS_TOKEN_KEY, responseData.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        sameSite: 'lax',
+        maxAge: ACCESS_TOKEN_MAX_AGE,
+      });
 
-    cookies().set(REFRESH_TOKEN_KEY, responseData.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
-      maxAge: REFRESH_TOKEN_MAX_AGE,
-    });
+      cookieStore.set(REFRESH_TOKEN_KEY, responseData.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        sameSite: 'lax',
+        maxAge: REFRESH_TOKEN_MAX_AGE,
+      });
 
-    return NextResponse.json({ isSuccess: true, message: "Login successful" });
+      return NextResponse.json({ isSuccess: true, message: "Login successful" });
+    } catch (cookieError: any) {
+      console.error("Error setting cookies:", cookieError.message);
+      return NextResponse.json({ isSuccess: false, errors: ["Login succeeded but failed to set session cookies."] }, { status: 500 });
+    }
   } else {
     const errorMessages = responseData?.errors && Array.isArray(responseData.errors) && responseData.errors.length > 0
       ? responseData.errors
       : [`Login failed. Please check your credentials or contact support. (Status: ${externalApiResponse.status})`];
     
-    // Determine status: use external API's status if not ok, otherwise determine from responseData
     const responseStatus = !externalApiResponse.ok ? externalApiResponse.status : (responseData?.isSuccess === false ? 401 : 500);
     
     return NextResponse.json(

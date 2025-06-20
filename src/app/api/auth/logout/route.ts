@@ -7,45 +7,55 @@ const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
 const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
 
 export async function POST(request: NextRequest) {
-  const accessToken = cookies().get(ACCESS_TOKEN_KEY)?.value;
-  const refreshToken = cookies().get(REFRESH_TOKEN_KEY)?.value;
+  let accessToken, refreshToken;
+  try {
+    const cookieStoreGetter = cookies(); // Get the cookie store accessor
+    accessToken = cookieStoreGetter.get(ACCESS_TOKEN_KEY)?.value;
+    refreshToken = cookieStoreGetter.get(REFRESH_TOKEN_KEY)?.value;
+  } catch (e) {
+    console.error("Error reading cookies for logout:", e);
+    // Proceed to clear cookies even if reading fails
+  }
+
 
   if (AUTH_API_BASE_URL && accessToken && refreshToken) {
     try {
-      // Ensure /api/ is included
       await fetch(`${AUTH_API_BASE_URL}/api/auth/logout`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // Body might vary based on your identity server's requirements
         body: JSON.stringify({ token: accessToken, refreshToken }), 
       });
-      // We don't typically need to check the response of the external logout
-      // as we'll clear local cookies regardless.
     } catch (error) {
-      // Log error but proceed to clear local cookies
       console.error("Error calling external logout API:", error);
     }
   }
 
-  // Clear the cookies by setting them with an immediate expiry (maxAge: 0)
-  // Directly use cookies().set()
-  cookies().set(ACCESS_TOKEN_KEY, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    sameSite: 'lax',
-    maxAge: 0, // Expire immediately
-  });
+  try {
+    const cookieStoreSetter = await cookies(); // As per user instruction for setting
 
-  cookies().set(REFRESH_TOKEN_KEY, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    sameSite: 'lax',
-    maxAge: 0, // Expire immediately
-  });
+    cookieStoreSetter.set(ACCESS_TOKEN_KEY, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 0, 
+    });
+
+    cookieStoreSetter.set(REFRESH_TOKEN_KEY, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 0, 
+    });
+  } catch (cookieError: any) {
+      console.error("Error clearing cookies during logout:", cookieError.message);
+      // Even if clearing fails, we should inform the client the logout was attempted
+      return NextResponse.json({ isSuccess: false, message: "Logout processed, but cookie clearing encountered an issue." }, { status: 500 });
+  }
+
 
   return NextResponse.json({ isSuccess: true, message: "Logout successful" });
 }
