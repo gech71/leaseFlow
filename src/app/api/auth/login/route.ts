@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   let externalApiResponse: Response;
   try {
-    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/auth/login`, {
+    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/login`, { // Updated path
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (networkError: any) {
     console.error("Network error calling external auth service:", networkError.message);
-    return NextResponse.json({ isSuccess: false, errors: ["Failed to connect to authentication service. Please try again later."] }, { status: 503 }); // Service Unavailable
+    return NextResponse.json({ isSuccess: false, errors: ["Failed to connect to authentication service. Please try again later."] }, { status: 503 });
   }
 
   let responseData;
@@ -49,14 +49,12 @@ export async function POST(request: NextRequest) {
     if (responseText) {
       responseData = JSON.parse(responseText);
     } else if (!externalApiResponse.ok) {
-      // Non-OK response with empty body
       console.warn(`External auth service returned status ${externalApiResponse.status} with an empty body.`);
       return NextResponse.json(
         { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status}.`] },
         { status: externalApiResponse.status }
       );
     } else {
-      // OK response but empty body - unusual for login
       console.warn("External auth service returned an OK status with an empty body for login.");
       return NextResponse.json(
         { isSuccess: false, errors: ["Received an unexpected empty response from authentication service."] },
@@ -65,21 +63,18 @@ export async function POST(request: NextRequest) {
     }
   } catch (jsonError: any) {
     console.error("Error parsing JSON from external auth service:", jsonError.message);
-    // If JSON parsing fails for a non-OK response, return a generic error based on the status
     if (!externalApiResponse.ok) {
         return NextResponse.json(
           { isSuccess: false, errors: [`Authentication failed. Server responded with status: ${externalApiResponse.status} and an invalid response format.`] },
           { status: externalApiResponse.status }
         );
     }
-    // If JSON parsing fails for an OK response, this indicates an issue with the auth provider's response format.
     return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response format from authentication service."] }, { status: 500 });
   }
 
   if (externalApiResponse.ok && responseData && responseData.isSuccess && responseData.accessToken && responseData.refreshToken) {
-    const cookieStore = cookies(); // This is synchronous
-
-    cookieStore.set(ACCESS_TOKEN_KEY, responseData.accessToken, {
+    // Use cookies().set() directly from next/headers to set response cookies
+    cookies().set(ACCESS_TOKEN_KEY, responseData.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
@@ -87,7 +82,7 @@ export async function POST(request: NextRequest) {
       maxAge: ACCESS_TOKEN_MAX_AGE,
     });
 
-    cookieStore.set(REFRESH_TOKEN_KEY, responseData.refreshToken, {
+    cookies().set(REFRESH_TOKEN_KEY, responseData.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
@@ -97,12 +92,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ isSuccess: true, message: "Login successful" });
   } else {
-    // Handle cases where externalApiResponse was ok, but data.isSuccess is false, or tokens are missing
     const errorMessages = responseData?.errors && Array.isArray(responseData.errors) && responseData.errors.length > 0
       ? responseData.errors
       : [`Login failed. Please check your credentials or contact support. (Status: ${externalApiResponse.status})`];
     
-    // Use the status from the external API if available and not OK, otherwise default to 401 or a meaningful error code.
     const responseStatus = !externalApiResponse.ok ? externalApiResponse.status : (responseData?.isSuccess === false ? 401 : 500);
     
     return NextResponse.json(
