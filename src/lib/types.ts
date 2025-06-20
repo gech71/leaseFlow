@@ -285,5 +285,3 @@ export const OLD_AVAILABLE_PERMISSIONS = [
   { id: 'role:manage', label: 'Manage Roles & Permissions' },
   // ... other old permissions
 ] as const;
-
-    
