@@ -86,8 +86,28 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     return !isBefore(today, renewalEligibilityStartDate) && !isAfter(today, agreementEndDate);
   };
 
-  const handleDownloadPdf = (agreementId: string) => {
-    toast({ title: "Download PDF", description: "PDF download functionality is coming soon!" });
+  const handleDownloadTxt = (agreementId: string) => {
+    const agreement = agreements.find(a => a.id === agreementId);
+    if (!agreement) {
+        toast({ title: "Error", description: "Could not find agreement to download.", variant: "destructive" });
+        return;
+    }
+
+    if (!agreement.agreementText) {
+        toast({ title: "Error", description: "Agreement text is empty and cannot be downloaded.", variant: "destructive" });
+        return;
+    }
+
+    const blob = new Blob([agreement.agreementText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Agreement-${agreement.tenant?.name}-${agreement.id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Download Started", description: "The agreement text file is downloading." });
   };
 
   const handleRenewAgreement = (agreement: AgreementWithRelations) => {
@@ -207,7 +227,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                         {canViewAgreements && (
                             <Link href={`/admin/agreements/${agreement.id}`} passHref className="w-full sm:w-auto"> <Button variant="outline" size="sm" className="w-full"> <Eye className="mr-1 h-4 w-4" /> View </Button> </Link>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(agreement.id)} className="w-full sm:w-auto"> <Download className="mr-1 h-4 w-4" /> PDF </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)} className="w-full sm:w-auto"> <Download className="mr-1 h-4 w-4" /> Download </Button>
                         {canDeleteAgreements && (
                             <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)} className="w-full sm:w-auto"><Trash2 className="mr-1 h-4 w-4"/>Del</Button>
                         )}
