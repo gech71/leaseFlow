@@ -9,14 +9,14 @@ import Link from 'next/link';
 export default function SettingsPage() {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <Card>
+      <Card className="flex flex-col">
         <CardHeader>
           <CardTitle className="font-headline">User Registration</CardTitle>
           <CardDescription>
             Register new users for the application.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-grow">
           <p className="text-sm text-muted-foreground mb-4">
             Create new accounts. New users are created without any roles by default.
           </p>
@@ -30,14 +30,14 @@ export default function SettingsPage() {
         </CardFooter>
       </Card>
 
-      <Card>
+      <Card className="flex flex-col">
         <CardHeader>
           <CardTitle className="font-headline">User Management</CardTitle>
           <CardDescription>
             Manage user roles and the buildings they are assigned to.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-grow">
           <p className="text-sm text-muted-foreground mb-4">
             Assign roles and buildings to users to control access and responsibilities.
           </p>
@@ -51,14 +51,14 @@ export default function SettingsPage() {
         </CardFooter>
       </Card>
 
-      <Card>
+      <Card className="flex flex-col">
         <CardHeader>
           <CardTitle className="font-headline">Role Management</CardTitle>
           <CardDescription>
             Define roles and their permissions within the application.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-grow">
           <p className="text-sm text-muted-foreground mb-4">
             Create new roles, or edit existing ones to specify what actions users with that role can perform.
           </p>
