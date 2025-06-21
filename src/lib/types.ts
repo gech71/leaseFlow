@@ -173,10 +173,6 @@ export interface CurrentUser {
   effectivePermissions: string[];
 }
 
-// Defines actions for a resource
-export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete'] as const;
-export type PermissionAction = typeof PERMISSION_ACTIONS[number];
-
 // Defines a single permission
 export interface PermissionItem {
   id: string; // e.g., "building:view"
@@ -223,7 +219,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     permissions: [
       { id: 'tenant:view', label: 'View' },
       { id: 'tenant:create', label: 'Create' },
-      { id: 'tenant:edit', label: 'Edit' },
+      { id: 'tenant:edit', label: 'Edit' }, 
       { id: 'tenant:delete', label: 'Delete' },
     ],
   },
@@ -241,8 +237,8 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceId: 'building_utility',
     resourceLabel: 'Building Utilities',
     permissions: [
-      { id: 'building_utility:view', label: 'View Page' },
-      { id: 'building_utility:save', label: 'Save Costs' },
+      { id: 'building_utility:view', label: 'View' },
+      { id: 'building_utility:save', label: 'Save' },
     ],
   },
   {
@@ -250,9 +246,9 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: 'Billing',
     permissions: [
       { id: 'billing:view', label: 'View' },
-      { id: 'billing:generate', label: 'Generate Bills' },
-      { id: 'billing:manage_payments', label: 'Record/Verify Payments' },
-      { id: 'billing:delete', label: 'Delete Bills' },
+      { id: 'billing:generate', label: 'Generate' },
+      { id: 'billing:manage_payments', label: 'Manage Payments' },
+      { id: 'billing:delete', label: 'Delete' },
     ],
   },
   {
@@ -264,31 +260,25 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
   },
   {
     resourceId: 'settings',
-    resourceLabel: 'Settings Area', 
+    resourceLabel: 'Settings', 
     permissions: [
-      { id: 'settings:user_registration:manage', label: 'Register New Users' },
+      { id: 'settings:user_registration:manage', label: 'Manage User Registration' },
       { id: 'settings:user_management:view', label: 'View User Assignments' },
       { id: 'settings:user_management:assign', label: 'Assign Roles/Buildings' },
       { id: 'settings:role_management:view', label: 'View Roles' },
-      { id: 'settings:role_management:manage', label: 'Manage Roles (CUD)' },
+      { id: 'settings:role_management:manage', label: 'Manage Roles' },
     ],
   },
   {
     resourceId: 'portal',
-    resourceLabel: 'Tenant Portal Link',
+    resourceLabel: 'Tenant Portal (Link)',
     permissions: [
-      { id: 'portal:view', label: 'View Link in Sidebar' },
+      { id: 'portal:view', label: 'View Link' },
     ],
   },
 ];
 
-// Flattened list for convenience, though direct iteration over structured list is often better.
+
+// Flattened list for convenience
 export const AVAILABLE_PERMISSIONS: PermissionItem[] = ALL_RESOURCE_PERMISSIONS.flatMap(group => group.permissions);
 export type PermissionId = typeof AVAILABLE_PERMISSIONS[number]['id'];
-
-// Old list - to be deprecated/removed after refactor
-export const OLD_AVAILABLE_PERMISSIONS = [
-  { id: 'user:manage', label: 'Manage Users & Registration' },
-  { id: 'role:manage', label: 'Manage Roles & Permissions' },
-  // ... other old permissions
-] as const;

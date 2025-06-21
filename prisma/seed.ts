@@ -103,12 +103,12 @@ async function main() {
   console.log('Creating Users...');
   const user1 = await prisma.user.create({
     data: {
-      userId: 'auth0|user123_superadmin', 
-      email: 'super.admin@leaseflow.com',
-      name: 'Super Admin',
-      firstName: 'Super',
-      lastName: 'Admin',
-      phoneNumber: '555-0001',
+      userId: 'external-id-superadmin', // This ID must match the one from your auth provider for this user
+      email: 'superadmin@leaseflow.com',
+      name: 'Default Super Admin',
+      firstName: 'Default',
+      lastName: 'SuperAdmin',
+      phoneNumber: '0912345678', // The login credential
       roles: { connect: { id: superAdminRole.id } },
     },
   });
