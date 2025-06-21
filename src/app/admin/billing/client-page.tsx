@@ -223,7 +223,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     }
     
     setIsLoading(true);
-    const result = await generateBillAndUpdateAgreementAction(agreementId, nextDueDate.toISOString());
+    // Pass date as 'yyyy-MM-dd' string to avoid timezone issues.
+    const result = await generateBillAndUpdateAgreementAction(agreementId, format(nextDueDate, 'yyyy-MM-dd'));
     setIsLoading(false);
 
     if (result.success && result.bill) {
@@ -255,7 +256,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         const nextDueDate = parseISO(agreement.nextPaymentDueDate);
         if (isAfter(nextDueDate, today)) { skippedCount++; continue; }
 
-        const result = await generateBillAndUpdateAgreementAction(agreement.id, nextDueDate.toISOString());
+        // Pass date as 'yyyy-MM-dd' string to avoid timezone issues.
+        const result = await generateBillAndUpdateAgreementAction(agreement.id, format(nextDueDate, 'yyyy-MM-dd'));
         if (result.success) generatedCount++;
         else {
             if (result.error && result.error.includes("already exists")) skippedCount++;

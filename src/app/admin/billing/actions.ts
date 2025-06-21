@@ -259,7 +259,8 @@ function calculateIndividualPenalty(
 
 export async function generateBillAndUpdateAgreementAction(agreementId: string, targetBillDateStr: string) {
   try {
-    const targetBillDate = parseISO(targetBillDateStr); // Use date as-is from client to avoid timezone shifts
+    // The date string from the client is 'yyyy-MM-dd'. We parse it as a UTC date to avoid timezone shifts.
+    const targetBillDate = parseISO(`${targetBillDateStr}T00:00:00.000Z`);
     const today = startOfDay(new Date());
 
     const agreement = await databaseService.getAgreementById(agreementId, { 
@@ -279,7 +280,8 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     if (!agreement.space) throw new Error("Space details for agreement not found.");
     if (!agreement.space.building) throw new Error("Building details for space not found.");
 
-    const targetDayStart = startOfDay(targetBillDate);
+    // Use the UTC date for checking duplicates to ensure consistency
+    const targetDayStart = targetBillDate;
     const targetDayEnd = addDays(targetDayStart, 1);
 
     const existingBill = await databaseService.getAllBills({
