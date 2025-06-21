@@ -214,21 +214,15 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const agreement = agreements.find(ag => ag.id === agreementId);
     if (!agreement) { toast({ title: "Error", description: "Agreement not found.", variant: "destructive" }); return; }
     
-    const nextDueDate = parseISO(agreement.nextPaymentDueDate);
-    const agreementStartDate = parseISO(agreement.startDate);
-    const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-
-    if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) {
-      toast({ title: "Info", description: "Agreement not active or expired.", variant: "default" }); return;
-    }
+    // Use substring on the ISO date string to get 'yyyy-MM-dd' format and avoid timezone issues.
+    const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
     
     setIsLoading(true);
-    // Pass date as 'yyyy-MM-dd' string to avoid timezone issues.
-    const result = await generateBillAndUpdateAgreementAction(agreementId, format(nextDueDate, 'yyyy-MM-dd'));
+    const result = await generateBillAndUpdateAgreementAction(agreementId, nextDueDateString);
     setIsLoading(false);
 
     if (result.success && result.bill) {
-      toast({ title: "Bill Generated", description: `New bill for ${agreement.tenant?.name} (Due: ${format(parseISO(result.bill.dueDate.toISOString()), 'PP')}) created. Total: $${result.bill.totalAmount.toFixed(2)}` });
+      toast({ title: "Bill Generated", description: `New bill for ${agreement.tenant?.name} (Due: ${format(parseISO(result.bill.dueDate as string), 'PP')}) created. Total: $${result.bill.totalAmount.toFixed(2)}` });
       await refreshBillingData();
     } else {
       toast({ title: "Bill Generation Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
@@ -244,20 +238,30 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     let generatedCount = 0, skippedCount = 0, errorCount = 0;
     const errorMessages: string[] = [];
 
+    // Get today's date as a 'yyyy-MM-dd' string based on UTC to avoid timezone issues.
+    const todayUtcDateString = new Date().toISOString().substring(0, 10);
+
     for (const agreement of agreements) {
         if (!agreement.tenant) { 
              skippedCount++;
              continue;
         }
+        
         const agreementStartDate = parseISO(agreement.startDate);
         const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-        if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) { skippedCount++; continue; }
+        if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) { 
+            skippedCount++; 
+            continue; 
+        }
         
-        const nextDueDate = parseISO(agreement.nextPaymentDueDate);
-        if (isAfter(nextDueDate, today)) { skippedCount++; continue; }
+        // Compare date strings to determine if a bill is due, avoiding timezone issues.
+        const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+        if (nextDueDateString > todayUtcDateString) {
+            skippedCount++;
+            continue;
+        }
 
-        // Pass date as 'yyyy-MM-dd' string to avoid timezone issues.
-        const result = await generateBillAndUpdateAgreementAction(agreement.id, format(nextDueDate, 'yyyy-MM-dd'));
+        const result = await generateBillAndUpdateAgreementAction(agreement.id, nextDueDateString);
         if (result.success) generatedCount++;
         else {
             if (result.error && result.error.includes("already exists")) skippedCount++;
@@ -372,6 +376,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     if (event.target.files && event.target.files[0]) setAdminSelectedProofFile(event.target.files[0]);
     else setAdminSelectedProofFile(null);
   };
+  
+  const todayUtcDateString = new Date().toISOString().substring(0, 10);
 
   if (!isMounted && agreements.length === 0 && !canViewBilling) { 
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
@@ -398,17 +404,19 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {agreements.map(agreement => {
               if (!agreement.tenant || !agreement.space) return null; 
+              
               const agreementStartDate = parseISO(agreement.startDate);
               const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
               const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
-              const nextDueDate = parseISO(agreement.nextPaymentDueDate);
-              const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, today);
+              const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+              const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
+              
               return (
                 <Card key={agreement.id} className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="flex-grow pb-2 pt-3">
                     <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
                     <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
-                    <CardDescription className="text-xs pt-1"> Next Due: {format(nextDueDate, 'PP')}
+                    <CardDescription className="text-xs pt-1"> Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}
                       {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive)</span>}
                       {isAgreementActive && isDueForGeneration && <Badge variant="default" className="ml-1 text-xs bg-green-100 text-green-700">Due for Gen</Badge>}
                       {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
