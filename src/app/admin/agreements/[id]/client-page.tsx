@@ -11,9 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer, Download, DollarSign as DollarSignIcon, CreditCard, Landmark, Wallet, Coins, HelpCircle, Loader2 } from 'lucide-react';
 import type { Agreement as AgreementPrisma, Tenant, Space } from '@prisma/client';
 import { format, parseISO } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
 import React from 'react';
-// Removed: import { databaseService } from '@/lib/services/databaseService'; // No direct DB access
 
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
@@ -32,24 +30,30 @@ interface ViewAgreementClientPageProps {
 
 export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgreementClientPageProps) {
   const router = useRouter();
-  const { toast } = useToast();
-  // Agreement state expects dates to be Date objects for formatting, 
-  // but initialAgreement prop has them as strings.
   const [agreement, setAgreement] = useState<AgreementWithRelations | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
     if (initialAgreement) {
-        setAgreement(initialAgreement); // Dates are already strings, format function handles this
+        setAgreement(initialAgreement);
     } else if (isMounted) { 
-      toast({ title: "Error", description: "Agreement not found or failed to load.", variant: "destructive" });
+      // toast({ title: "Error", description: "Agreement not found or failed to load.", variant: "destructive" });
       router.push('/admin/agreements');
     }
-  }, [initialAgreement, router, toast, isMounted]);
+  }, [initialAgreement, router, isMounted]);
 
-  const handleDownloadPdf = () => {
-    toast({ title: "Download PDF", description: "PDF download functionality is coming soon!" });
+  const handleDownloadAgreement = () => {
+    if (!agreement) return;
+    const blob = new Blob([agreement.agreementText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Agreement-${agreement.tenant?.name}-${agreement.id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const getPaymentMethodIcon = (method?: string | null) => {
@@ -111,7 +115,11 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
           <ScrollArea className="h-[300px] sm:h-[400px] w-full rounded-md border p-4 bg-secondary/30"> <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed"> {agreement.agreementText} </pre> </ScrollArea>
           {agreement.additionalTerms && ( <> <h3 className="text-lg font-semibold mb-2 font-headline mt-4">Additional Terms</h3> <p className="text-sm text-muted-foreground p-4 border rounded-md bg-secondary/30">{agreement.additionalTerms}</p> </> )}
         </CardContent>
-        <CardFooter className="border-t pt-4 flex justify-end"> <Button onClick={handleDownloadPdf} className="w-full sm:w-auto"> <Download className="mr-2 h-4 w-4" /> Download PDF </Button> </CardFooter>
+        <CardFooter className="border-t pt-4 flex justify-end">
+          <Button onClick={handleDownloadAgreement} className="w-full sm:w-auto">
+            <Download className="mr-2 h-4 w-4" /> Download Agreement
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   );

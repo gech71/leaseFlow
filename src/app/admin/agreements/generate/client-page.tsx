@@ -8,11 +8,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye, CalendarClock, Sigma, CreditCard, Landmark, Wallet, Coins, HelpCircle, Info, CalendarDays, EyeOff } from 'lucide-react';
+import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye, CalendarClock, Sigma, CreditCard, Landmark, Wallet, Coins, HelpCircle, Info, CalendarDays, EyeOff, Download } from 'lucide-react';
 import type { Space as SpacePrismaType, Tenant as TenantPrismaType, Agreement as AgreementPrismaType } from '@prisma/client';
-import type { AgreementInput as AIInputType } from '@/lib/types'; // For AI
 import { useToast } from '@/hooks/use-toast';
-import { generateAgreementAction } from '@/app/actions';
 import { createFullAgreementAction, type CreateFullAgreementData } from '../actions';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -69,7 +67,7 @@ interface GenerateAgreementClientPageProps {
 
 export function GenerateAgreementClientPage({ tenants, availableSpaces }: GenerateAgreementClientPageProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSavingToDb, setIsSavingToDb] = useState(false);
   const [generatedAgreementText, setGeneratedAgreementText] = useState<string | null>(null);
   const [finalizedAgreement, setFinalizedAgreement] = useState<AgreementPrismaType | null>(null);
@@ -112,12 +110,12 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
 
   useEffect(() => setIsMounted(true), []);
 
-  const handleGenerateAIAgreement = async (data: AgreementFormValues) => {
+  const handlePreviewAgreement = (data: AgreementFormValues) => {
     if (!canCreateAgreements) {
       toast({ title: "Permission Denied", description: "You do not have permission to generate agreement text.", variant: "destructive" });
       return;
     }
-    setIsLoadingAI(true);
+    setIsPreviewing(true);
     setError(null);
     setGeneratedAgreementText(null);
     setFinalizedAgreement(null);
@@ -127,36 +125,68 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
 
     if (!selectedTenant || !selectedSpace) {
       toast({ title: "Error", description: "Selected tenant or space not found.", variant: "destructive" });
-      setIsLoadingAI(false);
+      setIsPreviewing(false);
       return;
     }
 
-    const agreementInputForAI: AIInputType = {
-      tenantName: selectedTenant.name,
-      building: selectedSpace.buildingName,
-      spaceId: selectedSpace.spaceIdName,
-      spaceArea: selectedSpace.area,
-      floor: selectedSpace.floor,
-      monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
-      paymentTermMonths: data.paymentTermMonths,
-      initialPaymentMonths: data.initialPaymentMonths,
-      additionalTerms: data.additionalTerms || "",
-    };
+    const agreementTemplate = `
+RENTAL AGREEMENT
 
-    const result = await generateAgreementAction(agreementInputForAI);
+This Rental Agreement ("Agreement") is made and entered into on ${format(data.startDate, 'PPP')}, by and between the Landlord and the Tenant.
 
-    if ('error' in result) {
-      setError(result.error);
-      toast({ title: "AI Agreement Generation Failed", description: result.error, variant: "destructive" });
-    } else if (result.agreementText) {
-      setGeneratedAgreementText(result.agreementText);
-      toast({ title: "AI Agreement Text Generated!", description: "Review the text and proceed to save." });
-    } else {
-      const aiError = "Received an empty or invalid response from the AI for agreement text.";
-      setError(aiError);
-      toast({ title: "AI Agreement Generation Failed", description: aiError, variant: "destructive" });
-    }
-    setIsLoadingAI(false);
+1.  PARTIES
+    -   Tenant: ${selectedTenant.name}
+    -   Landlord: [Landlord Name/Company]
+
+2.  PROPERTY
+    -   Building: ${selectedSpace.buildingName}
+    -   Space: ${selectedSpace.spaceIdName}
+    -   Floor: ${selectedSpace.floor}
+    -   Area: ${selectedSpace.area} sq ft
+
+3.  TERM
+    This Agreement shall commence on ${format(data.startDate, 'PPP')} and continue for a term of ${data.paymentTermMonths} month(s).
+
+4.  RENT
+    -   Monthly Rent: $${selectedSpace.monthlyRentalPrice.toLocaleString()}
+    -   Initial Payment: An amount equivalent to ${data.initialPaymentMonths} month(s) rent, totaling $${(selectedSpace.monthlyRentalPrice * data.initialPaymentMonths).toLocaleString()}, has been paid upfront.
+    -   Next Payment Due: ${format(addMonths(data.startDate, data.initialPaymentMonths), 'PPP')}
+
+5.  UTILITIES
+    Tenant shall be responsible for a pro-rated share of building utilities as determined by the Landlord's policies and the space's assigned proration share of ${selectedSpace.utilityProrationShare * 100}%.
+
+6.  ADDITIONAL TERMS
+    ${data.additionalTerms || "No additional terms specified."}
+
+7.  GOVERNING LAW
+    This Agreement shall be governed by and construed in accordance with the laws of the applicable jurisdiction.
+
+IN WITNESS WHEREOF, the parties have executed this Agreement as of the date first above written.
+
+_________________________
+Tenant: ${selectedTenant.name}
+
+_________________________
+Landlord/Authorized Representative
+    `;
+    
+    setGeneratedAgreementText(agreementTemplate.trim());
+    toast({ title: "Agreement Preview Generated!", description: "Review the text and proceed to save." });
+    setIsPreviewing(false);
+  };
+  
+  const handleDownloadAgreement = () => {
+    if (!generatedAgreementText) return;
+    const blob = new Blob([generatedAgreementText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const selectedTenant = tenants.find(t => t.id === form.getValues().tenantId);
+    a.download = `Draft-Agreement-${selectedTenant?.name || 'Tenant'}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleSaveFullAgreement = async () => {
@@ -230,7 +260,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleGenerateAIAgreement)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(handlePreviewAgreement)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="tenantId"
@@ -334,11 +364,11 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
                   <FormItem>
                     <FormLabel>Additional Terms for Agreement (Optional)</FormLabel>
                     <FormControl><Textarea placeholder="Enter any specific clauses..." className="resize-none" rows={3} {...field} disabled={!canCreateAgreements}/></FormControl>
-                    <FormDescription>These terms will be appended to the standard agreement clauses by the AI.</FormDescription><FormMessage />
+                    <FormDescription>These terms will be appended to the standard agreement clauses.</FormDescription><FormMessage />
                   </FormItem>
               )}/>
-              <Button type="submit" disabled={isLoadingAI || isSavingToDb || availableSpaces.length === 0 || tenants.length === 0 || !form.formState.isValid || !canCreateAgreements} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                {isLoadingAI ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating AI Text...</> : "Generate Agreement Text (AI)"}
+              <Button type="submit" disabled={isPreviewing || isSavingToDb || availableSpaces.length === 0 || tenants.length === 0 || !form.formState.isValid || !canCreateAgreements} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                {isPreviewing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> : "Preview Agreement"}
               </Button>
             </form>
           </Form>
@@ -348,19 +378,24 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Generated Agreement & Finalize</CardTitle>
-          <CardDescription>Review the AI-generated text. If satisfied, save the agreement to the database.</CardDescription>
+          <CardDescription>Review the generated text. If satisfied, save the agreement to the database.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingAI && ( <div className="flex flex-col items-center justify-center h-64 text-muted-foreground"> <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /> <p>Generating AI text...</p> </div> )}
-          {error && !isLoadingAI && ( <div className="flex flex-col items-center justify-center h-64 text-destructive-foreground bg-destructive/80 p-6 rounded-md"> <AlertTriangle className="h-12 w-12 mb-4" /> <p className="font-semibold text-lg">Error</p> <p className="text-sm text-center">{error}</p> </div> )}
+          {isPreviewing && ( <div className="flex flex-col items-center justify-center h-64 text-muted-foreground"> <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /> <p>Generating text...</p> </div> )}
+          {error && !isPreviewing && ( <div className="flex flex-col items-center justify-center h-64 text-destructive-foreground bg-destructive/80 p-6 rounded-md"> <AlertTriangle className="h-12 w-12 mb-4" /> <p className="font-semibold text-lg">Error</p> <p className="text-sm text-center">{error}</p> </div> )}
           
-          {generatedAgreementText && !finalizedAgreement && !isLoadingAI && !error && (
+          {generatedAgreementText && !finalizedAgreement && !isPreviewing && !error && (
             <div className="space-y-4">
-              <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">AI Agreement text generated!</p></div>
+              <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">Agreement text generated!</p></div>
               <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-secondary/30"><pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">{generatedAgreementText}</pre></ScrollArea>
-              <Button onClick={handleSaveFullAgreement} disabled={isSavingToDb || isLoadingAI || !canCreateAgreements} className="w-full">
-                {isSavingToDb ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving to Database...</> : "Finalize & Save Agreement to Database"}
-              </Button>
+               <div className="flex flex-col sm:flex-row gap-2">
+                <Button onClick={handleSaveFullAgreement} disabled={isSavingToDb || isPreviewing || !canCreateAgreements} className="w-full">
+                  {isSavingToDb ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Finalize & Save Agreement"}
+                </Button>
+                <Button onClick={handleDownloadAgreement} variant="outline" className="w-full sm:w-auto" disabled={isSavingToDb}>
+                  <Download className="mr-2 h-4 w-4"/> Download
+                </Button>
+              </div>
             </div>
           )}
 
@@ -379,11 +414,11 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
               </div>
           )}
 
-          {!generatedAgreementText && !finalizedAgreement && !isLoadingAI && !error && (
+          {!generatedAgreementText && !finalizedAgreement && !isPreviewing && !error && (
             <div className="flex flex-col items-center justify-center h-64 text-muted-foreground border-2 border-dashed border-border rounded-md p-6">
               <FileText className="h-12 w-12 mb-4" />
-              <p className="font-semibold">AI-generated agreement text will appear here.</p>
-              <p className="text-sm text-center">Fill form and click "Generate Agreement Text (AI)".</p>
+              <p className="font-semibold">Agreement text preview will appear here.</p>
+              <p className="text-sm text-center">Fill form and click "Preview Agreement".</p>
             </div>
           )}
         </CardContent>
