@@ -299,7 +299,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                     return (
                       <AccordionItem value={group.resourceId} key={group.resourceId}>
                         <AccordionTrigger className={cn("hover:no-underline", isGroupIndeterminate ? "text-primary" : "")}>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-1 items-center gap-2">
                              <Checkbox
                                 id={`group-${group.resourceId}-trigger`}
                                 checked={isGroupChecked}
