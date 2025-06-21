@@ -135,8 +135,8 @@ async function main() {
   const user1 = await prisma.user.create({
     data: {
       // This userId must match the 'sub' claim in the JWT from your external authentication provider.
-      // After you log in with the phone number '0912345678' and password 'Admin@123', the auth service should return a token where the user ID is 'external-id-superadmin'.
-      userId: 'external-id-superadmin', 
+      // After you log in with the phone number '0912345678' and password 'Admin@123', the auth service should return a token where the user ID is 'b1e55c84-9055-4eb5-8bd4-a262538f7e66'.
+      userId: 'b1e55c84-9055-4eb5-8bd4-a262538f7e66', 
       email: 'superadmin@leaseflow.com',
       name: 'Default Super Admin',
       firstName: 'Default',
