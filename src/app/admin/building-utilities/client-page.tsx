@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -275,14 +274,14 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                           </Button>
                         )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
                             <Label htmlFor={`utilityName-${item.uiId}`}>Type</Label>
-                            <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                            <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} className="mt-1.5" disabled={isSaving || !canSaveUtilities}/>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="col-span-1">
                             <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label>
-                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', e.target.value)} className="mt-1.5" disabled={isSaving || !canSaveUtilities}/>
                         </div>
                     </div>
                     <div className="space-y-1.5">
@@ -347,5 +346,3 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     </div>
   );
 }
-
-    
