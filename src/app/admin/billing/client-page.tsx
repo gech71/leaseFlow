@@ -400,8 +400,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
               const nextDueDate = parseISO(agreement.nextPaymentDueDate);
               const isDueForGeneration = isAgreementActive && !isAfter(nextDueDate, today);
               return (
-                <Card key={agreement.id} className={`bg-secondary/30 shadow-sm hover:shadow-md transition-shadow ${!isAgreementActive ? 'opacity-60' : ''}`}>
-                  <CardHeader className="pb-2 pt-3">
+                <Card key={agreement.id} className={`flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow ${!isAgreementActive ? 'opacity-60' : ''}`}>
+                  <CardHeader className="flex-grow pb-2 pt-3">
                     <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
                     <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
                     <CardDescription className="text-xs pt-1"> Next Due: {format(nextDueDate, 'PP')}
