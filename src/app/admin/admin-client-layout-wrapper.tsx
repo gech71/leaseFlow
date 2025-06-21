@@ -33,6 +33,7 @@ import {
   ExternalLink,
   Loader2,
   EyeOff,
+  Eye,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -258,7 +259,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
-        <div className="md:flex items-center justify-start mb-6 h-[3.7rem]">
+        <div className="md:flex items-center justify-start mb-6 h-[3.7rem] px-4">
             {/* This trigger is for desktop only, and only when collapsed */}
             <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
         </div>
@@ -271,9 +272,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminClientLayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [isMounted, setIsMounted] = React.useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setIsMounted(true);
   }, []);
 
