@@ -101,9 +101,7 @@ export async function updateTenantAction(
 export async function deleteTenantAction(tenantId: string) {
   try {
     const tenant = await databaseService.getTenantById(tenantId, {
-      // Pass include options directly, not nested under another 'include' key
       agreements: true,
-      rentedSpace: true
     });
 
     if (!tenant) {
@@ -120,14 +118,18 @@ export async function deleteTenantAction(tenantId: string) {
         return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve or terminate these agreements first." };
       }
     }
+    
+    // Find any space that this tenant occupies
+    const spacesOccupiedByTenant = await databaseService.getAllSpaces({
+        where: { tenantId: tenantId }
+    });
 
-    const spaceIdToVacate = tenant.rentedSpaceId;
-
-    if (spaceIdToVacate) {
-      await databaseService.updateSpace(spaceIdToVacate, {
-        isOccupied: false,
-        tenant: { disconnect: true }, 
-      });
+    // Vacate all spaces linked to this tenant
+    for (const space of spacesOccupiedByTenant) {
+        await databaseService.updateSpace(space.id, {
+            isOccupied: false,
+            tenant: { disconnect: true }
+        });
     }
     
     await databaseService.deleteTenant(tenantId);
@@ -148,4 +150,3 @@ export async function deleteTenantAction(tenantId: string) {
     return { success: false, error: error.message || "Failed to delete tenant." };
   }
 }
-
