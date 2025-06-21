@@ -214,7 +214,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const agreement = agreements.find(ag => ag.id === agreementId);
     if (!agreement) { toast({ title: "Error", description: "Agreement not found.", variant: "destructive" }); return; }
     
-    // Use substring on the ISO date string to get 'yyyy-MM-dd' format and avoid timezone issues.
     const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
     
     setIsLoading(true);
@@ -235,48 +234,61 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       return;
     }
     setIsLoading(true);
-    let generatedCount = 0, skippedCount = 0, errorCount = 0;
+    let totalGenerated = 0;
+    let totalSkipped = 0;
+    let totalErrors = 0;
     const errorMessages: string[] = [];
 
-    // Get today's date as a 'yyyy-MM-dd' string based on UTC to avoid timezone issues.
     const todayUtcDateString = new Date().toISOString().substring(0, 10);
 
     for (const agreement of agreements) {
-        if (!agreement.tenant) { 
-             skippedCount++;
-             continue;
-        }
-        
+      let currentNextDueDate = agreement.nextPaymentDueDate;
+      let generatedForThisAgreement = false;
+      let stopProcessing = false;
+
+      while (!stopProcessing) {
         const agreementStartDate = parseISO(agreement.startDate);
         const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-        if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) { 
-            skippedCount++; 
-            continue; 
+
+        if (isBefore(today, agreementStartDate) || isAfter(today, agreementEndDate)) {
+          stopProcessing = true;
+          continue;
         }
-        
-        // Compare date strings to determine if a bill is due, avoiding timezone issues.
-        const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+
+        const nextDueDateString = currentNextDueDate.substring(0, 10);
         if (nextDueDateString > todayUtcDateString) {
-            skippedCount++;
-            continue;
+          stopProcessing = true;
+          continue;
         }
 
         const result = await generateBillAndUpdateAgreementAction(agreement.id, nextDueDateString);
-        if (result.success) generatedCount++;
-        else {
-            if (result.error && result.error.includes("already exists")) skippedCount++;
-            else {
-                errorCount++;
-                errorMessages.push(result.error || `Failed for ${agreement.tenant.name}`);
-            }
+        
+        if (result.success && result.bill) {
+          totalGenerated++;
+          generatedForThisAgreement = true;
+          currentNextDueDate = addMonths(parseISO(result.bill.dueDate as string), 1).toISOString();
+        } else {
+          if (result.error && !result.error.includes("already exists")) {
+            totalErrors++;
+            errorMessages.push(result.error || `Failed for ${agreement.tenant?.name}`);
+          }
+          stopProcessing = true;
         }
+      }
+
+      if (!generatedForThisAgreement) {
+        totalSkipped++;
+      }
     }
+
     setIsLoading(false);
-    let summaryMessage = `${generatedCount} bills generated. ${skippedCount} skipped.`;
-    if (errorCount > 0) summaryMessage += ` ${errorCount} failed.`;
+    let summaryMessage = `${totalGenerated} bills generated. ${totalSkipped} agreements skipped.`;
+    if (totalErrors > 0) summaryMessage += ` ${totalErrors} failed.`;
+
     toast({ title: "Bulk Bill Generation Complete", description: summaryMessage });
+
     if (errorMessages.length > 0) {
-        toast({ title: "Bulk Generation Errors", description: errorMessages.slice(0,3).join('; '), variant: "destructive", duration: 10000});
+      toast({ title: "Bulk Generation Errors", description: errorMessages.slice(0, 3).join('; '), variant: "destructive", duration: 10000 });
     }
     await refreshBillingData();
   };
