@@ -16,13 +16,6 @@ export default function SettingsLayout({
         title="Application Settings"
         icon={SettingsIcon}
         description="Manage users and other application configurations."
-        actions={
-            <Link href="/admin/dashboard" passHref>
-                <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-                </Button>
-            </Link>
-        }
       />
       {/* Add navigation for sub-settings pages if needed in the future */}
       {/* e.g., a Tabs component or a simple list of links */}
