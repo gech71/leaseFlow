@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { ShieldCheck, Edit, Trash2, PlusCircle, Loader2, AlertTriangle, BadgeAlert, ListChecks, EyeOff } from 'lucide-react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getAllRolesAction, createRoleAction, updateRoleAction, deleteRoleAction, type RoleUpsertData } from './actions';
@@ -21,8 +21,10 @@ import type { Role } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ALL_RESOURCE_PERMISSIONS, type PermissionItem } from '@/lib/types'; 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ALL_RESOURCE_PERMISSIONS } from '@/lib/types'; 
 import { usePermissions } from '@/contexts/PermissionContext';
+import { cn } from '@/lib/utils';
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
   createdAt: string;
@@ -285,32 +287,33 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               <FormItem>
                 <div className="mb-2">
                   <FormLabel className="text-base flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Permissions</FormLabel>
-                  <p className="text-sm text-muted-foreground">Select the permissions for this role. Checking the resource name (e.g., "Buildings") will toggle all its sub-permissions.</p>
+                  <p className="text-sm text-muted-foreground">Select permissions for this role. Expand a section to see individual permissions.</p>
                 </div>
-                <ScrollArea className="max-h-72 w-full rounded-md border p-4 bg-secondary/20">
-                  <div className="space-y-4">
-                    {ALL_RESOURCE_PERMISSIONS.map((group) => {
-                      const groupPermissionIds = group.permissions.map(p => p.id);
-                      const isGroupChecked = groupPermissionIds.every(pId => selectedPermissions?.includes(pId));
-                      const isGroupIndeterminate = !isGroupChecked && groupPermissionIds.some(pId => selectedPermissions?.includes(pId));
+                <Accordion type="multiple" className="w-full">
+                  {ALL_RESOURCE_PERMISSIONS.map((group) => {
+                    const groupPermissionIds = group.permissions.map(p => p.id);
+                    const selectedCount = groupPermissionIds.filter(pId => selectedPermissions?.includes(pId)).length;
+                    const isGroupChecked = selectedCount === groupPermissionIds.length;
+                    const isGroupIndeterminate = !isGroupChecked && selectedCount > 0;
 
-                      return (
-                        <div key={group.resourceId} className="space-y-2 pb-2 border-b border-border last:border-b-0">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`group-${group.resourceId}`}
-                              checked={isGroupChecked}
-                              onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
-                              aria-label={`Toggle all ${group.resourceLabel} permissions`}
-                              data-indeterminate={isGroupIndeterminate ? "true" : undefined}
-                              className="data-[indeterminate=true]:bg-primary/50"
-                              disabled={isSaving || !canManageRoles}
-                            />
-                            <Label htmlFor={`group-${group.resourceId}`} className="text-md font-semibold text-foreground cursor-pointer">
-                              {group.resourceLabel}
-                            </Label>
+                    return (
+                      <AccordionItem value={group.resourceId} key={group.resourceId}>
+                        <AccordionTrigger className={cn("hover:no-underline", isGroupIndeterminate ? "text-primary" : "")}>
+                          <div className="flex items-center gap-2">
+                             <Checkbox
+                                id={`group-${group.resourceId}-trigger`}
+                                checked={isGroupChecked}
+                                data-indeterminate={isGroupIndeterminate ? "true" : undefined}
+                                className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
+                                onClick={(e) => { e.stopPropagation(); handleResourceGroupToggle(group, !isGroupChecked); }}
+                                disabled={isSaving || !canManageRoles}
+                              />
+                            <span className="font-semibold">{group.resourceLabel}</span>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 pl-6">
+                          <Badge variant={selectedCount > 0 ? "default" : "secondary"}>{selectedCount} / {groupPermissionIds.length}</Badge>
+                        </AccordionTrigger>
+                        <AccordionContent className="pl-8 pr-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
                             {group.permissions.map((permission) => (
                               <FormItem key={permission.id} className="flex flex-row items-center space-x-2 space-y-0">
                                 <FormControl>
@@ -326,11 +329,11 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                               </FormItem>
                             ))}
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
                 <FormMessage>{form.formState.errors.permissions?.message}</FormMessage>
               </FormItem>
 
