@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal } from '@prisma/client';
-import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, isSameDay, setMonth, setYear, parseISO, format } from 'date-fns';
+import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays } from 'date-fns';
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
@@ -259,7 +259,7 @@ function calculateIndividualPenalty(
 
 export async function generateBillAndUpdateAgreementAction(agreementId: string, targetBillDateStr: string) {
   try {
-    const targetBillDate = startOfDay(parseISO(targetBillDateStr));
+    const targetBillDate = parseISO(targetBillDateStr); // Use date as-is from client to avoid timezone shifts
     const today = startOfDay(new Date());
 
     const agreement = await databaseService.getAgreementById(agreementId, { 
@@ -279,10 +279,16 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     if (!agreement.space) throw new Error("Space details for agreement not found.");
     if (!agreement.space.building) throw new Error("Building details for space not found.");
 
+    const targetDayStart = startOfDay(targetBillDate);
+    const targetDayEnd = addDays(targetDayStart, 1);
+
     const existingBill = await databaseService.getAllBills({
         where: {
             agreementId: agreement.id,
-            billDate: targetBillDate,
+            billDate: {
+                gte: targetDayStart,
+                lt: targetDayEnd,
+            },
             OR: [{status: 'Pending'}, {status: 'Overdue'}, {status: 'PendingVerification'}]
         }
     });
@@ -500,3 +506,4 @@ export async function deleteBillAction(billId: string) {
     
     
 
+    
