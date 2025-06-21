@@ -67,8 +67,18 @@ async function main() {
       name: 'SUPER_ADMIN',
       description: 'Full access to all system features and data.',
       permissions: [
-        'user:manage', 'building:manage', 'space:manage', 
-        'tenant:manage', 'agreement:manage', 'billing:manage', 'reports:view_all'
+        'dashboard:view',
+        'building:view', 'building:create', 'building:edit', 'building:delete',
+        'space:view', 'space:create', 'space:edit', 'space:delete',
+        'tenant:view', 'tenant:create', 'tenant:edit', 'tenant:delete',
+        'agreement:view', 'agreement:create', 'agreement:edit', 'agreement:delete',
+        'building_utility:view', 'building_utility:save',
+        'billing:view', 'billing:generate', 'billing:manage_payments', 'billing:delete',
+        'payment_overview:view',
+        'settings:user_registration:manage', 
+        'settings:user_management:view', 'settings:user_management:assign',
+        'settings:role_management:view', 'settings:role_management:manage',
+        'portal:view'
       ],
     },
   });
@@ -77,8 +87,15 @@ async function main() {
       name: 'PROPERTY_MANAGER',
       description: 'Manages assigned properties, tenants, and related operations.',
       permissions: [
-        'building:read', 'space:manage', 'tenant:manage', 
-        'agreement:manage', 'billing:manage', 'reports:view_assigned'
+        'dashboard:view',
+        'building:view', 'building:edit',
+        'space:view', 'space:create', 'space:edit',
+        'tenant:view', 'tenant:create', 'tenant:edit',
+        'agreement:view', 'agreement:create', 'agreement:edit',
+        'building_utility:view', 'building_utility:save',
+        'billing:view', 'billing:generate',
+        'payment_overview:view',
+        'portal:view'
       ],
     },
   });
@@ -86,14 +103,28 @@ async function main() {
     data: {
         name: 'ACCOUNTANT',
         description: 'Manages financial records, billing, and payments.',
-        permissions: ['billing:manage', 'agreement:read', 'tenant:read', 'reports:view_financial'],
+        permissions: [
+          'dashboard:view',
+          'billing:view', 'billing:manage_payments',
+          'agreement:view', 
+          'tenant:view',
+          'payment_overview:view'
+        ],
     }
   });
-  const supportStaffRole = await prisma.role.create({ // Ensure SUPPORT_STAFF role exists
+  const supportStaffRole = await prisma.role.create({
     data: {
       name: 'SUPPORT_STAFF',
       description: 'Assists users and views data with limited modification rights.',
-      permissions: ['building:read', 'space:read', 'tenant:read', 'agreement:read', 'billing:read', 'reports:view_limited'],
+      permissions: [
+        'dashboard:view',
+        'building:view', 
+        'space:view', 
+        'tenant:view', 
+        'agreement:view', 
+        'billing:view',
+        'payment_overview:view'
+      ],
     },
   });
   console.log(`Created Roles: ${superAdminRole.name}, ${propertyManagerRole.name}, ${accountantRole.name}, ${supportStaffRole.name}`);
@@ -103,12 +134,14 @@ async function main() {
   console.log('Creating Users...');
   const user1 = await prisma.user.create({
     data: {
-      userId: 'external-id-superadmin', // This ID must match the one from your auth provider for this user
+      // This userId must match the 'sub' claim in the JWT from your external authentication provider.
+      // After you log in with the phone number '0912345678' and password 'Admin@123', the auth service should return a token where the user ID is 'external-id-superadmin'.
+      userId: 'external-id-superadmin', 
       email: 'superadmin@leaseflow.com',
       name: 'Default Super Admin',
       firstName: 'Default',
       lastName: 'SuperAdmin',
-      phoneNumber: '0912345678', // The login credential
+      phoneNumber: '0912345678', // The login credential used with the auth service.
       roles: { connect: { id: superAdminRole.id } },
     },
   });
