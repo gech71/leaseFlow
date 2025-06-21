@@ -266,7 +266,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
               {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
               {!isLoadingData && currentUtilityItems.map((item, index) => (
                 <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
-                  <CardContent className="p-0 space-y-3">
+                  <CardContent className="p-0 space-y-4">
                     <div className="flex justify-between items-start">
                         <Label className="text-base font-medium text-foreground">Utility Item {index + 1}</Label>
                         {currentUtilityItems.length > 1 && canSaveUtilities && (
@@ -276,19 +276,35 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                         )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><Label htmlFor={`utilityName-${item.uiId}`}>Type</Label><Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canSaveUtilities}/></div>
-                        <div><Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label><Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', e.target.value)} disabled={isSaving || !canSaveUtilities}/></div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`utilityName-${item.uiId}`}>Type</Label>
+                            <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label>
+                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                        </div>
                     </div>
-                    <div><Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center mb-1"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
+                    <div className="space-y-1.5">
+                        <Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
                         <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value)} disabled={isSaving || !canSaveUtilities}>
                             <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    {item.appliesToScope === 'Floor' && (<div><Label htmlFor={`applicableFloor-${item.uiId}`}>Floor Name</Label><Input id={`applicableFloor-${item.uiId}`} placeholder="e.g., 10th" value={item.applicableFloor || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableFloor', e.target.value)} disabled={isSaving || !canSaveUtilities}/></div>)}
-                    {item.appliesToScope === 'SpecificSpaces' && (<div><Label htmlFor={`applicableSpaces-${item.uiId}`} className="flex items-center"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Space IDs (comma-separated)</Label>
-                        <Textarea id={`applicableSpaces-${item.uiId}`} placeholder="e.g., Unit 10A, Office 201" value={item.applicableSpaceIdNamesStr || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableSpaceIdNamesStr', e.target.value)} rows={2} disabled={isSaving || !canSaveUtilities}/>
-                        <p className="text-xs text-muted-foreground mt-1">Enter exact 'Space ID/Name' from Spaces page.</p></div>)}
+                    {item.appliesToScope === 'Floor' && (
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor Name</Label>
+                            <Input id={`applicableFloor-${item.uiId}`} placeholder="e.g., 10th" value={item.applicableFloor || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableFloor', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                        </div>
+                    )}
+                    {item.appliesToScope === 'SpecificSpaces' && (
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`applicableSpaces-${item.uiId}`} className="flex items-center"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Space IDs (comma-separated)</Label>
+                            <Textarea id={`applicableSpaces-${item.uiId}`} placeholder="e.g., Unit 10A, Office 201" value={item.applicableSpaceIdNamesStr || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableSpaceIdNamesStr', e.target.value)} rows={2} disabled={isSaving || !canSaveUtilities}/>
+                            <p className="text-xs text-muted-foreground">Enter exact 'Space ID/Name' from Spaces page.</p>
+                        </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -331,3 +347,5 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     </div>
   );
 }
+
+    
