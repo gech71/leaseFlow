@@ -40,6 +40,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { getBillingPageDataAction, generateBillAndUpdateAgreementAction, recordPaymentOrVerificationAction, deleteBillAction } from './actions';
 import type { SerializedBillingPageData, ClientBill, ClientAgreement, ClientBuilding } from './page'; 
 import { usePermissions } from '@/contexts/PermissionContext';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 
 const paymentFormSchema = z.object({
@@ -80,6 +81,9 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const { toast } = useToast();
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isLoading, setIsLoading] = useState(false);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canGenerateBills = isSuperAdmin || hasPermission('billing:generate');
@@ -180,6 +184,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       };
     }).sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
   }, [bills, calculatePenalty, today]);
+
+  const totalPages = Math.ceil(processedClientBills.length / ITEMS_PER_PAGE);
+  const paginatedBills = processedClientBills.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
  useEffect(() => {
     if (isPaymentDialogOpen && billForPayment) {
@@ -513,7 +523,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                 <TableHead className="text-right pr-2 sm:pr-4">Actions</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {processedClientBills.map((bill) => (
+                {paginatedBills.map((bill) => (
                   <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
                     <TableCell className="font-medium">{bill.tenantName}</TableCell>
                     <TableCell className="hidden md:table-cell text-xs">{bill.agreement?.space?.spaceIdName}, {bill.agreement?.space?.buildingName}</TableCell>
@@ -540,6 +550,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
             </Table>
           </CardContent>
         </Card>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          className="mt-4"
+        />
         </div>
       )}
     </div>

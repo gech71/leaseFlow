@@ -16,6 +16,7 @@ import { updateUserAssignments } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/contexts/PermissionContext';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
   createdAt: string;
@@ -59,9 +60,18 @@ export function UserManagementClientPage({
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
   const [buildingSearchTerm, setBuildingSearchTerm] = useState('');
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canManageUserAssignments = isSuperAdmin || hasPermission('settings:user_management:assign');
   const canViewUserManagement = isSuperAdmin || hasPermission('settings:user_management:view') || canManageUserAssignments;
+
+  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
+  const paginatedUsers = users.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   useEffect(() => {
     setIsMounted(true);
@@ -162,38 +172,46 @@ export function UserManagementClientPage({
             <p>No users found. You can register new users via the "User Registration" settings.</p>
           </div>
         ) : (
-          <ScrollArea className="max-h-[60vh]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="hidden md:table-cell">Managed Buildings</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name || `${user.firstName} ${user.lastName}`.trim() || 'N/A'}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell className="text-xs">
-                      {user.roles.length > 0 ? user.roles[0].name.replace(/_/g, ' ') : <span className="italic text-muted-foreground">No role</span>}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-xs">
-                      {user.managedBuildings.length > 0 ? user.managedBuildings.map(b => b.name).join(', ') : <span className="italic text-muted-foreground">No buildings</span>}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleEditUser(user)} disabled={isSaving || !canViewUserManagement}>
-                        <Edit className="mr-1 h-3.5 w-3.5" /> {canManageUserAssignments ? 'Edit' : 'View'}
-                      </Button>
-                    </TableCell>
+          <>
+            <ScrollArea className="max-h-[60vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="hidden md:table-cell">Managed Buildings</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+                </TableHeader>
+                <TableBody>
+                  {paginatedUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name || `${user.firstName} ${user.lastName}`.trim() || 'N/A'}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="text-xs">
+                        {user.roles.length > 0 ? user.roles[0].name.replace(/_/g, ' ') : <span className="italic text-muted-foreground">No role</span>}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-xs">
+                        {user.managedBuildings.length > 0 ? user.managedBuildings.map(b => b.name).join(', ') : <span className="italic text-muted-foreground">No buildings</span>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => handleEditUser(user)} disabled={isSaving || !canViewUserManagement}>
+                          <Edit className="mr-1 h-3.5 w-3.5" /> {canManageUserAssignments ? 'Edit' : 'View'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              className="mt-4"
+            />
+          </>
         )}
       </CardContent>
 

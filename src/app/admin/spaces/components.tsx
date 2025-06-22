@@ -32,6 +32,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createSpaceAction, updateSpaceAction, deleteSpaceAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 export interface SpaceWithBuildingName extends SpaceTypePrisma {
   buildingName: string; 
@@ -50,6 +51,9 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [spaceToDelete, setSpaceToDelete] = useState<SpaceWithBuildingName | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 9;
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateSpaces = isSuperAdmin || hasPermission('space:create');
@@ -63,7 +67,12 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     setSpaces(initialSpaces); 
     setBuildings(initialBuildings);
   }, [initialSpaces, initialBuildings]);
-
+  
+  const totalPages = Math.ceil(spaces.length / ITEMS_PER_PAGE);
+  const paginatedSpaces = spaces.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -336,7 +345,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       </AlertDialog>
 
       {spaces.length === 0 && isMounted ? ( 
-        <Card className="text-center py-12 shadow-sm">
+         <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Building2 className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2 font-headline">No Spaces Yet</h3>
@@ -351,41 +360,49 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {spaces.map((space) => (
-            <Card key={space.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                  <div>
-                    <CardTitle className="font-headline text-xl mb-1">{space.spaceIdName}</CardTitle>
-                    <CardDescription className="text-sm">{space.buildingName}</CardDescription>
+        <>
+          <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedSpaces.map((space) => (
+              <Card key={space.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                    <div>
+                      <CardTitle className="font-headline text-xl mb-1">{space.spaceIdName}</CardTitle>
+                      <CardDescription className="text-sm">{space.buildingName}</CardDescription>
+                    </div>
+                    <span className={`px-2 py-1 text-xs rounded-full self-start sm:self-center ${space.isOccupied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      {space.isOccupied ? 'Occupied' : 'Vacant'}
+                    </span>
                   </div>
-                  <span className={`px-2 py-1 text-xs rounded-full self-start sm:self-center ${space.isOccupied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                    {space.isOccupied ? 'Occupied' : 'Vacant'}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> Floor: {space.floor}</div>
-                <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} sq ft</div>
-                <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(Number(space.utilityProrationShare) * 100).toFixed(0)}%</div>
-                <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${Number(space.monthlyRentalPrice).toLocaleString()}/month</div>
-              </CardContent>
-              <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
-                {(canEditSpaces || canViewSpaces) && (
-                  <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto" disabled={isSaving}>
-                    {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <EyeOff className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}
-                  </Button>
-                )}
-                {canDeleteSpaces && (
-                  <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving} className="w-full sm:w-auto">
-                    <Trash2 className="mr-1 h-4 w-4" /> Delete
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> Floor: {space.floor}</div>
+                  <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} sq ft</div>
+                  <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(Number(space.utilityProrationShare) * 100).toFixed(0)}%</div>
+                  <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${Number(space.monthlyRentalPrice).toLocaleString()}/month</div>
+                </CardContent>
+                <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
+                  {(canEditSpaces || canViewSpaces) && (
+                    <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto" disabled={isSaving}>
+                      {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <EyeOff className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}
+                    </Button>
+                  )}
+                  {canDeleteSpaces && (
+                    <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving} className="w-full sm:w-auto">
+                      <Trash2 className="mr-1 h-4 w-4" /> Delete
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            className="mt-8"
+          />
+        </>
       )}
     </div>
   );

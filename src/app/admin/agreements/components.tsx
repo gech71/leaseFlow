@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePermissions } from '@/contexts/PermissionContext';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
@@ -51,6 +52,9 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const [agreementToDelete, setAgreementToDelete] = useState<AgreementWithRelations | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission('agreement:create');
   const canEditAgreements = isSuperAdmin || hasPermission('agreement:edit'); // For Renew
@@ -70,6 +74,16 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     agreement.space?.spaceIdName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     agreement.space?.buildingName.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
+
+  const totalPages = Math.ceil(filteredAgreements.length / ITEMS_PER_PAGE);
+  const paginatedAgreements = filteredAgreements.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const isPaymentOverdue = (agreement: AgreementWithRelations): boolean => {
     if (!agreement.nextPaymentDueDate) return false;
@@ -198,45 +212,53 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAgreements.map((agreement) => {
-            const overdue = isPaymentOverdue(agreement);
-            const eligibleForRenewal = isEligibleForRenewal(agreement);
-            const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
-            const spaceDesc = agreement.space ? `${agreement.space.spaceIdName}, ${agreement.space.buildingName}` : "N/A";
-            return (
-              <Card key={agreement.id} className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${overdue ? 'border-destructive border-2' : ''}`}>
-                <CardHeader>
-                  <div className="flex justify-between items-start"> <CardTitle className="font-headline text-lg">{agreement.tenant?.name || "N/A"}</CardTitle>
-                    <div className="flex flex-col items-end space-y-1"> {overdue && (<Badge variant="destructive" className="flex items-center"><AlertTriangle className="mr-1 h-3 w-3" /> Payment Overdue</Badge>)} {eligibleForRenewal && (<Badge variant="default" className="bg-accent text-accent-foreground">Renew Soon</Badge>)} </div>
-                  </div> <CardDescription>{spaceDesc}</CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm space-y-1.5">
-                  <p><strong>Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
-                  <p><strong>End Date:</strong> {format(agreementEndDate, 'PP')}</p>
-                  <p><strong>Rent:</strong> ${agreement.monthlyRentalPrice.toLocaleString()}/month</p>
-                  <p><strong>Term:</strong> {agreement.paymentTermMonths} months</p>
-                  <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
-                  <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
-                </CardContent>
-                <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
-                    <div className="flex-grow flex gap-2">
-                        {eligibleForRenewal && canEditAgreements && ( <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto"> <RefreshCw className="mr-1 h-4 w-4" /> Renew </Button> )}
-                    </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        {canViewAgreements && (
-                            <Link href={`/admin/agreements/${agreement.id}`} passHref className="w-full sm:w-auto"> <Button variant="outline" size="sm" className="w-full"> <Eye className="mr-1 h-4 w-4" /> View </Button> </Link>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)} className="w-full sm:w-auto"> <Download className="mr-1 h-4 w-4" /> Download </Button>
-                        {canDeleteAgreements && (
-                            <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)} className="w-full sm:w-auto"><Trash2 className="mr-1 h-4 w-4"/>Del</Button>
-                        )}
-                    </div>
-                </CardFooter>
-              </Card>
-            );
-          })}
-        </div>
+        <>
+          <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedAgreements.map((agreement) => {
+              const overdue = isPaymentOverdue(agreement);
+              const eligibleForRenewal = isEligibleForRenewal(agreement);
+              const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
+              const spaceDesc = agreement.space ? `${agreement.space.spaceIdName}, ${agreement.space.buildingName}` : "N/A";
+              return (
+                <Card key={agreement.id} className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${overdue ? 'border-destructive border-2' : ''}`}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start"> <CardTitle className="font-headline text-lg">{agreement.tenant?.name || "N/A"}</CardTitle>
+                      <div className="flex flex-col items-end space-y-1"> {overdue && (<Badge variant="destructive" className="flex items-center"><AlertTriangle className="mr-1 h-3 w-3" /> Payment Overdue</Badge>)} {eligibleForRenewal && (<Badge variant="default" className="bg-accent text-accent-foreground">Renew Soon</Badge>)} </div>
+                    </div> <CardDescription>{spaceDesc}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-1.5">
+                    <p><strong>Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
+                    <p><strong>End Date:</strong> {format(agreementEndDate, 'PP')}</p>
+                    <p><strong>Rent:</strong> ${agreement.monthlyRentalPrice.toLocaleString()}/month</p>
+                    <p><strong>Term:</strong> {agreement.paymentTermMonths} months</p>
+                    <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
+                    <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
+                  </CardContent>
+                  <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
+                      <div className="flex-grow flex gap-2">
+                          {eligibleForRenewal && canEditAgreements && ( <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto"> <RefreshCw className="mr-1 h-4 w-4" /> Renew </Button> )}
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                          {canViewAgreements && (
+                              <Link href={`/admin/agreements/${agreement.id}`} passHref className="w-full sm:w-auto"> <Button variant="outline" size="sm" className="w-full"> <Eye className="mr-1 h-4 w-4" /> View </Button> </Link>
+                          )}
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)} className="w-full sm:w-auto"> <Download className="mr-1 h-4 w-4" /> Download </Button>
+                          {canDeleteAgreements && (
+                              <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)} className="w-full sm:w-auto"><Trash2 className="mr-1 h-4 w-4"/>Del</Button>
+                          )}
+                      </div>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            className="mt-8"
+          />
+        </>
       )}
     </div>
   );

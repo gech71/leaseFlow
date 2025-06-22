@@ -39,6 +39,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createTenantAction, updateTenantAction, deleteTenantAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 // Client-side specific types ensuring dates are strings
 export interface ClientSpace extends Omit<SpaceTypePrisma, 'createdAt' | 'updatedAt' | 'tenantId'> {
@@ -104,6 +105,9 @@ export function TenantsClientPage({
   const [tenantToDelete, setTenantToDelete] = useState<TenantWithRelations | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateTenants = isSuperAdmin || hasPermission('tenant:create');
   const canEditTenants = isSuperAdmin || hasPermission('tenant:edit');
@@ -117,6 +121,12 @@ export function TenantsClientPage({
       representativeName: "", representativePhone: "", rentedSpaceId: null,
     },
   });
+
+  const totalPages = Math.ceil(tenants.length / ITEMS_PER_PAGE);
+  const paginatedTenants = tenants.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   useEffect(() => {
     setIsMounted(true);
@@ -373,61 +383,69 @@ export function TenantsClientPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {tenants.map((tenant) => {
-            const tenantActiveAgreement = findActiveAgreementForTenant(tenant.id);
-            return (
-              <Card key={tenant.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
-                <CardHeader>
-                  <div className="flex items-center gap-4">
-                    <Image src={`https://placehold.co/60x60.png?text=${tenant.name.charAt(0)}`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial"/>
-                    <div>
-                      <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
-                      <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
+        <>
+          <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedTenants.map((tenant) => {
+              const tenantActiveAgreement = findActiveAgreementForTenant(tenant.id);
+              return (
+                <Card key={tenant.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
+                  <CardHeader>
+                    <div className="flex items-center gap-4">
+                      <Image src={`https://placehold.co/60x60.png?text=${tenant.name.charAt(0)}`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial"/>
+                      <div>
+                        <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
+                        <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm flex-grow">
-                  {tenant.phone && (
-                    <div className="flex items-center text-muted-foreground">
-                      <Phone className="mr-2 h-4 w-4 text-primary" /> Phone: {tenant.phone}
-                    </div>
-                  )}
-                  <div className="flex items-center">
-                    <BedDouble className="mr-2 h-4 w-4 text-primary" /> 
-                    Rented Space: {getSpaceDetails(tenant.rentedSpace)}
-                  </div>
-                   <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
-                </CardContent>
-                <CardFooter className="border-t pt-4 flex justify-between items-center gap-2">
-                   <div>
-                    {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
-                      <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                        <Button variant="outline" size="sm" disabled={isSaving}>
-                          <Eye className="mr-1 h-4 w-4" /> Agreement
-                        </Button>
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">{tenantActiveAgreement ? 'View Agreement' : 'No active agreement'}</span>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm flex-grow">
+                    {tenant.phone && (
+                      <div className="flex items-center text-muted-foreground">
+                        <Phone className="mr-2 h-4 w-4 text-primary" /> Phone: {tenant.phone}
+                      </div>
                     )}
-                  </div>
-                  <div className="flex gap-1">
-                      {(canEditTenants || canViewTenants) && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)} disabled={isSaving}>
-                            {canEditTenants ? <Edit3 className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
-                        </Button>
+                    <div className="flex items-center">
+                      <BedDouble className="mr-2 h-4 w-4 text-primary" /> 
+                      Rented Space: {getSpaceDetails(tenant.rentedSpace)}
+                    </div>
+                     <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
+                  </CardContent>
+                  <CardFooter className="border-t pt-4 flex justify-between items-center gap-2">
+                     <div>
+                      {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
+                        <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
+                          <Button variant="outline" size="sm" disabled={isSaving}>
+                            <Eye className="mr-1 h-4 w-4" /> Agreement
+                          </Button>
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">{tenantActiveAgreement ? 'View Agreement' : 'No active agreement'}</span>
                       )}
-                      {canDeleteTenants && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)} disabled={isSaving}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                  </div>
-                </CardFooter>
-              </Card>
-            );
-          })}
-        </div>
+                    </div>
+                    <div className="flex gap-1">
+                        {(canEditTenants || canViewTenants) && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)} disabled={isSaving}>
+                              {canEditTenants ? <Edit3 className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
+                          </Button>
+                        )}
+                        {canDeleteTenants && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)} disabled={isSaving}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                    </div>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            className="mt-8"
+          />
+        </>
       )}
     </div>
   );

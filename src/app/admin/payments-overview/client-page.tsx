@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
 import { usePermissions } from '@/contexts/PermissionContext';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 // Client-side representation types, ensuring dates are strings (ISO format)
 export interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id'> { id?: string; } 
@@ -98,6 +99,9 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canViewPage = isSuperAdmin || hasPermission('payment_overview:view');
 
+  const [upcomingCurrentPage, setUpcomingCurrentPage] = useState(1);
+  const [paidCurrentPage, setPaidCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     setIsMounted(true);
@@ -181,11 +185,28 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   
   const upcomingAndPendingBills = useMemo(() => processedBills.filter(b => b.status === 'Pending' || b.status === 'Overdue' || b.status === 'PendingVerification'), [processedBills]);
   
-  const paidBillsInSelectedPeriod = useMemo(() => processedBills.filter(bill => {
-    if (bill.status !== 'Paid' || !bill.paymentDate) return false;
-    const paymentDateObj = parseISO(bill.paymentDate);
-    return getMonth(paymentDateObj) === selectedMonth && getYear(paymentDateObj) === selectedYear;
-  }), [processedBills, selectedMonth, selectedYear]);
+  const paidBillsInSelectedPeriod = useMemo(() => {
+    setPaidCurrentPage(1); // Reset page when filter changes
+    return processedBills.filter(bill => {
+      if (bill.status !== 'Paid' || !bill.paymentDate) return false;
+      const paymentDateObj = parseISO(bill.paymentDate);
+      return getMonth(paymentDateObj) === selectedMonth && getYear(paymentDateObj) === selectedYear;
+    })
+  }, [processedBills, selectedMonth, selectedYear]);
+
+  // Pagination for upcoming bills
+  const upcomingTotalPages = Math.ceil(upcomingAndPendingBills.length / ITEMS_PER_PAGE);
+  const paginatedUpcomingBills = upcomingAndPendingBills.slice(
+    (upcomingCurrentPage - 1) * ITEMS_PER_PAGE,
+    upcomingCurrentPage * ITEMS_PER_PAGE
+  );
+  
+  // Pagination for paid bills
+  const paidTotalPages = Math.ceil(paidBillsInSelectedPeriod.length / ITEMS_PER_PAGE);
+  const paginatedPaidBills = paidBillsInSelectedPeriod.slice(
+    (paidCurrentPage - 1) * ITEMS_PER_PAGE,
+    paidCurrentPage * ITEMS_PER_PAGE
+  );
 
   const totalUpcomingAmount = useMemo(() => upcomingAndPendingBills.reduce((sum, bill) => sum + bill.totalAmount, 0), [upcomingAndPendingBills]);
   const totalPaidSelectedPeriod = useMemo(() => paidBillsInSelectedPeriod.reduce((sum, bill) => sum + bill.totalAmount, 0), [paidBillsInSelectedPeriod]);
@@ -324,42 +345,50 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
             </CardContent>
           </Card>
         ) : (
-          <Card className="shadow-md">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tenant</TableHead>
-                    <TableHead className="hidden md:table-cell">Space</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
-                    <TableHead className="text-right">Amount Due</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {upcomingAndPendingBills.map(bill => (
-                    <TableRow key={bill.id} className={`${bill.status === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                      <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
-                      <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
-                      <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
-                        {format(parseISO(bill.dueDate), 'PP')}
-                      </TableCell>
-                      <TableCell className="hidden xl:table-cell text-xs text-destructive text-right">
-                        {bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : ''}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize ${bill.status === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
-                          {getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification',' Ver.')}</span>
-                        </Badge>
-                      </TableCell>
+          <>
+            <Card className="shadow-md">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead className="hidden md:table-cell">Space</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
+                      <TableHead className="text-right">Amount Due</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUpcomingBills.map(bill => (
+                      <TableRow key={bill.id} className={`${bill.status === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
+                        <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
+                        <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
+                        <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
+                          {format(parseISO(bill.dueDate), 'PP')}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-xs text-destructive text-right">
+                          {bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : ''}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize ${bill.status === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                            {getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification',' Ver.')}</span>
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <PaginationControls
+              currentPage={upcomingCurrentPage}
+              totalPages={upcomingTotalPages}
+              onPageChange={setUpcomingCurrentPage}
+              className="mt-4"
+            />
+          </>
         )}
       </section>
 
@@ -410,36 +439,44 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
             </CardContent>
           </Card>
         ) : (
-          <Card className="shadow-md">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tenant</TableHead>
-                    <TableHead className="hidden md:table-cell">Space</TableHead>
-                    <TableHead>Payment Date</TableHead>
-                    <TableHead className="hidden lg:table-cell">Method</TableHead>
-                    <TableHead className="text-right">Amount Paid</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paidBillsInSelectedPeriod.map(bill => (
-                    <TableRow key={bill.id}>
-                      <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
-                      <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
-                      <TableCell>{bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}</TableCell>
-                      <TableCell className="hidden lg:table-cell text-xs">
-                        {bill.paymentMethod || 'N/A'}
-                        {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
-                        {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-green-600">${bill.totalAmount.toFixed(2)}</TableCell>
+          <>
+            <Card className="shadow-md">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead className="hidden md:table-cell">Space</TableHead>
+                      <TableHead>Payment Date</TableHead>
+                      <TableHead className="hidden lg:table-cell">Method</TableHead>
+                      <TableHead className="text-right">Amount Paid</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedPaidBills.map(bill => (
+                      <TableRow key={bill.id}>
+                        <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
+                        <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
+                        <TableCell>{bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs">
+                          {bill.paymentMethod || 'N/A'}
+                          {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
+                          {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">${bill.totalAmount.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <PaginationControls
+              currentPage={paidCurrentPage}
+              totalPages={paidTotalPages}
+              onPageChange={setPaidCurrentPage}
+              className="mt-4"
+            />
+          </>
         )}
       </section>
     </div>

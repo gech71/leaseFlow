@@ -25,6 +25,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ALL_RESOURCE_PERMISSIONS } from '@/lib/types'; 
 import { usePermissions } from '@/contexts/PermissionContext';
 import { cn } from '@/lib/utils';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
   createdAt: string;
@@ -54,6 +55,9 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const [currentRoleForForm, setCurrentRoleForForm] = useState<ClientRole | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<ClientRole | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   const { hasPermission: contextHasPermission, isSuperAdmin } = usePermissions(); 
   const canManageRoles = isSuperAdmin || contextHasPermission('settings:role_management:manage');
   const canViewRoles = isSuperAdmin || contextHasPermission('settings:role_management:view') || canManageRoles;
@@ -65,6 +69,12 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   });
 
   const selectedPermissions = form.watch('permissions');
+
+  const totalPages = Math.ceil(roles.length / ITEMS_PER_PAGE);
+  const paginatedRoles = roles.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   useEffect(() => {
     setIsMounted(true);
@@ -220,41 +230,49 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
             <p>No roles defined yet. {canManageRoles ? 'Click "Add New Role" to get started.' : 'Contact an administrator to add roles.'}</p>
           </div>
         ) : (
-          <ScrollArea className="max-h-[60vh]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">Description</TableHead>
-                  <TableHead>Permissions Count</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {roles.map((role) => (
-                  <TableRow key={role.id}>
-                    <TableCell className="font-medium">{role.name.replace(/_/g, ' ')}</TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-xs truncate">{role.description || "-"}</TableCell>
-                    <TableCell>
-                      {role.permissions.length > 0 ? (
-                        <Badge variant="secondary" className="text-xs">{role.permissions.length} assigned</Badge>
-                      ) : <span className="text-xs text-muted-foreground italic">None</span>}
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
-                          {canManageRoles ? <Edit className="h-4 w-4 text-blue-600" /> : <EyeOff className="h-4 w-4 text-blue-600" />}
-                        </Button>
-                      {canManageRoles && (
-                          <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || role.name === 'SUPER_ADMIN' || role.name === 'PROPERTY_MANAGER' || role.name === 'ACCOUNTANT' || role.name === 'SUPPORT_STAFF'}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                      )}
-                    </TableCell>
+          <>
+            <ScrollArea className="max-h-[60vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden md:table-cell">Description</TableHead>
+                    <TableHead>Permissions Count</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRoles.map((role) => (
+                    <TableRow key={role.id}>
+                      <TableCell className="font-medium">{role.name.replace(/_/g, ' ')}</TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-xs truncate">{role.description || "-"}</TableCell>
+                      <TableCell>
+                        {role.permissions.length > 0 ? (
+                          <Badge variant="secondary" className="text-xs">{role.permissions.length} assigned</Badge>
+                        ) : <span className="text-xs text-muted-foreground italic">None</span>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
+                            {canManageRoles ? <Edit className="h-4 w-4 text-blue-600" /> : <EyeOff className="h-4 w-4 text-blue-600" />}
+                          </Button>
+                        {canManageRoles && (
+                            <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || role.name === 'SUPER_ADMIN' || role.name === 'PROPERTY_MANAGER' || role.name === 'ACCOUNTANT' || role.name === 'SUPPORT_STAFF'}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              className="mt-4"
+            />
+          </>
         )}
       </CardContent>
 

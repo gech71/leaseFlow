@@ -23,6 +23,7 @@ import {
 import { format } from 'date-fns';
 import { deleteBuildingAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext'; 
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
@@ -118,10 +119,19 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const [buildingToDelete, setBuildingToDelete] = useState<BuildingWithPenaltyTiers | null>(null);
   const { hasPermission, isSuperAdmin } = usePermissions(); 
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
   const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
   const canEditBuildings = isSuperAdmin || hasPermission('building:edit');
   const canDeleteBuildings = isSuperAdmin || hasPermission('building:delete');
   const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings; // If can do anything, can view
+
+  const totalPages = Math.ceil(buildings.length / ITEMS_PER_PAGE);
+  const paginatedBuildings = buildings.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   useEffect(() => {
     setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
@@ -205,18 +215,26 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {buildings.map((building) => (
-            <BuildingCard 
-              key={building.id} 
-              building={building} 
-              onDelete={setBuildingToDelete} 
-              canEdit={canEditBuildings}
-              canDelete={canDeleteBuildings}
-              canViewDetails={canViewBuildings}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedBuildings.map((building) => (
+              <BuildingCard 
+                key={building.id} 
+                building={building} 
+                onDelete={setBuildingToDelete} 
+                canEdit={canEditBuildings}
+                canDelete={canDeleteBuildings}
+                canViewDetails={canViewBuildings}
+              />
+            ))}
+          </div>
+          <PaginationControls 
+            currentPage={currentPage} 
+            totalPages={totalPages} 
+            onPageChange={setCurrentPage} 
+            className="mt-8"
+          />
+        </>
       )}
     </div>
   );
