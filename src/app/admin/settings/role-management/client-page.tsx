@@ -317,41 +317,25 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
 
                     return (
                        <AccordionItem value={group.resourceId} key={group.resourceId}>
-                        <AccordionPrimitive.Header className="flex items-center">
-                          <div
-                            className={cn(
-                              "flex flex-1 items-center justify-between py-4 font-medium",
-                              isGroupIndeterminate ? "text-primary" : ""
-                            )}
-                          >
-                            <div className="flex flex-1 items-center gap-3">
-                              <Checkbox
-                                id={`group-${group.resourceId}-checkbox`}
-                                checked={isGroupChecked}
-                                onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
-                                data-indeterminate={isGroupIndeterminate ? "true" : undefined}
-                                className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
-                                disabled={isSaving || !canManageRoles}
-                              />
-                              <label
-                                htmlFor={`group-${group.resourceId}-checkbox`}
-                                className="font-semibold cursor-pointer"
-                              >
-                                {group.resourceLabel}
-                              </label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant={selectedCount > 0 ? "default" : "secondary"}>
-                                {selectedCount} / {groupPermissionIds.length}
-                              </Badge>
-                            </div>
+                        <AccordionPrimitive.Header className="flex w-full items-center">
+                          <div className="py-4 pl-4">
+                            <Checkbox
+                              id={`group-${group.resourceId}-checkbox`}
+                              checked={isGroupChecked}
+                              onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
+                              data-indeterminate={isGroupIndeterminate ? "true" : undefined}
+                              className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
+                              disabled={isSaving || !canManageRoles}
+                            />
                           </div>
-                          <AccordionPrimitive.Trigger
-                            className={cn(
-                              "p-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180"
-                            )}
-                          >
-                            <ChevronDown className="h-4 w-4 shrink-0" />
+                          <AccordionPrimitive.Trigger className="flex flex-1 items-center justify-between py-4 pr-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180">
+                              <span className="font-semibold">{group.resourceLabel}</span>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={selectedCount > 0 ? "default" : "secondary"}>
+                                  {selectedCount} / {groupPermissionIds.length}
+                                </Badge>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                              </div>
                           </AccordionPrimitive.Trigger>
                         </AccordionPrimitive.Header>
                         <AccordionContent className="pl-8 pr-2">
