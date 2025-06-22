@@ -3,7 +3,6 @@
 "use server";
 
 import { databaseService } from '@/lib/services/databaseService';
-import { generateAgreementAction, type AgreementInput } from '@/app/actions';
 import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, Prisma } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns';
 
@@ -29,7 +28,7 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
 
 export interface TenantPortalData {
   agreement: PortalAgreementWithRelations | null;
-  aiGeneratedAgreementText: string | null;
+  aiGeneratedAgreementText: string | null; // This will now just be the agreementText from the DB
   // Bills are now part of the agreement object, so no separate bills array here.
   error?: string;
 }
@@ -106,37 +105,13 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       return { agreement: null, aiGeneratedAgreementText: null, error: "No active agreement found for any tenant." };
     }
 
-    const agreementInputForAI: AgreementInput = {
-      tenantName: targetAgreement.tenant.name,
-      building: targetAgreement.space.building.name,
-      spaceId: targetAgreement.space.spaceIdName,
-      spaceArea: targetAgreement.space.area,
-      floor: targetAgreement.space.floor,
-      monthlyRentalPrice: targetAgreement.monthlyRentalPrice,
-      paymentTermMonths: targetAgreement.paymentTermMonths,
-      initialPaymentMonths: targetAgreement.initialPaymentMonths,
-      additionalTerms: targetAgreement.additionalTerms || "",
-    };
-
-    let aiGeneratedText: string | null = null;
-    let aiError: string | null = null;
-
-    try {
-      const aiResult = await generateAgreementAction(agreementInputForAI);
-      if ('error' in aiResult) {
-        aiError = aiResult.error;
-      } else {
-        aiGeneratedText = aiResult.agreementText;
-      }
-    } catch (e: any) {
-      console.error("AI Agreement Generation Error in Portal Action:", e);
-      aiError = e.message || "An unexpected error occurred while generating agreement text.";
-    }
+    // The "AI Generated Text" is now simply the agreement text stored in the database.
+    const agreementText = targetAgreement.agreementText;
     
     return {
       agreement: targetAgreement,
-      aiGeneratedAgreementText: aiGeneratedText,
-      error: aiError || undefined,
+      aiGeneratedAgreementText: agreementText,
+      error: undefined,
     };
 
   } catch (error: any) {

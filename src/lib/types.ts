@@ -140,19 +140,6 @@ export interface Bill {
   agreement?: Agreement; // Optional on base type, usually included where needed
 }
 
-// Input type for the AI agreement generation flow
-export interface AgreementInput {
-  tenantName: string;
-  building: string;
-  spaceId: string;
-  spaceArea: number;
-  floor: string;
-  monthlyRentalPrice: number;
-  paymentTermMonths: number;
-  initialPaymentMonths: number;
-  additionalTerms?: string;
-}
-
 // --- RBAC Types ---
 export interface UserRole {
   id: string;
