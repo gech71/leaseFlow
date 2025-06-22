@@ -275,7 +275,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                           </Button>
                         )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                         <div className="md:col-span-2">
                             <Label htmlFor={`utilityName-${item.uiId}`}>Type</Label>
                             <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} className="mt-1.5" disabled={isSaving || !canSaveUtilities}/>
