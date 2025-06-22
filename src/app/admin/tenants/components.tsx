@@ -410,11 +410,11 @@ export function TenantsClientPage({
                     </div>
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex justify-between items-center gap-2">
-                     <div>
+                  <CardFooter className="border-t pt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:justify-between sm:items-center">
+                     <div className="flex-shrink-0">
                       {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
                         <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                          <Button variant="outline" size="sm" disabled={isSaving}>
+                          <Button variant="outline" size="sm" disabled={isSaving} className="w-full sm:w-auto">
                             <Eye className="mr-1 h-4 w-4" /> Agreement
                           </Button>
                         </Link>
@@ -422,7 +422,7 @@ export function TenantsClientPage({
                         <span className="text-xs text-muted-foreground italic">{tenantActiveAgreement ? 'View Agreement' : 'No active agreement'}</span>
                       )}
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 self-stretch sm:self-center justify-end">
                         {(canEditTenants || canViewTenants) && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)} disabled={isSaving}>
                               {canEditTenants ? <Edit3 className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}

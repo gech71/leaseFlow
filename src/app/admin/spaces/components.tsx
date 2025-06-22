@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff } from 'lucide-react';
+import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff, Eye } from 'lucide-react';
 import type { Building as BuildingTypePrisma, Space as SpaceTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -315,7 +315,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 <Button type="button" variant="outline" disabled={isSaving}>Cancel</Button>
               </DialogClose>
               {((formMode === 'add' && canCreateSpaces) || (formMode === 'edit' && canEditSpaces)) && (
-                <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
+                <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   {formMode === 'add' ? 'Add Space' : 'Save Changes'}
                 </Button>
@@ -384,7 +384,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
                   {(canEditSpaces || canViewSpaces) && (
                     <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto" disabled={isSaving}>
-                      {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <EyeOff className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}
+                      {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}
                     </Button>
                   )}
                   {canDeleteSpaces && (

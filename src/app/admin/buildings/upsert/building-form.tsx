@@ -365,7 +365,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                       </div>
                     </CardHeader>
                     <CardContent className="p-0 space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div>
                               <Label htmlFor={`ruleDuration-${uiRule.id}`} className="text-xs">Duration (Days)</Label>
                               <Input id={`ruleDuration-${uiRule.id}`} type="number" min="1" placeholder="e.g., 5"
@@ -423,9 +423,9 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
               </div>
             </div>
           </CardContent>
-          <CardFooter className="border-t p-6 flex justify-end gap-2">
+          <CardFooter className="border-t p-6 flex justify-end">
             {canManageThisForm && (
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
+              <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                 {isSaving ? 'Saving...' : (formMode === 'add' ? 'Add Building' : 'Save Changes')}
               </Button>
