@@ -308,7 +308,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                   <FormLabel className="text-base flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Permissions</FormLabel>
                   <p className="text-sm text-muted-foreground">Select permissions for this role. Expand a section to see individual permissions.</p>
                 </div>
-                <Accordion type="multiple" className="w-full">
+                <Accordion type="multiple" className="w-full space-y-2">
                   {ALL_RESOURCE_PERMISSIONS.map((group) => {
                     const groupPermissionIds = group.permissions.map(p => p.id);
                     const selectedCount = groupPermissionIds.filter(pId => selectedPermissions?.includes(pId)).length;
@@ -316,20 +316,19 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                     const isGroupIndeterminate = !isGroupChecked && selectedCount > 0;
 
                     return (
-                       <AccordionItem value={group.resourceId} key={group.resourceId}>
-                        <AccordionPrimitive.Header className="flex w-full items-center">
-                          <div className="py-4 pl-4">
-                            <Checkbox
-                              id={`group-${group.resourceId}-checkbox`}
-                              checked={isGroupChecked}
-                              onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
-                              data-indeterminate={isGroupIndeterminate ? "true" : undefined}
-                              className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
-                              disabled={isSaving || !canManageRoles}
-                            />
-                          </div>
-                          <AccordionPrimitive.Trigger className="flex flex-1 items-center justify-between py-4 pr-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180">
-                              <span className="font-semibold">{group.resourceLabel}</span>
+                       <AccordionItem value={group.resourceId} key={group.resourceId} className="border bg-background shadow-sm rounded-md overflow-hidden">
+                        <AccordionPrimitive.Header className="flex w-full items-center px-4 py-3">
+                          <Checkbox
+                            id={`group-${group.resourceId}-checkbox`}
+                            checked={isGroupChecked}
+                            onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
+                            data-indeterminate={isGroupIndeterminate ? "true" : undefined}
+                            className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50 mr-4"
+                            disabled={isSaving || !canManageRoles}
+                            aria-label={`Select all permissions for ${group.resourceLabel}`}
+                          />
+                          <AccordionPrimitive.Trigger className="flex flex-1 items-center justify-between font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                              <span className="font-semibold text-base">{group.resourceLabel}</span>
                               <div className="flex items-center gap-2">
                                 <Badge variant={selectedCount > 0 ? "default" : "secondary"}>
                                   {selectedCount} / {groupPermissionIds.length}
@@ -338,23 +337,25 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                               </div>
                           </AccordionPrimitive.Trigger>
                         </AccordionPrimitive.Header>
-                        <AccordionContent className="pl-8 pr-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
-                            {group.permissions.map((permission) => (
-                              <FormItem key={permission.id} className="flex flex-row items-center space-x-2 space-y-0">
-                                <FormControl>
-                                  <Checkbox
-                                    checked={selectedPermissions?.includes(permission.id)}
-                                    onCheckedChange={(checked) => handlePermissionToggle(permission.id, !!checked)}
-                                    disabled={isSaving || !canManageRoles}
-                                  />
-                                </FormControl>
-                                <FormLabel className="text-sm font-normal cursor-pointer">
-                                  {permission.label}
-                                </FormLabel>
-                              </FormItem>
-                            ))}
-                          </div>
+                        <AccordionContent className="bg-muted/30 border-t">
+                            <div className="p-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {group.permissions.map((permission) => (
+                                    <FormItem key={permission.id} className="flex flex-row items-center space-x-3 space-y-0 rounded-md border bg-background p-3 hover:bg-muted/50 transition-colors">
+                                      <FormControl>
+                                        <Checkbox
+                                          checked={selectedPermissions?.includes(permission.id)}
+                                          onCheckedChange={(checked) => handlePermissionToggle(permission.id, !!checked)}
+                                          disabled={isSaving || !canManageRoles}
+                                        />
+                                      </FormControl>
+                                      <FormLabel className="text-sm font-normal cursor-pointer leading-none">
+                                        {permission.label}
+                                      </FormLabel>
+                                    </FormItem>
+                                  ))}
+                                </div>
+                            </div>
                         </AccordionContent>
                       </AccordionItem>
                     );
