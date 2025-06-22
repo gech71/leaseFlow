@@ -316,26 +316,43 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                     const isGroupIndeterminate = !isGroupChecked && selectedCount > 0;
 
                     return (
-                      <AccordionItem value={group.resourceId} key={group.resourceId}>
-                        <AccordionPrimitive.Header className="flex">
-                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180", isGroupIndeterminate ? "text-primary" : "")}>
-                                <div className="flex flex-1 items-center gap-3">
-                                    <Checkbox
-                                        id={`group-${group.resourceId}-trigger`}
-                                        checked={isGroupChecked}
-                                        onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        data-indeterminate={isGroupIndeterminate ? "true" : undefined}
-                                        className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
-                                        disabled={isSaving || !canManageRoles}
-                                    />
-                                    <span className="font-semibold">{group.resourceLabel}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant={selectedCount > 0 ? "default" : "secondary"}>{selectedCount} / {groupPermissionIds.length}</Badge>
-                                  <ChevronDown className="h-4 w-4 shrink-0" />
-                                </div>
-                            </AccordionPrimitive.Trigger>
+                       <AccordionItem value={group.resourceId} key={group.resourceId}>
+                        <AccordionPrimitive.Header className="flex items-center">
+                          <div
+                            className={cn(
+                              "flex flex-1 items-center justify-between py-4 font-medium",
+                              isGroupIndeterminate ? "text-primary" : ""
+                            )}
+                          >
+                            <div className="flex flex-1 items-center gap-3">
+                              <Checkbox
+                                id={`group-${group.resourceId}-checkbox`}
+                                checked={isGroupChecked}
+                                onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
+                                data-indeterminate={isGroupIndeterminate ? "true" : undefined}
+                                className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
+                                disabled={isSaving || !canManageRoles}
+                              />
+                              <label
+                                htmlFor={`group-${group.resourceId}-checkbox`}
+                                className="font-semibold cursor-pointer"
+                              >
+                                {group.resourceLabel}
+                              </label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={selectedCount > 0 ? "default" : "secondary"}>
+                                {selectedCount} / {groupPermissionIds.length}
+                              </Badge>
+                            </div>
+                          </div>
+                          <AccordionPrimitive.Trigger
+                            className={cn(
+                              "p-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180"
+                            )}
+                          >
+                            <ChevronDown className="h-4 w-4 shrink-0" />
+                          </AccordionPrimitive.Trigger>
                         </AccordionPrimitive.Header>
                         <AccordionContent className="pl-8 pr-2">
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
