@@ -364,7 +364,28 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     await databaseService.updateAgreement(agreement.id, { nextPaymentDueDate: addMonths(targetBillDate, 1) });
 
     revalidatePath('/admin/billing');
-    return { success: true, bill: newBill };
+    
+    let parsedUtilityBreakdown: any[] = [];
+    if (typeof newBill.utilityBreakdown === 'string') {
+        try {
+            parsedUtilityBreakdown = JSON.parse(newBill.utilityBreakdown);
+        } catch (e) { /* ignore */ }
+    } else if (Array.isArray(newBill.utilityBreakdown)) {
+        parsedUtilityBreakdown = newBill.utilityBreakdown;
+    }
+
+    const serializedBill = {
+      ...newBill,
+      billDate: newBill.billDate.toISOString(),
+      dueDate: newBill.dueDate.toISOString(),
+      createdAt: newBill.createdAt.toISOString(),
+      updatedAt: newBill.updatedAt.toISOString(),
+      paymentDate: newBill.paymentDate?.toISOString() || null,
+      utilityBreakdown: parsedUtilityBreakdown,
+    };
+    
+    return { success: true, bill: serializedBill };
+
   } catch (error: any) {
     console.error("Error generating bill:", error);
     return { success: false, error: error.message || "Failed to generate bill." };
@@ -484,7 +505,27 @@ export async function recordPaymentOrVerificationAction(
     const updatedBill = await databaseService.updateBill(billId, billUpdateData);
 
     revalidatePath('/admin/billing');
-    return { success: true, bill: updatedBill };
+    
+    let parsedUtilityBreakdown: any[] = [];
+    if (typeof updatedBill.utilityBreakdown === 'string') {
+        try {
+            parsedUtilityBreakdown = JSON.parse(updatedBill.utilityBreakdown);
+        } catch (e) { /* ignore */ }
+    } else if (Array.isArray(updatedBill.utilityBreakdown)) {
+        parsedUtilityBreakdown = updatedBill.utilityBreakdown;
+    }
+
+    const serializedBill = {
+      ...updatedBill,
+      billDate: updatedBill.billDate.toISOString(),
+      dueDate: updatedBill.dueDate.toISOString(),
+      createdAt: updatedBill.createdAt.toISOString(),
+      updatedAt: updatedBill.updatedAt.toISOString(),
+      paymentDate: updatedBill.paymentDate?.toISOString() || null,
+      utilityBreakdown: parsedUtilityBreakdown,
+    };
+    
+    return { success: true, bill: serializedBill };
   } catch (error: any) {
     console.error(`Error in ${actionType}:`, error);
     return { success: false, error: error.message || `Failed to ${actionType.replace('Verification', ' verification').toLowerCase()}.` };
@@ -509,3 +550,4 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
