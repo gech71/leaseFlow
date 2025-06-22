@@ -34,6 +34,7 @@ import {
   Loader2,
   EyeOff,
   Eye,
+  LayoutGrid,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -65,8 +66,8 @@ interface NavItem {
 
 const allNavItems: NavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermissions: ['dashboard:view'] },
-  { href: '/admin/buildings', label: 'Buildings', icon: Building, requiredPermissions: ['building:view', 'building:create', 'building:edit', 'building:delete'] },
-  { href: '/admin/spaces', label: 'Spaces', icon: Building2, requiredPermissions: ['space:view', 'space:create', 'space:edit', 'space:delete'] },
+  { href: '/admin/buildings', label: 'Buildings', icon: LayoutGrid, requiredPermissions: ['building:view', 'building:create', 'building:edit', 'building:delete'] },
+  { href: '/admin/spaces', label: 'Spaces', icon: Building, requiredPermissions: ['space:view', 'space:create', 'space:edit', 'space:delete'] },
   { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:view', 'tenant:create', 'tenant:edit', 'tenant:delete'] },
   { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:view', 'agreement:create', 'agreement:edit', 'agreement:delete'] },
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: ['building_utility:view', 'building_utility:save'] },
@@ -259,11 +260,11 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
-        <div className="md:flex items-center justify-start mb-6 h-[3.7rem] px-4">
+        <div className="md:flex items-center justify-start h-[3.7rem] px-4">
             {/* This trigger is for desktop only, and only when collapsed */}
             <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
         </div>
-        <div className="p-4 sm:p-6 lg:p-8 pt-0 md:pt-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {children}
         </div>
       </main>
