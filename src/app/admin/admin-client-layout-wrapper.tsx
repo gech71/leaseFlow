@@ -259,12 +259,12 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
           </DropdownMenu>
         </SidebarFooter>
       </Sidebar>
-      <main className="flex-1 md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
-        <div className="md:flex items-center justify-start h-[3.7rem] px-4">
-            {/* This trigger is for desktop only, and only when collapsed */}
-            <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
-        </div>
-        <div className="p-4 sm:p-6 lg:p-8">
+      <main className="flex flex-1 flex-col md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)] transition-[margin-left] duration-200 ease-linear">
+        <header className="flex h-[3.7rem] shrink-0 items-center border-b bg-background px-4">
+          {/* This trigger is for desktop only, and only when collapsed */}
+          <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
+        </header>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
         </div>
       </main>
