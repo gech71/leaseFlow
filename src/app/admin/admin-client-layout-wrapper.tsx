@@ -168,7 +168,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               
               const sidebarButtonContent = (
                 <>
-                  <item.icon />
+                  <item.icon className="h-5 w-5 shrink-0" />
                   <span
                     className={cn(
                       "flex-1 min-w-0",
