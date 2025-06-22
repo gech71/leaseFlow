@@ -260,7 +260,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex flex-1 flex-col transition-[margin-left] duration-200 ease-linear md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)]">
-        <header className="flex h-[3.7rem] shrink-0 items-center border-b bg-background px-4 md:px-3">
+        <header className="flex h-[3.7rem] shrink-0 items-center border-b bg-background px-4 md:px-2">
           {/* This trigger is for mobile view */}
           <SidebarTrigger className="md:hidden" />
           {/* This trigger is for desktop only, and only when collapsed */}
