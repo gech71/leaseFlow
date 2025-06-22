@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldCheck, Edit, Trash2, PlusCircle, Loader2, AlertTriangle, BadgeAlert, ListChecks, EyeOff } from 'lucide-react';
+import { ShieldCheck, Edit, Trash2, PlusCircle, Loader2, AlertTriangle, BadgeAlert, ListChecks, EyeOff, ChevronDown } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,7 +21,8 @@ import type { Role } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ALL_RESOURCE_PERMISSIONS } from '@/lib/types'; 
 import { usePermissions } from '@/contexts/PermissionContext';
 import { cn } from '@/lib/utils';
@@ -316,20 +317,26 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
 
                     return (
                       <AccordionItem value={group.resourceId} key={group.resourceId}>
-                        <AccordionTrigger className={cn("hover:no-underline", isGroupIndeterminate ? "text-primary" : "")}>
-                          <div className="flex flex-1 items-center gap-2">
-                             <Checkbox
-                                id={`group-${group.resourceId}-trigger`}
-                                checked={isGroupChecked}
-                                data-indeterminate={isGroupIndeterminate ? "true" : undefined}
-                                className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
-                                onClick={(e) => { e.stopPropagation(); handleResourceGroupToggle(group, !isGroupChecked); }}
-                                disabled={isSaving || !canManageRoles}
-                              />
-                            <span className="font-semibold">{group.resourceLabel}</span>
-                          </div>
-                          <Badge variant={selectedCount > 0 ? "default" : "secondary"}>{selectedCount} / {groupPermissionIds.length}</Badge>
-                        </AccordionTrigger>
+                        <AccordionPrimitive.Header className="flex">
+                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180", isGroupIndeterminate ? "text-primary" : "")}>
+                                <div className="flex flex-1 items-center gap-3">
+                                    <Checkbox
+                                        id={`group-${group.resourceId}-trigger`}
+                                        checked={isGroupChecked}
+                                        onCheckedChange={(checked) => handleResourceGroupToggle(group, !!checked)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        data-indeterminate={isGroupIndeterminate ? "true" : undefined}
+                                        className="data-[state=checked]:bg-primary data-[indeterminate=true]:bg-primary/50"
+                                        disabled={isSaving || !canManageRoles}
+                                    />
+                                    <span className="font-semibold">{group.resourceLabel}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={selectedCount > 0 ? "default" : "secondary"}>{selectedCount} / {groupPermissionIds.length}</Badge>
+                                  <ChevronDown className="h-4 w-4 shrink-0" />
+                                </div>
+                            </AccordionPrimitive.Trigger>
+                        </AccordionPrimitive.Header>
                         <AccordionContent className="pl-8 pr-2">
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
                             {group.permissions.map((permission) => (
