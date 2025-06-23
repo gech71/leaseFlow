@@ -7,7 +7,7 @@ import { Building2, FileText, DollarSign, LayoutDashboard, AlertCircle, User } f
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart'; // Import the new chart component
 import { databaseService } from '@/lib/services/databaseService';
-import { getMonth, getYear, format, isAfter, addMonths, startOfMonth, endOfMonth, isValid } from 'date-fns';
+import { getMonth, getYear, format, isAfter, addMonths, subMonths, isValid } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cookies } from 'next/headers';
 import type { User as UserPrisma, Role, Prisma } from '@prisma/client';
@@ -100,8 +100,8 @@ export default async function AdminDashboardPage() {
   const buildingsPromise = databaseService.getAllBuildings({ where: buildingWhere });
   const spacesPromise = databaseService.getAllSpaces({ where: spaceWhere });
   const agreementsPromise = databaseService.getAllAgreements({ where: agreementWhere, include: { space: true, tenant: true } });
-  const billsPromise = databaseService.getAllBills({ where: billWhere, include: { agreement: { include: { tenant: true, space: true } } } });
-  const buildingUtilitiesPromise = databaseService.getAllBuildingMonthlyUtilities({
+  const allBillsPromise = databaseService.getAllBills({ where: billWhere, include: { agreement: { include: { tenant: true, space: true } } } }); // Renamed to reflect all bills
+  const currentMonthBuildingUtilitiesPromise = databaseService.getAllBuildingMonthlyUtilities({
     where: buildingUtilitiesWhere,
     include: { utilities: true },
   });
@@ -116,8 +116,8 @@ export default async function AdminDashboardPage() {
     buildingsPromise,
     spacesPromise,
     agreementsPromise,
-    billsPromise,
-    buildingUtilitiesPromise,
+    allBillsPromise,
+    currentMonthBuildingUtilitiesPromise,
   ]);
 
   const totalBuildingsCount = buildings.length;
@@ -170,7 +170,7 @@ export default async function AdminDashboardPage() {
       .filter(b => b.status === 'Paid')
       .reduce((sum, b) => sum + b.totalAmount, 0);
     const incomePendingConfirmation = billsForBuildingCurrentMonth
-      .filter(b => b.status === 'PendingVerification') // Corrected status check
+      .filter(b => b.status === 'PendingVerification')
       .reduce((sum, b) => sum + b.totalAmount, 0);
     const incomeToBeCollected = billsForBuildingCurrentMonth
       .filter(b => b.status === 'Pending' || b.status === 'Overdue')
@@ -186,14 +186,38 @@ export default async function AdminDashboardPage() {
     };
   });
 
-   const overviewData = [
-    { name: 'Jan', revenue: Math.random() * 50000 + 10000, expenses: Math.random() * 30000 + 5000 },
-    { name: 'Feb', revenue: Math.random() * 50000 + 10000, expenses: Math.random() * 30000 + 5000 },
-    { name: 'Mar', revenue: Math.random() * 50000 + 10000, expenses: Math.random() * 30000 + 5000 },
-    { name: 'Apr', revenue: Math.random() * 50000 + 10000, expenses: Math.random() * 30000 + 5000 },
-    { name: 'May', revenue: Math.random() * 50000 + 10000, expenses: Math.random() * 30000 + 5000 },
-    { name: 'Jun', revenue: Math.random() * 50000 + 10000, expenses: Math.random() * 30000 + 5000 },
-  ];
+  // --- Chart Data Calculation (Last 6 Months) ---
+  const chartData = [];
+  const allPaidBills = allBills.filter(bill => bill.status === 'Paid');
+  const allUtilities = await databaseService.getAllBuildingMonthlyUtilities({
+    where: managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {},
+    include: { utilities: true }
+  });
+
+  for (let i = 5; i >= 0; i--) {
+    const date = subMonths(today, i);
+    const monthName = format(date, 'MMM'); // 'Jan', 'Feb', etc.
+    const year = getYear(date);
+    const month = getMonth(date);
+
+    const monthlyRevenue = allPaidBills
+      .filter(bill => {
+        if (!bill.paymentDate) return false;
+        const paymentDate = bill.paymentDate;
+        return getYear(paymentDate) === year && getMonth(paymentDate) === month;
+      })
+      .reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+    const monthlyExpenses = allUtilities
+      .filter(util => util.year === year && util.month === month)
+      .reduce((sum, util) => sum + util.utilities.reduce((utilSum, item) => utilSum + item.totalCost, 0), 0);
+
+    chartData.push({
+      name: monthName,
+      revenue: parseFloat(monthlyRevenue.toFixed(2)),
+      expenses: parseFloat(monthlyExpenses.toFixed(2)),
+    });
+  }
   
   const recentActivities = allBills
     .sort((a, b) => {
@@ -223,7 +247,7 @@ export default async function AdminDashboardPage() {
 
         switch(bill.status) {
             case "Paid":
-                actionText = `${tenantName} paid bill for ${spaceName}.`;
+                actionText = `paid bill for ${spaceName}.`;
                 break;
             case "Pending":
                 actionText = `Bill generated for ${tenantName} for ${spaceName}, due ${billDueDateFormatted}.`;
@@ -286,7 +310,7 @@ export default async function AdminDashboardPage() {
             </Card>
         )}
         {financials.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {financials.map(summary => (
                 <BuildingFinancialCard
                 key={summary.buildingId}
@@ -305,10 +329,10 @@ export default async function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="font-headline text-xl">Monthly Overview (Sample Data)</CardTitle>
+            <CardTitle className="font-headline text-xl">Monthly Overview</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px]">
-            <DashboardChart data={overviewData} />
+            <DashboardChart data={chartData} />
           </CardContent>
         </Card>
         <Card className="shadow-lg">
