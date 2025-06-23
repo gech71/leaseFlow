@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff, Eye } from 'lucide-react';
+import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff, Eye, Clock } from 'lucide-react'; // Added Clock
 import type { Building as BuildingTypePrisma, Space as SpaceTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,11 +33,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createSpaceAction, updateSpaceAction, deleteSpaceAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import { formatDistanceToNow, parseISO } from 'date-fns'; // Added date-fns imports
 
 export interface SpaceWithBuildingName extends SpaceTypePrisma {
   buildingName: string; 
   createdAt: string; 
   updatedAt: string; 
+  availabilityDate?: string | null;
 }
 
 export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialSpaces: SpaceWithBuildingName[], initialBuildings: BuildingTypePrisma[] }) {
@@ -380,15 +382,21 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                   <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} sq ft</div>
                   <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(Number(space.utilityProrationShare) * 100).toFixed(0)}%</div>
                   <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${Number(space.monthlyRentalPrice).toLocaleString()}/month</div>
+                  {space.isOccupied && space.availabilityDate && (
+                    <div className="flex items-center text-blue-600 font-medium pt-3 border-t mt-3">
+                      <Clock className="mr-2 h-4 w-4" /> 
+                      <span>Available {formatDistanceToNow(parseISO(space.availabilityDate), { addSuffix: true })}</span>
+                    </div>
+                  )}
                 </CardContent>
-                <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
+                <CardFooter className="border-t pt-4 flex justify-end gap-2">
                   {(canEditSpaces || canViewSpaces) && (
-                    <Button variant="outline" size="sm" onClick={() => openEditForm(space)} className="w-full sm:w-auto" disabled={isSaving}>
+                    <Button variant="outline" size="sm" onClick={() => openEditForm(space)} disabled={isSaving}>
                       {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}
                     </Button>
                   )}
                   {canDeleteSpaces && (
-                    <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving} className="w-full sm:w-auto">
+                    <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
                       <Trash2 className="mr-1 h-4 w-4" /> Delete
                     </Button>
                   )}

@@ -3,6 +3,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Space as SpaceTypePrisma, Building as BuildingTypePrisma, Prisma, User, Role } from '@prisma/client';
 import { SpacesClientPage, type SpaceWithBuildingName } from './components';
 import { cookies } from 'next/headers';
+import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
 
 // Insecure JWT payload decoder
 function decodeJwtPayload(token: string): any | null {
@@ -54,18 +55,36 @@ export default async function SpacesPage() {
 
   const spacesData = await databaseService.getAllSpaces({ 
     where: spaceWhere,
-    include: { building: true },
+    include: { 
+        building: true,
+        agreements: true,
+    },
     orderBy: { createdAt: 'desc' }
   });
   const buildingsData = await databaseService.getAllBuildings({ where: buildingWhere, orderBy: { name: 'asc' } });
 
   // Serialize dates and structure data for the client component
-  const serializableSpaces: SpaceWithBuildingName[] = spacesData.map(space => ({
-    ...space,
-    createdAt: space.createdAt.toISOString(),
-    updatedAt: space.updatedAt?.toISOString() || new Date().toISOString(), 
-    buildingName: space.building.name,
-  }));
+  const serializableSpaces: SpaceWithBuildingName[] = spacesData.map(space => {
+    let availabilityDate: string | null = null;
+    if (space.isOccupied && space.agreements.length > 0) {
+      const activeAgreements = space.agreements
+        .filter(ag => isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date()))
+        .sort((a,b) => b.startDate.getTime() - a.startDate.getTime());
+
+      if (activeAgreements.length > 0) {
+        const endDate = addMonths(activeAgreements[0].startDate, activeAgreements[0].paymentTermMonths);
+        availabilityDate = endDate.toISOString();
+      }
+    }
+    
+    return {
+      ...space,
+      createdAt: space.createdAt.toISOString(),
+      updatedAt: space.updatedAt?.toISOString() || new Date().toISOString(), 
+      buildingName: space.building.name,
+      availabilityDate,
+    };
+  });
 
   const serializableBuildings: BuildingTypePrisma[] = buildingsData.map(building => ({
     ...building,
