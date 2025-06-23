@@ -7,14 +7,25 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent } from 'lucide-react';
+import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle } from 'lucide-react';
 import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth, parseISO } from 'date-fns';
-import { getBuildingUtilitiesAction, saveBuildingUtilitiesAction, getAllBuildingUtilitiesForListAction, type BuildingUtilityItemInput } from './actions';
+import { getBuildingUtilitiesAction, saveBuildingUtilitiesAction, getAllBuildingUtilitiesForListAction, deleteBuildingUtilitiesAction, type BuildingUtilityItemInput } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 // Client-safe types passed as props
 interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt'> {
@@ -26,7 +37,7 @@ interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updated
   updatedAt: string;
   spaces: ClientSpace[];
 }
-interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingMonthlyUtilitiesPrismaType, 'createdAt' | 'updatedAt' | 'utilities'> {
+export interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingMonthlyUtilitiesPrismaType, 'createdAt' | 'updatedAt' | 'utilities'> {
   createdAt: string;
   updatedAt: string;
   utilities: BuildingUtilityItemPrismaType[]; 
@@ -62,6 +73,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const [currentUtilityItems, setCurrentUtilityItems] = useState<UIUtilityItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<ClientBuildingMonthlyUtilitiesPrismaType | null>(null);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canSaveUtilities = isSuperAdmin || hasPermission('building_utility:save');
@@ -340,6 +352,21 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       toast({ title: 'Error Saving Utilities', description: result.error, variant: 'destructive' });
     }
   };
+
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete || !canSaveUtilities) return;
+    setIsSaving(true);
+    const result = await deleteBuildingUtilitiesAction(recordToDelete.id);
+    setIsSaving(false);
+    
+    if (result.success) {
+      toast({ title: "Record Deleted", description: `Utility record for ${recordToDelete.buildingName} - ${format(setMonth(setYear(new Date(), recordToDelete.year), recordToDelete.month), 'MMMM yyyy')} has been removed.`});
+      setAllUtilityRecords(prev => prev.filter(r => r.id !== recordToDelete.id));
+    } else {
+      toast({ title: "Error Deleting Record", description: result.error, variant: "destructive" });
+    }
+    setRecordToDelete(null);
+  };
   
   const years = Array.from({ length: 10 }, (_, i) => getYear(new Date()) - 5 + i); 
   const months = Array.from({ length: 12 }, (_, i) => ({
@@ -372,6 +399,21 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
           </CardHeader>
         </Card>
       )}
+
+      <AlertDialog open={!!recordToDelete} onOpenChange={(open) => { if(!open) setRecordToDelete(null); }}>
+        <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-5 w-5"/>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+                Are you sure you want to delete the utility record for {recordToDelete?.buildingName} for {recordToDelete ? format(setMonth(setYear(new Date(), recordToDelete.year), recordToDelete.month), 'MMMM yyyy') : ''}? This action cannot be undone.
+            </AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter> 
+              <AlertDialogCancel onClick={() => setRecordToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel> 
+              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90" disabled={isSaving || !canSaveUtilities}> 
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Record
+              </AlertDialogAction> 
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -561,7 +603,8 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
             {allUtilityRecords.length > 0 && (
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                     {allUtilityRecords.map(entry => (
-                        <Button key={entry.id} variant="outline" className="w-full justify-start h-auto p-4 text-left"
+                      <div key={entry.id} className="flex items-center gap-2">
+                        <Button variant="outline" className="flex-grow justify-start h-auto p-4 text-left"
                             onClick={() => { setSelectedBuildingId(entry.buildingId); setSelectedYear(entry.year); setSelectedMonth(entry.month);}}>
                             <div className="w-full">
                                 <h4 className="font-semibold">{entry.buildingName} - {format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</h4>
@@ -573,7 +616,18 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                                                 {util.appliesToScope === 'Floor' && util.applicableFloor ? ` - Floor: ${util.applicableFloor}` : ''}
                                                 {util.appliesToScope === 'SpecificSpaces' && util.applicableSpaceIdNames && util.applicableSpaceIdNames.length > 0 ? ` - Space: ${util.applicableSpaceIdNames.join(', ')}` : ''})</span></li>))}</ul>
                                 <p className="text-xs text-muted-foreground/70 mt-1">Last Saved: {format(parseISO(entry.updatedAt as unknown as string), 'PPp')}</p>
-                            </div></Button>))}</div>)}
+                            </div>
+                        </Button>
+                        {canSaveUtilities && (
+                          <Button variant="destructive" size="icon" onClick={() => setRecordToDelete(entry)} disabled={isSaving}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete Record</span>
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                </div>
+            )}
         </CardContent>
       </Card>
     </div>
