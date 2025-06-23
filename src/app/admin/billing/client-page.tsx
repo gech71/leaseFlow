@@ -427,7 +427,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
             {agreements.map(agreement => {
               if (!agreement.tenant || !agreement.space) return null; 
               
-              const agreementStartDate = parseISO(agreement.startDate);
+              const agreementStartDate = startOfDay(parseISO(agreement.startDate));
               const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
               const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
               const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
