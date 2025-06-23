@@ -49,13 +49,14 @@ export default async function TenantsPage() {
       managedBuildingIds = managedBuildings.map(b => b.id);
   }
 
-  // A user can see tenants in their managed buildings, or tenants who are not yet assigned a space
+  // A user can see tenants in their managed buildings. Unassigned tenants are only visible to SUPER_ADMIN on this page.
   const tenantWhere: Prisma.TenantWhereInput = managedBuildingIds
     ? {
-        OR: [
-          { rentedSpace: null },
-          { rentedSpace: { buildingId: { in: managedBuildingIds } } }
-        ]
+        rentedSpace: {
+          buildingId: {
+            in: managedBuildingIds,
+          },
+        },
       }
     : {};
   
