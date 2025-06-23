@@ -107,7 +107,7 @@ export async function updateBuildingAction(id: string, data: Prisma.BuildingUpda
 export async function deleteBuildingAction(id: string) {
   try {
     // Check if building has spaces
-    const buildingWithSpaces = await databaseService.getBuildingById(id, { include: { spaces: { take: 1 } } });
+    const buildingWithSpaces = await databaseService.getBuildingById(id, { spaces: { take: 1 } });
     if (buildingWithSpaces && buildingWithSpaces.spaces.length > 0) {
       return { success: false, error: "Cannot delete building with associated spaces. Please remove or reassign spaces first." };
     }

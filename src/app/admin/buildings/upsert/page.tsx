@@ -61,7 +61,7 @@ async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?
 
   if (buildingIdParam) {
     let buildingToEdit = await databaseService.getBuildingById(buildingIdParam, {
-      include: { penaltyPolicyTiers: true }
+      penaltyPolicyTiers: true
     });
 
     // Security Check: Ensure non-super-admin can only edit their own buildings
