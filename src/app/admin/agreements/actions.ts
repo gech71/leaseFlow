@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement } from '@prisma/client';
 import { addMonths, parseISO } from 'date-fns';
+import { prisma } from '@/lib/prisma';
 
 export interface CreateFullAgreementData {
   // IDs for relations
@@ -28,40 +29,73 @@ export interface CreateFullAgreementData {
 export async function createFullAgreementAction(input: CreateFullAgreementData) {
   try {
     const startDateObj = parseISO(input.startDate);
-    // The next due date is for the first bill (utilities). Rent is handled separately by the initial payment months.
+    // The next due date is for the first monthly utility bill.
     const nextPaymentDueDateObj = addMonths(startDateObj, 1);
     const initialPaymentAmount = input.monthlyRentalPrice * input.initialPaymentMonths;
 
-    const agreementToCreate: Prisma.AgreementCreateInput = {
-      agreementText: input.agreementText,
-      startDate: startDateObj,
-      monthlyRentalPrice: input.monthlyRentalPrice,
-      paymentTermMonths: input.paymentTermMonths,
-      initialPaymentMonths: input.initialPaymentMonths,
-      nextPaymentDueDate: nextPaymentDueDateObj,
-      additionalTerms: input.additionalTerms,
+    const newAgreement = await prisma.$transaction(async (tx) => {
+      // 1. Create the Agreement
+      const agreement = await tx.agreement.create({
+        data: {
+          agreementText: input.agreementText,
+          startDate: startDateObj,
+          monthlyRentalPrice: input.monthlyRentalPrice,
+          paymentTermMonths: input.paymentTermMonths,
+          initialPaymentMonths: input.initialPaymentMonths,
+          nextPaymentDueDate: nextPaymentDueDateObj,
+          additionalTerms: input.additionalTerms,
+          
+          initialPaymentAmount: initialPaymentAmount,
+          initialPaymentMethod: input.initialPaymentMethod,
+          initialPaymentReference: input.initialPaymentReference,
+          initialPaymentBankOrWalletName: (input.initialPaymentMethod === "Bank Transfer" || input.initialPaymentMethod === "Wallet") ? input.initialPaymentBankOrWalletName : null,
+          initialPaymentDate: startDateObj,
+
+          tenant: { connect: { id: input.tenantId } },
+          space: { connect: { id: input.spaceId } },
+        }
+      });
+
+      // 2. Create a "Bill" for the initial payment, marked as Paid
+      if (initialPaymentAmount > 0) {
+        await tx.bill.create({
+          data: {
+            agreementId: agreement.id,
+            tenantId: input.tenantId,
+            billDate: startDateObj,
+            dueDate: startDateObj,
+            rentAmount: initialPaymentAmount,
+            utilityBreakdown: Prisma.JsonNull,
+            penaltyAmount: 0,
+            totalAmount: initialPaymentAmount,
+            status: 'Paid',
+            paymentDate: startDateObj,
+            paymentMethod: input.initialPaymentMethod,
+            paymentReference: input.initialPaymentReference,
+            bankOrWalletName: (input.initialPaymentMethod === "Bank Transfer" || input.initialPaymentMethod === "Wallet") ? input.initialPaymentBankOrWalletName : null,
+            adminVerifiedPayment: true,
+          }
+        });
+      }
+
+      // 3. Update space to be occupied by this tenant
+      await tx.space.update({
+        where: { id: input.spaceId },
+        data: {
+          isOccupied: true,
+          tenant: { connect: { id: input.tenantId } },
+        },
+      });
+
+      // 4. Update tenant's rentedSpaceId
+      await tx.tenant.update({
+        where: { id: input.tenantId },
+        data: {
+          rentedSpace: { connect: { id: input.spaceId } },
+        },
+      });
       
-      initialPaymentAmount: initialPaymentAmount,
-      initialPaymentMethod: input.initialPaymentMethod,
-      initialPaymentReference: input.initialPaymentReference,
-      initialPaymentBankOrWalletName: (input.initialPaymentMethod === "Bank Transfer" || input.initialPaymentMethod === "Wallet") ? input.initialPaymentBankOrWalletName : undefined,
-      initialPaymentDate: startDateObj, // Assuming initial payment is made on start date
-
-      tenant: { connect: { id: input.tenantId } },
-      space: { connect: { id: input.spaceId } },
-    };
-
-    const newAgreement = await databaseService.createAgreement(agreementToCreate);
-
-    // Update space to be occupied by this tenant
-    await databaseService.updateSpace(input.spaceId, {
-      isOccupied: true,
-      tenant: { connect: { id: input.tenantId } },
-    });
-
-    // Update tenant's rentedSpaceId
-    await databaseService.updateTenant(input.tenantId, {
-      rentedSpace: { connect: { id: input.spaceId } },
+      return agreement;
     });
 
     revalidatePath('/admin/agreements');
