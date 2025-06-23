@@ -459,17 +459,14 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
               </div>
               {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
               {!isLoadingData && currentUtilityItems.map((item, index) => {
-                let totalPercentageForFloor = 0;
-                if (item.appliesToScope === 'Floor' && item.perSpacePercentages) {
-                    totalPercentageForFloor = Object.values(item.perSpacePercentages).reduce((sum, p) => sum + (p || 0), 0);
-                }
+                const totalPercentageForFloor = Object.values(item.perSpacePercentages || {}).reduce((sum, p) => sum + (p || 0), 0);
 
                 return (
                 <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
                   <CardContent className="p-0 space-y-4">
                     <div className="flex justify-between items-start">
                         <Label className="text-base font-medium text-foreground">Utility Item {index + 1}</Label>
-                        {currentUtilityItems.length > 1 && canSaveUtilities && (
+                        {canSaveUtilities && (
                           <Button variant="ghost" size="icon" onClick={() => handleRemoveUtilityItem(item.uiId)} className="text-destructive hover:bg-destructive/10 h-7 w-7" disabled={isSaving}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
