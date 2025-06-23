@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal } from '@prisma/client';
-import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays } from 'date-fns';
+import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths } from 'date-fns';
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
@@ -302,13 +302,16 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const utilityItemsForJson: {name: string; amount: number}[] = []; 
     let totalUtilityCostForBill = 0;
 
-    const billYear = getYear(targetBillDate);
-    const billMonth = getMonth(targetBillDate);
+    // Fetch utilities for the month PRIOR to the bill's date.
+    // e.g., A bill dated June 1st should include utilities consumed in May.
+    const utilityPeriodDate = subMonths(targetBillDate, 1);
+    const utilityYear = getYear(utilityPeriodDate);
+    const utilityMonth = getMonth(utilityPeriodDate);
 
     const monthlyBuildingUtilityData = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(
       agreement.space.building.id,
-      billMonth,
-      billYear,
+      utilityMonth,
+      utilityYear,
       { utilities: true } 
     );
 
@@ -551,3 +554,4 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
