@@ -319,16 +319,25 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       monthlyBuildingUtilityData.utilities.forEach(utilItem => {
         let costForThisUtility = 0;
         switch (utilItem.appliesToScope) {
-          case 'Building': costForThisUtility = utilItem.totalCost * agreement.space.utilityProrationShare; break;
+          case 'Building': 
+            costForThisUtility = utilItem.totalCost * agreement.space.utilityProrationShare; 
+            break;
           case 'Floor':
             if (utilItem.applicableFloor && agreement.space.floor === utilItem.applicableFloor) {
-              const spacesOnFloor = agreement.space.building.spaces?.filter(s => s.floor === utilItem.applicableFloor).length || 1;
-              costForThisUtility = spacesOnFloor > 0 ? utilItem.totalCost / spacesOnFloor : 0;
+              const occupiedSpacesOnFloor = agreement.space.building.spaces?.filter(
+                (s) => s.floor === utilItem.applicableFloor && s.isOccupied
+              ) || [];
+              const totalOccupiedSpacesOnFloor = occupiedSpacesOnFloor.length;
+              if (totalOccupiedSpacesOnFloor > 0) {
+                const isAgreementSpaceOccupiedOnFloor = occupiedSpacesOnFloor.some(s => s.id === agreement.spaceId);
+                if (isAgreementSpaceOccupiedOnFloor) {
+                  costForThisUtility = utilItem.totalCost / totalOccupiedSpacesOnFloor;
+                }
+              }
             }
             break;
           case 'SpecificSpaces':
             if (utilItem.applicableSpaceIdNames?.includes(agreement.space.spaceIdName)) {
-                // The totalCost of a 'SpecificSpaces' item is the cost for that one space.
                 costForThisUtility = utilItem.totalCost;
             }
             break;
@@ -554,4 +563,5 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
 
