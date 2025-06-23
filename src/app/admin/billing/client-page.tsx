@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon as CalendarLucideIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip, EyeOff, Eye } from 'lucide-react';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon as CalendarLucideIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip, EyeOff, Eye, Search } from 'lucide-react';
 import type { Agreement as AgreementPrisma, Bill as BillPrismaOriginal, Space as SpacePrisma, Building as BuildingPrisma, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, Prisma, Tenant as TenantPrismaOriginal } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -89,6 +89,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const { toast } = useToast();
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isLoading, setIsLoading] = useState(false);
+  const [billFilterTerm, setBillFilterTerm] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -124,6 +125,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setAllBuildings(initialData.buildings);
     setToday(startOfDay(new Date()));
   }, [initialData]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [billFilterTerm]);
 
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
@@ -200,8 +205,15 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
         tenantName: bill.agreement?.tenant?.name || 'N/A',
       };
+    }).filter(bill => {
+        if (!billFilterTerm) return true;
+        const searchTermLower = billFilterTerm.toLowerCase();
+        const tenantName = bill.tenantName.toLowerCase();
+        const spaceIdName = bill.agreement?.space?.spaceIdName.toLowerCase() || '';
+        const buildingName = bill.agreement?.space?.building?.name.toLowerCase() || '';
+        return tenantName.includes(searchTermLower) || spaceIdName.includes(searchTermLower) || buildingName.includes(searchTermLower);
     }).sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [bills, calculatePenalty, today]);
+  }, [bills, calculatePenalty, today, billFilterTerm]);
 
   const totalPages = Math.ceil(processedClientBills.length / itemsPerPage);
   const paginatedBills = processedClientBills.slice(
@@ -584,68 +596,89 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         </DialogContent>
       </Dialog>
 
-      {processedClientBills.length === 0 && !isLoading ? (
-        <Card className="text-center py-12 shadow-sm mt-8"> <CardContent><DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" /><h3 className="text-xl font-semibold mb-2 font-headline">No Bills Yet</h3><p className="text-muted-foreground">Generate bills to see them here.</p></CardContent> </Card>
-      ) : (
-        <div className="space-y-4 mt-8">
-        <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
-        {isLoading && bills.length > 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-        <Card className="shadow-md">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead className="hidden md:table-cell">Space</TableHead>
-                  <TableHead>Bill Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Rent</TableHead>
-                  <TableHead className="hidden lg:table-cell text-right">Utilities</TableHead>
-                  <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right pr-2 sm:pr-4">Actions</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {paginatedBills.map((bill) => (
-                    <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                      <TableCell className="font-medium">{bill.tenantName}</TableCell>
-                      <TableCell className="hidden md:table-cell text-xs">{bill.agreement?.space?.spaceIdName}, {bill.agreement?.space?.buildingName}</TableCell>
-                      <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
-                      <TableCell className={bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                      <TableCell className="hidden lg:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)} Birr</TableCell>
-                      <TableCell className="hidden lg:table-cell text-right whitespace-nowrap">
-                        {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)} Birr</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)} Birr</span></li>))}</ul></PopoverContent></Popover>) : ('0.00 Birr')}
-                      </TableCell>
-                      <TableCell className="hidden xl:table-cell text-right text-destructive whitespace-nowrap">{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : '0.00 Birr'}</TableCell>
-                      <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
-                      <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span></Badge></TableCell>
-                      <TableCell className="text-right pr-2 sm:pr-4">
-                        <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">
-                          {bill.currentStatus === 'PendingVerification' && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" disabled={isLoading}><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button> )}
-                          {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button> )}
-                          {bill.status !== 'Paid' && canManagePayments && (<Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Edit</span><span className="sm:hidden">Edit</span></Button>)}
-                          {bill.currentStatus === 'Paid' && canManagePayments && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Eye className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View Details</span><span className="sm:hidden">View</span></Button> )}
-                          {canDeleteBills && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive/10 self-center sm:self-auto" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading || bill.status === 'Paid'}><Trash2 className="h-4 w-4"/></Button>}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      <div className="space-y-4 mt-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
+           <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Filter by tenant, space..."
+                className="pl-10"
+                value={billFilterTerm}
+                onChange={(e) => setBillFilterTerm(e.target.value)}
+              />
             </div>
-          </CardContent>
-        </Card>
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          itemsPerPage={itemsPerPage}
-          onItemsPerPageChange={handleItemsPerPageChange}
-          className="mt-4"
-        />
         </div>
-      )}
+
+        {isLoading && bills.length > 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
+        
+        {paginatedBills.length === 0 && !isLoading ? (
+            <Card className="text-center py-12 shadow-sm">
+                <CardContent>
+                    <DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-semibold mb-2 font-headline">{billFilterTerm ? 'No Bills Match Filter' : 'No Bills Yet'}</h3>
+                    <p className="text-muted-foreground">{billFilterTerm ? 'Try a different search term.' : 'Generate bills to see them here.'}</p>
+                </CardContent>
+            </Card>
+        ) : (
+          <>
+            <Card className="shadow-md">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead className="hidden md:table-cell">Space</TableHead>
+                      <TableHead>Bill Date</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead className="hidden lg:table-cell text-right">Rent</TableHead>
+                      <TableHead className="hidden lg:table-cell text-right">Utilities</TableHead>
+                      <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-right pr-2 sm:pr-4">Actions</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {paginatedBills.map((bill) => (
+                        <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
+                          <TableCell className="font-medium">{bill.tenantName}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs">{bill.agreement?.space?.spaceIdName}, {bill.agreement?.space?.buildingName}</TableCell>
+                          <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
+                          <TableCell className={bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
+                          <TableCell className="hidden lg:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)} Birr</TableCell>
+                          <TableCell className="hidden lg:table-cell text-right whitespace-nowrap">
+                            {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)} Birr</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)} Birr</span></li>))}</ul></PopoverContent></Popover>) : ('0.00 Birr')}
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell text-right text-destructive whitespace-nowrap">{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : '0.00 Birr'}</TableCell>
+                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
+                          <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span></Badge></TableCell>
+                          <TableCell className="text-right pr-2 sm:pr-4">
+                            <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">
+                              {bill.currentStatus === 'PendingVerification' && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" disabled={isLoading}><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button> )}
+                              {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button> )}
+                              {bill.status !== 'Paid' && canManagePayments && (<Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Edit</span><span className="sm:hidden">Edit</span></Button>)}
+                              {bill.currentStatus === 'Paid' && canManagePayments && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Eye className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View Details</span><span className="sm:hidden">View</span></Button> )}
+                              {canDeleteBills && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive/10 self-center sm:self-auto" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading || bill.status === 'Paid'}><Trash2 className="h-4 w-4"/></Button>}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              className="mt-4"
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }
