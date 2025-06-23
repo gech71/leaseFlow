@@ -313,16 +313,15 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         
         // Handle building-wide utilities based on proration share
         if (utilItem.appliesToScope === 'Building') {
-          cost = utilItem.totalCost * (space.utilityProrationShare || 0);
+          cost = Number(utilItem.totalCost) * (Number(space.utilityProrationShare) || 0);
         }
         
-        // Handle utilities assigned to specific spaces. This now covers both
-        // "Specific Floor" and "Specific Spaces" from the UI, as both are saved
-        // as 'SpecificSpaces' with pre-calculated final costs.
+        // Handle utilities assigned to a specific space. The UI saves both 'Floor' and 'SpecificSpaces'
+        // scopes as one or more 'SpecificSpaces' items with a pre-calculated final cost.
         else if (utilItem.appliesToScope === 'SpecificSpaces') {
           if (utilItem.applicableSpaceIdNames?.includes(space.spaceIdName)) {
-            // The totalCost here is the final, pre-calculated amount for this space.
-            cost = utilItem.totalCost;
+            // The totalCost here is the final, pre-calculated amount for this one space.
+            cost = Number(utilItem.totalCost);
           }
         }
         
@@ -547,6 +546,7 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
 
 
 
