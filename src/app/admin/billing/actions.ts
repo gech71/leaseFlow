@@ -304,33 +304,33 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       agreement.space.building.id, utilityMonth, utilityYear, { utilities: true } 
     );
 
-    if (monthlyBuildingUtilityData?.utilities.length) {
+    if (monthlyBuildingUtilityData && monthlyBuildingUtilityData.utilities && monthlyBuildingUtilityData.utilities.length > 0) {
       const allUtilitiesForPeriod = monthlyBuildingUtilityData.utilities;
       const space = agreement.space;
 
-      allUtilitiesForPeriod.forEach(utilItem => {
-        let cost = 0;
-        
-        // Handle building-wide utilities based on proration share
+      for (const utilItem of allUtilitiesForPeriod) {
+        let costForThisItem = 0;
+        const utilTotalCost = Number(utilItem.totalCost);
+
+        if (isNaN(utilTotalCost)) continue;
+
         if (utilItem.appliesToScope === 'Building') {
-          cost = Number(utilItem.totalCost) * (Number(space.utilityProrationShare) || 0);
-        }
-        
-        // Handle utilities assigned to a specific space. The UI saves both 'Floor' and 'SpecificSpaces'
-        // scopes as one or more 'SpecificSpaces' items with a pre-calculated final cost.
-        else if (utilItem.appliesToScope === 'SpecificSpaces') {
-          if (utilItem.applicableSpaceIdNames?.includes(space.spaceIdName)) {
-            // The totalCost here is the final, pre-calculated amount for this one space.
-            cost = Number(utilItem.totalCost);
+          const prorationShare = Number(space.utilityProrationShare);
+          if (!isNaN(prorationShare) && prorationShare > 0) {
+            costForThisItem = utilTotalCost * prorationShare;
+          }
+        } else if (utilItem.appliesToScope === 'SpecificSpaces') {
+          if (Array.isArray(utilItem.applicableSpaceIdNames) && utilItem.applicableSpaceIdNames.includes(space.spaceIdName)) {
+            costForThisItem = utilTotalCost;
           }
         }
         
-        if (cost > 0) {
-          const roundedCost = parseFloat(cost.toFixed(2));
+        if (costForThisItem > 0) {
+          const roundedCost = parseFloat(costForThisItem.toFixed(2));
           utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
           totalUtilityCostForBill += roundedCost;
         }
-      });
+      }
     }
 
     let initialPenalty = 0;
@@ -546,6 +546,7 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
 
 
 
