@@ -14,6 +14,7 @@ import { getYear, getMonth, format, setYear, setMonth, parseISO } from 'date-fns
 import { getBuildingUtilitiesAction, saveBuildingUtilitiesAction, getAllBuildingUtilitiesForListAction, type BuildingUtilityItemInput } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 // Client-safe types passed as props
 interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt'> {
@@ -68,6 +69,13 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const selectedBuilding = useMemo(() => {
     return registeredBuildings.find(b => b.id === selectedBuildingId);
   }, [selectedBuildingId, registeredBuildings]);
+  
+  const uniqueFloors = useMemo(() => {
+    if (!selectedBuilding) return [];
+    const floors = selectedBuilding.spaces.map(s => s.floor).filter(Boolean); // filter out null/empty floors
+    // Sort numerically if possible, otherwise alphabetically
+    return [...new Set(floors)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [selectedBuilding]);
 
 
   useEffect(() => {
@@ -350,19 +358,40 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                         </div>
                     </div>
                     
-                    {item.appliesToScope !== 'SpecificSpaces' && (
+                    {item.appliesToScope === 'Building' && (
+                        <div className="space-y-1.5">
+                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
+                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                        </div>
+                    )}
+
+                    {item.appliesToScope === 'Floor' && (
+                      <div className="space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                             <div className="space-y-1.5">
-                                <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label>
-                                <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                                <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost for Floor</Label>
+                                <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 200.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
                             </div>
-                            {item.appliesToScope === 'Floor' && (
-                                <div className="space-y-1.5">
-                                    <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor Name</Label>
-                                    <Input id={`applicableFloor-${item.uiId}`} placeholder="e.g., 10th" value={item.applicableFloor || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableFloor', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
-                                </div>
-                            )}
+                            <div className="space-y-1.5">
+                                <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor</Label>
+                                <Select value={item.applicableFloor || ''} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'applicableFloor', value)} disabled={isSaving || !canSaveUtilities}>
+                                    <SelectTrigger id={`applicableFloor-${item.uiId}`}><SelectValue placeholder="Select a floor" /></SelectTrigger>
+                                    <SelectContent>{uniqueFloors.map(floor => (<SelectItem key={floor} value={floor}>{floor}</SelectItem>))}</SelectContent>
+                                </Select>
+                            </div>
                         </div>
+                        {item.applicableFloor && (
+                            <div className="space-y-1">
+                                <Label className="text-xs font-medium text-muted-foreground">Spaces on this floor (for context):</Label>
+                                <div className="flex flex-wrap gap-1.5 text-xs p-2 border rounded-md bg-background min-h-[40px]">
+                                    {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(s => (
+                                        <Badge key={s.id} variant="secondary" className="font-normal">{s.spaceIdName}</Badge>
+                                    ))}
+                                    {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).length === 0 && <span className="italic">No spaces found for this floor.</span>}
+                                </div>
+                            </div>
+                        )}
+                      </div>
                     )}
                     
                     {item.appliesToScope === 'SpecificSpaces' && (
