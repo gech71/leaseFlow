@@ -205,7 +205,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   const paidTotalPages = Math.ceil(paidBillsInSelectedPeriod.length / ITEMS_PER_PAGE);
   const paginatedPaidBills = paidBillsInSelectedPeriod.slice(
     (paidCurrentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    paidCurrentPage * ITEMS_PER_PAGE
   );
 
   const totalUpcomingAmount = useMemo(() => upcomingAndPendingBills.reduce((sum, bill) => sum + bill.totalAmount, 0), [upcomingAndPendingBills]);
