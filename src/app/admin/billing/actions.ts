@@ -355,7 +355,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     }
 
     // Determine if rent should be charged based on upfront payment
-    const agreementStartDate = parseISO(agreement.startDate as unknown as string);
+    const agreementStartDate = agreement.startDate;
     const lastRentFreeDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
 
     let rentAmount = agreement.monthlyRentalPrice;
