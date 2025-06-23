@@ -259,7 +259,6 @@ function calculateIndividualPenalty(
 
 export async function generateBillAndUpdateAgreementAction(agreementId: string, targetBillDateStr: string) {
   try {
-    // The date string from the client is 'yyyy-MM-dd'. We parse it as a UTC date to avoid timezone shifts.
     const targetBillDate = parseISO(`${targetBillDateStr}T00:00:00.000Z`);
     const today = startOfDay(new Date());
 
@@ -280,17 +279,12 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     if (!agreement.space) throw new Error("Space details for agreement not found.");
     if (!agreement.space.building) throw new Error("Building details for space not found.");
 
-    // Use the UTC date for checking duplicates to ensure consistency
     const targetDayStart = targetBillDate;
     const targetDayEnd = addDays(targetDayStart, 1);
-
     const existingBill = await databaseService.getAllBills({
         where: {
             agreementId: agreement.id,
-            billDate: {
-                gte: targetDayStart,
-                lt: targetDayEnd,
-            },
+            billDate: { gte: targetDayStart, lt: targetDayEnd },
             OR: [{status: 'Pending'}, {status: 'Overdue'}, {status: 'PendingVerification'}]
         }
     });
@@ -302,17 +296,12 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const utilityItemsForJson: {name: string; amount: number}[] = []; 
     let totalUtilityCostForBill = 0;
 
-    // Fetch utilities for the month PRIOR to the bill's date.
-    // e.g., A bill dated June 1st should include utilities consumed in May.
     const utilityPeriodDate = subMonths(targetBillDate, 1);
     const utilityYear = getYear(utilityPeriodDate);
     const utilityMonth = getMonth(utilityPeriodDate);
 
     const monthlyBuildingUtilityData = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(
-      agreement.space.building.id,
-      utilityMonth,
-      utilityYear,
-      { utilities: true } 
+      agreement.space.building.id, utilityMonth, utilityYear, { utilities: true } 
     );
 
     if (monthlyBuildingUtilityData?.utilities.length) {
@@ -323,7 +312,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       // 1. Process 'Building' scope utilities
       const buildingScopeUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'Building');
       buildingScopeUtils.forEach(utilItem => {
-        const cost = utilItem.totalCost * space.utilityProrationShare;
+        const cost = utilItem.totalCost * (space.utilityProrationShare || 0);
         if (cost > 0) {
           const roundedCost = parseFloat(cost.toFixed(2));
           utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
@@ -331,36 +320,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         }
       });
 
-      // 2. Process 'Floor' scope utilities
-      const floorScopeUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'Floor' && u.applicableFloor === space.floor);
-      floorScopeUtils.forEach(utilItem => {
-        const occupiedSpacesOnFloor = building.spaces?.filter(
-          (s) => s.floor === utilItem.applicableFloor && s.isOccupied
-        ) || [];
-        
-        if (occupiedSpacesOnFloor.length > 0) {
-          const totalProrationShareOnFloor = occupiedSpacesOnFloor.reduce(
-            (sum, s) => sum + (s.utilityProrationShare || 0),
-            0
-          );
-
-          const isSpaceIncluded = occupiedSpacesOnFloor.some(s => s.id === space.id);
-
-          // Only apply cost if the space is on the floor and there's a share to divide by
-          if (isSpaceIncluded && totalProrationShareOnFloor > 0) {
-            const spaceProrationShare = space.utilityProrationShare || 0;
-            const cost = utilItem.totalCost * (spaceProrationShare / totalProrationShareOnFloor);
-            
-            if (cost > 0) {
-              const roundedCost = parseFloat(cost.toFixed(2));
-              utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
-              totalUtilityCostForBill += roundedCost;
-            }
-          }
-        }
-      });
-
-      // 3. Process 'SpecificSpaces' scope utilities
+      // 2. Process 'SpecificSpaces' scope utilities (this now includes transformed 'Floor' utilities)
       const specificSpaceUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'SpecificSpaces' && u.applicableSpaceIdNames?.includes(space.spaceIdName));
       specificSpaceUtils.forEach(utilItem => {
         const cost = utilItem.totalCost;
@@ -585,6 +545,7 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
 
 
 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent } from 'lucide-react';
 import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth, parseISO } from 'date-fns';
@@ -37,9 +37,10 @@ interface UIUtilityItem {
   uiId: string;
   name: string;
   appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
-  totalCost?: number; // Used for Building/Floor scope
-  applicableFloor?: string; // Used for Floor scope
-  perSpaceCosts?: { [spaceId: string]: number }; // Used for SpecificSpaces scope
+  totalCost?: number;
+  applicableFloor?: string;
+  perSpaceCosts?: { [spaceId: string]: number };
+  perSpacePercentages?: { [spaceId: string]: number };
 }
 
 
@@ -77,6 +78,9 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     return [...new Set(floors)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [selectedBuilding]);
 
+  const createEmptyItem = (): UIUtilityItem => ({
+    uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {}, perSpacePercentages: {}
+  });
 
   useEffect(() => {
     setIsMounted(true);
@@ -93,44 +97,84 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
         if (existingEntry && existingEntry.utilities) {
-            // Group DB items into logical UI items
-            const groupedItems: { [name: string]: UIUtilityItem } = {};
-            existingEntry.utilities.forEach((dbItem, index) => {
-                if (dbItem.appliesToScope === 'SpecificSpaces') {
-                    if (!groupedItems[dbItem.name]) {
-                        groupedItems[dbItem.name] = {
-                            uiId: `logical-${dbItem.name}-${Date.now()}`,
-                            name: dbItem.name,
-                            appliesToScope: 'SpecificSpaces',
-                            perSpaceCosts: {},
-                        };
+             const uiItems: UIUtilityItem[] = [];
+            // Group utilities from DB by name to reconstruct logical floor utilities
+            const groupedByName = existingEntry.utilities.reduce((acc, item) => {
+                if (!acc[item.name]) acc[item.name] = [];
+                acc[item.name].push(item);
+                return acc;
+            }, {} as Record<string, BuildingUtilityItemPrismaType[]>);
+
+            for (const name in groupedByName) {
+                const items = groupedByName[name];
+                const firstItem = items[0];
+
+                // Check if this group can be reconstructed as a single "Floor" UI item
+                const allAreSpecificSpaces = items.every(i => i.appliesToScope === 'SpecificSpaces' && i.applicableSpaceIdNames?.length === 1);
+                const firstSpaceName = firstItem.applicableSpaceIdNames?.[0];
+                const firstSpace = selectedBuilding?.spaces.find(s => s.spaceIdName === firstSpaceName);
+                const commonFloor = firstSpace?.floor;
+
+                if (allAreSpecificSpaces && commonFloor) {
+                    const allOnSameFloor = items.every(i => {
+                        const spaceName = i.applicableSpaceIdNames?.[0];
+                        const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
+                        return space?.floor === commonFloor;
+                    });
+
+                    if (allOnSameFloor) {
+                        const totalCost = items.reduce((sum, i) => sum + i.totalCost, 0);
+                        const perSpacePercentages: { [spaceId: string]: number } = {};
+                        items.forEach(i => {
+                            const spaceName = i.applicableSpaceIdNames?.[0];
+                            const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
+                            if (space && totalCost > 0) {
+                                perSpacePercentages[space.id] = (i.totalCost / totalCost) * 100;
+                            }
+                        });
+                        uiItems.push({
+                            uiId: `logical-${name}-${Date.now()}`,
+                            name: name,
+                            appliesToScope: 'Floor',
+                            totalCost: totalCost,
+                            applicableFloor: commonFloor,
+                            perSpacePercentages: perSpacePercentages,
+                            perSpaceCosts: {}
+                        });
+                        continue;
                     }
-                    const spaceName = dbItem.applicableSpaceIdNames?.[0];
-                    const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
-                    if (space && groupedItems[dbItem.name].perSpaceCosts) {
-                        groupedItems[dbItem.name].perSpaceCosts![space.id] = dbItem.totalCost;
+                }
+                
+                // If not a reconstructable floor group, add items as they are
+                items.forEach((dbItem, index) => {
+                    const perSpaceCosts: { [spaceId: string]: number } = {};
+                    if (dbItem.appliesToScope === 'SpecificSpaces') {
+                        dbItem.applicableSpaceIdNames?.forEach(spaceName => {
+                            const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
+                            if (space) perSpaceCosts[space.id] = dbItem.totalCost;
+                        })
                     }
-                } else {
-                    // For Building/Floor, each DB item is one UI item
-                    const uiId = dbItem.id || `dbItem-${index}-${Date.now()}`;
-                    groupedItems[uiId] = {
-                        uiId: uiId,
+
+                    uiItems.push({
+                        uiId: dbItem.id || `dbItem-${index}-${Date.now()}`,
                         name: dbItem.name,
                         totalCost: dbItem.totalCost,
                         appliesToScope: dbItem.appliesToScope as 'Building' | 'Floor',
-                        applicableFloor: dbItem.applicableFloor || undefined
-                    };
-                }
-            });
-            setCurrentUtilityItems(Object.values(groupedItems));
+                        applicableFloor: dbItem.applicableFloor || undefined,
+                        perSpaceCosts: perSpaceCosts,
+                        perSpacePercentages: {}
+                    });
+                })
+            }
+             setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
         } else {
-          setCurrentUtilityItems([{ uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {} }]);
+          setCurrentUtilityItems([createEmptyItem()]);
         }
         setIsLoadingData(false);
       };
       fetchUtilities();
     } else if (isMounted) { 
-      setCurrentUtilityItems([{ uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {} }]);
+      setCurrentUtilityItems([createEmptyItem()]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBuildingId, selectedYear, selectedMonth, isMounted]);
@@ -150,7 +194,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
 
   const handleAddUtilityItem = () => {
     if (!canSaveUtilities) return;
-    setCurrentUtilityItems([...currentUtilityItems, { uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {} }]);
+    setCurrentUtilityItems([...currentUtilityItems, createEmptyItem()]);
   };
 
   const handleRemoveUtilityItem = (uiIdToRemove: string) => {
@@ -168,6 +212,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         if (field === 'appliesToScope') {
             updatedItem.totalCost = 0;
             updatedItem.perSpaceCosts = {};
+            updatedItem.perSpacePercentages = {};
             updatedItem.applicableFloor = '';
         }
         
@@ -186,6 +231,18 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         }));
    };
 
+   const handlePerSpacePercentageChange = (uiId: string, spaceId: string, percentageStr: string) => {
+        if (!canSaveUtilities) return;
+        const percentage = parseFloat(percentageStr);
+        setCurrentUtilityItems(prev => prev.map(item => {
+            if (item.uiId !== uiId) return item;
+            
+            const newPercentages = { ...item.perSpacePercentages, [spaceId]: isNaN(percentage) ? 0 : percentage };
+            return { ...item, perSpacePercentages: newPercentages };
+        }));
+   };
+
+
   const handleSaveUtilities = async () => {
     if (!canSaveUtilities) {
       toast({ title: "Permission Denied", description: "You do not have permission to save utilities.", variant: "destructive" });
@@ -197,30 +254,26 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     }
 
     const finalUtilityItemsForDb: BuildingUtilityItemInput[] = [];
-    for (const item of currentUtilityItems) {
+    
+    try {
+      for (const item of currentUtilityItems) {
         if (!item.name.trim()) {
             toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
             return;
         }
 
-        if (item.appliesToScope === 'Building' || item.appliesToScope === 'Floor') {
+        if (item.appliesToScope === 'Building') {
             if (!item.totalCost || item.totalCost <= 0) {
                  toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
                  return;
-            }
-             if (item.appliesToScope === 'Floor' && !item.applicableFloor?.trim()) {
-                toast({ title: 'Validation Error', description: `Applicable floor is required for floor-scoped utility: "${item.name}".`, variant: 'destructive' });
-                return;
             }
             finalUtilityItemsForDb.push({
                 name: item.name,
                 totalCost: item.totalCost,
                 appliesToScope: item.appliesToScope,
-                applicableFloor: item.applicableFloor || null,
-                applicableSpaceIdNames: null,
             });
         } else if (item.appliesToScope === 'SpecificSpaces') {
-            if (!item.perSpaceCosts || Object.keys(item.perSpaceCosts).length === 0) continue; // Skip if no costs entered
+            if (!item.perSpaceCosts || Object.keys(item.perSpaceCosts).length === 0) continue; 
 
             for (const spaceId in item.perSpaceCosts) {
                 const cost = item.perSpaceCosts[spaceId];
@@ -232,13 +285,43 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                             totalCost: cost,
                             appliesToScope: 'SpecificSpaces',
                             applicableSpaceIdNames: [space.spaceIdName],
-                            applicableFloor: null
                         });
                     }
                 }
             }
+        } else if (item.appliesToScope === 'Floor') {
+            const totalCostForFloor = item.totalCost || 0;
+            if (totalCostForFloor <= 0) {
+                 toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost for the floor.`, variant: 'destructive' });
+                 return;
+            }
+            if (!item.applicableFloor) {
+                 toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
+                 return;
+            }
+            const percentages = item.perSpacePercentages || {};
+            const totalPercentage = Object.values(percentages).reduce((sum, p) => sum + (p || 0), 0);
+            if (Math.abs(totalPercentage - 100) > 0.01) {
+                toast({ title: 'Validation Error', description: `Percentages for "${item.name}" on floor ${item.applicableFloor} must add up to 100%. Current total: ${totalPercentage.toFixed(2)}%`, variant: 'destructive' });
+                return;
+            }
+            
+            const spacesOnFloor = selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor);
+            for (const space of spacesOnFloor) {
+                const percentageForSpace = percentages[space.id] || 0;
+                if (percentageForSpace > 0) {
+                    const costForSpace = totalCostForFloor * (percentageForSpace / 100);
+                    finalUtilityItemsForDb.push({
+                        name: item.name,
+                        totalCost: parseFloat(costForSpace.toFixed(2)),
+                        appliesToScope: 'SpecificSpaces', // Transform to SpecificSpaces for DB storage
+                        applicableSpaceIdNames: [space.spaceIdName],
+                    });
+                }
+            }
         }
-    }
+      }
+    } catch(e) { return; } // Stop if validation toast was shown
     
     setIsSaving(true);
     const result = await saveBuildingUtilitiesAction(
@@ -293,7 +376,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
-          <CardDescription>Select building, month, and year, then input utility details.</CardDescription>
+          <CardDescription>Select building, month, and year, then input utility details. Floor-based utilities will be saved as space-specific entries and may look different on re-edit.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -333,7 +416,13 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 )}
               </div>
               {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-              {!isLoadingData && currentUtilityItems.map((item, index) => (
+              {!isLoadingData && currentUtilityItems.map((item, index) => {
+                const totalPercentageForFloor = useMemo(() => {
+                    if (item.appliesToScope !== 'Floor' || !item.perSpacePercentages) return 0;
+                    return Object.values(item.perSpacePercentages).reduce((sum, p) => sum + (p || 0), 0);
+                }, [item.appliesToScope, item.perSpacePercentages]);
+
+                return (
                 <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
                   <CardContent className="p-0 space-y-4">
                     <div className="flex justify-between items-start">
@@ -381,18 +470,37 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                             </div>
                         </div>
                         {item.applicableFloor && (
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-medium text-muted-foreground flex items-center">
-                                    <InfoIcon className="mr-1.5 h-3.5 w-3.5" />
-                                    Cost Allocation for Occupied Spaces on this Floor (based on each space's Proration Share):
-                                </Label>
-                                <div className="flex flex-wrap gap-1.5 text-xs p-2 border rounded-md bg-background min-h-[40px]">
-                                    {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(s => (
-                                        <Badge key={s.id} variant="secondary" className="font-normal">
-                                            {s.spaceIdName}: {(s.utilityProrationShare * 100).toFixed(0)}%
-                                        </Badge>
-                                    ))}
-                                    {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).length === 0 && <span className="italic">No spaces found for this floor to display percentages.</span>}
+                             <div className="space-y-2 pt-2">
+                                <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
+                                <p className="text-xs text-muted-foreground">Define how the total cost is split. Must add up to 100%.</p>
+                                <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
+                                        {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(space => (
+                                            <div key={space.id} className="flex items-center gap-2">
+                                                <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
+                                                    {space.spaceIdName}
+                                                </Label>
+                                                <div className="relative w-28">
+                                                    <Input
+                                                        id={`space-percent-${item.uiId}-${space.id}`}
+                                                        type="number"
+                                                        placeholder="0"
+                                                        value={item.perSpacePercentages?.[space.id] || ''}
+                                                        onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
+                                                        className="w-full h-8 pr-6"
+                                                        disabled={isSaving || !canSaveUtilities}
+                                                    />
+                                                    <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                                <div className="text-right text-sm font-medium mt-2">
+                                    Total Allocated: 
+                                    <span className={Math.abs(totalPercentageForFloor - 100) > 0.01 ? "text-destructive ml-1" : "text-green-600 ml-1"}>
+                                        {totalPercentageForFloor.toFixed(2)}%
+                                    </span>
                                 </div>
                             </div>
                         )}
@@ -430,7 +538,8 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
 
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
