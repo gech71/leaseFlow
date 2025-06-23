@@ -71,6 +71,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
   const [isSavingToDb, setIsSavingToDb] = useState(false);
   const [generatedAgreementText, setGeneratedAgreementText] = useState<string | null>(null);
   const [finalizedAgreement, setFinalizedAgreement] = useState<AgreementPrismaType | null>(null);
+  const [validatedData, setValidatedData] = useState<AgreementFormValues | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -119,6 +120,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
     setError(null);
     setGeneratedAgreementText(null);
     setFinalizedAgreement(null);
+    setValidatedData(data);
 
     const selectedTenant = tenants.find(t => t.id === data.tenantId);
     const selectedSpace = availableSpaces.find(s => s.id === data.selectedSpaceId);
@@ -198,7 +200,11 @@ Landlord/Authorized Representative
         toast({ title: "Error", description: "No agreement text generated to save.", variant: "destructive" });
         return;
     }
-    const formValues = form.getValues(); 
+    if (!validatedData) {
+      toast({ title: "Error", description: "Form data is not validated. Please preview the agreement again.", variant: "destructive" });
+      return;
+    }
+    const formValues = validatedData; 
     const selectedTenant = tenants.find(t => t.id === formValues.tenantId);
     const selectedSpace = availableSpaces.find(s => s.id === formValues.selectedSpaceId);
 
@@ -230,7 +236,8 @@ Landlord/Authorized Representative
     if (result.success && result.agreement) {
       setFinalizedAgreement(result.agreement as AgreementPrismaType);
       toast({ title: "Agreement Saved Successfully!", description: "The agreement is now active." });
-      setGeneratedAgreementText(null); 
+      setGeneratedAgreementText(null);
+      setValidatedData(null); 
       form.reset();
     } else {
       setError(result.error || "Failed to save agreement to database.");
@@ -406,7 +413,7 @@ Landlord/Authorized Representative
                   <p className="text-sm">Tenant: {tenants.find(t => t.id === finalizedAgreement.tenantId)?.name}</p>
                   <p className="text-sm">Space: {availableSpaces.find(s => s.id === finalizedAgreement.spaceId)?.spaceIdName}</p>
                   <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-                      <Button onClick={() => { setFinalizedAgreement(null); form.reset(); }} variant="outline" className="w-full sm:w-auto">Create Another Agreement</Button>
+                      <Button onClick={() => { setFinalizedAgreement(null); setValidatedData(null); form.reset(); }} variant="outline" className="w-full sm:w-auto">Create Another Agreement</Button>
                       <Link href={`/admin/agreements/${finalizedAgreement.id}`} passHref>
                           <Button className="w-full sm:w-auto"><Eye className="mr-2 h-4 w-4" /> View Saved Agreement</Button>
                       </Link>
