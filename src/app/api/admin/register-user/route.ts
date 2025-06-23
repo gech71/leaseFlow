@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminAccessToken}` // Send admin's token
+        // 'Authorization': `Bearer ${adminAccessToken}` // The external registration endpoint doesn't require the admin's token, our own API route already secured it.
       },
       body: JSON.stringify({ firstName, lastName, phoneNumber, email, password }),
     });
