@@ -316,34 +316,48 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     );
 
     if (monthlyBuildingUtilityData?.utilities.length) {
-      monthlyBuildingUtilityData.utilities.forEach(utilItem => {
-        let costForThisUtility = 0;
-        switch (utilItem.appliesToScope) {
-          case 'Building': 
-            costForThisUtility = utilItem.totalCost * agreement.space.utilityProrationShare; 
-            break;
-          case 'Floor':
-            if (utilItem.applicableFloor && agreement.space.floor === utilItem.applicableFloor) {
-              const occupiedSpacesOnFloor = agreement.space.building.spaces?.filter(
-                (s) => s.floor === utilItem.applicableFloor && s.isOccupied
-              ) || [];
-              const totalOccupiedSpacesOnFloor = occupiedSpacesOnFloor.length;
-              if (totalOccupiedSpacesOnFloor > 0) {
-                const isAgreementSpaceOccupiedOnFloor = occupiedSpacesOnFloor.some(s => s.id === agreement.spaceId);
-                if (isAgreementSpaceOccupiedOnFloor) {
-                  costForThisUtility = utilItem.totalCost / totalOccupiedSpacesOnFloor;
-                }
-              }
-            }
-            break;
-          case 'SpecificSpaces':
-            if (utilItem.applicableSpaceIdNames?.includes(agreement.space.spaceIdName)) {
-                costForThisUtility = utilItem.totalCost;
-            }
-            break;
+      const allUtilitiesForPeriod = monthlyBuildingUtilityData.utilities;
+      const building = agreement.space.building;
+      const space = agreement.space;
+
+      // 1. Process 'Building' scope utilities
+      const buildingScopeUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'Building');
+      buildingScopeUtils.forEach(utilItem => {
+        const cost = utilItem.totalCost * space.utilityProrationShare;
+        if (cost > 0) {
+          const roundedCost = parseFloat(cost.toFixed(2));
+          utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
+          totalUtilityCostForBill += roundedCost;
         }
-        if (costForThisUtility > 0) {
-          const roundedCost = parseFloat(costForThisUtility.toFixed(2));
+      });
+
+      // 2. Process 'Floor' scope utilities
+      const floorScopeUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'Floor' && u.applicableFloor === space.floor);
+      floorScopeUtils.forEach(utilItem => {
+        const occupiedSpacesOnFloor = building.spaces?.filter(
+          (s) => s.floor === utilItem.applicableFloor && s.isOccupied
+        ) || [];
+        const totalOccupiedSpacesOnFloor = occupiedSpacesOnFloor.length;
+        if (totalOccupiedSpacesOnFloor > 0) {
+           // Ensure the current space is actually one of the occupied spaces before billing
+           const isSpaceIncluded = occupiedSpacesOnFloor.some(s => s.id === space.id);
+           if (isSpaceIncluded) {
+              const cost = utilItem.totalCost / totalOccupiedSpacesOnFloor;
+              if (cost > 0) {
+                const roundedCost = parseFloat(cost.toFixed(2));
+                utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
+                totalUtilityCostForBill += roundedCost;
+              }
+           }
+        }
+      });
+
+      // 3. Process 'SpecificSpaces' scope utilities
+      const specificSpaceUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'SpecificSpaces' && u.applicableSpaceIdNames?.includes(space.spaceIdName));
+      specificSpaceUtils.forEach(utilItem => {
+        const cost = utilItem.totalCost;
+        if (cost > 0) {
+          const roundedCost = parseFloat(cost.toFixed(2));
           utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
           totalUtilityCostForBill += roundedCost;
         }
@@ -563,5 +577,6 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
 
 
