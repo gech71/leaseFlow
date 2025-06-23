@@ -343,13 +343,16 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 
     const targetDayStart = targetBillDate;
     const targetDayEnd = addDays(targetDayStart, 1);
+    
+    // Check for ANY existing bill for this agreement on the target date.
+    // This will find the initial "Paid" bill and prevent duplicates.
     const existingBill = await databaseService.getAllBills({
         where: {
             agreementId: agreement.id,
             billDate: { gte: targetDayStart, lt: targetDayEnd },
-            OR: [{status: 'Pending'}, {status: 'Overdue'}, {status: 'PendingVerification'}]
         }
     });
+
     if (existingBill.length > 0) {
         return { success: false, error: `A bill for ${format(targetBillDate, 'PP')} for ${agreement.tenant.name} already exists (Status: ${existingBill[0].status}).`};
     }
@@ -611,5 +614,3 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
-
-    
