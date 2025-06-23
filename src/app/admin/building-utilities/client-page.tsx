@@ -631,7 +631,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                                 <h4 className="font-semibold">{entry.buildingName} - {format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</h4>
                                 <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
                                     {entry.utilities.map((util, idx) => (
-                                        <li key={util.id || `util-${idx}`}> {util.name}: ${util.totalCost.toFixed(2)}
+                                        <li key={util.id || `util-${idx}`}> {util.name}: {util.totalCost.toFixed(2)} Birr
                                             <span className="text-xs italic ml-1">
                                                 (Scope: {util.appliesToScope}
                                                 {util.appliesToScope === 'Floor' && util.applicableFloor ? ` - Floor: ${util.applicableFloor}` : ''}
