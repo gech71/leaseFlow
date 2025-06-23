@@ -1,4 +1,3 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -29,7 +28,7 @@ function decodeJwtPayload(token: string): any | null {
 }
 
 export async function GET(request: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
 
   if (!accessToken) {
