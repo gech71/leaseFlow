@@ -28,7 +28,8 @@ export interface CreateFullAgreementData {
 export async function createFullAgreementAction(input: CreateFullAgreementData) {
   try {
     const startDateObj = parseISO(input.startDate);
-    const nextPaymentDueDateObj = addMonths(startDateObj, input.initialPaymentMonths);
+    // The next due date is for the first bill (utilities). Rent is handled separately by the initial payment months.
+    const nextPaymentDueDateObj = addMonths(startDateObj, 1);
     const initialPaymentAmount = input.monthlyRentalPrice * input.initialPaymentMonths;
 
     const agreementToCreate: Prisma.AgreementCreateInput = {

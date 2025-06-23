@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal, type User, type Role } from '@prisma/client';
-import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths } from 'date-fns';
+import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths, isSameDay } from 'date-fns';
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 import { cookies } from 'next/headers';
 
@@ -354,13 +354,21 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         return { success: false, error: `A bill for ${format(targetBillDate, 'PP')} for ${agreement.tenant.name} already exists (Status: ${existingBill[0].status}).`};
     }
 
-    const rentAmount = agreement.monthlyRentalPrice;
+    // Determine if rent should be charged based on upfront payment
+    const agreementStartDate = parseISO(agreement.startDate as unknown as string);
+    const lastRentFreeDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
+
+    let rentAmount = agreement.monthlyRentalPrice;
+    if (agreement.initialPaymentMonths > 0 && (isBefore(targetBillDate, lastRentFreeDueDate) || isSameDay(targetBillDate, lastRentFreeDueDate))) {
+        rentAmount = 0;
+    }
+    
+    // Calculate Utility Costs
     const utilityItemsForJson: {name: string; amount: number}[] = []; 
     let totalUtilityCostForBill = 0;
 
-    const utilityPeriodDate = targetBillDate; 
-    const utilityYear = getYear(utilityPeriodDate);
-    const utilityMonth = getMonth(utilityPeriodDate);
+    const utilityYear = getYear(targetBillDate);
+    const utilityMonth = getMonth(targetBillDate);
 
     const monthlyBuildingUtilityData = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(
       agreement.space.building.id, utilityMonth, utilityYear, { utilities: true } 
