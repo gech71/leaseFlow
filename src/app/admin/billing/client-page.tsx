@@ -90,6 +90,9 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isLoading, setIsLoading] = useState(false);
   const [billFilterTerm, setBillFilterTerm] = useState('');
+  const [filterYear, setFilterYear] = useState<number | 'all'>('all');
+  const [filterMonth, setFilterMonth] = useState<number | 'all'>('all');
+
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -128,7 +131,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   
   useEffect(() => {
     setCurrentPage(1);
-  }, [billFilterTerm]);
+  }, [billFilterTerm, filterYear, filterMonth]);
 
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
@@ -206,14 +209,33 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         tenantName: bill.agreement?.tenant?.name || 'N/A',
       };
     }).filter(bill => {
-        if (!billFilterTerm) return true;
-        const searchTermLower = billFilterTerm.toLowerCase();
-        const tenantName = bill.tenantName.toLowerCase();
-        const spaceIdName = bill.agreement?.space?.spaceIdName.toLowerCase() || '';
-        const buildingName = bill.agreement?.space?.building?.name.toLowerCase() || '';
-        return tenantName.includes(searchTermLower) || spaceIdName.includes(searchTermLower) || buildingName.includes(searchTermLower);
+        // Text search filter
+        if (billFilterTerm) {
+            const searchTermLower = billFilterTerm.toLowerCase();
+            const tenantName = bill.tenantName.toLowerCase();
+            const spaceIdName = bill.agreement?.space?.spaceIdName.toLowerCase() || '';
+            const buildingName = bill.agreement?.space?.building?.name.toLowerCase() || '';
+            if (!(tenantName.includes(searchTermLower) || spaceIdName.includes(searchTermLower) || buildingName.includes(searchTermLower))) {
+                return false;
+            }
+        }
+        
+        // Date filter
+        const billDate = parseISO(bill.billDate);
+        if (filterYear !== 'all') {
+            if (getYear(billDate) !== filterYear) {
+                return false;
+            }
+            if (filterMonth !== 'all') {
+                if (getMonth(billDate) !== filterMonth) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }).sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [bills, calculatePenalty, today, billFilterTerm]);
+  }, [bills, calculatePenalty, today, billFilterTerm, filterYear, filterMonth]);
 
   const totalPages = Math.ceil(processedClientBills.length / itemsPerPage);
   const paginatedBills = processedClientBills.slice(
@@ -467,6 +489,19 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   };
   
   const todayUtcDateString = new Date().toISOString().substring(0, 10);
+  
+  const yearsForFilter = useMemo(() => {
+    if (!bills) return [];
+    const years = new Set(bills.map(r => getYear(parseISO(r.billDate))));
+    return Array.from(years).sort((a,b) => b - a);
+  }, [bills]);
+  
+  const monthsForFilter = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => ({
+      value: i,
+      label: format(new Date(0, i), 'MMMM'),
+    }));
+  }, []);
 
   if (!isMounted && agreements.length === 0 && !canViewBilling) { 
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
@@ -599,15 +634,41 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       <div className="space-y-4 mt-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
-           <div className="relative w-full sm:w-64">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 placeholder="Filter by tenant, space..."
-                className="pl-10"
+                className="pl-10 h-9"
                 value={billFilterTerm}
                 onChange={(e) => setBillFilterTerm(e.target.value)}
               />
             </div>
+            <div className="flex gap-2">
+              <Select value={String(filterYear)} onValueChange={(val) => { setFilterYear(val === 'all' ? 'all' : Number(val)); if(val === 'all') setFilterMonth('all'); }}>
+                  <SelectTrigger className="w-full sm:w-[120px] h-9">
+                      <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      {yearsForFilter.map(year => (
+                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              <Select value={String(filterMonth)} onValueChange={(val) => setFilterMonth(val === 'all' ? 'all' : Number(val))} disabled={filterYear === 'all'}>
+                  <SelectTrigger className="w-full sm:w-[150px] h-9">
+                      <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Months</SelectItem>
+                      {monthsForFilter.map(month => (
+                           <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         {isLoading && bills.length > 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
@@ -616,8 +677,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
             <Card className="text-center py-12 shadow-sm">
                 <CardContent>
                     <DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-semibold mb-2 font-headline">{billFilterTerm ? 'No Bills Match Filter' : 'No Bills Yet'}</h3>
-                    <p className="text-muted-foreground">{billFilterTerm ? 'Try a different search term.' : 'Generate bills to see them here.'}</p>
+                    <h3 className="text-xl font-semibold mb-2 font-headline">{billFilterTerm || filterYear !== 'all' ? 'No Bills Match Filter' : 'No Bills Yet'}</h3>
+                    <p className="text-muted-foreground">{billFilterTerm || filterYear !== 'all' ? 'Try different filter options.' : 'Generate bills to see them here.'}</p>
                 </CardContent>
             </Card>
         ) : (
