@@ -274,77 +274,91 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     }
 
     const finalUtilityItemsForDb: BuildingUtilityItemInput[] = [];
-    
-    try {
-      for (const item of currentUtilityItems) {
-        if (!item.name.trim()) {
-            if (currentUtilityItems.length > 1) { // Only show error if it's not the only empty item
-              toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
-              return;
-            }
-            continue; // Skip empty items
+    let validationFailed = false;
+
+    for (const item of currentUtilityItems) {
+      if (validationFailed) break;
+
+      if (!item.name.trim()) {
+        if (currentUtilityItems.length > 1) {
+          toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
+          validationFailed = true;
+        }
+        continue;
+      }
+
+      if (item.appliesToScope === 'Building') {
+        if (!item.totalCost || item.totalCost <= 0) {
+          toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
+          validationFailed = true;
+          continue;
+        }
+        finalUtilityItemsForDb.push({
+          name: item.name,
+          totalCost: item.totalCost,
+          appliesToScope: item.appliesToScope,
+        });
+      } else if (item.appliesToScope === 'Floor' || item.appliesToScope === 'SpecificSpaces') {
+        const totalCostForAllocation = item.totalCost || 0;
+        if (totalCostForAllocation <= 0) {
+          toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost for allocation.`, variant: 'destructive' });
+          validationFailed = true;
+          continue;
+        }
+        if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
+          toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
+          validationFailed = true;
+          continue;
         }
 
-        if (item.appliesToScope === 'Building') {
-            if (!item.totalCost || item.totalCost <= 0) {
-                 toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
-                 return;
-            }
+        const percentages = item.perSpacePercentages || {};
+        const spacesToProcess = item.appliesToScope === 'Floor'
+          ? selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor)
+          : selectedBuilding.spaces;
+        
+        for (const space of spacesToProcess) {
+          const percentageForSpace = percentages[space.id] || 0;
+          if (percentageForSpace > 0) {
+            const costForSpace = totalCostForAllocation * (percentageForSpace / 100);
             finalUtilityItemsForDb.push({
-                name: item.name,
-                totalCost: item.totalCost,
-                appliesToScope: item.appliesToScope,
+              name: item.name,
+              totalCost: parseFloat(costForSpace.toFixed(2)),
+              appliesToScope: 'SpecificSpaces',
+              applicableSpaceIdNames: [space.spaceIdName],
             });
-        } else if (item.appliesToScope === 'Floor' || item.appliesToScope === 'SpecificSpaces') {
-            const totalCostForAllocation = item.totalCost || 0;
-            if (totalCostForAllocation <= 0) {
-                 toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost for allocation.`, variant: 'destructive' });
-                 return;
-            }
-            if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
-                 toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
-                 return;
-            }
-
-            const percentages = item.perSpacePercentages || {};
-            
-            const spacesToProcess = item.appliesToScope === 'Floor' 
-              ? selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor)
-              : selectedBuilding.spaces;
-            
-            for (const space of spacesToProcess) {
-                const percentageForSpace = percentages[space.id] || 0;
-                if (percentageForSpace > 0) {
-                    const costForSpace = totalCostForAllocation * (percentageForSpace / 100);
-                    finalUtilityItemsForDb.push({
-                        name: item.name,
-                        totalCost: parseFloat(costForSpace.toFixed(2)),
-                        appliesToScope: 'SpecificSpaces', // Always store as specific space for DB
-                        applicableSpaceIdNames: [space.spaceIdName],
-                    });
-                }
-            }
+          }
         }
       }
-    } catch(e) { return; } // Stop if validation toast was shown
+    }
+
+    if (validationFailed) {
+      return;
+    }
     
     setIsSaving(true);
-    const result = await saveBuildingUtilitiesAction(
-      selectedBuilding.id,
-      selectedBuilding.name,
-      selectedYear,
-      selectedMonth,
-      finalUtilityItemsForDb
-    );
-    setIsSaving(false);
+    try {
+      const result = await saveBuildingUtilitiesAction(
+        selectedBuilding.id,
+        selectedBuilding.name,
+        selectedYear,
+        selectedMonth,
+        finalUtilityItemsForDb
+      );
 
-    if (result.success) {
-      toast({ title: 'Utilities Saved', description: `Utility costs for ${selectedBuilding.name} for ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')} have been saved.` });
-      await refreshUtilityRecordsList(); 
-    } else {
-      toast({ title: 'Error Saving Utilities', description: result.error, variant: 'destructive' });
+      if (result?.success) {
+        toast({ title: 'Utilities Saved', description: `Utility costs for ${selectedBuilding.name} for ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')} have been saved.` });
+        await refreshUtilityRecordsList();
+      } else {
+        toast({ title: 'Error Saving Utilities', description: result?.error || 'An unknown server error occurred.', variant: 'destructive' });
+      }
+    } catch (error) {
+       console.error("Error during saveBuildingUtilitiesAction call:", error);
+       toast({ title: 'Request Failed', description: 'Could not communicate with the server to save utilities.', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
     }
   };
+
 
   const handleConfirmDelete = async () => {
     if (!recordToDelete || !canSaveUtilities) return;
