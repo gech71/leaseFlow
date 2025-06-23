@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal, type User, type Role } from '@prisma/client';
-import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths, isSameDay } from 'date-fns';
+import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths, isSameDay, isAfter } from 'date-fns';
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 import { cookies } from 'next/headers';
 
@@ -617,6 +617,72 @@ export async function recordPaymentOrVerificationAction(
   } catch (error: any) {
     console.error(`Error in ${actionType}:`, error);
     return { success: false, error: error.message || `Failed to ${actionType.replace('Verification', ' verification').toLowerCase()}.` };
+  }
+}
+
+export async function updateBillAdminDetailsAction(
+  billId: string,
+  data: {
+    paymentReference?: string | null;
+    adminProofUrl?: string | null;
+    adminVerificationNotes?: string | null;
+  }
+) {
+  try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    const bill = await databaseService.getBillById(billId, {
+      include: { agreement: { include: { space: true } } },
+    });
+
+    if (!bill) {
+      return { success: false, error: "Bill not found." };
+    }
+    if (bill.status === 'Paid') {
+      return { success: false, error: "Cannot edit details for a paid bill." };
+    }
+    if (!isSuperAdmin && (!bill.agreement?.space?.buildingId || !managedBuildingIds?.includes(bill.agreement.space.buildingId))) {
+      return { success: false, error: "Permission denied." };
+    }
+
+    const updateData: Prisma.BillUpdateInput = {};
+    if (data.paymentReference !== undefined) {
+      updateData.paymentReference = data.paymentReference;
+    }
+    if (data.adminProofUrl !== undefined) {
+      updateData.paymentProofUrl = data.adminProofUrl;
+    }
+    if (data.adminVerificationNotes !== undefined) {
+      updateData.adminVerificationNotes = data.adminVerificationNotes;
+    }
+
+    const updatedBill = await databaseService.updateBill(billId, updateData);
+
+    revalidatePath('/admin/billing');
+    
+    // Serialize and return bill
+    let parsedUtilityBreakdown: any[] = [];
+    if (typeof updatedBill.utilityBreakdown === 'string') {
+        try {
+            parsedUtilityBreakdown = JSON.parse(updatedBill.utilityBreakdown);
+        } catch (e) { /* ignore */ }
+    } else if (Array.isArray(updatedBill.utilityBreakdown)) {
+        parsedUtilityBreakdown = updatedBill.utilityBreakdown;
+    }
+
+    const serializedBill = {
+      ...updatedBill,
+      billDate: updatedBill.billDate.toISOString(),
+      dueDate: updatedBill.dueDate.toISOString(),
+      createdAt: updatedBill.createdAt.toISOString(),
+      updatedAt: updatedBill.updatedAt.toISOString(),
+      paymentDate: updatedBill.paymentDate?.toISOString() || null,
+      utilityBreakdown: parsedUtilityBreakdown,
+    };
+    
+    return { success: true, bill: serializedBill };
+  } catch (error: any) {
+    console.error("Error updating bill details:", error);
+    return { success: false, error: error.message || "Failed to update bill details." };
   }
 }
 
