@@ -3,7 +3,8 @@
 "use server";
 
 import { databaseService } from '@/lib/services/databaseService';
-import type { Bill as BillPrisma, Space as SpacePrisma, Prisma } from '@prisma/client';
+import type { Bill as BillPrisma, Space as SpacePrisma, Prisma, User, Role } from '@prisma/client';
+import { cookies } from 'next/headers';
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItem {
@@ -35,9 +36,58 @@ export interface PaymentsOverviewData {
   spaces: SpacePrisma[]; // For "Total Potential Monthly Revenue"
 }
 
+// Insecure JWT payload decoder
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
+// Gets current user from cookie
+async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+    const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+    const cookieStore = cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    if (!accessToken) return null;
+    
+    const tokenPayload = decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) return null;
+
+    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+}
+
 export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewData> {
-  // Fetch bills without attempting to include utilityBreakdown as a relation if it's a scalar/JSON field
+  const currentUser = await getCurrentUser();
+  const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
+  let managedBuildingIds: string[] | undefined = undefined;
+
+  if (!isSuperAdmin && currentUser) {
+      const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
+      managedBuildingIds = managedBuildings.map(b => b.id);
+      if (managedBuildingIds.length === 0) {
+          return { bills: [], spaces: [] };
+      }
+  }
+
+  const billWhere: Prisma.BillWhereInput = managedBuildingIds ? { agreement: { space: { buildingId: { in: managedBuildingIds } } } } : {};
+  const spaceWhere: Prisma.SpaceWhereInput = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
+
   const rawBills = await databaseService.getAllBills({
+    where: billWhere,
     include: {
       agreement: {
         include: {
@@ -51,14 +101,13 @@ export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewD
           }
         }
       },
-      // utilityBreakdown: true, // Removed to prevent Prisma error if it's a scalar
     },
     orderBy: { billDate: 'desc' }
   });
 
   const bills: PaymentsOverviewBill[] = rawBills.map(rawBill => {
     let parsedUtilityBreakdown: ParsedUtilityItem[] = [];
-    const rawUtilityData = (rawBill as any).utilityBreakdown; // Access the field directly
+    const rawUtilityData = (rawBill as any).utilityBreakdown;
 
     if (typeof rawUtilityData === 'string') {
       try {
@@ -76,7 +125,6 @@ export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewD
         console.error(`Failed to parse utilityBreakdown JSON for bill ${rawBill.id}:`, e, rawUtilityData);
       }
     } else if (Array.isArray(rawUtilityData)) { 
-      // If it's already an array (e.g. if schema has it as relation and client was fixed, or direct array from JSON type)
       parsedUtilityBreakdown = rawUtilityData
         .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
         .map(item => ({
@@ -86,18 +134,16 @@ export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewD
         }));
     }
 
-    // Create a new object that matches PaymentsOverviewBill type
-    // Ensure all properties from BillPrisma (except original utilityBreakdown) are spread
     const { utilityBreakdown: _originalUtilityData, ...billWithoutOriginalUtility } = rawBill;
     
     return {
       ...billWithoutOriginalUtility,
-      agreement: (rawBill as any).agreement, // This should be fine as it's included
+      agreement: (rawBill as any).agreement,
       utilityBreakdown: parsedUtilityBreakdown,
     };
-  }) as PaymentsOverviewBill[]; // Cast to ensure the final array matches the desired type
+  }) as PaymentsOverviewBill[];
 
-  const spaces = await databaseService.getAllSpaces();
+  const spaces = await databaseService.getAllSpaces({ where: spaceWhere });
 
   return { bills, spaces };
 }

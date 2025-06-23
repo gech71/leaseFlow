@@ -3,17 +3,66 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type Building, type BuildingMonthlyUtilities } from '@prisma/client';
+import { Prisma, type Building, type BuildingMonthlyUtilities, type User, type Role } from '@prisma/client';
+import { cookies } from 'next/headers';
+
+// Insecure JWT payload decoder
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
+// Gets current user from cookie
+async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+    const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+    const cookieStore = cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    if (!accessToken) return null;
+    
+    const tokenPayload = decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) return null;
+
+    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+}
 
 export async function getRegisteredBuildingsAction(): Promise<Building[]> {
   try {
+    const currentUser = await getCurrentUser();
+    const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
+    let managedBuildingIds: string[] | undefined = undefined;
+
+    if (!isSuperAdmin && currentUser) {
+        const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
+        managedBuildingIds = managedBuildings.map(b => b.id);
+        if (managedBuildingIds.length === 0) {
+            managedBuildingIds = ['-1']; // Non-existent ID to return no results
+        }
+    }
+    const whereClause = managedBuildingIds ? { id: { in: managedBuildingIds } } : {};
+
     return await databaseService.getAllBuildings({ 
+      where: whereClause,
       orderBy: { name: 'asc' },
-      include: { spaces: { orderBy: { spaceIdName: 'asc' } } } // Include spaces, sorted
+      include: { spaces: { orderBy: { spaceIdName: 'asc' } } }
     });
   } catch (error: any) {
     console.error("Error fetching buildings:", error);
-    return []; // Return empty array on error, client can handle this
+    return [];
   }
 }
 
@@ -110,7 +159,21 @@ export async function saveBuildingUtilitiesAction(
 
 export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMonthlyUtilities[]> {
   try {
+    const currentUser = await getCurrentUser();
+    const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
+    let managedBuildingIds: string[] | undefined = undefined;
+
+    if (!isSuperAdmin && currentUser) {
+        const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
+        managedBuildingIds = managedBuildings.map(b => b.id);
+        if (managedBuildingIds.length === 0) {
+           return []; // No buildings, so no utility records
+        }
+    }
+    const whereClause = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
+
     return await databaseService.getAllBuildingMonthlyUtilities({
+      where: whereClause,
       include: { utilities: true, building: { select: { name: true }} },
       orderBy: [{ year: 'desc' }, { month: 'desc' }, { buildingName: 'asc' }],
     });

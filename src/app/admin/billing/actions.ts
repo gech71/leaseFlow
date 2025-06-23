@@ -3,23 +3,88 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal } from '@prisma/client';
+import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal, type User, type Role } from '@prisma/client';
 import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths } from 'date-fns';
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
+import { cookies } from 'next/headers';
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
-// Original data structure from DB (BillingPageData definition removed as action now returns SerializedBillingPageData)
+// Insecure JWT payload decoder
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
+// Gets current user from cookie
+async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+    const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+    const cookieStore = cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    if (!accessToken) return null;
+    
+    const tokenPayload = decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) return null;
+
+    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+}
+
 
 export async function getBillingPageDataAction(): Promise<SerializedBillingPageData> {
+  const currentUser = await getCurrentUser();
+  const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
+  let managedBuildingIds: string[] | undefined = undefined;
+
+  if (!isSuperAdmin && currentUser) {
+      const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
+      managedBuildingIds = managedBuildings.map(b => b.id);
+      if (managedBuildingIds.length === 0) {
+          // Return empty data if user manages no buildings
+          return { agreements: [], spaces: [], buildings: [], bills: [], buildingMonthlyUtilities: [] };
+      }
+  }
+
+  // Define where clauses
+  const agreementWhere: Prisma.AgreementWhereInput = managedBuildingIds ? { space: { buildingId: { in: managedBuildingIds } } } : {};
+  const spaceWhere: Prisma.SpaceWhereInput = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
+  const buildingWhere: Prisma.BuildingWhereInput = managedBuildingIds ? { id: { in: managedBuildingIds } } : {};
+  const billWhere: Prisma.BillWhereInput = managedBuildingIds ? { agreement: { space: { buildingId: { in: managedBuildingIds } } } } : {};
+  
   const today = new Date();
   const currentMonth = getMonth(today);
   const currentYear = getYear(today);
   const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
   const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
 
+  const buildingMonthlyUtilityWhere: Prisma.BuildingMonthlyUtilitiesWhereInput = {
+    OR: [
+      { year: currentYear, month: currentMonth },
+      { year: prevMonthYear, month: prevMonth },
+    ]
+  };
+  if(managedBuildingIds) {
+      buildingMonthlyUtilityWhere.buildingId = { in: managedBuildingIds };
+  }
+
+
   const [agreementsData, spacesData, buildingsData, billsDataRaw, buildingMonthlyUtilitiesData] = await Promise.all([
     databaseService.getAllAgreements({
+      where: agreementWhere,
       include: {
         tenant: true,
         space: {
@@ -31,12 +96,14 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
       orderBy: { tenant: { name: 'asc' } }
     }),
     databaseService.getAllSpaces({
+      where: spaceWhere,
       include: {
         building: { include: { penaltyPolicyTiers: true, spaces: true } } 
       }
     }),
-    databaseService.getAllBuildings({ include: { penaltyPolicyTiers: true, spaces: true } }), 
+    databaseService.getAllBuildings({ where: buildingWhere, include: { penaltyPolicyTiers: true, spaces: true } }), 
     databaseService.getAllBills({ 
+      where: billWhere,
       include: {
         agreement: {
           include: {
@@ -52,12 +119,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
       orderBy: { billDate: 'desc' }
     }),
     databaseService.getAllBuildingMonthlyUtilities({
-      where: {
-        OR: [
-          { year: currentYear, month: currentMonth },
-          { year: prevMonthYear, month: prevMonth },
-        ]
-      },
+      where: buildingMonthlyUtilityWhere,
       include: { utilities: true }
     })
   ]);
@@ -296,7 +358,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const utilityItemsForJson: {name: string; amount: number}[] = []; 
     let totalUtilityCostForBill = 0;
 
-    const utilityPeriodDate = targetBillDate; // Changed from subMonths(targetBillDate, 1)
+    const utilityPeriodDate = targetBillDate; 
     const utilityYear = getYear(utilityPeriodDate);
     const utilityMonth = getMonth(utilityPeriodDate);
 
@@ -311,7 +373,6 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
       for (const utilItem of allUtilitiesForPeriod) {
         let costForThisItem = 0;
         const utilTotalCost = Number(utilItem.totalCost);
-
         if (isNaN(utilTotalCost)) continue;
 
         if (utilItem.appliesToScope === 'Building') {
@@ -542,18 +603,3 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
-    
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-    

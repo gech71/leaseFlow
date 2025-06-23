@@ -5,8 +5,10 @@ import { Building2, FileText, DollarSign, LayoutDashboard, AlertCircle, User } f
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart'; // Import the new chart component
 import { databaseService } from '@/lib/services/databaseService';
-import { getMonth, getYear, format, isAfter, addMonths, startOfMonth, endOfMonth, isValid } from 'date-fns'; // Added parseISO and isValid
+import { getMonth, getYear, format, isAfter, addMonths, startOfMonth, endOfMonth, isValid } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cookies } from 'next/headers';
+import type { User as UserPrisma, Role, Prisma } from '@prisma/client';
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
@@ -31,20 +33,74 @@ interface BuildingFinancialSummary {
   currentMonthIncomeToBeCollected: number;
 }
 
+// Insecure JWT payload decoder
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
+// Gets current user from cookie
+async function getCurrentUser(): Promise<(UserPrisma & { roles: Role[] }) | null> {
+    const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+    const cookieStore = cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    if (!accessToken) return null;
+    
+    const tokenPayload = decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) return null;
+
+    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+}
+
 export default async function AdminDashboardPage() {
+  const currentUser = await getCurrentUser();
+  const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
+  let managedBuildingIds: string[] | undefined = undefined;
+
+  if (!isSuperAdmin && currentUser) {
+      const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
+      managedBuildingIds = managedBuildings.map(b => b.id);
+      if (managedBuildingIds.length === 0) {
+          managedBuildingIds = ['-1']; // Use a non-existent ID to ensure no results are returned
+      }
+  }
+  
+  const buildingWhere = managedBuildingIds ? { id: { in: managedBuildingIds } } : {};
+  const spaceWhere = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
+  const agreementWhere = managedBuildingIds ? { space: { buildingId: { in: managedBuildingIds } } } : {};
+  const billWhere = managedBuildingIds ? { agreement: { space: { buildingId: { in: managedBuildingIds } } } } : {};
+
   const today = new Date();
-  const currentMonth = getMonth(today); // 0-11
+  const currentMonth = getMonth(today);
   const currentYear = getYear(today);
   const periodDescription = format(today, "MMMM yyyy");
-  const startOfCurrentPeriod = startOfMonth(today);
-  const endOfCurrentPeriod = endOfMonth(today);
 
-  const buildingsPromise = databaseService.getAllBuildings();
-  const spacesPromise = databaseService.getAllSpaces();
-  const agreementsPromise = databaseService.getAllAgreements({ include: { space: true, tenant: true } });
-  const billsPromise = databaseService.getAllBills({ include: { agreement: { include: { tenant: true, space: true } } } });
+  const buildingUtilitiesWhere: Prisma.BuildingMonthlyUtilitiesWhereInput = { month: currentMonth, year: currentYear };
+  if(managedBuildingIds) {
+      buildingUtilitiesWhere.buildingId = { in: managedBuildingIds };
+  }
+
+  const buildingsPromise = databaseService.getAllBuildings({ where: buildingWhere });
+  const spacesPromise = databaseService.getAllSpaces({ where: spaceWhere });
+  const agreementsPromise = databaseService.getAllAgreements({ where: agreementWhere, include: { space: true, tenant: true } });
+  const billsPromise = databaseService.getAllBills({ where: billWhere, include: { agreement: { include: { tenant: true, space: true } } } });
   const buildingUtilitiesPromise = databaseService.getAllBuildingMonthlyUtilities({
-    where: { month: currentMonth, year: currentYear },
+    where: buildingUtilitiesWhere,
     include: { utilities: true },
   });
 
@@ -141,16 +197,14 @@ export default async function AdminDashboardPage() {
     .sort((a, b) => {
         const dateA = a.createdAt;
         const dateB = b.createdAt;
-        // Ensure createdAt is a valid Date object before calling getTime()
-        // Handle null/undefined or invalid Date objects by treating them as epoch 0 or placing them consistently
         const timeA = dateA && isValid(dateA) ? dateA.getTime() : 0;
         const timeB = dateB && isValid(dateB) ? dateB.getTime() : 0;
 
-        if (isNaN(timeA) && isNaN(timeB)) return 0; // Both invalid, treat as equal
-        if (isNaN(timeA)) return 1; // Invalid a.createdAt comes after valid b.createdAt
-        if (isNaN(timeB)) return -1; // Invalid b.createdAt comes after valid a.createdAt
+        if (isNaN(timeA) && isNaN(timeB)) return 0;
+        if (isNaN(timeA)) return 1;
+        if (isNaN(timeB)) return -1;
         
-        return timeB - timeA; // Descending order (newest first)
+        return timeB - timeA;
     })
     .slice(0, 5)
     .map(bill => {
@@ -286,6 +340,3 @@ export default async function AdminDashboardPage() {
     </div>
   );
 }
-    
-
-    
