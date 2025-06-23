@@ -146,7 +146,7 @@ export default async function AdminDashboardPage() {
     occupiedSpaces: occupiedSpacesCount,
     totalTenants: uniqueActiveTenantIds.size,
     occupancyRate: `${occupancyRateValue.toFixed(1)}%`,
-    totalRevenueMTD: `Birr ${totalRevenueMTDValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    totalRevenueMTD: `${totalRevenueMTDValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Birr`,
     activeAgreements: activeAgreements.length,
   };
 

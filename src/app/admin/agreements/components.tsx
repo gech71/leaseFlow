@@ -229,7 +229,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                   <CardContent className="text-sm space-y-1.5">
                     <p><strong>Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
                     <p><strong>End Date:</strong> {format(agreementEndDate, 'PP')}</p>
-                    <p><strong>Rent:</strong> Birr {agreement.monthlyRentalPrice.toLocaleString()}/month</p>
+                    <p><strong>Rent:</strong> {agreement.monthlyRentalPrice.toLocaleString()} Birr/month</p>
                     <p><strong>Term:</strong> {agreement.paymentTermMonths} months</p>
                     <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>

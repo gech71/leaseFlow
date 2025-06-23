@@ -149,8 +149,8 @@ This Rental Agreement ("Agreement") is made and entered into on ${format(data.st
     This Agreement shall commence on ${format(data.startDate, 'PPP')} and continue for a term of ${data.paymentTermMonths} month(s).
 
 4.  RENT
-    -   Monthly Rent: Birr ${selectedSpace.monthlyRentalPrice.toLocaleString()}
-    -   Initial Payment: An amount equivalent to ${data.initialPaymentMonths} month(s) rent, totaling Birr ${(selectedSpace.monthlyRentalPrice * data.initialPaymentMonths).toLocaleString()}, has been paid upfront.
+    -   Monthly Rent: ${selectedSpace.monthlyRentalPrice.toLocaleString()} Birr
+    -   Initial Payment: An amount equivalent to ${data.initialPaymentMonths} month(s) rent, totaling ${(selectedSpace.monthlyRentalPrice * data.initialPaymentMonths).toLocaleString()} Birr, has been paid upfront.
     -   Next Payment Due: ${format(addMonths(data.startDate, data.initialPaymentMonths), 'PPP')}
 
 5.  UTILITIES
@@ -296,7 +296,7 @@ Landlord/Authorized Representative
                       <SelectContent>
                         {availableSpaces.length > 0 ? availableSpaces.map(space => (
                           <SelectItem key={space.id} value={space.id}>
-                            {space.spaceIdName} ({space.buildingName}) - Birr {space.monthlyRentalPrice.toLocaleString()}/month
+                            {space.spaceIdName} ({space.buildingName}) - {space.monthlyRentalPrice.toLocaleString()} Birr/month
                           </SelectItem>
                         )) : (<SelectItem value="no-spaces" disabled>No available spaces</SelectItem>)}
                       </SelectContent>
@@ -339,7 +339,7 @@ Landlord/Authorized Representative
               {calculatedInitialPaymentAmount > 0 && (
                 <div className="p-3 bg-secondary/50 rounded-md border border-border">
                   <Label className="font-semibold flex items-center text-foreground"><Info className="mr-2 h-4 w-4 text-primary"/>Calculated Initial Payment Amount</Label>
-                  <p className="text-2xl font-bold text-primary mt-1">Birr {calculatedInitialPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-2xl font-bold text-primary mt-1">{calculatedInitialPaymentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Birr</p>
                   <p className="text-xs text-muted-foreground">({initialPaymentMonths} month(s) upfront based on selected space)</p>
                 </div>
               )}
