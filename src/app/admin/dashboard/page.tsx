@@ -5,12 +5,19 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, FileText, DollarSign, LayoutDashboard, AlertCircle, User } from 'lucide-react';
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
-import { DashboardChart } from '@/components/custom/DashboardChart'; // Import the new chart component
+import { DashboardChart } from '@/components/custom/DashboardChart';
 import { databaseService } from '@/lib/services/databaseService';
 import { getMonth, getYear, format, isAfter, addMonths, subMonths, isValid } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cookies } from 'next/headers';
 import type { User as UserPrisma, Role, Prisma } from '@prisma/client';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
@@ -310,19 +317,32 @@ export default async function AdminDashboardPage() {
             </Card>
         )}
         {financials.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {financials.map(summary => (
-                <BuildingFinancialCard
-                key={summary.buildingId}
-                buildingName={summary.buildingName}
-                currentMonthExpenses={summary.currentMonthExpenses}
-                currentMonthIncomeCollected={summary.currentMonthIncomeCollected}
-                currentMonthIncomePendingConfirmation={summary.currentMonthIncomePendingConfirmation}
-                currentMonthIncomeToBeCollected={summary.currentMonthIncomeToBeCollected}
-                periodDescription={periodDescription}
-                />
-            ))}
-            </div>
+          <Carousel
+            opts={{
+              align: "start",
+              loop: financials.length > 3,
+            }}
+            className="w-full"
+          >
+            <CarouselContent>
+              {financials.map((summary) => (
+                <CarouselItem key={summary.buildingId} className="sm:basis-1/2 lg:basis-1/3">
+                  <div className="p-1 h-full">
+                    <BuildingFinancialCard
+                      buildingName={summary.buildingName}
+                      currentMonthExpenses={summary.currentMonthExpenses}
+                      currentMonthIncomeCollected={summary.currentMonthIncomeCollected}
+                      currentMonthIncomePendingConfirmation={summary.currentMonthIncomePendingConfirmation}
+                      currentMonthIncomeToBeCollected={summary.currentMonthIncomeToBeCollected}
+                      periodDescription={periodDescription}
+                    />
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious />
+            <CarouselNext />
+          </Carousel>
         )}
       </div>
 
