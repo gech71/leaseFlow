@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle } from 'lucide-react';
 import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
-import { getYear, getMonth, format, setYear, setMonth, parseISO } from 'date-fns';
+import { getYear, getMonth, format, setYear, setMonth, parseISO, subMonths } from 'date-fns';
 import { getBuildingUtilitiesAction, saveBuildingUtilitiesAction, getAllBuildingUtilitiesForListAction, deleteBuildingUtilitiesAction, type BuildingUtilityItemInput } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -65,10 +65,13 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const [registeredBuildings, setRegisteredBuildings] = useState<ClientBuilding[]>(initialBuildings);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
+  
+  // Default to the previous month for data entry
+  const [defaultDate] = useState(() => subMonths(new Date(), 1));
 
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
-  const [selectedYear, setSelectedYear] = useState<number>(getYear(new Date()));
-  const [selectedMonth, setSelectedMonth] = useState<number>(getMonth(new Date())); 
+  const [selectedYear, setSelectedYear] = useState<number>(() => getYear(defaultDate));
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => getMonth(defaultDate)); 
   
   const [currentUtilityItems, setCurrentUtilityItems] = useState<UIUtilityItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -270,8 +273,11 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     try {
       for (const item of currentUtilityItems) {
         if (!item.name.trim()) {
-            toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
-            return;
+            if (currentUtilityItems.length > 1) { // Only show error if it's not the only empty item
+              toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
+              return;
+            }
+            continue; // Skip empty items
         }
 
         if (item.appliesToScope === 'Building') {
@@ -404,7 +410,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
-          <CardDescription>Select building, month, and year, then input utility details. Percentage-based utilities will be saved as space-specific entries and may look different on re-edit.</CardDescription>
+          <CardDescription>Select building and period, then input utility details. Billing logic uses data from the month PRIOR to a bill's due date.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
