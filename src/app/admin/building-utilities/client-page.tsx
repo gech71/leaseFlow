@@ -112,8 +112,8 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
         if (existingEntry && existingEntry.utilities) {
-             const uiItems: UIUtilityItem[] = [];
-            // Group utilities from DB by name to reconstruct logical floor utilities
+            const uiItems: UIUtilityItem[] = [];
+            // Group utilities from DB by name to reconstruct logical UI items
             const groupedByName = existingEntry.utilities.reduce((acc, item) => {
                 if (!acc[item.name]) acc[item.name] = [];
                 acc[item.name].push(item);
@@ -121,67 +121,68 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
             }, {} as Record<string, BuildingUtilityItemPrismaType[]>);
 
             for (const name in groupedByName) {
-                const items = groupedByName[name];
-                const firstItem = items[0];
+                const itemsInGroup = groupedByName[name];
+                const firstItem = itemsInGroup[0];
 
-                // Check if this group can be reconstructed as a single "Floor" UI item
-                const allAreSpecificSpaces = items.every(i => i.appliesToScope === 'SpecificSpaces' && i.applicableSpaceIdNames?.length === 1);
-                const firstSpaceName = firstItem.applicableSpaceIdNames?.[0];
-                const firstSpace = selectedBuilding?.spaces.find(s => s.spaceIdName === firstSpaceName);
-                const commonFloor = firstSpace?.floor;
+                // Handle 'Building' scope items (they are not grouped, always single)
+                if (itemsInGroup.length === 1 && firstItem.appliesToScope === 'Building') {
+                    uiItems.push({
+                        uiId: firstItem.id || `dbItem-building-${Date.now()}`,
+                        name: firstItem.name,
+                        totalCost: firstItem.totalCost,
+                        appliesToScope: 'Building',
+                        perSpaceCosts: {},
+                        perSpacePercentages: {},
+                    });
+                    continue; // Go to next group
+                }
 
-                if (allAreSpecificSpaces && commonFloor) {
-                    const allOnSameFloor = items.every(i => {
-                        const spaceName = i.applicableSpaceIdNames?.[0];
+                // All other groups are either 'Floor' or 'SpecificSpaces' which were saved as multiple 'SpecificSpaces' records.
+                const groupTotalCost = itemsInGroup.reduce((sum, i) => sum + i.totalCost, 0);
+                const perSpacePercentages: { [spaceId: string]: number } = {};
+
+                itemsInGroup.forEach(item => {
+                    const spaceName = item.applicableSpaceIdNames?.[0];
+                    const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
+                    if (space && groupTotalCost > 0) {
+                        const percentage = (item.totalCost / groupTotalCost) * 100;
+                        perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
+                    }
+                });
+                
+                // Infer if it was originally a 'Floor' item.
+                let inferredScope: 'Floor' | 'SpecificSpaces' = 'SpecificSpaces';
+                let inferredFloor: string | undefined = undefined;
+
+                const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
+                const firstSpaceInGroup = selectedBuilding?.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
+
+                if (firstSpaceInGroup?.floor) {
+                    const commonFloor = firstSpaceInGroup.floor;
+                    const allOnSameFloor = itemsInGroup.every(item => {
+                        const spaceName = item.applicableSpaceIdNames?.[0];
                         const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
                         return space?.floor === commonFloor;
                     });
 
                     if (allOnSameFloor) {
-                        const totalCost = items.reduce((sum, i) => sum + i.totalCost, 0);
-                        const perSpacePercentages: { [spaceId: string]: number } = {};
-                        items.forEach(i => {
-                            const spaceName = i.applicableSpaceIdNames?.[0];
-                            const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
-                            if (space && totalCost > 0) {
-                                perSpacePercentages[space.id] = (i.totalCost / totalCost) * 100;
-                            }
-                        });
-                        uiItems.push({
-                            uiId: `logical-${name}-${Date.now()}`,
-                            name: name,
-                            appliesToScope: 'Floor',
-                            totalCost: totalCost,
-                            applicableFloor: commonFloor,
-                            perSpacePercentages: perSpacePercentages,
-                            perSpaceCosts: {}
-                        });
-                        continue;
+                        inferredScope = 'Floor';
+                        inferredFloor = commonFloor;
                     }
                 }
                 
-                // If not a reconstructable floor group, add items as they are
-                items.forEach((dbItem, index) => {
-                    const perSpaceCosts: { [spaceId: string]: number } = {};
-                    if (dbItem.appliesToScope === 'SpecificSpaces') {
-                        dbItem.applicableSpaceIdNames?.forEach(spaceName => {
-                            const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
-                            if (space) perSpaceCosts[space.id] = dbItem.totalCost;
-                        })
-                    }
-
-                    uiItems.push({
-                        uiId: dbItem.id || `dbItem-${index}-${Date.now()}`,
-                        name: dbItem.name,
-                        totalCost: dbItem.totalCost,
-                        appliesToScope: dbItem.appliesToScope as 'Building' | 'Floor' | 'SpecificSpaces',
-                        applicableFloor: dbItem.applicableFloor || undefined,
-                        perSpaceCosts: perSpaceCosts,
-                        perSpacePercentages: {}
-                    });
-                })
+                uiItems.push({
+                    uiId: `logical-${name}-${Date.now()}`,
+                    name: name,
+                    appliesToScope: inferredScope,
+                    totalCost: groupTotalCost,
+                    applicableFloor: inferredFloor,
+                    perSpacePercentages: perSpacePercentages,
+                    perSpaceCosts: {} // Not used for reading
+                });
             }
-             setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
+
+            setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
         } else {
           setCurrentUtilityItems([createEmptyItem()]);
         }
@@ -308,19 +309,20 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 return;
             }
             
-            for (const spaceId in percentages) {
-                const percentageForSpace = percentages[spaceId] || 0;
+            const spacesToProcess = item.appliesToScope === 'Floor' 
+              ? selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor)
+              : selectedBuilding.spaces;
+            
+            for (const space of spacesToProcess) {
+                const percentageForSpace = percentages[space.id] || 0;
                 if (percentageForSpace > 0) {
-                    const space = selectedBuilding.spaces.find(s => s.id === spaceId);
-                    if (space) {
-                        const costForSpace = totalCostForAllocation * (percentageForSpace / 100);
-                        finalUtilityItemsForDb.push({
-                            name: item.name,
-                            totalCost: parseFloat(costForSpace.toFixed(2)),
-                            appliesToScope: 'SpecificSpaces', // Always store as specific space for DB
-                            applicableSpaceIdNames: [space.spaceIdName],
-                        });
-                    }
+                    const costForSpace = totalCostForAllocation * (percentageForSpace / 100);
+                    finalUtilityItemsForDb.push({
+                        name: item.name,
+                        totalCost: parseFloat(costForSpace.toFixed(2)),
+                        appliesToScope: 'SpecificSpaces', // Always store as specific space for DB
+                        applicableSpaceIdNames: [space.spaceIdName],
+                    });
                 }
             }
         }
@@ -410,7 +412,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
-          <CardDescription>Select building and period, then input utility details. Billing logic uses data from the month PRIOR to a bill's due date.</CardDescription>
+          <CardDescription>Select building and period, then input utility details. A bill due in a given month uses utilities from that same month.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
