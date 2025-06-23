@@ -296,7 +296,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const utilityItemsForJson: {name: string; amount: number}[] = []; 
     let totalUtilityCostForBill = 0;
 
-    const utilityPeriodDate = subMonths(targetBillDate, 1);
+    const utilityPeriodDate = targetBillDate; // Changed from subMonths(targetBillDate, 1)
     const utilityYear = getYear(utilityPeriodDate);
     const utilityMonth = getMonth(utilityPeriodDate);
 
@@ -554,3 +554,6 @@ export async function deleteBillAction(billId: string) {
 
 
 
+
+
+    
