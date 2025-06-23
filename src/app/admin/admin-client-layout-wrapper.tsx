@@ -226,12 +226,12 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         <SidebarFooter className="p-4 border-t border-sidebar-border">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center justify-start gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+              <Button variant="ghost" className="flex items-center group-data-[state=expanded]/sidebar-wrapper:justify-start group-data-[state=collapsed]/sidebar-wrapper:justify-center gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src="https://placehold.co/100x100.png" alt={currentUser?.name || "User"} data-ai-hint="user avatar"/>
                   <AvatarFallback>{currentUser?.name?.substring(0,2).toUpperCase() || 'AU'}</AvatarFallback>
                 </Avatar>
-                <div className={cn("text-left", (!isMobile && sidebarState === "collapsed") ? "hidden" : "")}>
+                <div className={cn("text-left", "group-data-[state=collapsed]/sidebar-wrapper:hidden")}>
                   <p className="text-sm font-medium">{currentUser?.name || "User"}</p>
                   <p className="text-xs text-sidebar-foreground/70">{currentUser?.email || "user@example.com"}</p>
                 </div>
