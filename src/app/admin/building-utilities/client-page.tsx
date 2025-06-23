@@ -141,34 +141,38 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 const groupTotalCost = itemsInGroup.reduce((sum, i) => sum + i.totalCost, 0);
                 const perSpacePercentages: { [spaceId: string]: number } = {};
 
-                itemsInGroup.forEach(item => {
-                    const spaceName = item.applicableSpaceIdNames?.[0];
-                    const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
-                    if (space && groupTotalCost > 0) {
-                        const percentage = (item.totalCost / groupTotalCost) * 100;
-                        perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
-                    }
-                });
+                if (selectedBuilding) {
+                  itemsInGroup.forEach(item => {
+                      const spaceName = item.applicableSpaceIdNames?.[0];
+                      const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
+                      if (space && groupTotalCost > 0) {
+                          const percentage = (item.totalCost / groupTotalCost) * 100;
+                          perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
+                      }
+                  });
+                }
                 
                 // Infer if it was originally a 'Floor' item.
                 let inferredScope: 'Floor' | 'SpecificSpaces' = 'SpecificSpaces';
                 let inferredFloor: string | undefined = undefined;
 
-                const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
-                const firstSpaceInGroup = selectedBuilding?.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
+                if (selectedBuilding) {
+                  const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
+                  const firstSpaceInGroup = selectedBuilding.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
 
-                if (firstSpaceInGroup?.floor) {
-                    const commonFloor = firstSpaceInGroup.floor;
-                    const allOnSameFloor = itemsInGroup.every(item => {
-                        const spaceName = item.applicableSpaceIdNames?.[0];
-                        const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
-                        return space?.floor === commonFloor;
-                    });
+                  if (firstSpaceInGroup?.floor) {
+                      const commonFloor = firstSpaceInGroup.floor;
+                      const allOnSameFloor = itemsInGroup.every(item => {
+                          const spaceName = item.applicableSpaceIdNames?.[0];
+                          const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
+                          return space?.floor === commonFloor;
+                      });
 
-                    if (allOnSameFloor) {
-                        inferredScope = 'Floor';
-                        inferredFloor = commonFloor;
-                    }
+                      if (allOnSameFloor) {
+                          inferredScope = 'Floor';
+                          inferredFloor = commonFloor;
+                      }
+                  }
                 }
                 
                 uiItems.push({
@@ -303,11 +307,6 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
             }
 
             const percentages = item.perSpacePercentages || {};
-            const totalPercentage = Object.values(percentages).reduce((sum, p) => sum + (p || 0), 0);
-            if (Math.abs(totalPercentage - 100) > 0.01) {
-                toast({ title: 'Validation Error', description: `Percentages for "${item.name}" must add up to 100%. Current total: ${totalPercentage.toFixed(2)}%`, variant: 'destructive' });
-                return;
-            }
             
             const spacesToProcess = item.appliesToScope === 'Floor' 
               ? selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor)
@@ -506,7 +505,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                         {item.applicableFloor && (
                              <div className="space-y-2 pt-2">
                                 <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
-                                <p className="text-xs text-muted-foreground">Define how the total cost is split. Must add up to 100%.</p>
+                                <p className="text-xs text-muted-foreground">Define how the total cost is split. This is not required to add up to 100%.</p>
                                 <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
                                         {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(space => (
@@ -532,7 +531,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                                 </ScrollArea>
                                 <div className="text-right text-sm font-medium mt-2">
                                     Total Allocated: 
-                                    <span className={Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive ml-1" : "text-green-600 ml-1"}>
+                                    <span className="text-foreground ml-1">
                                         {totalPercentage.toFixed(2)}%
                                     </span>
                                 </div>
@@ -550,7 +549,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
 
                           <div className="space-y-2 pt-2">
                             <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
-                            <p className="text-xs text-muted-foreground">Define how the total cost is split across any spaces. Must add up to 100%.</p>
+                            <p className="text-xs text-muted-foreground">Define how the total cost is split across any spaces. This is not required to add up to 100%.</p>
                             <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
                                 {(selectedBuilding?.spaces ?? []).length > 0 ? selectedBuilding?.spaces.map(space => (
@@ -578,7 +577,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                             </ScrollArea>
                             <div className="text-right text-sm font-medium mt-2">
                                 Total Allocated: 
-                                <span className={Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive ml-1" : "text-green-600 ml-1"}>
+                                <span className="text-foreground ml-1">
                                     {totalPercentage.toFixed(2)}%
                                 </span>
                             </div>
