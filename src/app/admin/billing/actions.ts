@@ -44,26 +44,35 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
 }
 
+// Helper to get user and their managed building IDs
+async function getUserAndManagedIds() {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Authentication required.");
+
+    const isSuperAdmin = currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
+    let managedBuildingIds: string[] | null = null; // null means all access for super admin
+
+    if (!isSuperAdmin) {
+        const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
+        managedBuildingIds = managedBuildings.map(b => b.id);
+    }
+    return { currentUser, isSuperAdmin, managedBuildingIds };
+}
+
 
 export async function getBillingPageDataAction(): Promise<SerializedBillingPageData> {
-  const currentUser = await getCurrentUser();
-  const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
-  let managedBuildingIds: string[] | undefined = undefined;
+  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
-  if (!isSuperAdmin && currentUser) {
-      const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-      managedBuildingIds = managedBuildings.map(b => b.id);
-      if (managedBuildingIds.length === 0) {
-          // Return empty data if user manages no buildings
-          return { agreements: [], spaces: [], buildings: [], bills: [], buildingMonthlyUtilities: [] };
-      }
+  if (!isSuperAdmin && managedBuildingIds?.length === 0) {
+      // Return empty data if user manages no buildings
+      return { agreements: [], spaces: [], buildings: [], bills: [], buildingMonthlyUtilities: [] };
   }
 
   // Define where clauses
-  const agreementWhere: Prisma.AgreementWhereInput = managedBuildingIds ? { space: { buildingId: { in: managedBuildingIds } } } : {};
-  const spaceWhere: Prisma.SpaceWhereInput = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
-  const buildingWhere: Prisma.BuildingWhereInput = managedBuildingIds ? { id: { in: managedBuildingIds } } : {};
-  const billWhere: Prisma.BillWhereInput = managedBuildingIds ? { agreement: { space: { buildingId: { in: managedBuildingIds } } } } : {};
+  const agreementWhere: Prisma.AgreementWhereInput = !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {};
+  const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
+  const buildingWhere: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds! } } : {};
+  const billWhere: Prisma.BillWhereInput = !isSuperAdmin ? { agreement: { space: { buildingId: { in: managedBuildingIds! } } } } : {};
   
   const today = new Date();
   const currentMonth = getMonth(today);
@@ -77,8 +86,8 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
       { year: prevMonthYear, month: prevMonth },
     ]
   };
-  if(managedBuildingIds) {
-      buildingMonthlyUtilityWhere.buildingId = { in: managedBuildingIds };
+  if(!isSuperAdmin) {
+      buildingMonthlyUtilityWhere.buildingId = { in: managedBuildingIds! };
   }
 
 
@@ -321,6 +330,7 @@ function calculateIndividualPenalty(
 
 export async function generateBillAndUpdateAgreementAction(agreementId: string, targetBillDateStr: string) {
   try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     const targetBillDate = parseISO(`${targetBillDateStr}T00:00:00.000Z`);
     const today = startOfDay(new Date());
 
@@ -341,6 +351,10 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     if (!agreement.space) throw new Error("Space details for agreement not found.");
     if (!agreement.space.building) throw new Error("Building details for space not found.");
 
+    if (!isSuperAdmin && !managedBuildingIds?.includes(agreement.space.buildingId)) {
+        return { success: false, error: "Permission denied." };
+    }
+
     const targetDayStart = targetBillDate;
     const targetDayEnd = addDays(targetDayStart, 1);
     
@@ -359,10 +373,11 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 
     // Determine if rent should be charged based on upfront payment
     const agreementStartDate = agreement.startDate;
-    const lastRentFreeDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
+    const firstChargeableRentDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
+
 
     let rentAmount = agreement.monthlyRentalPrice;
-    if (agreement.initialPaymentMonths > 0 && isBefore(targetBillDate, lastRentFreeDueDate)) {
+    if (agreement.initialPaymentMonths > 0 && !isAfter(targetBillDate, firstChargeableRentDueDate) && !isSameDay(targetBillDate, firstChargeableRentDueDate)) {
         rentAmount = 0;
     }
     
@@ -473,6 +488,7 @@ export async function recordPaymentOrVerificationAction(
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
   try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     const bill = await databaseService.getBillById(billId, { 
       agreement: {                                       
         include: {                                       
@@ -492,6 +508,10 @@ export async function recordPaymentOrVerificationAction(
     });
     if (!bill) throw new Error("Bill not found.");
     if (!bill.agreement?.space?.building) throw new Error("Building details for bill not found for penalty check.");
+
+    if (!isSuperAdmin && !managedBuildingIds?.includes(bill.agreement.space.buildingId)) {
+        return { success: false, error: "Permission denied." };
+    }
 
     let utilityBreakdownItems: SerializedParsedUtilityItem[] = [];
     if (typeof (bill as any).utilityBreakdown === 'string') {
@@ -602,11 +622,24 @@ export async function recordPaymentOrVerificationAction(
 
 export async function deleteBillAction(billId: string) {
     try {
+        const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+
+        const bill = await databaseService.getBillById(billId, {
+            include: { agreement: { include: { space: true } } },
+        });
+
+        if (!bill) {
+            return { success: false, error: "Bill not found." };
+        }
+
+        if (!isSuperAdmin && (!bill.agreement?.space?.buildingId || !managedBuildingIds?.includes(bill.agreement.space.buildingId))) {
+            return { success: false, error: "Permission denied." };
+        }
+
         await databaseService.deleteBill(billId);
         revalidatePath('/admin/billing');
         return { success: true };
-    } catch (error: any)
-     {
+    } catch (error: any) {
         console.error("Error deleting bill:", error);
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
             return { success: false, error: "Bill not found." };

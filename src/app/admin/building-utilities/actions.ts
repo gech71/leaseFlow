@@ -7,7 +7,7 @@ import { Prisma, type Building, type BuildingMonthlyUtilities, type User, type R
 import { cookies } from 'next/headers';
 
 // Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
+async function decodeJwtPayload(token: string): Promise<any | null> {
   try {
     const base64Url = token.split('.')[1];
     if (!base64Url) return null;
@@ -34,26 +34,35 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
     if (!accessToken) return null;
     
-    const tokenPayload = decodeJwtPayload(accessToken);
+    const tokenPayload = await decodeJwtPayload(accessToken);
     if (!tokenPayload || !tokenPayload.sub) return null;
 
     return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
 }
 
-export async function getRegisteredBuildingsAction(): Promise<Building[]> {
-  try {
+async function getUserAndManagedIds() {
     const currentUser = await getCurrentUser();
-    const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
-    let managedBuildingIds: string[] | undefined = undefined;
+    if (!currentUser) throw new Error("Authentication required.");
 
-    if (!isSuperAdmin && currentUser) {
+    const isSuperAdmin = currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
+    let managedBuildingIds: string[] | null = null; // null means all access for super admin
+
+    if (!isSuperAdmin) {
         const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
         managedBuildingIds = managedBuildings.map(b => b.id);
-        if (managedBuildingIds.length === 0) {
-            managedBuildingIds = ['-1']; // Non-existent ID to return no results
-        }
     }
-    const whereClause = managedBuildingIds ? { id: { in: managedBuildingIds } } : {};
+    return { currentUser, isSuperAdmin, managedBuildingIds };
+}
+
+export async function getRegisteredBuildingsAction(): Promise<Building[]> {
+  try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    
+    if (!isSuperAdmin && managedBuildingIds?.length === 0) {
+        return [];
+    }
+
+    const whereClause = !isSuperAdmin ? { id: { in: managedBuildingIds! } } : {};
 
     return await databaseService.getAllBuildings({ 
       where: whereClause,
@@ -72,7 +81,12 @@ export async function getBuildingUtilitiesAction(
   month: number
 ): Promise<BuildingMonthlyUtilities | null> {
   try {
-    // Corrected: Pass the include options directly
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
+        console.warn(`Permission denied: User tried to access utilities for unmanaged building ${buildingId}`);
+        return null; // Don't return data user can't access
+    }
+
     return await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(buildingId, month, year, {
       utilities: true,
     });
@@ -98,6 +112,11 @@ export async function saveBuildingUtilitiesAction(
   utilityItems: BuildingUtilityItemInput[]
 ) {
   try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
+        return { success: false, error: "Permission denied." };
+    }
+
     const where: Prisma.BuildingMonthlyUtilitiesWhereUniqueInput = {
       buildingId_year_month: { // Using the @@unique constraint name
         buildingId,
@@ -159,18 +178,12 @@ export async function saveBuildingUtilitiesAction(
 
 export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMonthlyUtilities[]> {
   try {
-    const currentUser = await getCurrentUser();
-    const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
-    let managedBuildingIds: string[] | undefined = undefined;
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
-    if (!isSuperAdmin && currentUser) {
-        const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-        managedBuildingIds = managedBuildings.map(b => b.id);
-        if (managedBuildingIds.length === 0) {
-           return []; // No buildings, so no utility records
-        }
+    if (!isSuperAdmin && managedBuildingIds?.length === 0) {
+       return []; // No buildings, so no utility records
     }
-    const whereClause = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
+    const whereClause = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
 
     return await databaseService.getAllBuildingMonthlyUtilities({
       where: whereClause,
@@ -185,6 +198,18 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMo
 
 export async function deleteBuildingUtilitiesAction(id: string) {
   try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    
+    // Fetch the record first to check for ownership
+    const recordToDelete = await databaseService.getBuildingMonthlyUtilitiesById(id);
+    if (!recordToDelete) {
+        return { success: false, error: "Utility record not found for deletion." };
+    }
+
+    if (!isSuperAdmin && !managedBuildingIds?.includes(recordToDelete.buildingId)) {
+        return { success: false, error: "Permission denied." };
+    }
+
     await databaseService.deleteBuildingMonthlyUtilities(id);
     revalidatePath('/admin/building-utilities');
     revalidatePath('/admin/billing');
