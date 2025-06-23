@@ -11,7 +11,7 @@ import { cookies } from 'next/headers';
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
 // Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
+async function decodeJwtPayload(token: string): Promise<any | null> {
   try {
     const base64Url = token.split('.')[1];
     if (!base64Url) return null;
@@ -38,7 +38,7 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
     if (!accessToken) return null;
     
-    const tokenPayload = decodeJwtPayload(accessToken);
+    const tokenPayload = await decodeJwtPayload(accessToken);
     if (!tokenPayload || !tokenPayload.sub) return null;
 
     return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
@@ -359,7 +359,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const lastRentFreeDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
 
     let rentAmount = agreement.monthlyRentalPrice;
-    if (agreement.initialPaymentMonths > 0 && (isBefore(targetBillDate, lastRentFreeDueDate) || isSameDay(targetBillDate, lastRentFreeDueDate))) {
+    if (agreement.initialPaymentMonths > 0 && isBefore(targetBillDate, lastRentFreeDueDate)) {
         rentAmount = 0;
     }
     
@@ -611,3 +611,5 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
+
+    
