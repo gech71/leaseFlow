@@ -493,7 +493,13 @@ async function main() {
       utilities: {
         create: [
           { name: 'General Building Maintenance', totalCost: 1500, appliesToScope: 'Building' },
-          { name: 'Penthouse Landscaping', totalCost: 250, appliesToScope: 'SpecificSpaces', applicableSpaceIdNames: ['Penthouse Suite'] },
+          // Changed to create one item per specific space
+          { 
+            name: 'Penthouse Landscaping', 
+            totalCost: 250, 
+            appliesToScope: 'SpecificSpaces', 
+            applicableSpaceIdNames: ['Penthouse Suite'] 
+          },
         ],
       },
     },

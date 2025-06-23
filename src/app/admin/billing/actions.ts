@@ -325,7 +325,8 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
             break;
           case 'SpecificSpaces':
             if (utilItem.applicableSpaceIdNames?.includes(agreement.space.spaceIdName)) {
-              costForThisUtility = utilItem.applicableSpaceIdNames.length > 0 ? utilItem.totalCost / utilItem.applicableSpaceIdNames.length : 0;
+                // The totalCost of a 'SpecificSpaces' item is the cost for that one space.
+                costForThisUtility = utilItem.totalCost;
             }
             break;
         }
@@ -550,4 +551,3 @@ export async function deleteBillAction(billId: string) {
     
 
     
-

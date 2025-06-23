@@ -5,10 +5,23 @@ import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Wrench, Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType } from '@prisma/client';
+import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { BuildingUtilitiesClientPage } from './client-page'; // Import the new client component
 import { getAllBuildingUtilitiesForListAction, getRegisteredBuildingsAction } from './actions';
 import { parseISO } from 'date-fns';
+
+// Define a client-safe Space type
+interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt'> {
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Define a client-safe Building type that includes spaces
+interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt' | 'spaces'> {
+  createdAt: string;
+  updatedAt: string;
+  spaces: ClientSpace[];
+}
 
 
 // Server Component to fetch initial data
@@ -29,14 +42,19 @@ export default function BuildingUtilitiesServerPage() {
 
 // This is an async Server Component responsible for fetching data
 async function BuildingUtilitiesDataFetcher() {
-  const buildings = await getRegisteredBuildingsAction();
+  const buildingsWithSpaces = await getRegisteredBuildingsAction();
   const initialRecordsRaw = await getAllBuildingUtilitiesForListAction();
   
   // Serialize dates for client component props
-  const serializableBuildings = buildings.map(b => ({
+  const serializableBuildings: ClientBuilding[] = buildingsWithSpaces.map(b => ({
     ...b,
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt?.toISOString() || b.createdAt.toISOString(), // Safe serialization
+    spaces: b.spaces.map(s => ({
+      ...s,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString(),
+    }))
   }));
 
   const serializableInitialRecords = initialRecordsRaw.map(r => ({

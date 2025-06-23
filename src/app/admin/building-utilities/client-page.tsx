@@ -1,28 +1,29 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff } from 'lucide-react';
-import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType } from '@prisma/client';
+import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon } from 'lucide-react';
+import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth, parseISO } from 'date-fns';
-import { Textarea } from '@/components/ui/textarea';
 import { getBuildingUtilitiesAction, saveBuildingUtilitiesAction, getAllBuildingUtilitiesForListAction, type BuildingUtilityItemInput } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-interface UIUtilityItem extends BuildingUtilityItemInput {
-  uiId: string; 
-  applicableSpaceIdNamesStr?: string; 
-}
-
-interface ClientBuildingPrismaType extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt'> {
+// Client-safe types passed as props
+interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt'> {
   createdAt: string;
   updatedAt: string;
+}
+interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt' | 'spaces'> {
+  createdAt: string;
+  updatedAt: string;
+  spaces: ClientSpace[];
 }
 interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingMonthlyUtilitiesPrismaType, 'createdAt' | 'updatedAt' | 'utilities'> {
   createdAt: string;
@@ -30,14 +31,25 @@ interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingMonthlyU
   utilities: BuildingUtilityItemPrismaType[]; 
 }
 
+// Internal state type for a "logical" utility item in the UI
+interface UIUtilityItem {
+  uiId: string;
+  name: string;
+  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
+  totalCost?: number; // Used for Building/Floor scope
+  applicableFloor?: string; // Used for Floor scope
+  perSpaceCosts?: { [spaceId: string]: number }; // Used for SpecificSpaces scope
+}
+
+
 interface BuildingUtilitiesClientPageProps {
-  initialBuildings: ClientBuildingPrismaType[];
+  initialBuildings: ClientBuilding[];
   initialUtilityRecords: ClientBuildingMonthlyUtilitiesPrismaType[];
 }
 
 export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRecords }: BuildingUtilitiesClientPageProps) {
   const [allUtilityRecords, setAllUtilityRecords] = useState<ClientBuildingMonthlyUtilitiesPrismaType[]>(initialUtilityRecords);
-  const [registeredBuildings, setRegisteredBuildings] = useState<ClientBuildingPrismaType[]>(initialBuildings);
+  const [registeredBuildings, setRegisteredBuildings] = useState<ClientBuilding[]>(initialBuildings);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
@@ -53,6 +65,11 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const canSaveUtilities = isSuperAdmin || hasPermission('building_utility:save');
   const canViewUtilities = isSuperAdmin || hasPermission('building_utility:view') || canSaveUtilities;
 
+  const selectedBuilding = useMemo(() => {
+    return registeredBuildings.find(b => b.id === selectedBuildingId);
+  }, [selectedBuildingId, registeredBuildings]);
+
+
   useEffect(() => {
     setIsMounted(true);
     if (initialBuildings.length > 0 && !selectedBuildingId) {
@@ -66,24 +83,46 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       const fetchUtilities = async () => {
         setIsLoadingData(true);
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
-        if (existingEntry) {
-          setCurrentUtilityItems(existingEntry.utilities.map((u, index) => ({
-            uiId: u.id || `dbItem-${index}-${Date.now()}`,
-            name: u.name,
-            totalCost: u.totalCost,
-            appliesToScope: u.appliesToScope as BuildingUtilityItemInput['appliesToScope'],
-            applicableFloor: u.applicableFloor || '',
-            applicableSpaceIdNamesStr: u.applicableSpaceIdNames?.join(', ') || '',
-            applicableSpaceIdNames: u.applicableSpaceIdNames || [],
-          })));
+        
+        if (existingEntry && existingEntry.utilities) {
+            // Group DB items into logical UI items
+            const groupedItems: { [name: string]: UIUtilityItem } = {};
+            existingEntry.utilities.forEach((dbItem, index) => {
+                if (dbItem.appliesToScope === 'SpecificSpaces') {
+                    if (!groupedItems[dbItem.name]) {
+                        groupedItems[dbItem.name] = {
+                            uiId: `logical-${dbItem.name}-${Date.now()}`,
+                            name: dbItem.name,
+                            appliesToScope: 'SpecificSpaces',
+                            perSpaceCosts: {},
+                        };
+                    }
+                    const spaceName = dbItem.applicableSpaceIdNames?.[0];
+                    const space = selectedBuilding?.spaces.find(s => s.spaceIdName === spaceName);
+                    if (space && groupedItems[dbItem.name].perSpaceCosts) {
+                        groupedItems[dbItem.name].perSpaceCosts![space.id] = dbItem.totalCost;
+                    }
+                } else {
+                    // For Building/Floor, each DB item is one UI item
+                    const uiId = dbItem.id || `dbItem-${index}-${Date.now()}`;
+                    groupedItems[uiId] = {
+                        uiId: uiId,
+                        name: dbItem.name,
+                        totalCost: dbItem.totalCost,
+                        appliesToScope: dbItem.appliesToScope as 'Building' | 'Floor',
+                        applicableFloor: dbItem.applicableFloor || undefined
+                    };
+                }
+            });
+            setCurrentUtilityItems(Object.values(groupedItems));
         } else {
-          setCurrentUtilityItems([{ uiId: `newItem-${Date.now()}`, name: '', totalCost: 0, appliesToScope: 'Building', applicableFloor: '', applicableSpaceIdNamesStr: '', applicableSpaceIdNames: [] }]);
+          setCurrentUtilityItems([{ uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {} }]);
         }
         setIsLoadingData(false);
       };
       fetchUtilities();
     } else if (isMounted) { 
-      setCurrentUtilityItems([{ uiId: `newItem-${Date.now()}`, name: '', totalCost: 0, appliesToScope: 'Building', applicableFloor: '', applicableSpaceIdNamesStr: '', applicableSpaceIdNames: [] }]);
+      setCurrentUtilityItems([{ uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {} }]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBuildingId, selectedYear, selectedMonth, isMounted]);
@@ -103,7 +142,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
 
   const handleAddUtilityItem = () => {
     if (!canSaveUtilities) return;
-    setCurrentUtilityItems([...currentUtilityItems, { uiId: `newItem-${Date.now()}`, name: '', totalCost: 0, appliesToScope: 'Building', applicableFloor: '', applicableSpaceIdNamesStr: '', applicableSpaceIdNames: [] }]);
+    setCurrentUtilityItems([...currentUtilityItems, { uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {} }]);
   };
 
   const handleRemoveUtilityItem = (uiIdToRemove: string) => {
@@ -111,70 +150,92 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     setCurrentUtilityItems(currentUtilityItems.filter(item => item.uiId !== uiIdToRemove));
   };
 
-  const handleUtilityItemChange = (uiIdToChange: string, field: keyof UIUtilityItem, value: string | number | string[]) => {
+  const handleUtilityItemChange = (uiIdToChange: string, field: keyof UIUtilityItem, value: any) => {
     if (!canSaveUtilities) return;
     setCurrentUtilityItems(prevItems => prevItems.map(item => {
-      if (item.uiId !== uiIdToChange) return item;
-      
-      let updatedItem = { ...item, [field]: value };
+        if (item.uiId !== uiIdToChange) return item;
 
-      if (field === 'totalCost' && typeof value === 'string') {
-        updatedItem.totalCost = parseFloat(value) || 0;
-      } else if (field === 'appliesToScope' && typeof value === 'string') {
-        updatedItem.appliesToScope = value as BuildingUtilityItemInput['appliesToScope'];
-        updatedItem.applicableFloor = ''; 
-        updatedItem.applicableSpaceIdNamesStr = '';
-        updatedItem.applicableSpaceIdNames = [];
-      } else if (field === 'applicableSpaceIdNamesStr' && typeof value === 'string') {
-        updatedItem.applicableSpaceIdNamesStr = value;
-        updatedItem.applicableSpaceIdNames = value.split(',').map(s => s.trim()).filter(s => s);
-      }
-      return updatedItem;
+        let updatedItem = { ...item, [field]: value };
+
+        if (field === 'appliesToScope') {
+            updatedItem.totalCost = 0;
+            updatedItem.perSpaceCosts = {};
+            updatedItem.applicableFloor = '';
+        }
+        
+        return updatedItem;
     }));
   };
+
+   const handlePerSpaceCostChange = (uiId: string, spaceId: string, costStr: string) => {
+        if (!canSaveUtilities) return;
+        const cost = parseFloat(costStr);
+        setCurrentUtilityItems(prev => prev.map(item => {
+            if (item.uiId !== uiId) return item;
+            
+            const newPerSpaceCosts = { ...item.perSpaceCosts, [spaceId]: isNaN(cost) ? 0 : cost };
+            return { ...item, perSpaceCosts: newPerSpaceCosts };
+        }));
+   };
 
   const handleSaveUtilities = async () => {
     if (!canSaveUtilities) {
       toast({ title: "Permission Denied", description: "You do not have permission to save utilities.", variant: "destructive" });
       return;
     }
-    if (!selectedBuildingId) {
+    if (!selectedBuilding) {
       toast({ title: 'Error', description: 'Please select a building.', variant: 'destructive' });
-      return;
-    }
-    const selectedBuildingObject = registeredBuildings.find(b => b.id === selectedBuildingId);
-    if (!selectedBuildingObject) {
-      toast({ title: 'Error', description: 'Selected building not found.', variant: 'destructive' });
       return;
     }
 
     const finalUtilityItemsForDb: BuildingUtilityItemInput[] = [];
     for (const item of currentUtilityItems) {
-        if (!item.name.trim() || item.totalCost <= 0) {
-            toast({ title: 'Validation Error', description: `Utility Item "${item.name || 'Unnamed'}" must have a name and a positive cost.`, variant: 'destructive' });
+        if (!item.name.trim()) {
+            toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
             return;
         }
-        if (item.appliesToScope === 'Floor' && !item.applicableFloor?.trim()) {
-            toast({ title: 'Validation Error', description: `Applicable floor is required for floor-scoped utility: "${item.name}".`, variant: 'destructive' });
-            return;
+
+        if (item.appliesToScope === 'Building' || item.appliesToScope === 'Floor') {
+            if (!item.totalCost || item.totalCost <= 0) {
+                 toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
+                 return;
+            }
+             if (item.appliesToScope === 'Floor' && !item.applicableFloor?.trim()) {
+                toast({ title: 'Validation Error', description: `Applicable floor is required for floor-scoped utility: "${item.name}".`, variant: 'destructive' });
+                return;
+            }
+            finalUtilityItemsForDb.push({
+                name: item.name,
+                totalCost: item.totalCost,
+                appliesToScope: item.appliesToScope,
+                applicableFloor: item.applicableFloor || null,
+                applicableSpaceIdNames: null,
+            });
+        } else if (item.appliesToScope === 'SpecificSpaces') {
+            if (!item.perSpaceCosts || Object.keys(item.perSpaceCosts).length === 0) continue; // Skip if no costs entered
+
+            for (const spaceId in item.perSpaceCosts) {
+                const cost = item.perSpaceCosts[spaceId];
+                if (cost > 0) {
+                    const space = selectedBuilding.spaces.find(s => s.id === spaceId);
+                    if (space) {
+                        finalUtilityItemsForDb.push({
+                            name: item.name,
+                            totalCost: cost,
+                            appliesToScope: 'SpecificSpaces',
+                            applicableSpaceIdNames: [space.spaceIdName],
+                            applicableFloor: null
+                        });
+                    }
+                }
+            }
         }
-        if (item.appliesToScope === 'SpecificSpaces' && (!item.applicableSpaceIdNames || item.applicableSpaceIdNames.length === 0)) {
-            toast({ title: 'Validation Error', description: `Applicable Space IDs are required for space-scoped utility: "${item.name}".`, variant: 'destructive' });
-            return;
-        }
-        finalUtilityItemsForDb.push({
-            name: item.name,
-            totalCost: item.totalCost,
-            appliesToScope: item.appliesToScope,
-            applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : undefined,
-            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? item.applicableSpaceIdNames : undefined,
-        });
     }
     
     setIsSaving(true);
     const result = await saveBuildingUtilitiesAction(
-      selectedBuildingId,
-      selectedBuildingObject.name,
+      selectedBuilding.id,
+      selectedBuilding.name,
       selectedYear,
       selectedMonth,
       finalUtilityItemsForDb
@@ -182,7 +243,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     setIsSaving(false);
 
     if (result.success) {
-      toast({ title: 'Utilities Saved', description: `Utility costs for ${selectedBuildingObject.name} for ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')} have been saved.` });
+      toast({ title: 'Utilities Saved', description: `Utility costs for ${selectedBuilding.name} for ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')} have been saved.` });
       await refreshUtilityRecordsList(); 
     } else {
       toast({ title: 'Error Saving Utilities', description: result.error, variant: 'destructive' });
@@ -275,36 +336,64 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                           </Button>
                         )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                        <div className="md:col-span-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                       <div className="space-y-1.5">
                             <Label htmlFor={`utilityName-${item.uiId}`}>Type</Label>
-                            <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} className="mt-1.5" disabled={isSaving || !canSaveUtilities}/>
+                            <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
                         </div>
-                        <div>
-                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label>
-                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', e.target.value)} className="mt-1.5" disabled={isSaving || !canSaveUtilities}/>
-                        </div>
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
-                        <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value)} disabled={isSaving || !canSaveUtilities}>
-                            <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
-                        </Select>
-                    </div>
-                    {item.appliesToScope === 'Floor' && (
                         <div className="space-y-1.5">
-                            <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor Name</Label>
-                            <Input id={`applicableFloor-${item.uiId}`} placeholder="e.g., 10th" value={item.applicableFloor || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableFloor', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                             <Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
+                            <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value)} disabled={isSaving || !canSaveUtilities}>
+                                <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    
+                    {item.appliesToScope !== 'SpecificSpaces' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                            <div className="space-y-1.5">
+                                <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost</Label>
+                                <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                            </div>
+                            {item.appliesToScope === 'Floor' && (
+                                <div className="space-y-1.5">
+                                    <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor Name</Label>
+                                    <Input id={`applicableFloor-${item.uiId}`} placeholder="e.g., 10th" value={item.applicableFloor || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableFloor', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                                </div>
+                            )}
                         </div>
                     )}
+                    
                     {item.appliesToScope === 'SpecificSpaces' && (
-                        <div className="space-y-1.5">
-                            <Label htmlFor={`applicableSpaces-${item.uiId}`} className="flex items-center"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Space IDs (comma-separated)</Label>
-                            <Textarea id={`applicableSpaces-${item.uiId}`} placeholder="e.g., Unit 10A, Office 201" value={item.applicableSpaceIdNamesStr || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'applicableSpaceIdNamesStr', e.target.value)} rows={2} disabled={isSaving || !canSaveUtilities}/>
-                            <p className="text-xs text-muted-foreground">Enter exact 'Space ID/Name' from Spaces page.</p>
+                        <div className="space-y-2 pt-2">
+                             <Label className="flex items-center text-sm font-medium"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Per-Space Costs</Label>
+                             <p className="text-xs text-muted-foreground">Enter the specific cost for each space. Only spaces with a cost greater than zero will be saved.</p>
+                             <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
+                                {(selectedBuilding?.spaces ?? []).length > 0 ? selectedBuilding?.spaces.map(space => (
+                                    <div key={space.id} className="flex items-center gap-2">
+                                        <Label htmlFor={`space-cost-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
+                                            {space.spaceIdName}
+                                        </Label>
+                                        <Input
+                                            id={`space-cost-${item.uiId}-${space.id}`}
+                                            type="number"
+                                            placeholder="0.00"
+                                            value={item.perSpaceCosts?.[space.id] || ''}
+                                            onChange={(e) => handlePerSpaceCostChange(item.uiId, space.id, e.target.value)}
+                                            className="w-28 h-8"
+                                            disabled={isSaving || !canSaveUtilities}
+                                        />
+                                    </div>
+                                )) : (
+                                    <p className="text-sm text-muted-foreground text-center col-span-2">No spaces found in this building.</p>
+                                )}
+                                </div>
+                             </ScrollArea>
                         </div>
                     )}
+
                   </CardContent>
                 </Card>
               ))}
@@ -339,7 +428,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                                             <span className="text-xs italic ml-1">
                                                 (Scope: {util.appliesToScope}
                                                 {util.appliesToScope === 'Floor' && util.applicableFloor ? ` - Floor: ${util.applicableFloor}` : ''}
-                                                {util.appliesToScope === 'SpecificSpaces' && util.applicableSpaceIdNames && util.applicableSpaceIdNames.length > 0 ? ` - Spaces: ${util.applicableSpaceIdNames.join(', ')}` : ''})</span></li>))}</ul>
+                                                {util.appliesToScope === 'SpecificSpaces' && util.applicableSpaceIdNames && util.applicableSpaceIdNames.length > 0 ? ` - Space: ${util.applicableSpaceIdNames.join(', ')}` : ''})</span></li>))}</ul>
                                 <p className="text-xs text-muted-foreground/70 mt-1">Last Saved: {format(parseISO(entry.updatedAt as unknown as string), 'PPp')}</p>
                             </div></Button>))}</div>)}
         </CardContent>

@@ -7,7 +7,10 @@ import { Prisma, type Building, type BuildingMonthlyUtilities } from '@prisma/cl
 
 export async function getRegisteredBuildingsAction(): Promise<Building[]> {
   try {
-    return await databaseService.getAllBuildings({ orderBy: { name: 'asc' } });
+    return await databaseService.getAllBuildings({ 
+      orderBy: { name: 'asc' },
+      include: { spaces: { orderBy: { spaceIdName: 'asc' } } } // Include spaces, sorted
+    });
   } catch (error: any) {
     console.error("Error fetching buildings:", error);
     return []; // Return empty array on error, client can handle this
@@ -116,4 +119,3 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMo
     return [];
   }
 }
-
