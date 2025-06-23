@@ -67,17 +67,17 @@ export function UserManagementClientPage({
   const canManageUserAssignments = isSuperAdmin || hasPermission('settings:user_management:assign');
   const canViewUserManagement = isSuperAdmin || hasPermission('settings:user_management:view') || canManageUserAssignments;
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
+  
   const totalPages = Math.ceil(users.length / itemsPerPage);
   const paginatedUsers = users.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
   
-  const handleItemsPerPageChange = (newSize: number) => {
-    setItemsPerPage(newSize);
-    setCurrentPage(1);
-  };
-
   useEffect(() => {
     setIsMounted(true);
     setUsers(initialUsers);

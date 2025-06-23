@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldCheck, Edit, Trash2, PlusCircle, Loader2, AlertTriangle, BadgeAlert, ListChecks, EyeOff, ChevronDown } from 'lucide-react';
+import { ShieldCheck, Edit, Trash2, PlusCircle, Loader2, AlertTriangle, BadgeAlert, ListChecks, EyeOff, ChevronDown, Eye } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -63,6 +63,11 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const canManageRoles = isSuperAdmin || contextHasPermission('settings:role_management:manage');
   const canViewRoles = isSuperAdmin || contextHasPermission('settings:role_management:view') || canManageRoles;
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
+
 
   const form = useForm<RoleFormValues>({
     resolver: zodResolver(roleFormSchema),
@@ -76,11 +81,6 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  const handleItemsPerPageChange = (newSize: number) => {
-    setItemsPerPage(newSize);
-    setCurrentPage(1);
-  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -112,7 +112,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   };
 
   const handleOpenEditForm = (role: ClientRole) => {
-    if (!canViewRoles) {
+     if (!canViewRoles) {
          toast({ title: "Permission Denied", description: "You do not have permission to view or edit roles.", variant: "destructive" });
          return;
     }
@@ -237,7 +237,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
           </div>
         ) : (
           <>
-            <ScrollArea className="max-h-[60vh] border rounded-md">
+            <div className="border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -259,7 +259,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                       </TableCell>
                       <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
-                            {canManageRoles ? <Edit className="h-4 w-4 text-blue-600" /> : <EyeOff className="h-4 w-4 text-blue-600" />}
+                            {canManageRoles ? <Edit className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
                           </Button>
                         {canManageRoles && (
                             <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || role.name === 'SUPER_ADMIN' || role.name === 'PROPERTY_MANAGER' || role.name === 'ACCOUNTANT' || role.name === 'SUPPORT_STAFF'}>
@@ -271,7 +271,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}

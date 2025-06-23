@@ -61,6 +61,11 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const canDeleteAgreements = isSuperAdmin || hasPermission('agreement:delete');
   const canViewAgreements = isSuperAdmin || hasPermission('agreement:view') || canCreateAgreements || canEditAgreements || canDeleteAgreements;
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     setIsMounted(true);
     setAgreements(initialAgreements.map(ag => ({
@@ -80,11 +85,6 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  const handleItemsPerPageChange = (newSize: number) => {
-    setItemsPerPage(newSize);
-    setCurrentPage(1);
-  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -238,27 +238,27 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                     <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex items-center justify-between">
-                    <div>
+                  <CardFooter className="border-t pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    <div className="flex-shrink-0">
                       {eligibleForRenewal && canEditAgreements && (
-                        <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                        <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto">
                           <RefreshCw className="mr-1 h-4 w-4" /> Renew
                         </Button>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 justify-end w-full">
                       {canViewAgreements && (
                         <Link href={`/admin/agreements/${agreement.id}`} passHref>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                             <Eye className="mr-1 h-4 w-4" /> View
                           </Button>
                         </Link>
                       )}
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)}>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)} className="flex-1 sm:flex-initial">
                         <Download className="mr-1 h-4 w-4" /> Download
                       </Button>
                       {canDeleteAgreements && (
-                        <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)}>
+                        <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)} className="flex-1 sm:flex-initial">
                           <Trash2 className="mr-1 h-4 w-4" /> Delete
                         </Button>
                       )}

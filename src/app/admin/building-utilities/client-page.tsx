@@ -94,6 +94,11 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const [recordsCurrentPage, setRecordsCurrentPage] = useState(1);
   const [recordsItemsPerPage, setRecordsItemsPerPage] = useState(5);
 
+  const handleRecordsItemsPerPageChange = (newSize: number) => {
+    setRecordsItemsPerPage(newSize);
+    setRecordsCurrentPage(1);
+  };
+
   const recordsTotalPages = Math.ceil(allUtilityRecords.length / recordsItemsPerPage);
   const paginatedUtilityRecords = useMemo(() => {
     const sortedRecords = [...allUtilityRecords].sort((a, b) => {
@@ -106,11 +111,6 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       recordsCurrentPage * recordsItemsPerPage
     );
   }, [allUtilityRecords, recordsCurrentPage, recordsItemsPerPage]);
-
-  const handleRecordsItemsPerPageChange = (newSize: number) => {
-    setRecordsItemsPerPage(newSize);
-    setRecordsCurrentPage(1);
-  };
 
 
   const selectedBuilding = useMemo(() => {
@@ -517,7 +517,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                         </div>
                         <div className="space-y-1.5">
                              <Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
-                            <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value)} disabled={isSaving || !canSaveUtilities}>
+                            <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value as UIUtilityItem['appliesToScope'])} disabled={isSaving || !canSaveUtilities}>
                                 <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
                                 <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
                             </Select>
@@ -638,7 +638,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
           )}
         </CardContent>
         {canSaveUtilities && (
-          <CardFooter className="border-t pt-6">
+          <CardFooter className="border-t p-6">
             <Button onClick={handleSaveUtilities} disabled={!selectedBuildingId || currentUtilityItems.length === 0 || registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
               Save Utilities for {selectedBuildingName ? `${selectedBuildingName} - ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}` : 'Selected Period'}
