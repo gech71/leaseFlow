@@ -3,11 +3,64 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma } from '@prisma/client'; // Ensure Prisma namespace is imported for runtime checks
+import { Prisma, type User, type Role } from '@prisma/client';
+import { cookies } from 'next/headers';
+
+// Helper function to decode JWT
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
+// Helper function to get current user from cookie
+async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+    const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    if (!accessToken) return null;
+    
+    const tokenPayload = decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) return null;
+
+    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+}
+
 
 export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
   try {
-    const newBuilding = await databaseService.createBuilding(data);
+    // Get the current user who is creating the building
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+        return { success: false, error: "Authentication required to create a building." };
+    }
+
+    // Add the current user's ID as the manager
+    const dataWithManager = {
+        ...data,
+        manager: {
+          connect: {
+            userId: currentUser.userId
+          }
+        }
+    };
+    
+    // The create call now includes the manager's ID
+    const newBuilding = await databaseService.createBuilding(dataWithManager);
     revalidatePath('/admin/buildings'); // Revalidate the list page
     return { success: true, building: newBuilding };
   } catch (error: any) {
@@ -24,6 +77,15 @@ export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
 
 export async function updateBuildingAction(id: string, data: Prisma.BuildingUpdateInput) {
   try {
+    // Security: Prevent changing the manager via this action.
+    // Manager assignment should be handled in user management.
+    if ((data as any).managedByUserId) {
+        delete (data as any).managedByUserId;
+    }
+    if ((data as any).manager) {
+        delete (data as any).manager;
+    }
+
     const updatedBuilding = await databaseService.updateBuilding(id, data);
     revalidatePath('/admin/buildings'); // Revalidate the list page
     revalidatePath(`/admin/buildings/upsert?id=${id}`); // Revalidate the edit page itself
@@ -76,4 +138,3 @@ export async function deleteBuildingAction(id: string) {
     return { success: false, error: error.message || "Failed to delete building." };
   }
 }
-
