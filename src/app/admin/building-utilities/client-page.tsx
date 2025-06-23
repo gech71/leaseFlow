@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle, Edit } from 'lucide-react';
 import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth, parseISO, subMonths } from 'date-fns';
@@ -25,6 +25,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 
 // Client-safe types passed as props
@@ -81,6 +90,27 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canSaveUtilities = isSuperAdmin || hasPermission('building_utility:save');
   const canViewUtilities = isSuperAdmin || hasPermission('building_utility:view') || canSaveUtilities;
+
+  const [recordsCurrentPage, setRecordsCurrentPage] = useState(1);
+  const [recordsItemsPerPage, setRecordsItemsPerPage] = useState(5);
+
+  const recordsTotalPages = Math.ceil(allUtilityRecords.length / recordsItemsPerPage);
+  const paginatedUtilityRecords = useMemo(() => {
+    const sortedRecords = [...allUtilityRecords].sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      if (a.month !== b.month) return b.month - a.month;
+      return a.buildingName.localeCompare(b.buildingName);
+    });
+    return sortedRecords.slice(
+      (recordsCurrentPage - 1) * recordsItemsPerPage,
+      recordsCurrentPage * recordsItemsPerPage
+    );
+  }, [allUtilityRecords, recordsCurrentPage, recordsItemsPerPage]);
+
+  useEffect(() => {
+    setRecordsCurrentPage(1);
+  }, [recordsItemsPerPage]);
+
 
   const selectedBuilding = useMemo(() => {
     return registeredBuildings.find(b => b.id === selectedBuildingId);
@@ -617,38 +647,65 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       </Card>
 
       <Card className="mt-8 shadow-lg">
-        <CardHeader><CardTitle className="font-headline text-xl">Saved Utility Records</CardTitle><CardDescription>Overview of previously entered utility costs. Click to edit.</CardDescription></CardHeader>
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">Saved Utility Records</CardTitle>
+          <CardDescription>Overview of previously entered utility costs. Click the edit icon to load and modify a record.</CardDescription>
+        </CardHeader>
         <CardContent>
-            {isLoadingData && allUtilityRecords.length === 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-            {!isLoadingData && allUtilityRecords.length === 0 && (<p className="text-muted-foreground">No utility records saved yet in the database.</p>)}
-            {allUtilityRecords.length > 0 && (
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                    {allUtilityRecords.map(entry => (
-                      <div key={entry.id} className="flex items-center gap-2">
-                        <Button variant="outline" className="flex-grow justify-start h-auto p-4 text-left"
-                            onClick={() => { setSelectedBuildingId(entry.buildingId); setSelectedYear(entry.year); setSelectedMonth(entry.month);}}>
-                            <div className="w-full">
-                                <h4 className="font-semibold">{entry.buildingName} - {format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</h4>
-                                <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
-                                    {entry.utilities.map((util, idx) => (
-                                        <li key={util.id || `util-${idx}`}> {util.name}: {util.totalCost.toFixed(2)} Birr
-                                            <span className="text-xs italic ml-1">
-                                                (Scope: {util.appliesToScope}
-                                                {util.appliesToScope === 'Floor' && util.applicableFloor ? ` - Floor: ${util.applicableFloor}` : ''}
-                                                {util.appliesToScope === 'SpecificSpaces' && util.applicableSpaceIdNames && util.applicableSpaceIdNames.length > 0 ? ` - Space: ${util.applicableSpaceIdNames.join(', ')}` : ''})</span></li>))}</ul>
-                                <p className="text-xs text-muted-foreground/70 mt-1">Last Saved: {format(parseISO(entry.updatedAt as unknown as string), 'PPp')}</p>
-                            </div>
-                        </Button>
-                        {canSaveUtilities && (
-                          <Button variant="destructive" size="icon" onClick={() => setRecordToDelete(entry)} disabled={isSaving}>
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete Record</span>
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                </div>
-            )}
+          {isLoadingData && allUtilityRecords.length === 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
+          {!isLoadingData && allUtilityRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">No utility records saved yet in the database.</p>)}
+          {allUtilityRecords.length > 0 && (
+            <>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Building</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead className="text-center hidden sm:table-cell">Items</TableHead>
+                      <TableHead className="hidden md:table-cell">Last Updated</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedUtilityRecords.map(entry => {
+                      const totalCost = entry.utilities.reduce((sum, util) => sum + util.totalCost, 0);
+                      return (
+                        <TableRow key={entry.id}>
+                          <TableCell className="font-medium">{entry.buildingName}</TableCell>
+                          <TableCell>{format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{totalCost.toFixed(2)} Birr</TableCell>
+                          <TableCell className="text-center hidden sm:table-cell">{entry.utilities.length}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs">{format(parseISO(entry.updatedAt as unknown as string), 'PPp')}</TableCell>
+                          <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" onClick={() => { setSelectedBuildingId(entry.buildingId); setSelectedYear(entry.year); setSelectedMonth(entry.month);}} className="h-8 w-8 text-blue-600 hover:text-blue-700">
+                                  <Edit className="h-4 w-4" />
+                                  <span className="sr-only">Edit Record</span>
+                              </Button>
+                              {canSaveUtilities && (
+                                  <Button variant="ghost" size="icon" onClick={() => setRecordToDelete(entry)} disabled={isSaving} className="h-8 w-8 text-destructive hover:text-destructive/80">
+                                      <Trash2 className="h-4 w-4" />
+                                      <span className="sr-only">Delete Record</span>
+                                  </Button>
+                              )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <PaginationControls
+                currentPage={recordsCurrentPage}
+                totalPages={recordsTotalPages}
+                onPageChange={setRecordsCurrentPage}
+                itemsPerPage={recordsItemsPerPage}
+                onItemsPerPageChange={setRecordsItemsPerPage}
+                className="mt-4"
+              />
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
