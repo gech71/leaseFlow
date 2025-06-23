@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { addMonths, format, parseISO, isValid } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/contexts/PermissionContext';
@@ -296,7 +296,7 @@ Landlord/Authorized Representative
                       <SelectContent>
                         {availableSpaces.length > 0 ? availableSpaces.map(space => (
                           <SelectItem key={space.id} value={space.id}>
-                            {space.spaceIdName} ({space.buildingName}) - {space.monthlyRentalPrice.toLocaleString()} Birr/month
+                            {space.spaceIdName} ({space.buildingName}) - {space.monthlyRentalPrice.toLocaleString()} Birr
                           </SelectItem>
                         )) : (<SelectItem value="no-spaces" disabled>No available spaces</SelectItem>)}
                       </SelectContent>
