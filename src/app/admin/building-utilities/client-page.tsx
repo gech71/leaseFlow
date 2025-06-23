@@ -417,10 +417,10 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
               </div>
               {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
               {!isLoadingData && currentUtilityItems.map((item, index) => {
-                const totalPercentageForFloor = useMemo(() => {
-                    if (item.appliesToScope !== 'Floor' || !item.perSpacePercentages) return 0;
-                    return Object.values(item.perSpacePercentages).reduce((sum, p) => sum + (p || 0), 0);
-                }, [item.appliesToScope, item.perSpacePercentages]);
+                let totalPercentageForFloor = 0;
+                if (item.appliesToScope === 'Floor' && item.perSpacePercentages) {
+                    totalPercentageForFloor = Object.values(item.perSpacePercentages).reduce((sum, p) => sum + (p || 0), 0);
+                }
 
                 return (
                 <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
