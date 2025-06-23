@@ -1,4 +1,6 @@
 
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Users as UsersIcon, ArrowLeft, Loader2 } from 'lucide-react';

@@ -1,4 +1,6 @@
 
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getBillingPageDataAction } from './actions'; // Server action now returns SerializedBillingPageData
@@ -104,4 +106,3 @@ export default function BillingPage() {
     </Suspense>
   );
 }
-

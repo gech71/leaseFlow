@@ -1,4 +1,6 @@
 
+export const dynamic = 'force-dynamic';
+
 // Main form interaction is client-side, but data fetching for props is server-side.
 
 import { Suspense } from 'react';
@@ -10,6 +12,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Tenant, Space, Prisma, User, Role } from '@prisma/client'; // For server-side fetching
 import { GenerateAgreementClientPage } from './client-page'; // Import the new client component
 import { cookies } from 'next/headers';
+import { Calendar } from '@/components/ui/calendar';
 
 // Insecure JWT payload decoder
 function decodeJwtPayload(token: string): any | null {
@@ -79,14 +82,13 @@ async function GenerateAgreementDataFetcher() {
       managedBuildingIds = managedBuildings.map(b => b.id);
   }
 
-  const tenantWhereClause: Prisma.TenantWhereInput = managedBuildingIds
-    ? {
-        OR: [
-          { rentedSpace: null }, // Unassigned tenants
-          { rentedSpace: { buildingId: { in: managedBuildingIds } } } // Tenants in managed buildings
-        ]
-      }
-    : {};
+  const tenantWhereClause: Prisma.TenantWhereInput = {
+    // Show all unassigned tenants, and tenants assigned to the manager's buildings
+    OR: [
+      { rentedSpace: null },
+      ...(managedBuildingIds ? [{ rentedSpace: { buildingId: { in: managedBuildingIds } } }] : []),
+    ],
+  };
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {
     isOccupied: false,

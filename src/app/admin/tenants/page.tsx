@@ -1,4 +1,6 @@
 
+export const dynamic = 'force-dynamic';
+
 import { databaseService } from '@/lib/services/databaseService';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, User, Role } from '@prisma/client';
 import { TenantsClientPage, type TenantWithRelations, type SpaceWithTenant, type ClientAgreement } from './components';

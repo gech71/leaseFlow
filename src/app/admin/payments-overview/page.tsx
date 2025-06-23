@@ -1,4 +1,6 @@
 
+export const dynamic = 'force-dynamic';
+
 // REMOVED "use client"; - This is now a Server Component module
 
 import React, { Suspense } from 'react'; // React is needed for Suspense

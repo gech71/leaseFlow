@@ -1,4 +1,6 @@
 
+export const dynamic = 'force-dynamic';
+
 import { databaseService } from '@/lib/services/databaseService';
 import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, User, Role, Prisma } from '@prisma/client';
 import { BuildingsClientPage } from './components'; // Import the new client component

@@ -1,4 +1,6 @@
 
+export const dynamic = 'force-dynamic';
+
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, FileText, DollarSign, LayoutDashboard, AlertCircle, User } from 'lucide-react';
