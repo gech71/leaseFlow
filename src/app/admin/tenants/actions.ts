@@ -7,24 +7,11 @@ import { Prisma } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
 
 export async function createTenantAction(
-  data: Prisma.TenantCreateInput, 
-  assignedSpaceId: string | null | undefined
+  data: Prisma.TenantCreateInput
 ) {
   try {
     const newTenant = await databaseService.createTenant(data);
-
-    if (assignedSpaceId) {
-      await databaseService.updateSpace(assignedSpaceId, {
-        isOccupied: true,
-        tenant: { connect: { id: newTenant.id } },
-      });
-      await databaseService.updateTenant(newTenant.id, {
-        rentedSpace: { connect: { id: assignedSpaceId } }
-      });
-    }
-
     revalidatePath('/admin/tenants');
-    revalidatePath('/admin/spaces'); 
     return { success: true, tenant: newTenant };
   } catch (error: any) {
     console.error("Error creating tenant:", error);
@@ -43,40 +30,11 @@ export async function createTenantAction(
 
 export async function updateTenantAction(
   tenantId: string,
-  data: Prisma.TenantUpdateInput, 
-  newAssignedSpaceId: string | null | undefined,
-  oldAssignedSpaceId: string | null | undefined
+  data: Prisma.TenantUpdateInput
 ) {
   try {
     const updatedTenant = await databaseService.updateTenant(tenantId, data);
-
-    if (oldAssignedSpaceId !== newAssignedSpaceId) {
-      if (oldAssignedSpaceId) {
-        await databaseService.updateSpace(oldAssignedSpaceId, {
-          isOccupied: false,
-          tenant: { disconnect: true }, 
-        });
-      }
-      if (newAssignedSpaceId) {
-        await databaseService.updateSpace(newAssignedSpaceId, {
-          isOccupied: true,
-          tenant: { connect: { id: tenantId } }, 
-        });
-      }
-    }
-    
-    if (newAssignedSpaceId) {
-        await databaseService.updateTenant(tenantId, { 
-            rentedSpace: { connect: { id: newAssignedSpaceId } } 
-        });
-    } else if (oldAssignedSpaceId && !newAssignedSpaceId) { 
-        await databaseService.updateTenant(tenantId, { 
-            rentedSpace: { disconnect: true } 
-        });
-    }
-
     revalidatePath('/admin/tenants');
-    revalidatePath('/admin/spaces'); 
     return { success: true, tenant: updatedTenant };
   } catch (error: any) {
     console.error("Error updating tenant:", error);

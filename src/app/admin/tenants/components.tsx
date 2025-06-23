@@ -35,7 +35,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createTenantAction, updateTenantAction, deleteTenantAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
@@ -78,7 +77,6 @@ const tenantFormSchema = z.object({
   nationalId: z.string().optional().or(z.literal('')),
   representativeName: z.string().optional().or(z.literal('')),
   representativePhone: z.string().optional().or(z.literal('')),
-  rentedSpaceId: z.string().nullable().optional(), 
 });
 type TenantFormValues = z.infer<typeof tenantFormSchema>;
 
@@ -118,7 +116,7 @@ export function TenantsClientPage({
     resolver: zodResolver(tenantFormSchema),
     defaultValues: {
       name: "", email: "", phone: "", alternativePhone: "", nationalId: "", 
-      representativeName: "", representativePhone: "", rentedSpaceId: null,
+      representativeName: "", representativePhone: "",
     },
   });
 
@@ -140,10 +138,6 @@ export function TenantsClientPage({
     if (!space) return "No space assigned";
     return `${space.spaceIdName}, ${space.buildingName}`;
   };
-  
-  const availableSpacesForAssignment = spaces.filter(s => 
-    !s.isOccupied || (formMode === 'edit' && currentTenantForForm?.rentedSpaceId && s.id === currentTenantForForm.rentedSpaceId)
-  );
 
   const handleOpenAddForm = () => {
     if (!canCreateTenants) {
@@ -154,7 +148,7 @@ export function TenantsClientPage({
     setCurrentTenantForForm(null); 
     form.reset({ 
       name: "", email: "", phone: "", alternativePhone: "", nationalId: "", 
-      representativeName: "", representativePhone: "", rentedSpaceId: null 
+      representativeName: "", representativePhone: "",
     });
     setIsFormOpen(true);
   };
@@ -174,7 +168,6 @@ export function TenantsClientPage({
       nationalId: tenant.nationalId || "",
       representativeName: tenant.representativeName || "",
       representativePhone: tenant.representativePhone || "",
-      rentedSpaceId: tenant.rentedSpaceId || null,
     });
     setIsFormOpen(true);
   };
@@ -185,7 +178,6 @@ export function TenantsClientPage({
       return;
     }
     setIsSaving(true);
-    const newRentedSpaceIdFromForm = values.rentedSpaceId === "null" || values.rentedSpaceId === "" ? null : values.rentedSpaceId;
     
     const tenantInputData = {
       name: values.name,
@@ -199,14 +191,11 @@ export function TenantsClientPage({
 
     let result;
     if (formMode === 'add') {
-      result = await createTenantAction(tenantInputData as Prisma.TenantCreateInput, newRentedSpaceIdFromForm);
+      result = await createTenantAction(tenantInputData as Prisma.TenantCreateInput);
     } else if (currentTenantForForm?.id) {
-      const oldRentedSpaceId = currentTenantForForm.rentedSpaceId;
       result = await updateTenantAction(
         currentTenantForForm.id, 
-        tenantInputData as Prisma.TenantUpdateInput, 
-        newRentedSpaceIdFromForm,
-        oldRentedSpaceId
+        tenantInputData as Prisma.TenantUpdateInput
       );
     } else {
       toast({ title: "Error", description: "Tenant ID missing for update.", variant: "destructive"});
@@ -219,7 +208,7 @@ export function TenantsClientPage({
       toast({ title: `Tenant ${formMode === 'add' ? 'Added' : 'Updated'}`, description: `${result.tenant?.name} has been saved.` });
       setIsFormOpen(false);
       setCurrentTenantForForm(null);
-      form.reset({ name: "", email: "", phone: "", rentedSpaceId: null });
+      form.reset({ name: "", email: "", phone: "" });
       router.refresh(); 
     } else {
       toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Tenant`, description: result.error, variant: "destructive" });
@@ -288,7 +277,7 @@ export function TenantsClientPage({
           if (!isOpen) {
             form.reset({ 
                 name: "", email: "", phone: "", alternativePhone: "", nationalId: "",
-                representativeName: "", representativePhone: "", rentedSpaceId: null 
+                representativeName: "", representativePhone: "",
             });
             setCurrentTenantForForm(null);
           }
@@ -309,32 +298,7 @@ export function TenantsClientPage({
               <FormField control={form.control} name="nationalId" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number</FormLabel> <FormControl><Input placeholder="e.g., AB1234567" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="representativeName" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" />Representative Name</FormLabel> <FormControl><Input placeholder="e.g., Jane Smith (Spouse, Agent)" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="representativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Representative Phone</FormLabel> <FormControl><Input placeholder="e.g., 555- representative phone" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField
-                control={form.control}
-                name="rentedSpaceId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center"><BedDouble className="mr-2 h-4 w-4 text-primary" />Assign Space (Optional)</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value === "null" || value === "" ? null : value)} 
-                      value={field.value ?? "null"} 
-                      disabled={isSaving || !canEditTenants && formMode ==='edit'}
-                    >
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select a space to assign" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="null">No space assigned / Vacate</SelectItem>
-                        {availableSpacesForAssignment.map(space => (
-                          <SelectItem key={space.id} value={space.id}>
-                            {space.spaceIdName} ({space.buildingName}) - ${Number(space.monthlyRentalPrice).toLocaleString()}/month
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>Select an available space or 'No space assigned' to vacate.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              
               <DialogFooter className="pt-4">
                 <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
                 { ((formMode === 'add' && canCreateTenants) || (formMode === 'edit' && canEditTenants)) && (
