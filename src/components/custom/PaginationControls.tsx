@@ -10,15 +10,32 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface PaginationControlsProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  itemsPerPage: number;
+  onItemsPerPageChange: (value: number) => void;
   className?: string;
 }
 
-export function PaginationControls({ currentPage, totalPages, onPageChange, className }: PaginationControlsProps) {
+export function PaginationControls({ 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  itemsPerPage, 
+  onItemsPerPageChange,
+  className 
+}: PaginationControlsProps) {
   if (totalPages <= 1) return null;
 
   const pageNumbers = () => {
@@ -43,11 +60,11 @@ export function PaginationControls({ currentPage, totalPages, onPageChange, clas
     // Remove duplicates that might occur if totalPages is small
     const uniqueRange = [...new Set(range)];
     // If we have "... 2", it's because current page is 3. Change "..." to 2.
-    if(uniqueRange[1] === '...' && uniqueRange[2] === 3) {
+    if(uniqueRange.length > 2 && uniqueRange[1] === '...' && uniqueRange[2] === 3) {
       uniqueRange[1] = 2;
     }
     // If we have "totalPages-2 ... totalPages", change "..." to totalPages-1
-    if(uniqueRange[uniqueRange.length - 3] === totalPages - 2 && uniqueRange[uniqueRange.length - 2] === '...') {
+    if(uniqueRange.length > 3 && uniqueRange[uniqueRange.length - 3] === totalPages - 2 && uniqueRange[uniqueRange.length - 2] === '...') {
       uniqueRange[uniqueRange.length - 2] = totalPages - 1;
     }
 
@@ -55,7 +72,23 @@ export function PaginationControls({ currentPage, totalPages, onPageChange, clas
   };
 
   return (
-    <div className={className}>
+    <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-4", className)}>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>Rows per page</span>
+        <Select
+          value={String(itemsPerPage)}
+          onValueChange={(value) => onItemsPerPageChange(Number(value))}
+        >
+          <SelectTrigger className="w-[70px] h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[6, 9, 10, 12, 15, 20, 50].map(size => (
+              <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <Pagination>
         <PaginationContent>
           <PaginationItem>

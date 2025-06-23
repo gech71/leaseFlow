@@ -57,7 +57,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const [roleToDelete, setRoleToDelete] = useState<ClientRole | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { hasPermission: contextHasPermission, isSuperAdmin } = usePermissions(); 
   const canManageRoles = isSuperAdmin || contextHasPermission('settings:role_management:manage');
@@ -71,16 +71,20 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
 
   const selectedPermissions = form.watch('permissions');
 
-  const totalPages = Math.ceil(roles.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(roles.length / itemsPerPage);
   const paginatedRoles = roles.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   useEffect(() => {
     setIsMounted(true);
     setRoles(initialRoles);
   }, [initialRoles]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
   
   const fetchRoles = async () => {
     const result = await getAllRolesAction();
@@ -232,7 +236,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
           </div>
         ) : (
           <>
-            <ScrollArea className="max-h-[60vh]">
+            <ScrollArea className="max-h-[60vh] border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -271,6 +275,8 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={setItemsPerPage}
               className="mt-4"
             />
           </>

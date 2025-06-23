@@ -61,22 +61,26 @@ export function UserManagementClientPage({
   const [buildingSearchTerm, setBuildingSearchTerm] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canManageUserAssignments = isSuperAdmin || hasPermission('settings:user_management:assign');
   const canViewUserManagement = isSuperAdmin || hasPermission('settings:user_management:view') || canManageUserAssignments;
 
-  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(users.length / itemsPerPage);
   const paginatedUsers = users.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   useEffect(() => {
     setIsMounted(true);
     setUsers(initialUsers);
   }, [initialUsers]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const handleEditUser = (user: ClientUserWithAssignments) => {
     if (!canViewUserManagement && !canManageUserAssignments) {
@@ -173,7 +177,7 @@ export function UserManagementClientPage({
           </div>
         ) : (
           <>
-            <ScrollArea className="max-h-[60vh]">
+            <div className="border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -204,11 +208,13 @@ export function UserManagementClientPage({
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={setItemsPerPage}
               className="mt-4"
             />
           </>

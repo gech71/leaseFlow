@@ -101,13 +101,23 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
 
   const [upcomingCurrentPage, setUpcomingCurrentPage] = useState(1);
   const [paidCurrentPage, setPaidCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const [upcomingItemsPerPage, setUpcomingItemsPerPage] = useState(10);
+  const [paidItemsPerPage, setPaidItemsPerPage] = useState(10);
+
 
   useEffect(() => {
     setIsMounted(true);
     setToday(startOfDay(new Date())); 
     setBills(initialBills); 
   }, [initialBills]);
+
+  useEffect(() => {
+    setUpcomingCurrentPage(1);
+  }, [upcomingItemsPerPage]);
+  
+  useEffect(() => {
+    setPaidCurrentPage(1);
+  }, [paidItemsPerPage, selectedMonth, selectedYear]);
 
   const calculatePenalty = useCallback((bill: ClientBill, currentStatus: ClientBill['status']): number => {
     const building = bill.agreement?.space?.building;
@@ -186,7 +196,6 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   const upcomingAndPendingBills = useMemo(() => processedBills.filter(b => b.status === 'Pending' || b.status === 'Overdue' || b.status === 'PendingVerification'), [processedBills]);
   
   const paidBillsInSelectedPeriod = useMemo(() => {
-    setPaidCurrentPage(1); // Reset page when filter changes
     return processedBills.filter(bill => {
       if (bill.status !== 'Paid' || !bill.paymentDate) return false;
       const paymentDateObj = parseISO(bill.paymentDate);
@@ -195,17 +204,17 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   }, [processedBills, selectedMonth, selectedYear]);
 
   // Pagination for upcoming bills
-  const upcomingTotalPages = Math.ceil(upcomingAndPendingBills.length / ITEMS_PER_PAGE);
+  const upcomingTotalPages = Math.ceil(upcomingAndPendingBills.length / upcomingItemsPerPage);
   const paginatedUpcomingBills = upcomingAndPendingBills.slice(
-    (upcomingCurrentPage - 1) * ITEMS_PER_PAGE,
-    upcomingCurrentPage * ITEMS_PER_PAGE
+    (upcomingCurrentPage - 1) * upcomingItemsPerPage,
+    upcomingCurrentPage * upcomingItemsPerPage
   );
   
   // Pagination for paid bills
-  const paidTotalPages = Math.ceil(paidBillsInSelectedPeriod.length / ITEMS_PER_PAGE);
+  const paidTotalPages = Math.ceil(paidBillsInSelectedPeriod.length / paidItemsPerPage);
   const paginatedPaidBills = paidBillsInSelectedPeriod.slice(
-    (paidCurrentPage - 1) * ITEMS_PER_PAGE,
-    paidCurrentPage * ITEMS_PER_PAGE
+    (paidCurrentPage - 1) * paidItemsPerPage,
+    paidCurrentPage * paidItemsPerPage
   );
 
   const totalUpcomingAmount = useMemo(() => upcomingAndPendingBills.reduce((sum, bill) => sum + bill.totalAmount, 0), [upcomingAndPendingBills]);
@@ -386,6 +395,8 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
               currentPage={upcomingCurrentPage}
               totalPages={upcomingTotalPages}
               onPageChange={setUpcomingCurrentPage}
+              itemsPerPage={upcomingItemsPerPage}
+              onItemsPerPageChange={setUpcomingItemsPerPage}
               className="mt-4"
             />
           </>
@@ -474,6 +485,8 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
               currentPage={paidCurrentPage}
               totalPages={paidTotalPages}
               onPageChange={setPaidCurrentPage}
+              itemsPerPage={paidItemsPerPage}
+              onItemsPerPageChange={setPaidItemsPerPage}
               className="mt-4"
             />
           </>

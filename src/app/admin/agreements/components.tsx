@@ -53,7 +53,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(6);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission('agreement:create');
@@ -75,15 +75,15 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     agreement.space?.buildingName.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
 
-  const totalPages = Math.ceil(filteredAgreements.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredAgreements.length / itemsPerPage);
   const paginatedAgreements = filteredAgreements.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, itemsPerPage]);
 
   const isPaymentOverdue = (agreement: AgreementWithRelations): boolean => {
     if (!agreement.nextPaymentDueDate) return false;
@@ -115,7 +115,6 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     const blob = new Blob([agreement.agreementText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
     a.download = `Agreement-${agreement.tenant?.name}-${agreement.id}.txt`;
     document.body.appendChild(a);
     a.click();
@@ -268,6 +267,8 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
             className="mt-8"
           />
         </>

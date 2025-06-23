@@ -55,7 +55,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [isSaving, setIsSaving] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 9;
+  const [itemsPerPage, setItemsPerPage] = useState(9);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateSpaces = isSuperAdmin || hasPermission('space:create');
@@ -70,10 +70,14 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     setBuildings(initialBuildings);
   }, [initialSpaces, initialBuildings]);
   
-  const totalPages = Math.ceil(spaces.length / ITEMS_PER_PAGE);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
+  
+  const totalPages = Math.ceil(spaces.length / itemsPerPage);
   const paginatedSpaces = spaces.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -408,6 +412,8 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
             className="mt-8"
           />
         </>

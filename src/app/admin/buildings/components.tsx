@@ -120,22 +120,26 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const { hasPermission, isSuperAdmin } = usePermissions(); 
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(6);
 
   const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
   const canEditBuildings = isSuperAdmin || hasPermission('building:edit');
   const canDeleteBuildings = isSuperAdmin || hasPermission('building:delete');
   const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings; // If can do anything, can view
 
-  const totalPages = Math.ceil(buildings.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(buildings.length / itemsPerPage);
   const paginatedBuildings = buildings.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   useEffect(() => {
     setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
   }, [initialBuildings]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
   
   const handleDeleteBuilding = async () => {
     if (!buildingToDelete) return;
@@ -232,6 +236,8 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
             currentPage={currentPage} 
             totalPages={totalPages} 
             onPageChange={setCurrentPage} 
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
             className="mt-8"
           />
         </>

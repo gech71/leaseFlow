@@ -104,7 +104,7 @@ export function TenantsClientPage({
   const [isSaving, setIsSaving] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(6);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateTenants = isSuperAdmin || hasPermission('tenant:create');
@@ -120,10 +120,10 @@ export function TenantsClientPage({
     },
   });
 
-  const totalPages = Math.ceil(tenants.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(tenants.length / itemsPerPage);
   const paginatedTenants = tenants.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   useEffect(() => {
@@ -133,6 +133,9 @@ export function TenantsClientPage({
     setAgreementsState(initialAgreements);
   }, [initialTenants, initialSpaces, initialAgreements]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const getSpaceDetails = (space: ClientSpace | null | undefined): string => {
     if (!space) return "No space assigned";
@@ -407,6 +410,8 @@ export function TenantsClientPage({
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
             className="mt-8"
           />
         </>

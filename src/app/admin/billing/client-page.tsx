@@ -83,7 +83,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canGenerateBills = isSuperAdmin || hasPermission('billing:generate');
@@ -106,6 +106,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setAllBuildings(initialData.buildings);
     setToday(startOfDay(new Date()));
   }, [initialData]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
@@ -185,10 +189,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     }).sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
   }, [bills, calculatePenalty, today]);
 
-  const totalPages = Math.ceil(processedClientBills.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(processedClientBills.length / itemsPerPage);
   const paginatedBills = processedClientBills.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
  useEffect(() => {
@@ -554,6 +558,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          itemsPerPage={itemsPerPage}
+          onItemsPerPageChange={setItemsPerPage}
           className="mt-4"
         />
         </div>
