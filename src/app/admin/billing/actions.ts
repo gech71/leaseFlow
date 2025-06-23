@@ -337,18 +337,26 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         const occupiedSpacesOnFloor = building.spaces?.filter(
           (s) => s.floor === utilItem.applicableFloor && s.isOccupied
         ) || [];
-        const totalOccupiedSpacesOnFloor = occupiedSpacesOnFloor.length;
-        if (totalOccupiedSpacesOnFloor > 0) {
-           // Ensure the current space is actually one of the occupied spaces before billing
-           const isSpaceIncluded = occupiedSpacesOnFloor.some(s => s.id === space.id);
-           if (isSpaceIncluded) {
-              const cost = utilItem.totalCost / totalOccupiedSpacesOnFloor;
-              if (cost > 0) {
-                const roundedCost = parseFloat(cost.toFixed(2));
-                utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
-                totalUtilityCostForBill += roundedCost;
-              }
-           }
+        
+        if (occupiedSpacesOnFloor.length > 0) {
+          const totalProrationShareOnFloor = occupiedSpacesOnFloor.reduce(
+            (sum, s) => sum + (s.utilityProrationShare || 0),
+            0
+          );
+
+          const isSpaceIncluded = occupiedSpacesOnFloor.some(s => s.id === space.id);
+
+          // Only apply cost if the space is on the floor and there's a share to divide by
+          if (isSpaceIncluded && totalProrationShareOnFloor > 0) {
+            const spaceProrationShare = space.utilityProrationShare || 0;
+            const cost = utilItem.totalCost * (spaceProrationShare / totalProrationShareOnFloor);
+            
+            if (cost > 0) {
+              const roundedCost = parseFloat(cost.toFixed(2));
+              utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
+              totalUtilityCostForBill += roundedCost;
+            }
+          }
         }
       });
 
@@ -577,6 +585,7 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
 
 
 

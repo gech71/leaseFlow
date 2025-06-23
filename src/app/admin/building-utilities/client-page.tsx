@@ -381,13 +381,18 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                             </div>
                         </div>
                         {item.applicableFloor && (
-                            <div className="space-y-1">
-                                <Label className="text-xs font-medium text-muted-foreground">Spaces on this floor (for context):</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground flex items-center">
+                                    <InfoIcon className="mr-1.5 h-3.5 w-3.5" />
+                                    Cost Allocation for Occupied Spaces on this Floor (based on each space's Proration Share):
+                                </Label>
                                 <div className="flex flex-wrap gap-1.5 text-xs p-2 border rounded-md bg-background min-h-[40px]">
                                     {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(s => (
-                                        <Badge key={s.id} variant="secondary" className="font-normal">{s.spaceIdName}</Badge>
+                                        <Badge key={s.id} variant="secondary" className="font-normal">
+                                            {s.spaceIdName}: {(s.utilityProrationShare * 100).toFixed(0)}%
+                                        </Badge>
                                     ))}
-                                    {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).length === 0 && <span className="italic">No spaces found for this floor.</span>}
+                                    {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).length === 0 && <span className="italic">No spaces found for this floor to display percentages.</span>}
                                 </div>
                             </div>
                         )}
