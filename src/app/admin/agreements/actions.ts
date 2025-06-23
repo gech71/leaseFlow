@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement } from '@prisma/client';
-import { addMonths, parseISO } from 'date-fns';
+import { addMonths, parseISO, isSameDay } from 'date-fns';
 import { prisma } from '@/lib/prisma';
 
 export interface CreateFullAgreementData {
@@ -122,45 +122,67 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
 
 export async function deleteAgreementAction(agreementId: string) {
     try {
-        const agreement = await databaseService.getAgreementById(agreementId, { // Corrected: Pass include options directly
-            bills: true, 
-            space: true 
+        const agreement = await databaseService.getAgreementById(agreementId, {
+            include: { bills: true, space: true }
         });
         if (!agreement) {
             return { success: false, error: "Agreement not found." };
         }
 
-        if (agreement.bills && agreement.bills.length > 0) {
-            return { success: false, error: "Cannot delete agreement with associated bills. Please resolve bills first." };
+        // Check if there are any monthly bills (not the initial payment record).
+        // A monthly bill is any bill whose date is not the same as the agreement's start date.
+        const hasSubsequentBills = agreement.bills.some(
+            bill => !isSameDay(bill.billDate, agreement.startDate)
+        );
+
+        if (hasSubsequentBills) {
+            return { success: false, error: "Cannot delete agreement with associated monthly bills. Please resolve or delete these bills first." };
         }
 
-        // Vacate space if this was the active agreement for it
-        if (agreement.space && agreement.space.tenantId === agreement.tenantId) {
-             // Check if there are other active agreements for this space and tenant before vacating
-            const otherAgreements = await databaseService.getAllAgreements({
-                where: { 
-                    spaceId: agreement.spaceId, 
-                    tenantId: agreement.tenantId, 
-                    id: { not: agreementId },
-                    // Add date checks if needed to define "active"
-                }
+        // Proceed with deletion in a transaction.
+        await prisma.$transaction(async (tx) => {
+            // 1. Delete all associated bills (which at this point can only be initial payment bills).
+            await tx.bill.deleteMany({
+                where: { agreementId: agreement.id }
             });
-            if (otherAgreements.length === 0) { // Only vacate if no other agreements link tenant to this space
-                await databaseService.updateSpace(agreement.spaceId, {
-                    isOccupied: false,
-                    tenant: { disconnect: true }
+
+            // 2. Vacate the space if this agreement made it occupied.
+            if (agreement.space && agreement.space.tenantId === agreement.tenantId) {
+                // Check if there are other agreements for this space and tenant before vacating.
+                const otherAgreements = await tx.agreement.findMany({
+                    where: {
+                        spaceId: agreement.spaceId,
+                        tenantId: agreement.tenantId,
+                        id: { not: agreementId },
+                    }
                 });
-                 await databaseService.updateTenant(agreement.tenantId, {
-                    rentedSpace: { disconnect: true }
-                });
+                if (otherAgreements.length === 0) {
+                    await tx.space.update({
+                        where: { id: agreement.spaceId },
+                        data: {
+                            isOccupied: false,
+                            tenant: { disconnect: true }
+                        }
+                    });
+                    await tx.tenant.update({
+                        where: { id: agreement.tenantId },
+                        data: {
+                            rentedSpace: { disconnect: true }
+                        }
+                    });
+                }
             }
-        }
-        
-        await databaseService.deleteAgreement(agreementId);
+            
+            // 3. Delete the agreement itself.
+            await tx.agreement.delete({
+                where: { id: agreementId }
+            });
+        });
+
         revalidatePath('/admin/agreements');
         revalidatePath('/admin/spaces');
         revalidatePath('/admin/tenants');
-        revalidatePath('/admin/billing'); // Invalidate billing page data
+        revalidatePath('/admin/billing');
         return { success: true };
     } catch (error: any) {
         console.error("Error deleting agreement:", error);
