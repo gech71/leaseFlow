@@ -8,7 +8,7 @@ import Link from 'next/link';
 // This page will act as a hub for different settings.
 export default function SettingsPage() {
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       <Card className="flex flex-col">
         <CardHeader>
           <CardTitle className="font-headline">User Registration</CardTitle>
