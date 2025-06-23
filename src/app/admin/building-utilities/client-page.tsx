@@ -171,7 +171,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                         uiId: dbItem.id || `dbItem-${index}-${Date.now()}`,
                         name: dbItem.name,
                         totalCost: dbItem.totalCost,
-                        appliesToScope: dbItem.appliesToScope as 'Building' | 'Floor',
+                        appliesToScope: dbItem.appliesToScope as 'Building' | 'Floor' | 'SpecificSpaces',
                         applicableFloor: dbItem.applicableFloor || undefined,
                         perSpaceCosts: perSpaceCosts,
                         perSpacePercentages: {}
@@ -284,51 +284,37 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 totalCost: item.totalCost,
                 appliesToScope: item.appliesToScope,
             });
-        } else if (item.appliesToScope === 'SpecificSpaces') {
-            if (!item.perSpaceCosts || Object.keys(item.perSpaceCosts).length === 0) continue; 
-
-            for (const spaceId in item.perSpaceCosts) {
-                const cost = item.perSpaceCosts[spaceId];
-                if (cost > 0) {
-                    const space = selectedBuilding.spaces.find(s => s.id === spaceId);
-                    if (space) {
-                        finalUtilityItemsForDb.push({
-                            name: item.name,
-                            totalCost: cost,
-                            appliesToScope: 'SpecificSpaces',
-                            applicableSpaceIdNames: [space.spaceIdName],
-                        });
-                    }
-                }
-            }
-        } else if (item.appliesToScope === 'Floor') {
-            const totalCostForFloor = item.totalCost || 0;
-            if (totalCostForFloor <= 0) {
-                 toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost for the floor.`, variant: 'destructive' });
+        } else if (item.appliesToScope === 'Floor' || item.appliesToScope === 'SpecificSpaces') {
+            const totalCostForAllocation = item.totalCost || 0;
+            if (totalCostForAllocation <= 0) {
+                 toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost for allocation.`, variant: 'destructive' });
                  return;
             }
-            if (!item.applicableFloor) {
+            if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
                  toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
                  return;
             }
+
             const percentages = item.perSpacePercentages || {};
             const totalPercentage = Object.values(percentages).reduce((sum, p) => sum + (p || 0), 0);
             if (Math.abs(totalPercentage - 100) > 0.01) {
-                toast({ title: 'Validation Error', description: `Percentages for "${item.name}" on floor ${item.applicableFloor} must add up to 100%. Current total: ${totalPercentage.toFixed(2)}%`, variant: 'destructive' });
+                toast({ title: 'Validation Error', description: `Percentages for "${item.name}" must add up to 100%. Current total: ${totalPercentage.toFixed(2)}%`, variant: 'destructive' });
                 return;
             }
             
-            const spacesOnFloor = selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor);
-            for (const space of spacesOnFloor) {
-                const percentageForSpace = percentages[space.id] || 0;
+            for (const spaceId in percentages) {
+                const percentageForSpace = percentages[spaceId] || 0;
                 if (percentageForSpace > 0) {
-                    const costForSpace = totalCostForFloor * (percentageForSpace / 100);
-                    finalUtilityItemsForDb.push({
-                        name: item.name,
-                        totalCost: parseFloat(costForSpace.toFixed(2)),
-                        appliesToScope: 'SpecificSpaces', // Transform to SpecificSpaces for DB storage
-                        applicableSpaceIdNames: [space.spaceIdName],
-                    });
+                    const space = selectedBuilding.spaces.find(s => s.id === spaceId);
+                    if (space) {
+                        const costForSpace = totalCostForAllocation * (percentageForSpace / 100);
+                        finalUtilityItemsForDb.push({
+                            name: item.name,
+                            totalCost: parseFloat(costForSpace.toFixed(2)),
+                            appliesToScope: 'SpecificSpaces', // Always store as specific space for DB
+                            applicableSpaceIdNames: [space.spaceIdName],
+                        });
+                    }
                 }
             }
         }
@@ -418,7 +404,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
-          <CardDescription>Select building, month, and year, then input utility details. Floor-based utilities will be saved as space-specific entries and may look different on re-edit.</CardDescription>
+          <CardDescription>Select building, month, and year, then input utility details. Percentage-based utilities will be saved as space-specific entries and may look different on re-edit.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -459,7 +445,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
               </div>
               {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
               {!isLoadingData && currentUtilityItems.map((item, index) => {
-                const totalPercentageForFloor = Object.values(item.perSpacePercentages || {}).reduce((sum, p) => sum + (p || 0), 0);
+                const totalPercentage = Object.values(item.perSpacePercentages || {}).reduce((sum, p) => sum + (p || 0), 0);
 
                 return (
                 <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
@@ -490,6 +476,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                         <div className="space-y-1.5">
                             <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
                             <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                            <p className="text-xs text-muted-foreground">This cost will be prorated among all spaces based on their individual Proration Share %.</p>
                         </div>
                     )}
 
@@ -537,8 +524,8 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                                 </ScrollArea>
                                 <div className="text-right text-sm font-medium mt-2">
                                     Total Allocated: 
-                                    <span className={Math.abs(totalPercentageForFloor - 100) > 0.01 ? "text-destructive ml-1" : "text-green-600 ml-1"}>
-                                        {totalPercentageForFloor.toFixed(2)}%
+                                    <span className={Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive ml-1" : "text-green-600 ml-1"}>
+                                        {totalPercentage.toFixed(2)}%
                                     </span>
                                 </div>
                             </div>
@@ -547,31 +534,47 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                     )}
                     
                     {item.appliesToScope === 'SpecificSpaces' && (
-                        <div className="space-y-2 pt-2">
-                             <Label className="flex items-center text-sm font-medium"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Per-Space Costs</Label>
-                             <p className="text-xs text-muted-foreground">Enter the specific cost for each space. Only spaces with a cost greater than zero will be saved.</p>
-                             <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
+                        <div className="space-y-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost to Allocate</Label>
+                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 300.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                          </div>
+
+                          <div className="space-y-2 pt-2">
+                            <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
+                            <p className="text-xs text-muted-foreground">Define how the total cost is split across any spaces. Must add up to 100%.</p>
+                            <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
                                 {(selectedBuilding?.spaces ?? []).length > 0 ? selectedBuilding?.spaces.map(space => (
                                     <div key={space.id} className="flex items-center gap-2">
-                                        <Label htmlFor={`space-cost-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
+                                        <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
                                             {space.spaceIdName}
                                         </Label>
-                                        <Input
-                                            id={`space-cost-${item.uiId}-${space.id}`}
-                                            type="number"
-                                            placeholder="0.00"
-                                            value={item.perSpaceCosts?.[space.id] || ''}
-                                            onChange={(e) => handlePerSpaceCostChange(item.uiId, space.id, e.target.value)}
-                                            className="w-28 h-8"
-                                            disabled={isSaving || !canSaveUtilities}
-                                        />
+                                        <div className="relative w-28">
+                                            <Input
+                                                id={`space-percent-${item.uiId}-${space.id}`}
+                                                type="number"
+                                                placeholder="0"
+                                                value={item.perSpacePercentages?.[space.id] || ''}
+                                                onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
+                                                className="w-full h-8 pr-6"
+                                                disabled={isSaving || !canSaveUtilities}
+                                            />
+                                            <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
+                                        </div>
                                     </div>
                                 )) : (
                                     <p className="text-sm text-muted-foreground text-center col-span-2">No spaces found in this building.</p>
                                 )}
-                                </div>
-                             </ScrollArea>
+                              </div>
+                            </ScrollArea>
+                            <div className="text-right text-sm font-medium mt-2">
+                                Total Allocated: 
+                                <span className={Math.abs(totalPercentage - 100) > 0.01 ? "text-destructive ml-1" : "text-green-600 ml-1"}>
+                                    {totalPercentage.toFixed(2)}%
+                                </span>
+                            </div>
+                          </div>
                         </div>
                     )}
 
