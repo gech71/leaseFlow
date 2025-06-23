@@ -87,6 +87,9 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const [isSaving, setIsSaving] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<ClientBuildingMonthlyUtilitiesPrismaType | null>(null);
   const [utilityFilterTerm, setUtilityFilterTerm] = useState('');
+  const [filterYear, setFilterYear] = useState<number | 'all'>('all');
+  const [filterMonth, setFilterMonth] = useState<number | 'all'>('all');
+
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canSaveUtilities = isSuperAdmin || hasPermission('building_utility:save');
@@ -102,13 +105,22 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   
   useEffect(() => {
     setRecordsCurrentPage(1);
-  }, [utilityFilterTerm]);
+  }, [utilityFilterTerm, filterYear, filterMonth]);
 
   const filteredRecords = useMemo(() => {
-    return allUtilityRecords.filter(record => 
-      record.buildingName.toLowerCase().includes(utilityFilterTerm.toLowerCase())
-    );
-  }, [allUtilityRecords, utilityFilterTerm]);
+    return allUtilityRecords.filter(record => {
+      const matchesSearchTerm = record.buildingName.toLowerCase().includes(utilityFilterTerm.toLowerCase());
+      const matchesYear = filterYear === 'all' || record.year === filterYear;
+      const matchesMonth = filterMonth === 'all' || record.month === filterMonth;
+      
+      // If a year is selected, month filter can apply. If no year, month filter is ignored.
+      if (filterYear === 'all') {
+        return matchesSearchTerm && matchesYear;
+      }
+      
+      return matchesSearchTerm && matchesYear && matchesMonth;
+    });
+  }, [allUtilityRecords, utilityFilterTerm, filterYear, filterMonth]);
 
   const recordsTotalPages = Math.ceil(filteredRecords.length / recordsItemsPerPage);
   
@@ -418,8 +430,21 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     setRecordToDelete(null);
   };
   
-  const years = Array.from({ length: 10 }, (_, i) => getYear(new Date()) - 5 + i); 
-  const months = Array.from({ length: 12 }, (_, i) => ({
+  const yearsForFilter = useMemo(() => {
+    const years = new Set(allUtilityRecords.map(r => r.year));
+    return Array.from(years).sort((a,b) => b - a);
+  }, [allUtilityRecords]);
+  
+  const monthsForFilter = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => ({
+      value: i,
+      label: format(new Date(0, i), 'MMMM'),
+    }));
+  }, []);
+
+
+  const yearsForEntry = Array.from({ length: 10 }, (_, i) => getYear(new Date()) - 5 + i); 
+  const monthsForEntry = Array.from({ length: 12 }, (_, i) => ({
     value: i,
     label: format(new Date(0, i), 'MMMM'),
   }));
@@ -483,14 +508,14 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
               <Label htmlFor="year" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Year</Label>
               <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
                 <SelectTrigger id="year"><SelectValue /></SelectTrigger>
-                <SelectContent>{years.map(year => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
+                <SelectContent>{yearsForEntry.map(year => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
               </Select>
             </div>
             <div>
               <Label htmlFor="month" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Month</Label>
               <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
                 <SelectTrigger id="month"><SelectValue /></SelectTrigger>
-                <SelectContent>{months.map(month => (<SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>))}</SelectContent>
+                <SelectContent>{monthsForEntry.map(month => (<SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>))}</SelectContent>
               </Select>
             </div>
           </div>
@@ -665,18 +690,45 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
           <CardDescription>Overview of previously entered utility costs. Click the edit icon to load and modify a record.</CardDescription>
         </CardHeader>
         <CardContent>
-           <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                id="utility-filter"
-                placeholder="Filter by building name..."
-                className="pl-10"
-                value={utilityFilterTerm}
-                onChange={(e) => setUtilityFilterTerm(e.target.value)}
-              />
+           <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="utility-filter"
+                  placeholder="Filter by building name..."
+                  className="pl-10 h-9"
+                  value={utilityFilterTerm}
+                  onChange={(e) => setUtilityFilterTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={String(filterYear)} onValueChange={(val) => { setFilterYear(val === 'all' ? 'all' : Number(val)); if(val === 'all') setFilterMonth('all'); }}>
+                    <SelectTrigger className="w-full sm:w-[120px] h-9">
+                        <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Years</SelectItem>
+                        {yearsForFilter.map(year => (
+                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={String(filterMonth)} onValueChange={(val) => setFilterMonth(val === 'all' ? 'all' : Number(val))} disabled={filterYear === 'all'}>
+                    <SelectTrigger className="w-full sm:w-[150px] h-9">
+                        <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Months</SelectItem>
+                        {monthsForFilter.map(month => (
+                             <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
+           </div>
+
           {isLoadingData && filteredRecords.length === 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-          {!isLoadingData && filteredRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">{utilityFilterTerm ? "No records match your filter." : "No utility records saved yet."}</p>)}
+          {!isLoadingData && filteredRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">{utilityFilterTerm || filterYear !== 'all' ? "No records match your filters." : "No utility records saved yet."}</p>)}
           {filteredRecords.length > 0 && (
             <>
               <div className="border rounded-md">
