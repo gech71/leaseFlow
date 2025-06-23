@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle, Edit } from 'lucide-react';
+import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle, Edit, Search } from 'lucide-react';
 import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth, parseISO, subMonths } from 'date-fns';
@@ -86,6 +86,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<ClientBuildingMonthlyUtilitiesPrismaType | null>(null);
+  const [utilityFilterTerm, setUtilityFilterTerm] = useState('');
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canSaveUtilities = isSuperAdmin || hasPermission('building_utility:save');
@@ -98,10 +99,21 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     setRecordsItemsPerPage(newSize);
     setRecordsCurrentPage(1);
   };
+  
+  useEffect(() => {
+    setRecordsCurrentPage(1);
+  }, [utilityFilterTerm]);
 
-  const recordsTotalPages = Math.ceil(allUtilityRecords.length / recordsItemsPerPage);
+  const filteredRecords = useMemo(() => {
+    return allUtilityRecords.filter(record => 
+      record.buildingName.toLowerCase().includes(utilityFilterTerm.toLowerCase())
+    );
+  }, [allUtilityRecords, utilityFilterTerm]);
+
+  const recordsTotalPages = Math.ceil(filteredRecords.length / recordsItemsPerPage);
+  
   const paginatedUtilityRecords = useMemo(() => {
-    const sortedRecords = [...allUtilityRecords].sort((a, b) => {
+    const sortedRecords = [...filteredRecords].sort((a, b) => {
       if (a.year !== b.year) return b.year - a.year;
       if (a.month !== b.month) return b.month - a.month;
       return a.buildingName.localeCompare(b.buildingName);
@@ -110,7 +122,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       (recordsCurrentPage - 1) * recordsItemsPerPage,
       recordsCurrentPage * recordsItemsPerPage
     );
-  }, [allUtilityRecords, recordsCurrentPage, recordsItemsPerPage]);
+  }, [filteredRecords, recordsCurrentPage, recordsItemsPerPage]);
 
 
   const selectedBuilding = useMemo(() => {
@@ -653,9 +665,19 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
           <CardDescription>Overview of previously entered utility costs. Click the edit icon to load and modify a record.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingData && allUtilityRecords.length === 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-          {!isLoadingData && allUtilityRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">No utility records saved yet in the database.</p>)}
-          {allUtilityRecords.length > 0 && (
+           <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                id="utility-filter"
+                placeholder="Filter by building name..."
+                className="pl-10"
+                value={utilityFilterTerm}
+                onChange={(e) => setUtilityFilterTerm(e.target.value)}
+              />
+            </div>
+          {isLoadingData && filteredRecords.length === 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
+          {!isLoadingData && filteredRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">{utilityFilterTerm ? "No records match your filter." : "No utility records saved yet."}</p>)}
+          {filteredRecords.length > 0 && (
             <>
               <div className="border rounded-md">
                 <Table>
