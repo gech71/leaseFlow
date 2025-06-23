@@ -120,7 +120,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const { hasPermission, isSuperAdmin } = usePermissions(); 
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
   const canEditBuildings = isSuperAdmin || hasPermission('building:edit');

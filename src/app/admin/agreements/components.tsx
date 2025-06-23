@@ -53,7 +53,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission('agreement:create');

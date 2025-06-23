@@ -55,7 +55,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [isSaving, setIsSaving] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(9);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateSpaces = isSuperAdmin || hasPermission('space:create');

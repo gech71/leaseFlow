@@ -80,10 +80,10 @@ export function PaginationControls({
           onValueChange={(value) => onItemsPerPageChange(Number(value))}
         >
           <SelectTrigger className="w-[70px] h-8">
-            <SelectValue />
+            <SelectValue placeholder={String(itemsPerPage)} />
           </SelectTrigger>
           <SelectContent>
-            {[6, 9, 10, 12, 15, 20, 50].map(size => (
+            {[5, 10, 15, 20, 50].map(size => (
               <SelectItem key={size} value={String(size)}>{size}</SelectItem>
             ))}
           </SelectContent>
