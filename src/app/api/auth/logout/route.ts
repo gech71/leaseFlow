@@ -8,10 +8,10 @@ const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
 
 export async function POST(request: NextRequest) {
   let accessToken, refreshToken;
+  const cookieStore = await cookies();
   try {
-    const cookieStoreGetter = cookies(); // Get the cookie store accessor
-    accessToken = cookieStoreGetter.get(ACCESS_TOKEN_KEY)?.value;
-    refreshToken = cookieStoreGetter.get(REFRESH_TOKEN_KEY)?.value;
+    accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    refreshToken = cookieStore.get(REFRESH_TOKEN_KEY)?.value;
   } catch (e) {
     console.error("Error reading cookies for logout:", e);
     // Proceed to clear cookies even if reading fails
@@ -33,9 +33,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const cookieStoreSetter = await cookies(); // As per user instruction for setting
-
-    cookieStoreSetter.set(ACCESS_TOKEN_KEY, '', {
+    cookieStore.set(ACCESS_TOKEN_KEY, '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest) {
       maxAge: 0, 
     });
 
-    cookieStoreSetter.set(REFRESH_TOKEN_KEY, '', {
+    cookieStore.set(REFRESH_TOKEN_KEY, '', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
