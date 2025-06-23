@@ -9,7 +9,7 @@ const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 // DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
-function decodeJwtPayload(token: string): any | null {
+async function decodeJwtPayload(token: string): Promise<any | null> {
   try {
     const base64Url = token.split('.')[1];
     if (!base64Url) return null;
@@ -43,9 +43,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required. Please log in as an administrator."] }, { status: 401 });
   }
 
-  const adminPayload = decodeJwtPayload(adminAccessToken);
-  // Check for "Admin" role based on the provided token structure
-  if (!adminPayload || adminPayload.role !== "Admin") { 
+  const adminPayload = await decodeJwtPayload(adminAccessToken);
+  if (!adminPayload || !adminPayload.sub) {
+    return NextResponse.json({ isSuccess: false, errors: ["Invalid admin token."] }, { status: 401 });
+  }
+
+  // Verify against local DB instead of just checking JWT role claim
+  const adminUser = await databaseService.getUserByExternalId(adminPayload.sub, { roles: true });
+  if (!adminUser) {
+    return NextResponse.json({ isSuccess: false, errors: ["Admin user not found in local system."] }, { status: 403 });
+  }
+  
+  const isSuperAdmin = adminUser.roles.some(r => r.name === 'SUPER_ADMIN');
+  if (!isSuperAdmin) {
     return NextResponse.json({ isSuccess: false, errors: ["Unauthorized: Only Super Admins can register users."] }, { status: 403 });
   }
 
@@ -68,9 +78,10 @@ export async function POST(request: NextRequest) {
   try {
     externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/register`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        // 'Authorization': `Bearer ${adminAccessToken}` // The external registration endpoint doesn't require the admin's token, our own API route already secured it.
+        // Authorization header is needed for the external service to recognize the admin
+        'Authorization': `Bearer ${adminAccessToken}`
       },
       body: JSON.stringify({ firstName, lastName, phoneNumber, email, password }),
     });
@@ -115,7 +126,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Identity server did not return an access token for the new user."] }, { status: 500 });
   }
 
-  const newUserPayload = decodeJwtPayload(newUserAccessToken);
+  const newUserPayload = await decodeJwtPayload(newUserAccessToken);
   if (!newUserPayload || !newUserPayload.sub) {
     return NextResponse.json({ isSuccess: false, errors: ["Failed to decode new user's token or extract user ID (sub)."] }, { status: 500 });
   }
@@ -154,3 +165,4 @@ export async function POST(request: NextRequest) {
     
 
     
+
