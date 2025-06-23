@@ -67,6 +67,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     revalidatePath('/admin/agreements/generate');
     revalidatePath('/admin/spaces'); // Space occupancy changed
     revalidatePath('/admin/tenants'); // Tenant's rentedSpace changed
+    revalidatePath('/admin/billing'); // Invalidate billing page data
     return { success: true, agreement: newAgreement };
   } catch (error: any) {
     console.error("Error creating agreement in DB:", error);
@@ -124,6 +125,7 @@ export async function deleteAgreementAction(agreementId: string) {
         revalidatePath('/admin/agreements');
         revalidatePath('/admin/spaces');
         revalidatePath('/admin/tenants');
+        revalidatePath('/admin/billing'); // Invalidate billing page data
         return { success: true };
     } catch (error: any) {
         console.error("Error deleting agreement:", error);
@@ -133,4 +135,3 @@ export async function deleteAgreementAction(agreementId: string) {
         return { success: false, error: error.message || "Failed to delete agreement." };
     }
 }
-
