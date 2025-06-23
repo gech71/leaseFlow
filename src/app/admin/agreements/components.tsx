@@ -81,9 +81,14 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     currentPage * itemsPerPage
   );
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, itemsPerPage]);
+  }, [searchTerm]);
 
   const isPaymentOverdue = (agreement: AgreementWithRelations): boolean => {
     if (!agreement.nextPaymentDueDate) return false;
@@ -268,7 +273,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             itemsPerPage={itemsPerPage}
-            onItemsPerPageChange={setItemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
             className="mt-8"
           />
         </>

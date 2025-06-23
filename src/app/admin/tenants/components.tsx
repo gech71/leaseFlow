@@ -126,16 +126,17 @@ export function TenantsClientPage({
     currentPage * itemsPerPage
   );
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     setIsMounted(true);
     setTenantsState(initialTenants);
     setSpacesState(initialSpaces);
     setAgreementsState(initialAgreements);
   }, [initialTenants, initialSpaces, initialAgreements]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemsPerPage]);
 
   const getSpaceDetails = (space: ClientSpace | null | undefined): string => {
     if (!space) return "No space assigned";
@@ -411,7 +412,7 @@ export function TenantsClientPage({
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             itemsPerPage={itemsPerPage}
-            onItemsPerPageChange={setItemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
             className="mt-8"
           />
         </>

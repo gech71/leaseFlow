@@ -104,20 +104,25 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
   const [upcomingItemsPerPage, setUpcomingItemsPerPage] = useState(10);
   const [paidItemsPerPage, setPaidItemsPerPage] = useState(10);
 
+  const handleUpcomingItemsPerPageChange = (newSize: number) => {
+    setUpcomingItemsPerPage(newSize);
+    setUpcomingCurrentPage(1);
+  };
+
+  const handlePaidItemsPerPageChange = (newSize: number) => {
+    setPaidItemsPerPage(newSize);
+    setPaidCurrentPage(1);
+  };
 
   useEffect(() => {
     setIsMounted(true);
     setToday(startOfDay(new Date())); 
     setBills(initialBills); 
   }, [initialBills]);
-
-  useEffect(() => {
-    setUpcomingCurrentPage(1);
-  }, [upcomingItemsPerPage]);
   
   useEffect(() => {
     setPaidCurrentPage(1);
-  }, [paidItemsPerPage, selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear]);
 
   const calculatePenalty = useCallback((bill: ClientBill, currentStatus: ClientBill['status']): number => {
     const building = bill.agreement?.space?.building;
@@ -396,7 +401,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
               totalPages={upcomingTotalPages}
               onPageChange={setUpcomingCurrentPage}
               itemsPerPage={upcomingItemsPerPage}
-              onItemsPerPageChange={setUpcomingItemsPerPage}
+              onItemsPerPageChange={handleUpcomingItemsPerPageChange}
               className="mt-4"
             />
           </>
@@ -486,7 +491,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
               totalPages={paidTotalPages}
               onPageChange={setPaidCurrentPage}
               itemsPerPage={paidItemsPerPage}
-              onItemsPerPageChange={setPaidItemsPerPage}
+              onItemsPerPageChange={handlePaidItemsPerPageChange}
               className="mt-4"
             />
           </>

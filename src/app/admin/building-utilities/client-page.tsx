@@ -107,9 +107,10 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     );
   }, [allUtilityRecords, recordsCurrentPage, recordsItemsPerPage]);
 
-  useEffect(() => {
+  const handleRecordsItemsPerPageChange = (newSize: number) => {
+    setRecordsItemsPerPage(newSize);
     setRecordsCurrentPage(1);
-  }, [recordsItemsPerPage]);
+  };
 
 
   const selectedBuilding = useMemo(() => {
@@ -701,7 +702,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 totalPages={recordsTotalPages}
                 onPageChange={setRecordsCurrentPage}
                 itemsPerPage={recordsItemsPerPage}
-                onItemsPerPageChange={setRecordsItemsPerPage}
+                onItemsPerPageChange={handleRecordsItemsPerPageChange}
                 className="mt-4"
               />
             </>

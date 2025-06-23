@@ -99,6 +99,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   
   const isReadOnly = billForPayment?.status === 'Paid';
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     setIsMounted(true);
     setAgreements(initialData.agreements);
@@ -106,10 +111,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setAllBuildings(initialData.buildings);
     setToday(startOfDay(new Date()));
   }, [initialData]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemsPerPage]);
 
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
@@ -559,7 +560,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           totalPages={totalPages}
           onPageChange={setCurrentPage}
           itemsPerPage={itemsPerPage}
-          onItemsPerPageChange={setItemsPerPage}
+          onItemsPerPageChange={handleItemsPerPageChange}
           className="mt-4"
         />
         </div>

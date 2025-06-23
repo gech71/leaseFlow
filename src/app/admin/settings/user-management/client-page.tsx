@@ -72,15 +72,16 @@ export function UserManagementClientPage({
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     setIsMounted(true);
     setUsers(initialUsers);
   }, [initialUsers]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemsPerPage]);
 
   const handleEditUser = (user: ClientUserWithAssignments) => {
     if (!canViewUserManagement && !canManageUserAssignments) {
@@ -214,7 +215,7 @@ export function UserManagementClientPage({
               totalPages={totalPages}
               onPageChange={setCurrentPage}
               itemsPerPage={itemsPerPage}
-              onItemsPerPageChange={setItemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
               className="mt-4"
             />
           </>

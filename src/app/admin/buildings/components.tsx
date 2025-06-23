@@ -132,14 +132,15 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+  
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
   }, [initialBuildings]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemsPerPage]);
   
   const handleDeleteBuilding = async () => {
     if (!buildingToDelete) return;
@@ -237,7 +238,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
             totalPages={totalPages} 
             onPageChange={setCurrentPage} 
             itemsPerPage={itemsPerPage}
-            onItemsPerPageChange={setItemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
             className="mt-8"
           />
         </>

@@ -70,9 +70,10 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     setBuildings(initialBuildings);
   }, [initialSpaces, initialBuildings]);
   
-  useEffect(() => {
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
     setCurrentPage(1);
-  }, [itemsPerPage]);
+  };
   
   const totalPages = Math.ceil(spaces.length / itemsPerPage);
   const paginatedSpaces = spaces.slice(
@@ -413,7 +414,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             itemsPerPage={itemsPerPage}
-            onItemsPerPageChange={setItemsPerPage}
+            onItemsPerPageChange={handleItemsPerPageChange}
             className="mt-8"
           />
         </>

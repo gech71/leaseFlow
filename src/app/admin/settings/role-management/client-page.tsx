@@ -77,14 +77,15 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
     currentPage * itemsPerPage
   );
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     setIsMounted(true);
     setRoles(initialRoles);
   }, [initialRoles]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemsPerPage]);
   
   const fetchRoles = async () => {
     const result = await getAllRolesAction();
@@ -276,7 +277,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               totalPages={totalPages}
               onPageChange={setCurrentPage}
               itemsPerPage={itemsPerPage}
-              onItemsPerPageChange={setItemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
               className="mt-4"
             />
           </>
