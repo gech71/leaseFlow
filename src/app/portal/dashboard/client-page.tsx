@@ -268,12 +268,12 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
               <p><strong>Property:</strong> {agreement.space.spaceIdName}, {agreement.space.building.name}</p>
               <p><strong>Address:</strong> {agreement.space.building.address || 'N/A'}</p>
               <p><strong>Floor:</strong> {agreement.space.floor}, <strong>Area:</strong> {agreement.space.area} sq ft</p>
-              <p><strong>Monthly Rent:</strong> ${agreement.monthlyRentalPrice.toLocaleString()}</p>
+              <p><strong>Monthly Rent:</strong> Birr {agreement.monthlyRentalPrice.toLocaleString()}</p>
               <p><strong>Lease Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
               <p><strong>Lease End Date:</strong> {format(agreementEndDate, 'PP')}</p>
               <p><strong>Payment Term:</strong> {agreement.paymentTermMonths} months</p>
               <p><strong>Next Lease Payment Due:</strong> {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</p>
-              {agreement.initialPaymentAmount && <p><strong>Initial Payment Made:</strong> ${agreement.initialPaymentAmount.toLocaleString()} for {agreement.initialPaymentMonths} month(s) on {agreement.initialPaymentDate ? format(parseISO(agreement.initialPaymentDate), 'PP') : 'N/A'}</p>}
+              {agreement.initialPaymentAmount && <p><strong>Initial Payment Made:</strong> Birr {agreement.initialPaymentAmount.toLocaleString()} for {agreement.initialPaymentMonths} month(s) on {agreement.initialPaymentDate ? format(parseISO(agreement.initialPaymentDate), 'PP') : 'N/A'}</p>}
             </CardContent>
              <CardFooter>
                 <Button onClick={() => toast({ title: "Download Agreement", description: "PDF download simulated."})} variant="outline">
@@ -314,10 +314,10 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                       {processedBills.map(bill => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
                           <TableCell className={bill.currentStatus === 'Overdue' ? 'font-semibold text-destructive' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary">${bill.calculatedTotal?.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-semibold text-primary">Birr {bill.calculatedTotal?.toFixed(2)}</TableCell>
                           <TableCell className="text-center">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification',' Ver.')}</span></Badge>
-                            {bill.calculatedPenalty && bill.calculatedPenalty > 0 && (<Popover><PopoverTrigger asChild><AlertTriangle className="h-3.5 w-3.5 text-destructive inline-block ml-1 cursor-help"/></PopoverTrigger><PopoverContent className="text-xs w-auto p-2" side="top">Penalty: ${bill.calculatedPenalty.toFixed(2)}</PopoverContent></Popover>)}
+                            {bill.calculatedPenalty && bill.calculatedPenalty > 0 && (<Popover><PopoverTrigger asChild><AlertTriangle className="h-3.5 w-3.5 text-destructive inline-block ml-1 cursor-help"/></PopoverTrigger><PopoverContent className="text-xs w-auto p-2" side="top">Penalty: Birr {bill.calculatedPenalty.toFixed(2)}</PopoverContent></Popover>)}
                           </TableCell>
                           <TableCell className="text-right">
                             {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && (
@@ -347,7 +347,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
             <DialogTitle className="font-headline">Pay Bill (Simulated)</DialogTitle>
             <DialogDescription>
               Bill ID: {selectedBillForDialog?.id} <br/>
-              Amount Due: ${processedBills.find(b=>b.id === selectedBillForDialog?.id)?.calculatedTotal?.toFixed(2)}
+              Amount Due: Birr {processedBills.find(b=>b.id === selectedBillForDialog?.id)?.calculatedTotal?.toFixed(2)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -408,7 +408,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
           <DialogHeader>
             <DialogTitle className="font-headline">Submit Payment Proof</DialogTitle>
             <DialogDescription>
-              For Bill ID: {selectedBillForDialog?.id} - Amount: ${processedBills.find(b=>b.id === selectedBillForDialog?.id)?.calculatedTotal?.toFixed(2)}
+              For Bill ID: {selectedBillForDialog?.id} - Amount: Birr {processedBills.find(b=>b.id === selectedBillForDialog?.id)?.calculatedTotal?.toFixed(2)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

@@ -231,7 +231,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setIsLoading(false);
 
     if (result.success && result.bill) {
-      toast({ title: "Bill Generated", description: `New bill for ${agreement.tenant?.name} (Due: ${format(parseISO(result.bill.dueDate as string), 'PP')}) created. Total: $${result.bill.totalAmount.toFixed(2)}` });
+      toast({ title: "Bill Generated", description: `New bill for ${agreement.tenant?.name} (Due: ${format(parseISO(result.bill.dueDate as string), 'PP')}) created. Total: Birr ${result.bill.totalAmount.toFixed(2)}` });
       await refreshBillingData();
     } else {
       toast({ title: "Bill Generation Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
@@ -456,7 +456,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <DialogContent className="sm:max-w-md">
               <DialogHeader>
                   <DialogTitle className="font-headline text-xl">{isReadOnly ? 'View Payment Details' : 'Record Payment'}</DialogTitle>
-                  {billForPayment && billForPayment.agreement && billForPayment.agreement.space && <DialogDescription>For {billForPayment.agreement.space.spaceIdName} - Total: ${processedClientBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)}</DialogDescription>}
+                  {billForPayment && billForPayment.agreement && billForPayment.agreement.space && <DialogDescription>For {billForPayment.agreement.space.spaceIdName} - Total: Birr {processedClientBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)}</DialogDescription>}
               </DialogHeader>
               <Form {...paymentForm}>
                   <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
@@ -479,7 +479,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                   <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
-                  {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: ${processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount?.toFixed(2)}</DialogDescription>}
+                  {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: Birr {processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount?.toFixed(2)}</DialogDescription>}
               </DialogHeader>
               {billForVerification && ( <div className="text-sm space-y-2 py-2"> <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p> <p><strong>Submitted Proof:</strong> {billForVerification.paymentProofUrl ? <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}> {billForVerification.paymentProofUrl} (Click to view - simulated) </Button> : <span className="italic text-muted-foreground">No proof URL found.</span>} </p> </div> )}
               <Form {...paymentForm}>
@@ -529,12 +529,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                     <TableCell className="hidden md:table-cell text-xs">{bill.agreement?.space?.spaceIdName}, {bill.agreement?.space?.buildingName}</TableCell>
                     <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
                     <TableCell className={bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-right">${bill.rentAmount.toFixed(2)}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-right">Birr {bill.rentAmount.toFixed(2)}</TableCell>
                     <TableCell className="hidden lg:table-cell text-right">
-                      {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">${u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('$0.00')}
+                      {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">Birr {bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">Birr {u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('Birr 0.00')}
                     </TableCell>
-                    <TableCell className="hidden xl:table-cell text-right text-destructive">{bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : '$0.00'}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="hidden xl:table-cell text-right text-destructive">{bill.penaltyAmount ? `Birr ${bill.penaltyAmount.toFixed(2)}` : 'Birr 0.00'}</TableCell>
+                    <TableCell className="text-right font-semibold text-primary">Birr {bill.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span></Badge></TableCell>
                     <TableCell className="text-right pr-2 sm:pr-4">
                       <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">

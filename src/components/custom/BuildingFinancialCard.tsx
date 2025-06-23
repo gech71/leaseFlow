@@ -38,7 +38,7 @@ export function BuildingFinancialCard({
             <DollarSign className="h-4 w-4 text-destructive mr-2" />
             <span className="font-medium text-destructive">Expenses (Utilities):</span>
           </div>
-          <span className="font-semibold text-destructive">${currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span className="font-semibold text-destructive">Birr {currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
 
         <div className="space-y-1.5 pt-2">
@@ -48,21 +48,21 @@ export function BuildingFinancialCard({
                 <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
                 <span className="text-green-700">Collected:</span>
               </div>
-              <span className="font-medium text-green-700">${currentMonthIncomeCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-medium text-green-700">Birr {currentMonthIncomeCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex items-center justify-between p-1.5 bg-blue-500/10 rounded-md">
               <div className="flex items-center">
                  <Clock className="h-4 w-4 text-blue-600 mr-2" />
                 <span className="text-blue-700">Pending Confirmation:</span>
               </div>
-              <span className="font-medium text-blue-700">${currentMonthIncomePendingConfirmation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-medium text-blue-700">Birr {currentMonthIncomePendingConfirmation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
              <div className="flex items-center justify-between p-1.5 bg-yellow-500/10 rounded-md">
               <div className="flex items-center">
                 <AlertCircle className="h-4 w-4 text-yellow-700 mr-2" />
                 <span className="text-yellow-800">To Be Collected:</span>
               </div>
-              <span className="font-medium text-yellow-800">${currentMonthIncomeToBeCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-medium text-yellow-800">Birr {currentMonthIncomeToBeCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
         </div>
         
@@ -74,7 +74,7 @@ export function BuildingFinancialCard({
                 <span className="text-sm font-semibold text-muted-foreground">Net (Collected - Expenses):</span>
             </div>
             <span className={`text-lg font-bold ${netCurrentMonth >= 0 ? 'text-green-600' : 'text-destructive'}`}>
-                ${netCurrentMonth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Birr {netCurrentMonth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
         </div>
       </CardFooter>

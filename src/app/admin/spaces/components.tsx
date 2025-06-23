@@ -381,7 +381,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                   <div className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> Floor: {space.floor}</div>
                   <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} sq ft</div>
                   <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(Number(space.utilityProrationShare) * 100).toFixed(0)}%</div>
-                  <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: ${Number(space.monthlyRentalPrice).toLocaleString()}/month</div>
+                  <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: Birr {Number(space.monthlyRentalPrice).toLocaleString()}/month</div>
                   {space.isOccupied && space.availabilityDate && (
                     <div className="flex items-center text-blue-600 font-medium pt-3 border-t mt-3">
                       <Clock className="mr-2 h-4 w-4" /> 

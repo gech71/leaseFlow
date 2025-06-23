@@ -31,7 +31,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
           fontSize={12} 
           tickLine={false} 
           axisLine={false} 
-          tickFormatter={(value) => `$${value / 1000}k`} 
+          tickFormatter={(value) => `Birr ${value / 1000}k`} 
         />
         <Tooltip
           cursor={{ fill: "hsl(var(--accent)/0.3)" }}
@@ -43,7 +43,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
           }}
           labelStyle={{ color: "hsl(var(--foreground))", fontWeight: "bold", marginBottom: "4px" }}
           formatter={(value: number, name: string) => {
-            const formattedValue = `$${value.toLocaleString()}`;
+            const formattedValue = `Birr ${value.toLocaleString()}`;
             const nameCapitalized = name.charAt(0).toUpperCase() + name.slice(1);
             return [formattedValue, nameCapitalized];
           }}
@@ -59,5 +59,3 @@ export function DashboardChart({ data }: DashboardChartProps) {
     </ResponsiveContainer>
   );
 }
-
-    

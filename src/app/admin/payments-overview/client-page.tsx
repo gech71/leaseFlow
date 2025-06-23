@@ -301,7 +301,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">${totalUpcomingAmount.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-primary">Birr {totalUpcomingAmount.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">{upcomingAndPendingBills.length} transactions (incl. Overdue & Verification)</p>
           </CardContent>
         </Card>
@@ -311,7 +311,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">${totalPaidSelectedPeriod.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-green-600">Birr {totalPaidSelectedPeriod.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">{paidBillsInSelectedPeriod.length} transactions</p>
           </CardContent>
         </Card>
@@ -321,7 +321,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
             <Landmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">${totalPotentialRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-foreground">Birr {totalPotentialRevenue.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">Based on {initialSpaces.length} total spaces</p>
           </CardContent>
         </Card>
@@ -368,9 +368,9 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                           {format(parseISO(bill.dueDate), 'PP')}
                         </TableCell>
                         <TableCell className="hidden xl:table-cell text-xs text-destructive text-right">
-                          {bill.penaltyAmount ? `$${bill.penaltyAmount.toFixed(2)}` : ''}
+                          {bill.penaltyAmount ? `Birr ${bill.penaltyAmount.toFixed(2)}` : ''}
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-primary">${bill.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-semibold text-primary">Birr {bill.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize ${bill.status === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
                             {getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification',' Ver.')}</span>
@@ -463,7 +463,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                           {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
                           {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-green-600">${bill.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">Birr {bill.totalAmount.toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

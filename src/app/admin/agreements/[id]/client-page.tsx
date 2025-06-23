@@ -92,7 +92,7 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
             <div className="flex items-center"><HomeIcon className="mr-2 h-4 w-4 text-primary" /> <strong>Space:</strong> <span className="ml-2">{spaceDescription}</span></div>
             <div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Start Date:</strong> <span className="ml-2">{format(parseISO(agreement.startDate), 'PP')}</span></div>
             <div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Term:</strong> <span className="ml-2">{agreement.paymentTermMonths} months</span></div>
-            <div className="flex items-center"><DollarSignIcon className="mr-2 h-4 w-4 text-primary" /><strong>Monthly Rent:</strong> <span className="ml-2">${agreement.monthlyRentalPrice.toLocaleString()}</span></div>
+            <div className="flex items-center"><DollarSignIcon className="mr-2 h-4 w-4 text-primary" /><strong>Monthly Rent:</strong> <span className="ml-2">Birr {agreement.monthlyRentalPrice.toLocaleString()}</span></div>
             <div className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" /> <strong>Initial Payment:</strong> <span className="ml-2">{agreement.initialPaymentMonths} month(s) upfront</span></div>
             <div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Next Lease Payment:</strong> <span className="ml-2">{format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span></div>
             <div className="flex items-center"><Printer className="mr-2 h-4 w-4 text-primary" /><strong>Generated:</strong> <span className="ml-2">{format(parseISO(agreement.createdAt), 'PPp')}</span></div>
@@ -103,7 +103,7 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
             <>
               <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Initial Payment Details</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-2 text-sm p-4 border rounded-md bg-secondary/30">
-                <div className="flex items-center"><DollarSignIcon className="mr-2 h-4 w-4 text-primary" /> <strong>Amount Paid:</strong> <span className="ml-2">${agreement.initialPaymentAmount.toLocaleString()}</span></div>
+                <div className="flex items-center"><DollarSignIcon className="mr-2 h-4 w-4 text-primary" /> <strong>Amount Paid:</strong> <span className="ml-2">Birr {agreement.initialPaymentAmount.toLocaleString()}</span></div>
                 {agreement.initialPaymentMethod && (<div className="flex items-center">{React.createElement(getPaymentMethodIcon(agreement.initialPaymentMethod), { className: "mr-2 h-4 w-4 text-primary" })}<strong>Method:</strong> <span className="ml-2">{agreement.initialPaymentMethod}</span></div>)}
                 {agreement.initialPaymentBankOrWalletName && (<div className="flex items-center"><Landmark className="mr-2 h-4 w-4 text-primary" /> <strong>Bank/Wallet:</strong> <span className="ml-2">{agreement.initialPaymentBankOrWalletName}</span></div>)}
                 {agreement.initialPaymentReference && (<div className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" /> <strong>Reference:</strong> <span className="ml-2">{agreement.initialPaymentReference}</span></div>)}
