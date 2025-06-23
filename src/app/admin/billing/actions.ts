@@ -306,24 +306,26 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 
     if (monthlyBuildingUtilityData?.utilities.length) {
       const allUtilitiesForPeriod = monthlyBuildingUtilityData.utilities;
-      const building = agreement.space.building;
       const space = agreement.space;
 
-      // 1. Process 'Building' scope utilities
-      const buildingScopeUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'Building');
-      buildingScopeUtils.forEach(utilItem => {
-        const cost = utilItem.totalCost * (space.utilityProrationShare || 0);
-        if (cost > 0) {
-          const roundedCost = parseFloat(cost.toFixed(2));
-          utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
-          totalUtilityCostForBill += roundedCost;
+      allUtilitiesForPeriod.forEach(utilItem => {
+        let cost = 0;
+        
+        // Handle building-wide utilities based on proration share
+        if (utilItem.appliesToScope === 'Building') {
+          cost = utilItem.totalCost * (space.utilityProrationShare || 0);
         }
-      });
-
-      // 2. Process 'SpecificSpaces' scope utilities (this now includes transformed 'Floor' utilities)
-      const specificSpaceUtils = allUtilitiesForPeriod.filter(u => u.appliesToScope === 'SpecificSpaces' && u.applicableSpaceIdNames?.includes(space.spaceIdName));
-      specificSpaceUtils.forEach(utilItem => {
-        const cost = utilItem.totalCost;
+        
+        // Handle utilities assigned to specific spaces. This now covers both
+        // "Specific Floor" and "Specific Spaces" from the UI, as both are saved
+        // as 'SpecificSpaces' with pre-calculated final costs.
+        else if (utilItem.appliesToScope === 'SpecificSpaces') {
+          if (utilItem.applicableSpaceIdNames?.includes(space.spaceIdName)) {
+            // The totalCost here is the final, pre-calculated amount for this space.
+            cost = utilItem.totalCost;
+          }
+        }
+        
         if (cost > 0) {
           const roundedCost = parseFloat(cost.toFixed(2));
           utilityItemsForJson.push({ name: utilItem.name, amount: roundedCost });
@@ -545,6 +547,7 @@ export async function deleteBillAction(billId: string) {
     
 
     
+
 
 
 
