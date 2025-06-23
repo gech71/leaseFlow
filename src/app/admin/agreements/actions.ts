@@ -123,7 +123,8 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
 export async function deleteAgreementAction(agreementId: string) {
     try {
         const agreement = await databaseService.getAgreementById(agreementId, {
-            include: { bills: true, space: true }
+            bills: true,
+            space: true
         });
         if (!agreement) {
             return { success: false, error: "Agreement not found." };
