@@ -118,6 +118,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const { toast } = useToast();
   const [buildingToDelete, setBuildingToDelete] = useState<BuildingWithPenaltyTiers | null>(null);
   const { hasPermission, isSuperAdmin } = usePermissions(); 
+  const router = useRouter();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -153,7 +154,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
 
     if (result.success) {
       toast({ title: "Building Deleted", description: `${buildingToDelete.name} has been removed.`});
-      setBuildings(prev => prev.filter(b => b.id !== buildingToDelete.id));
+      router.refresh();
     } else {
       toast({ title: "Error Deleting Building", description: result.error, variant: "destructive" });
     }

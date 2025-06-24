@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +48,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [buildings, setBuildings] = useState<BuildingTypePrisma[]>(initialBuildings);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const [currentSpaceData, setCurrentSpaceData] = useState<Partial<SpaceTypePrisma & { buildingName?: string }>>({});
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -156,6 +158,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       toast({ title: `Space ${formMode === 'add' ? 'Added' : 'Updated'}`, description: `${result.space?.spaceIdName} has been saved.` });
       setIsFormOpen(false);
       setCurrentSpaceData({});
+      router.refresh();
     } else {
       toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Space`, description: result.error, variant: "destructive" });
     }
@@ -202,6 +205,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     if (result.success) {
       toast({ title: "Space Deleted", description: "The space has been removed."});
       setSpaceToDelete(null);
+      router.refresh();
     } else {
       toast({ title: "Error Deleting Space", description: result.error, variant: "destructive" });
     }
