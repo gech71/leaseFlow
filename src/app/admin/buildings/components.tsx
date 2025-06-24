@@ -89,26 +89,25 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
               <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
            )}
         </CardContent>
-      <CardFooter className="border-t pt-4 flex justify-end gap-2">
+      <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
         {canEdit ? (
           <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
-            <Button variant="outline" size="sm">
-              <Edit3 className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Edit</span>
+            <Button variant="outline" size="sm" className="h-8">
+              <Edit3 className="mr-2 h-4 w-4" />
+              <span>Edit</span>
             </Button>
           </Link>
         ) : canViewDetails ? (
            <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">View Details</span>
+              <Button variant="outline" size="sm" className="h-8">
+                <Eye className="mr-2 h-4 w-4" />
+                <span>View</span>
               </Button>
             </Link>
         ) : null }
         {canDelete && (
-            <Button variant="destructive" size="icon" className="h-9 w-9" onClick={() => onDelete(building)}>
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Delete Building</span>
+            <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onDelete(building)}>
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
             </Button>
         )}
       </CardFooter>

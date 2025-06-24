@@ -26,12 +26,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
 
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
@@ -251,7 +245,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                     <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex items-center justify-end gap-1">
+                  <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
                     {canViewAgreements && (
                       <Link href={`/admin/agreements/${agreement.id}`} passHref>
                         <Button variant="outline" size="sm" className="h-8">
@@ -260,35 +254,17 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                       </Link>
                     )}
                     {eligibleForRenewal && canEditAgreements && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRenewAgreement(agreement)}>
-                            <RefreshCw className="h-4 w-4" />
-                            <span className="sr-only">Renew</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Renew Agreement</p></TooltipContent>
-                      </Tooltip>
+                      <Button variant="outline" size="sm" className="h-8" onClick={() => handleRenewAgreement(agreement)}>
+                        <RefreshCw className="mr-2 h-4 w-4" /> Renew
+                      </Button>
                     )}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadTxt(agreement.id)}>
-                          <Download className="h-4 w-4" />
-                          <span className="sr-only">Download</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Download Agreement</p></TooltipContent>
-                    </Tooltip>
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => handleDownloadTxt(agreement.id)}>
+                      <Download className="mr-2 h-4 w-4" /> Download
+                    </Button>
                     {canDeleteAgreements && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setAgreementToDelete(agreement)}>
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Delete Agreement</p></TooltipContent>
-                      </Tooltip>
+                      <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setAgreementToDelete(agreement)}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </Button>
                     )}
                   </CardFooter>
                 </Card>

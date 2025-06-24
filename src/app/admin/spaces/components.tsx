@@ -405,17 +405,16 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="border-t pt-4 flex justify-end gap-2">
+                <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
                   {(canEditSpaces || canViewSpaces) && (
-                    <Button variant="outline" size="sm" onClick={() => openEditForm(space)} disabled={isSaving}>
-                      {canEditSpaces ? <Edit3 className="h-4 w-4 sm:mr-2" /> : <Eye className="h-4 w-4 sm:mr-2" />}
-                      <span className="hidden sm:inline">{canEditSpaces ? 'Edit' : 'View'}</span>
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => openEditForm(space)} disabled={isSaving}>
+                      {canEditSpaces ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                      {canEditSpaces ? 'Edit' : 'View'}
                     </Button>
                   )}
                   {canDeleteSpaces && (
-                    <Button variant="destructive" size="icon" className="h-9 w-9" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Delete Space</span>
+                    <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
                     </Button>
                   )}
                 </CardFooter>

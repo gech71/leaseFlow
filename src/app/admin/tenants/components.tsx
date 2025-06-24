@@ -39,11 +39,6 @@ import { createTenantAction, updateTenantAction, deleteTenantAction } from './ac
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 // Client-side specific types ensuring dates are strings
 export interface ClientSpace extends Omit<SpaceTypePrisma, 'createdAt' | 'updatedAt' | 'tenantId'> {
@@ -391,39 +386,30 @@ export function TenantsClientPage({
                     </div>
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex items-center justify-end gap-1">
+                  <CardFooter className="border-t pt-4 flex items-center justify-between gap-2">
                     {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
                       <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                        <Button variant="outline" size="sm" disabled={isSaving} className="h-8 mr-auto">
+                        <Button variant="outline" size="sm" disabled={isSaving} className="h-8">
                           <Eye className="mr-2 h-4 w-4" />
                           <span className="truncate">Agreement</span>
                         </Button>
                       </Link>
                     ) : (
-                      <div className="mr-auto"></div> 
+                      <div /> /* Spacer */
                     )}
-                    {(canEditTenants || canViewTenants) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
-                            {canEditTenants ? <Edit3 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            <span className="sr-only">{canEditTenants ? 'Edit Tenant' : 'View Details'}</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>{canEditTenants ? 'Edit Tenant' : 'View Details'}</p></TooltipContent>
-                      </Tooltip>
-                    )}
-                    {canDeleteTenants && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setTenantToDelete(tenant)}>
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete Tenant</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Delete Tenant</p></TooltipContent>
-                      </Tooltip>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                        {(canEditTenants || canViewTenants) && (
+                            <Button variant="outline" size="sm" className="h-8" onClick={() => handleOpenEditForm(tenant)}>
+                                {canEditTenants ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                                {canEditTenants ? 'Edit' : 'View'}
+                            </Button>
+                        )}
+                        {canDeleteTenants && (
+                            <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setTenantToDelete(tenant)}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </Button>
+                        )}
+                    </div>
                   </CardFooter>
                 </Card>
               );
