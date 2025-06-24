@@ -317,19 +317,17 @@ export default async function AdminDashboardPage() {
             }}
             className="w-full"
           >
-            <CarouselContent className="-ml-2">
+            <CarouselContent className="-ml-1">
               {financials.map((summary) => (
-                <CarouselItem key={summary.buildingId} className="pl-2 md:basis-1/2 lg:basis-1/3">
-                  <div className="h-full flex">
-                    <BuildingFinancialCard
-                      buildingName={summary.buildingName}
-                      currentMonthExpenses={summary.currentMonthExpenses}
-                      currentMonthIncomeCollected={summary.currentMonthIncomeCollected}
-                      currentMonthIncomePendingConfirmation={summary.currentMonthIncomePendingConfirmation}
-                      currentMonthIncomeToBeCollected={summary.currentMonthIncomeToBeCollected}
-                      periodDescription={periodDescription}
-                    />
-                  </div>
+                <CarouselItem key={summary.buildingId} className="pl-1 md:basis-1/2 lg:basis-1/3">
+                  <BuildingFinancialCard
+                    buildingName={summary.buildingName}
+                    currentMonthExpenses={summary.currentMonthExpenses}
+                    currentMonthIncomeCollected={summary.currentMonthIncomeCollected}
+                    currentMonthIncomePendingConfirmation={summary.currentMonthIncomePendingConfirmation}
+                    currentMonthIncomeToBeCollected={summary.currentMonthIncomeToBeCollected}
+                    periodDescription={periodDescription}
+                  />
                 </CarouselItem>
               ))}
             </CarouselContent>
