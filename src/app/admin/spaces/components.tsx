@@ -35,6 +35,7 @@ import { createSpaceAction, updateSpaceAction, deleteSpaceAction } from './actio
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { formatDistanceToNow, parseISO } from 'date-fns'; // Added date-fns imports
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface SpaceWithBuildingName extends SpaceTypePrisma {
   buildingName: string; 
@@ -406,17 +407,28 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                   )}
                 </CardContent>
                 <CardFooter className="border-t pt-4">
-                  <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
+                  <div className="flex w-full items-center justify-end gap-1">
                     {(canEditSpaces || canViewSpaces) && (
-                      <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => openEditForm(space)} disabled={isSaving}>
-                        {canEditSpaces ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                        {canEditSpaces ? 'Edit' : 'View'}
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditForm(space)} disabled={isSaving}>
+                            {canEditSpaces ? <Edit3 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            <span className="sr-only">{canEditSpaces ? 'Edit Space' : 'View Space'}</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>{canEditSpaces ? 'Edit Space' : 'View Space'}</p></TooltipContent>
+                      </Tooltip>
                     )}
                     {canDeleteSpaces && (
-                      <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete Space</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Delete Space</p></TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                 </CardFooter>

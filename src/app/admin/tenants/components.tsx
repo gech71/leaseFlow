@@ -39,6 +39,7 @@ import { createTenantAction, updateTenantAction, deleteTenantAction } from './ac
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Client-side specific types ensuring dates are strings
 export interface ClientSpace extends Omit<SpaceTypePrisma, 'createdAt' | 'updatedAt' | 'tenantId'> {
@@ -387,35 +388,47 @@ export function TenantsClientPage({
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
                   <CardFooter className="border-t pt-4">
-                    <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        {/* Left side button */}
-                        <div className="w-full sm:w-auto">
-                            {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
-                                <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                                    <Button variant="outline" size="sm" disabled={isSaving} className="h-8 w-full sm:w-auto">
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        <span className="truncate">Agreement</span>
-                                    </Button>
-                                </Link>
-                            ) : (
-                                <div className="hidden sm:block" /> /* Spacer for alignment on larger screens */
-                            )}
-                        </div>
-
-                        {/* Right side buttons */}
-                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                            {(canEditTenants || canViewTenants) && (
-                                <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => handleOpenEditForm(tenant)}>
-                                    {canEditTenants ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                                    {canEditTenants ? 'Edit' : 'View'}
+                    <div className="flex w-full items-center justify-between">
+                      <div>
+                        {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
+                                <Button variant="outline" size="sm" disabled={isSaving} className="h-8">
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Agreement
                                 </Button>
-                            )}
-                            {canDeleteTenants && (
-                                <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setTenantToDelete(tenant)}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                </Button>
-                            )}
-                        </div>
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent><p>View Active Agreement</p></TooltipContent>
+                          </Tooltip>
+                        ) : (<div/>) /* Spacer */
+                        }
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {(canEditTenants || canViewTenants) && (
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
+                                {canEditTenants ? <Edit3 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                <span className="sr-only">{canEditTenants ? 'Edit Tenant' : 'View Tenant'}</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>{canEditTenants ? 'Edit Tenant' : 'View Tenant'}</p></TooltipContent>
+                          </Tooltip>
+                        )}
+                        {canDeleteTenants && (
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setTenantToDelete(tenant)}>
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Delete Tenant</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Delete Tenant</p></TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                     </div>
                   </CardFooter>
                 </Card>

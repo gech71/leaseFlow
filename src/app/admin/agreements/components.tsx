@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
@@ -246,26 +247,50 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
                   </CardContent>
                   <CardFooter className="border-t pt-4">
-                    <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
+                    <div className="flex w-full items-center justify-end gap-1">
                       {canViewAgreements && (
-                        <Link href={`/admin/agreements/${agreement.id}`} passHref>
-                          <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto">
-                            <Eye className="mr-2 h-4 w-4" /> View
-                          </Button>
-                        </Link>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={`/admin/agreements/${agreement.id}`} passHref>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">View Agreement</span>
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent><p>View Agreement</p></TooltipContent>
+                        </Tooltip>
                       )}
                       {eligibleForRenewal && canEditAgreements && (
-                        <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => handleRenewAgreement(agreement)}>
-                          <RefreshCw className="mr-2 h-4 w-4" /> Renew
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRenewAgreement(agreement)}>
+                              <RefreshCw className="h-4 w-4" />
+                              <span className="sr-only">Renew Agreement</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Renew Agreement</p></TooltipContent>
+                        </Tooltip>
                       )}
-                      <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => handleDownloadTxt(agreement.id)}>
-                        <Download className="mr-2 h-4 w-4" /> Download
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadTxt(agreement.id)}>
+                            <Download className="h-4 w-4" />
+                            <span className="sr-only">Download Agreement</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Download Agreement</p></TooltipContent>
+                      </Tooltip>
                       {canDeleteAgreements && (
-                        <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setAgreementToDelete(agreement)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setAgreementToDelete(agreement)}>
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete Agreement</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Delete Agreement</p></TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </CardFooter>

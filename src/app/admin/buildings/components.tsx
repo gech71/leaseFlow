@@ -24,6 +24,7 @@ import { format } from 'date-fns';
 import { deleteBuildingAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext'; 
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
@@ -89,26 +90,42 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
               <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
            )}
         </CardContent>
-      <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
+      <CardFooter className="border-t pt-4 flex items-center justify-end gap-1">
         {canEdit ? (
-          <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
-            <Button variant="outline" size="sm" className="h-8">
-              <Edit3 className="mr-2 h-4 w-4" />
-              <span>Edit</span>
-            </Button>
-          </Link>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Edit3 className="h-4 w-4" />
+                  <span className="sr-only">Edit Building</span>
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent><p>Edit Building</p></TooltipContent>
+          </Tooltip>
         ) : canViewDetails ? (
-           <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref>
-              <Button variant="outline" size="sm" className="h-8">
-                <Eye className="mr-2 h-4 w-4" />
-                <span>View</span>
-              </Button>
-            </Link>
+           <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Eye className="h-4 w-4" />
+                  <span className="sr-only">View Building</span>
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent><p>View Building</p></TooltipContent>
+          </Tooltip>
         ) : null }
         {canDelete && (
-            <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onDelete(building)}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
-            </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(building)}>
+                <Trash2 className="h-4 w-4" />
+                <span className="sr-only">Delete Building</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Delete Building</p></TooltipContent>
+          </Tooltip>
         )}
       </CardFooter>
     </Card>
