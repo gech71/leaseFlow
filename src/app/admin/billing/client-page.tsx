@@ -717,18 +717,15 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <>
             <Card className="shadow-md">
               <CardContent className="p-0">
-                <div className="w-full overflow-x-auto">
+                <div className="w-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Tenant</TableHead>
-                        <TableHead className="hidden md:table-cell">Space</TableHead>
-                        <TableHead className="hidden lg:table-cell">Bill Date</TableHead>
+                        <TableHead className="hidden sm:table-cell">Space</TableHead>
+                        <TableHead className="hidden md:table-cell">Bill Date</TableHead>
                         <TableHead>Due Date</TableHead>
-                        <TableHead className="hidden xl:table-cell text-right">Rent</TableHead>
-                        <TableHead className="hidden xl:table-cell text-right">Utilities</TableHead>
-                        <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Total Amount</TableHead>
                         <TableHead className="text-center">Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -739,11 +736,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                           <TableCell className="font-medium">
                             <div className="w-24 break-words">{bill.tenantName}</div>
                           </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs">
+                          <TableCell className="hidden sm:table-cell text-xs">
                             <div>{bill.agreement?.space?.spaceIdName},</div>
                             <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
                           </TableCell>
-                          <TableCell className="hidden lg:table-cell">
+                          <TableCell className="hidden md:table-cell">
                              <div className="flex flex-col text-xs">
                               <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
                               <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
@@ -755,12 +752,17 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                               <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="hidden xl:table-cell text-right">{bill.rentAmount.toFixed(2)}</TableCell>
-                          <TableCell className="hidden xl:table-cell text-right">
-                            {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('0.00')}
+                          <TableCell className="text-right">
+                            <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
+                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                (R: {bill.rentAmount.toFixed(2)} U: {(bill.utilityBreakdown?.reduce((s, u) => s + u.amount, 0) || 0).toFixed(2)})
+                            </div>
+                            {(bill.penaltyAmount ?? 0) > 0 && (
+                                <div className="text-xs text-destructive whitespace-nowrap">
+                                  Penalty: {(bill.penaltyAmount ?? 0).toFixed(2)}
+                                </div>
+                            )}
                           </TableCell>
-                          <TableCell className={`hidden xl:table-cell text-right ${bill.penaltyAmount ? 'text-destructive' : ''}`}>{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)}` : '0.00'}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary">{bill.totalAmount.toFixed(2)} Birr</TableCell>
                           <TableCell className="text-center">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-[110px] justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
                               {getStatusIcon(bill.currentStatus || bill.status)}
