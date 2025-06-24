@@ -53,7 +53,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission('agreement:create');
@@ -89,6 +89,13 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+  
+  useEffect(() => {
+    const newTotalPages = Math.ceil(agreements.length / itemsPerPage);
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+  }, [agreements.length, itemsPerPage, currentPage]);
 
   const isPaymentOverdue = (agreement: AgreementWithRelations): boolean => {
     if (!agreement.nextPaymentDueDate) return false;
@@ -244,7 +251,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                         <RefreshCw className="mr-1 h-4 w-4" /> Renew
                       </Button>
                     )}
-                    <div className="flex flex-wrap items-center gap-2 justify-end grow sm:grow-0">
+                    <div className="flex items-center gap-2 justify-end grow sm:grow-0">
                       {canViewAgreements && (
                         <Link href={`/admin/agreements/${agreement.id}`} passHref>
                           <Button variant="outline" size="sm">
