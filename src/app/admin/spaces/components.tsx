@@ -405,18 +405,20 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
-                  {(canEditSpaces || canViewSpaces) && (
-                    <Button variant="outline" size="sm" className="h-8" onClick={() => openEditForm(space)} disabled={isSaving}>
-                      {canEditSpaces ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                      {canEditSpaces ? 'Edit' : 'View'}
-                    </Button>
-                  )}
-                  {canDeleteSpaces && (
-                    <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </Button>
-                  )}
+                <CardFooter className="border-t pt-4">
+                  <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
+                    {(canEditSpaces || canViewSpaces) && (
+                      <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => openEditForm(space)} disabled={isSaving}>
+                        {canEditSpaces ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                        {canEditSpaces ? 'Edit' : 'View'}
+                      </Button>
+                    )}
+                    {canDeleteSpaces && (
+                      <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </Button>
+                    )}
+                  </div>
                 </CardFooter>
               </Card>
             ))}

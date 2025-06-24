@@ -245,27 +245,29 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                     <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
-                    {canViewAgreements && (
-                      <Link href={`/admin/agreements/${agreement.id}`} passHref>
-                        <Button variant="outline" size="sm" className="h-8">
-                          <Eye className="mr-2 h-4 w-4" /> View
+                  <CardFooter className="border-t pt-4">
+                    <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
+                      {canViewAgreements && (
+                        <Link href={`/admin/agreements/${agreement.id}`} passHref>
+                          <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto">
+                            <Eye className="mr-2 h-4 w-4" /> View
+                          </Button>
+                        </Link>
+                      )}
+                      {eligibleForRenewal && canEditAgreements && (
+                        <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => handleRenewAgreement(agreement)}>
+                          <RefreshCw className="mr-2 h-4 w-4" /> Renew
                         </Button>
-                      </Link>
-                    )}
-                    {eligibleForRenewal && canEditAgreements && (
-                      <Button variant="outline" size="sm" className="h-8" onClick={() => handleRenewAgreement(agreement)}>
-                        <RefreshCw className="mr-2 h-4 w-4" /> Renew
+                      )}
+                      <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => handleDownloadTxt(agreement.id)}>
+                        <Download className="mr-2 h-4 w-4" /> Download
                       </Button>
-                    )}
-                    <Button variant="outline" size="sm" className="h-8" onClick={() => handleDownloadTxt(agreement.id)}>
-                      <Download className="mr-2 h-4 w-4" /> Download
-                    </Button>
-                    {canDeleteAgreements && (
-                      <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setAgreementToDelete(agreement)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </Button>
-                    )}
+                      {canDeleteAgreements && (
+                        <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setAgreementToDelete(agreement)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </Button>
+                      )}
+                    </div>
                   </CardFooter>
                 </Card>
               );

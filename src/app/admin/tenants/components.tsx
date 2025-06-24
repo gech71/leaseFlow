@@ -386,29 +386,36 @@ export function TenantsClientPage({
                     </div>
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex items-center justify-between gap-2">
-                    {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
-                      <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                        <Button variant="outline" size="sm" disabled={isSaving} className="h-8">
-                          <Eye className="mr-2 h-4 w-4" />
-                          <span className="truncate">Agreement</span>
-                        </Button>
-                      </Link>
-                    ) : (
-                      <div /> /* Spacer */
-                    )}
-                    <div className="flex items-center justify-end gap-2">
-                        {(canEditTenants || canViewTenants) && (
-                            <Button variant="outline" size="sm" className="h-8" onClick={() => handleOpenEditForm(tenant)}>
-                                {canEditTenants ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                                {canEditTenants ? 'Edit' : 'View'}
-                            </Button>
-                        )}
-                        {canDeleteTenants && (
-                            <Button variant="outline" size="sm" className="h-8 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setTenantToDelete(tenant)}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </Button>
-                        )}
+                  <CardFooter className="border-t pt-4">
+                    <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        {/* Left side button */}
+                        <div className="w-full sm:w-auto">
+                            {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
+                                <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
+                                    <Button variant="outline" size="sm" disabled={isSaving} className="h-8 w-full sm:w-auto">
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        <span className="truncate">Agreement</span>
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <div className="hidden sm:block" /> /* Spacer for alignment on larger screens */
+                            )}
+                        </div>
+
+                        {/* Right side buttons */}
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                            {(canEditTenants || canViewTenants) && (
+                                <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto" onClick={() => handleOpenEditForm(tenant)}>
+                                    {canEditTenants ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                                    {canEditTenants ? 'Edit' : 'View'}
+                                </Button>
+                            )}
+                            {canDeleteTenants && (
+                                <Button variant="outline" size="sm" className="h-8 w-full sm:w-auto border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setTenantToDelete(tenant)}>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </Button>
+                            )}
+                        </div>
                     </div>
                   </CardFooter>
                 </Card>
