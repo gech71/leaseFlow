@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon as CalendarLucideIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip, EyeOff, Eye, Search } from 'lucide-react';
+import { DollarSign, FileText, User, AlertTriangle, CheckCircle, Loader2, Edit, Trash2, Zap, CreditCard, CalendarIcon as CalendarLucideIcon, InfoIcon, Building as BuildingIconLucide, UploadCloud, MessageSquare, ShieldCheck, ShieldX, Paperclip, Eye, EyeOff, Search } from 'lucide-react';
 import type { Agreement as AgreementPrisma, Bill as BillPrismaOriginal, Space as SpacePrisma, Building as BuildingPrisma, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, Prisma, Tenant as TenantPrismaOriginal } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -534,60 +534,90 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
       {canGenerateBills && (
         <Card className="mb-6 shadow-sm">
-          <CardHeader> <CardTitle className="font-headline">Generate Bills</CardTitle> <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription> </CardHeader>
-          <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
-          <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
+          <CardHeader>
+            <CardTitle className="font-headline">Generate Bills</CardTitle>
+            <CardDescription>
+              Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.
+            </CardDescription>
+          </CardHeader>
           <CardContent>
-            {agreements.length > 0 ? (
-              <Carousel
-                opts={{
-                  align: "start",
-                  loop: agreements.length > 4,
-                }}
-                className="w-full"
-              >
-                <CarouselContent className="-ml-2">
-                  {agreements.map(agreement => {
-                    if (!agreement.tenant || !agreement.space) return null; 
-                    
-                    const agreementStartDate = startOfDay(parseISO(agreement.startDate));
-                    const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-                    const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
-                    const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
-                    const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
-                    
-                    return (
-                      <CarouselItem key={agreement.id} className="pl-2 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
-                          <div className="p-1 h-full">
-                              <Card className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow h-full">
-                                <CardHeader className="flex-grow pb-2 pt-3">
-                                  <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
-                                  <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
-                                  <CardDescription className="text-xs pt-1 flex flex-col items-start">
-                                    <span>Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span>
-                                    {!isAgreementActive && <Badge variant="destructive" className="mt-1 text-xs">Inactive</Badge>}
-                                    {isAgreementActive && isDueForGeneration && <Badge variant="default" className="mt-1 text-xs bg-green-100 text-green-700">Ready</Badge>}
-                                    {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="mt-1 text-xs">Upcoming</Badge>}
-                                  </CardDescription>
-                                </CardHeader>
-                                <CardFooter className="pt-2 pb-3 mt-auto">
-                                  <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button>
-                                </CardFooter>
-                              </Card>
-                            </div>
-                      </CarouselItem>
-                    );
-                  })}
-                </CarouselContent>
-                <CarouselPrevious />
-                <CarouselNext />
-              </Carousel>
-            ) : (
-              <div className="text-center py-4 text-muted-foreground">
-                <p>No active agreements available for bill generation.</p>
-              </div>
-            )}
+            <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}>
+              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Zap className="mr-2 h-5 w-5" />}
+              Generate All Due Bills
+            </Button>
           </CardContent>
+
+          <div className="px-6 pb-6 pt-4">
+            <div className="pt-4 border-t">
+              <h3 className="text-xl font-bold tracking-tight font-headline">Individual Bill Generation</h3>
+              <p className="text-muted-foreground mt-1 text-sm">Select an active agreement to generate its next due bill.</p>
+            </div>
+            <div className="mt-6 -mx-2">
+              {agreements.length > 0 ? (
+                <Carousel
+                  opts={{
+                    align: "start",
+                  }}
+                  className="w-full"
+                >
+                  <CarouselContent className="-ml-4">
+                    {agreements.map(agreement => {
+                      if (!agreement.tenant || !agreement.space) return null;
+
+                      const agreementStartDate = startOfDay(parseISO(agreement.startDate));
+                      const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
+                      const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
+                      const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+                      const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
+
+                      return (
+                        <CarouselItem key={agreement.id} className="pl-4 basis-full sm:basis-1/2 md:basis-1/2 lg:basis-1/3">
+                          <div className="p-1 h-full">
+                            <Card className="flex flex-col h-full shadow-md border">
+                              <CardContent className="pt-5 pb-4 flex-grow flex flex-col">
+                                <p className="font-semibold text-base leading-tight">{agreement.tenant.name}</p>
+                                <p className="text-sm text-muted-foreground mt-1">{agreement.space.spaceIdName}, {agreement.space.buildingName}</p>
+                                <div className="flex-grow" /> {/* Spacer */}
+                                <div className="mt-4 space-y-2">
+                                  <p className="text-sm text-muted-foreground">Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</p>
+                                  <div>
+                                    {!isAgreementActive && (
+                                      <Badge variant="destructive" className="font-medium text-xs">Inactive</Badge>
+                                    )}
+                                    {isAgreementActive && isDueForGeneration && (
+                                      <Badge className="font-medium text-xs bg-green-100 text-green-800 border-transparent hover:bg-green-200">Ready</Badge>
+                                    )}
+                                    {isAgreementActive && !isDueForGeneration && (
+                                      <Badge variant="secondary" className="font-normal text-xs">Upcoming</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardContent>
+                              <CardFooter className="pb-4">
+                                <Button
+                                  className="w-full"
+                                  onClick={() => handleGenerateSingleBill(agreement.id)}
+                                  disabled={!isAgreementActive || isLoading}
+                                >
+                                  Generate Bill
+                                </Button>
+                              </CardFooter>
+                            </Card>
+                          </div>
+                        </CarouselItem>
+                      );
+                    })}
+                  </CarouselContent>
+                  <CarouselPrevious className="hidden sm:flex" />
+                  <CarouselNext className="hidden sm:flex" />
+                </Carousel>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground border rounded-md mt-4">
+                  <p>No active agreements available for bill generation.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </Card>
       )}
       
@@ -722,124 +752,126 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <>
             <Card className="shadow-md">
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tenant</TableHead>
-                      <TableHead className="hidden sm:table-cell">Space</TableHead>
-                      <TableHead className="hidden md:table-cell">Bill Date</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead className="text-right">Total Amount</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedBills.map((bill) => (
-                      <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                        <TableCell className="font-medium">
-                          <div className="w-24 break-words">{bill.tenantName}</div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-xs">
-                          <div>{bill.agreement?.space?.spaceIdName},</div>
-                          <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                            <div className="flex flex-col text-xs">
-                            <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
-                            <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
-                            <div className="flex flex-col text-xs font-medium">
-                            <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
-                            <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
-                          <div className="text-xs text-muted-foreground whitespace-nowrap">
-                            {`R: ${bill.rentAmount.toFixed(0)} | U: ${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(0)}`}
-                            {bill.penaltyAmount ? <span className="text-destructive">{` | P: ${bill.penaltyAmount.toFixed(0)}`}</span> : ''}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-auto justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
-                            {getStatusIcon(bill.currentStatus || bill.status)}
-                            <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-0">
-                            {bill.currentStatus === 'Paid' ? (
-                              <>
-                                <Tooltip>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[150px]">Tenant</TableHead>
+                        <TableHead className="hidden sm:table-cell">Space</TableHead>
+                        <TableHead className="hidden md:table-cell">Bill Date</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead className="text-right whitespace-nowrap">Total Amount</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedBills.map((bill) => (
+                        <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
+                          <TableCell className="font-medium">
+                            <div className="w-28 truncate" title={bill.tenantName}>{bill.tenantName}</div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-xs">
+                            <div>{bill.agreement?.space?.spaceIdName},</div>
+                            <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                              <div className="flex flex-col text-xs">
+                              <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
+                              <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
+                              <div className="flex flex-col text-xs font-medium">
+                              <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
+                              <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
+                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                              {`R: ${bill.rentAmount.toFixed(0)} | U: ${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(0)}`}
+                              {bill.penaltyAmount ? <span className="text-destructive">{` | P: ${bill.penaltyAmount.toFixed(0)}`}</span> : ''}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-auto justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                              {getStatusIcon(bill.currentStatus || bill.status)}
+                              <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-0">
+                              {bill.currentStatus === 'Paid' ? (
+                                <>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8" disabled={isLoading}>
+                                        <Eye className="h-4 w-4 text-blue-600" />
+                                        <span className="sr-only">View Details</span>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>View Details</p></TooltipContent>
+                                  </Tooltip>
+                                  {canManagePayments && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(bill)} className="h-8 w-8" disabled={isLoading}>
+                                          <Edit className="h-4 w-4" />
+                                          <span className="sr-only">Edit Details</span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Edit Details</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </>
+                              ) : bill.currentStatus === 'PendingVerification' ? (
+                                <>
+                                  {canManagePayments && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => handleOpenVerificationDialog(bill)} className="h-8 w-8 text-blue-600" disabled={isLoading}>
+                                          <ShieldCheck className="h-4 w-4" />
+                                          <span className="sr-only">Verify Payment</span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Verify Payment</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </>
+                              ) : ( // Pending or Overdue
+                                <>
+                                  {canManagePayments && (
+                                     <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8 text-green-600" disabled={isLoading}>
+                                          <CreditCard className="h-4 w-4" />
+                                          <span className="sr-only">Record Payment</span>
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent><p>Record Payment</p></TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </>
+                              )}
+                              {canDeleteBills && bill.currentStatus !== 'Paid' && (
+                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8" disabled={isLoading}>
-                                      <Eye className="h-4 w-4 text-blue-600" />
-                                      <span className="sr-only">View Details</span>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
+                                      <Trash2 className="h-4 w-4" />
+                                       <span className="sr-only">Delete Bill</span>
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent><p>View Details</p></TooltipContent>
+                                  <TooltipContent><p>Delete Bill</p></TooltipContent>
                                 </Tooltip>
-                                {canManagePayments && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(bill)} className="h-8 w-8" disabled={isLoading}>
-                                        <Edit className="h-4 w-4" />
-                                        <span className="sr-only">Edit Details</span>
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent><p>Edit Details</p></TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </>
-                            ) : bill.currentStatus === 'PendingVerification' ? (
-                              <>
-                                {canManagePayments && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" onClick={() => handleOpenVerificationDialog(bill)} className="h-8 w-8 text-blue-600" disabled={isLoading}>
-                                        <ShieldCheck className="h-4 w-4" />
-                                        <span className="sr-only">Verify Payment</span>
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent><p>Verify Payment</p></TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </>
-                            ) : ( // Pending or Overdue
-                              <>
-                                {canManagePayments && (
-                                   <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8 text-green-600" disabled={isLoading}>
-                                        <CreditCard className="h-4 w-4" />
-                                        <span className="sr-only">Record Payment</span>
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent><p>Record Payment</p></TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </>
-                            )}
-                            {canDeleteBills && bill.currentStatus !== 'Paid' && (
-                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
-                                    <Trash2 className="h-4 w-4" />
-                                     <span className="sr-only">Delete Bill</span>
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Delete Bill</p></TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
             <PaginationControls
@@ -856,5 +888,3 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     </div>
   );
 }
-
-    
