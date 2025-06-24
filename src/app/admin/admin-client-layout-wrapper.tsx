@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -97,6 +96,19 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   
   const { currentUser, hasAnyPermission, isLoading: permissionsLoading, isSuperAdmin } = usePermissions();
 
+  useEffect(() => {
+    // If loading is complete and there's no user, it means auth failed (e.g., expired token).
+    // Redirect to the login page. This handles client-side auth checks.
+    if (!permissionsLoading && !currentUser) {
+      toast({
+        title: "Session Expired",
+        description: "Please log in again to continue.",
+        variant: "default",
+      });
+      router.push('/auth/login');
+    }
+  }, [permissionsLoading, currentUser, router, toast]);
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -142,7 +154,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   }, [currentUser, permissionsLoading, hasAnyPermission, isSuperAdmin]);
 
 
-  if (permissionsLoading) {
+  // Show a loader while permissions are loading OR if there's no user (as we are about to redirect).
+  // This prevents a flash of a broken/unauthorized UI.
+  if (permissionsLoading || !currentUser) {
      return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
