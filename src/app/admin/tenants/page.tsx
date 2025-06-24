@@ -75,7 +75,11 @@ export default async function TenantsPage() {
     where: tenantWhere,
     include: { 
       rentedSpace: true, 
-      agreements: true
+      agreements: {
+        include: {
+          space: true,
+        }
+      }
     }, 
     orderBy: { createdAt: 'desc' } 
   });
@@ -85,7 +89,10 @@ export default async function TenantsPage() {
     orderBy: [{ buildingName: 'asc' }, { spaceIdName: 'asc' }]
   });
   const agreementsData = await databaseService.getAllAgreements({
-    where: agreementWhere
+    where: agreementWhere,
+    include: {
+        space: true,
+    }
   });
 
   // Serialize date fields for client component props
@@ -106,6 +113,11 @@ export default async function TenantsPage() {
       createdAt: ag.createdAt.toISOString(),
       updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Fallback
       initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
+      space: ag.space ? {
+        ...ag.space,
+        createdAt: ag.space.createdAt.toISOString(),
+        updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString()
+      } : null,
     })),
   }));
 
@@ -129,6 +141,11 @@ export default async function TenantsPage() {
       createdAt: ag.createdAt.toISOString(),
       updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Fallback
       initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
+      space: ag.space ? {
+        ...ag.space,
+        createdAt: ag.space.createdAt.toISOString(),
+        updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString()
+      } : null,
   }));
 
 

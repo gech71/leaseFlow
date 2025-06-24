@@ -48,13 +48,14 @@ export interface ClientSpace extends Omit<SpaceTypePrisma, 'createdAt' | 'update
   tenantId?: string | null; 
 }
 
-export interface ClientAgreement extends Omit<AgreementTypePrisma, 'startDate' | 'endDate' | 'nextPaymentDueDate' | 'createdAt' | 'updatedAt' | 'initialPaymentDate'> {
+export interface ClientAgreement extends Omit<AgreementTypePrisma, 'startDate' | 'endDate' | 'nextPaymentDueDate' | 'createdAt' | 'updatedAt' | 'initialPaymentDate' | 'space'> {
   startDate: string;
   endDate?: string | null;
   nextPaymentDueDate: string;
   createdAt: string;
   updatedAt: string;
   initialPaymentDate?: string | null;
+  space: ClientSpace | null;
 }
 
 export interface TenantWithRelations extends Omit<TenantTypePrisma, 'createdAt' | 'updatedAt' | 'rentedSpace' | 'agreements'> {
@@ -363,7 +364,17 @@ export function TenantsClientPage({
         <>
           <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {paginatedTenants.map((tenant) => {
+              const activeAgreements = tenant.agreements.filter(ag => {
+                if (!ag.startDate || !ag.paymentTermMonths) return false;
+                const agreementEndDate = addMonths(parseISO(ag.startDate), ag.paymentTermMonths);
+                return isAfter(agreementEndDate, new Date());
+              });
+
+              // Get unique spaces from active agreements
+              const rentedSpaces = [...new Map(activeAgreements.map(ag => ag.space).filter(Boolean).map(space => [space!.id, space])).values()];
+              
               const tenantActiveAgreement = findActiveAgreementForTenant(tenant.id);
+
               return (
                 <Card key={tenant.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
                   <CardHeader>
@@ -381,9 +392,20 @@ export function TenantsClientPage({
                         <Phone className="mr-2 h-4 w-4 text-primary" /> Phone: {tenant.phone}
                       </div>
                     )}
-                    <div className="flex items-center">
-                      <BedDouble className="mr-2 h-4 w-4 text-primary" /> 
-                      Rented Space: {getSpaceDetails(tenant.rentedSpace)}
+                    <div className="flex items-start">
+                        <BedDouble className="mr-2 h-4 w-4 shrink-0 mt-1 text-primary" />
+                        <div>
+                            <span className="font-medium">Rented Spaces</span>
+                             {rentedSpaces.length > 0 ? (
+                                <ul className="list-none text-muted-foreground text-xs space-y-0.5 mt-1">
+                                    {rentedSpaces.map(space => (
+                                        <li key={space!.id}>{space!.spaceIdName}, {space!.buildingName}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-xs text-muted-foreground mt-1">No active spaces</p>
+                            )}
+                        </div>
                     </div>
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
