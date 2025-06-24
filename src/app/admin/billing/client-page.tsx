@@ -48,12 +48,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel"
-import {
-  Tooltip,
-  TooltipProvider,
-  TooltipContent,
-  TooltipTrigger
-} from "@/components/ui/tooltip";
 
 
 const paymentFormSchema = z.object({
@@ -530,351 +524,314 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   }
 
   return (
-    <TooltipProvider>
-      <div className="animate-fadeIn">
-        <PageHeader title="Billing Management" icon={DollarSign} description="Generate and manage bills. Verify tenant-submitted payments." />
+    <div className="animate-fadeIn">
+      <PageHeader title="Billing Management" icon={DollarSign} description="Generate and manage bills. Verify tenant-submitted payments." />
 
-        {canGenerateBills && (
-          <Card className="mb-6 shadow-sm">
-            <CardHeader> <CardTitle className="font-headline">Generate Bills</CardTitle> <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription> </CardHeader>
-            <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
-            <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
-            <CardContent>
-              {agreements.length > 0 ? (
-                <Carousel
-                  opts={{
-                    align: "start",
-                    loop: agreements.length > 4,
-                  }}
-                  className="w-full"
-                >
-                  <CarouselContent className="-ml-2">
-                    {agreements.map(agreement => {
-                      if (!agreement.tenant || !agreement.space) return null; 
-                      
-                      const agreementStartDate = startOfDay(parseISO(agreement.startDate));
-                      const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-                      const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
-                      const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
-                      const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
-                      
-                      return (
-                        <CarouselItem key={agreement.id} className="pl-2 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
-                            <div className="p-1 h-full">
-                                <Card className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow h-full">
-                                  <CardHeader className="flex-grow pb-2 pt-3">
-                                    <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
-                                    <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
-                                    <CardDescription className="text-xs pt-1 flex flex-col items-start">
-                                      <span>Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span>
-                                      {!isAgreementActive && <Badge variant="destructive" className="mt-1 text-xs">Inactive</Badge>}
-                                      {isAgreementActive && isDueForGeneration && <Badge variant="default" className="mt-1 text-xs bg-green-100 text-green-700">Ready</Badge>}
-                                      {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="mt-1 text-xs">Upcoming</Badge>}
-                                    </CardDescription>
-                                  </CardHeader>
-                                  <CardFooter className="pt-2 pb-3 mt-auto">
-                                    <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button>
-                                  </CardFooter>
-                                </Card>
-                              </div>
-                        </CarouselItem>
-                      );
-                    })}
-                  </CarouselContent>
-                  <CarouselPrevious />
-                  <CarouselNext />
-                </Carousel>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  <p>No active agreements available for bill generation.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-        
-        <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="font-headline text-xl">{isReadOnly ? 'View Payment Details' : 'Record Payment'}</DialogTitle>
-                    {billForPayment && billForPayment.agreement && billForPayment.agreement.space && <DialogDescription>For {billForPayment.agreement.space.spaceIdName} - Total: {processedClientBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)} Birr</DialogDescription>}
-                </DialogHeader>
-                <Form {...paymentForm}>
-                    <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
-                        <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`} disabled={isReadOnly || isLoading || !canManagePayments}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                        <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly || isLoading || !canManagePayments}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                        {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} disabled={isReadOnly || isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} /> )}
-                        <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} disabled={isReadOnly || isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                        {canManagePayments && <div> <Label htmlFor="adminPaymentProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach Payment Slip (Simulated) </Label> <Input id="adminPaymentProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isReadOnly || isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">Selected: {adminSelectedProofFile.name}</p>} </div>}
-                        <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Confirmed via bank statement." rows={2} {...field} disabled={isReadOnly || isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                        <DialogFooter className="pt-4">
-                          <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                          {!isReadOnly && canManagePayments && <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}{'Record as Paid'}</Button>}
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
-
-        <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
-                    {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: {processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount?.toFixed(2)} Birr</DialogDescription>}
-                </DialogHeader>
-                {billForVerification && ( <div className="text-sm space-y-2 py-2"> <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p> <p><strong>Submitted Proof:</strong> {billForVerification.paymentProofUrl ? <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}> {billForVerification.paymentProofUrl} (Click to view - simulated) </Button> : <span className="italic text-muted-foreground">No proof URL found.</span>} </p> </div> )}
-                <Form {...paymentForm}>
-                    <form className="space-y-4 py-1"> 
-                        <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`} disabled={isLoading || !canManagePayments}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                        <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isLoading || !canManagePayments}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                        {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} /> )}
-                        <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                        {canManagePayments && <div> <Label htmlFor="adminVerificationProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated) </Label> <Input id="adminVerificationProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>} </div>}
-                        <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                        <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
-                            {canManagePayments && <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'rejectVerification'))()} disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}Reject Payment</Button>}
-                            <div className="flex-grow"></div>
-                            <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                            {canManagePayments && <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirmVerification'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}Confirm Payment</Button>}
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
-        
-        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => { setIsEditDialogOpen(isOpen); if (!isOpen) { setBillForEdit(null); editForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
+      {canGenerateBills && (
+        <Card className="mb-6 shadow-sm">
+          <CardHeader> <CardTitle className="font-headline">Generate Bills</CardTitle> <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription> </CardHeader>
+          <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
+          <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
+          <CardContent>
+            {agreements.length > 0 ? (
+              <Carousel
+                opts={{
+                  align: "start",
+                  loop: agreements.length > 4,
+                }}
+                className="w-full"
+              >
+                <CarouselContent className="-ml-2">
+                  {agreements.map(agreement => {
+                    if (!agreement.tenant || !agreement.space) return null; 
+                    
+                    const agreementStartDate = startOfDay(parseISO(agreement.startDate));
+                    const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
+                    const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
+                    const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+                    const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
+                    
+                    return (
+                      <CarouselItem key={agreement.id} className="pl-2 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                          <div className="p-1 h-full">
+                              <Card className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow h-full">
+                                <CardHeader className="flex-grow pb-2 pt-3">
+                                  <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
+                                  <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
+                                  <CardDescription className="text-xs pt-1 flex flex-col items-start">
+                                    <span>Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span>
+                                    {!isAgreementActive && <Badge variant="destructive" className="mt-1 text-xs">Inactive</Badge>}
+                                    {isAgreementActive && isDueForGeneration && <Badge variant="default" className="mt-1 text-xs bg-green-100 text-green-700">Ready</Badge>}
+                                    {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="mt-1 text-xs">Upcoming</Badge>}
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardFooter className="pt-2 pb-3 mt-auto">
+                                  <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button>
+                                </CardFooter>
+                              </Card>
+                            </div>
+                      </CarouselItem>
+                    );
+                  })}
+                </CarouselContent>
+                <CarouselPrevious />
+                <CarouselNext />
+              </Carousel>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                <p>No active agreements available for bill generation.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      
+      <Dialog open={isPaymentDialogOpen} onOpenChange={(isOpen) => { setIsPaymentDialogOpen(isOpen); if (!isOpen) { setBillForPayment(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="font-headline text-xl">Edit Bill Details</DialogTitle>
-              <DialogDescription>For bill ID: {billForEdit?.id}</DialogDescription>
-            </DialogHeader>
-            <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4 py-2">
-                <FormField control={editForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Payment Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID, Check No." {...field} value={field.value ?? ""} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                <div>
-                    <Label htmlFor="adminEditProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach/Replace Payment Slip (Simulated) </Label>
-                    <Input id="adminEditProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading || !canManagePayments}/>
-                    {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>}
-                    {!adminSelectedProofFile && billForEdit?.paymentProofUrl && <p className="text-xs text-muted-foreground mt-1">Current file: {billForEdit.paymentProofUrl}</p>}
-                </div>
-                <FormField control={editForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes</FormLabel><FormControl><Textarea placeholder="e.g., Initial details added." {...field} value={field.value ?? ""} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                <DialogFooter className="pt-4">
-                    <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                    <Button type="submit" disabled={isLoading || !canManagePayments} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                        Save Changes
-                    </Button>
-                </DialogFooter>
-              </form>
-            </Form>
+              <DialogHeader>
+                  <DialogTitle className="font-headline text-xl">{isReadOnly ? 'View Payment Details' : 'Record Payment'}</DialogTitle>
+                  {billForPayment && billForPayment.agreement && billForPayment.agreement.space && <DialogDescription>For {billForPayment.agreement.space.spaceIdName} - Total: {processedClientBills.find(pb => pb.id === billForPayment.id)?.totalAmount.toFixed(2)} Birr</DialogDescription>}
+              </DialogHeader>
+              <Form {...paymentForm}>
+                  <form onSubmit={paymentForm.handleSubmit(handleRecordPaymentSubmit)} className="space-y-4 py-2">
+                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`} disabled={isReadOnly || isLoading || !canManagePayments}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly || isLoading || !canManagePayments}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} disabled={isReadOnly || isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} /> )}
+                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Reference (Optional)</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} disabled={isReadOnly || isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+                      {canManagePayments && <div> <Label htmlFor="adminPaymentProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach Payment Slip (Simulated) </Label> <Input id="adminPaymentProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isReadOnly || isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">Selected: {adminSelectedProofFile.name}</p>} </div>}
+                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Confirmed via bank statement." rows={2} {...field} disabled={isReadOnly || isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+                      <DialogFooter className="pt-4">
+                        <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                        {!isReadOnly && canManagePayments && <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}{'Record as Paid'}</Button>}
+                      </DialogFooter>
+                  </form>
+              </Form>
           </DialogContent>
-        </Dialog>
+      </Dialog>
 
-        <div className="space-y-4 mt-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  placeholder="Filter by tenant, space..."
-                  className="pl-10 h-9"
-                  value={billFilterTerm}
-                  onChange={(e) => setBillFilterTerm(e.target.value)}
-                />
+      <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
+          <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                  <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
+                  {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: {processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount?.toFixed(2)} Birr</DialogDescription>}
+              </DialogHeader>
+              {billForVerification && ( <div className="text-sm space-y-2 py-2"> <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p> <p><strong>Submitted Proof:</strong> {billForVerification.paymentProofUrl ? <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}> {billForVerification.paymentProofUrl} (Click to view - simulated) </Button> : <span className="italic text-muted-foreground">No proof URL found.</span>} </p> </div> )}
+              <Form {...paymentForm}>
+                  <form className="space-y-4 py-1"> 
+                      <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`} disabled={isLoading || !canManagePayments}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                      <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isLoading || !canManagePayments}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                      {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}</FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} /> )}
+                      <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+                      {canManagePayments && <div> <Label htmlFor="adminVerificationProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated) </Label> <Input id="adminVerificationProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>} </div>}
+                      <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+                      <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
+                          {canManagePayments && <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'rejectVerification'))()} disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}Reject Payment</Button>}
+                          <div className="flex-grow"></div>
+                          <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                          {canManagePayments && <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirmVerification'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}Confirm Payment</Button>}
+                      </DialogFooter>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => { setIsEditDialogOpen(isOpen); if (!isOpen) { setBillForEdit(null); editForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-headline text-xl">Edit Bill Details</DialogTitle>
+            <DialogDescription>For bill ID: {billForEdit?.id}</DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4 py-2">
+              <FormField control={editForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Payment Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID, Check No." {...field} value={field.value ?? ""} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+              <div>
+                  <Label htmlFor="adminEditProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Attach/Replace Payment Slip (Simulated) </Label>
+                  <Input id="adminEditProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading || !canManagePayments}/>
+                  {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>}
+                  {!adminSelectedProofFile && billForEdit?.paymentProofUrl && <p className="text-xs text-muted-foreground mt-1">Current file: {billForEdit.paymentProofUrl}</p>}
               </div>
-              <div className="flex gap-2">
-                <Select value={String(filterYear)} onValueChange={(val) => { setFilterYear(val === 'all' ? 'all' : Number(val)); if(val === 'all') setFilterMonth('all'); }}>
-                    <SelectTrigger className="w-full sm:w-[120px] h-9">
-                        <SelectValue placeholder="Year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Years</SelectItem>
-                        {yearsForFilter.map(year => (
-                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Select value={String(filterMonth)} onValueChange={(val) => setFilterMonth(val === 'all' ? 'all' : Number(val))} disabled={filterYear === 'all'}>
-                    <SelectTrigger className="w-full sm:w-[150px] h-9">
-                        <SelectValue placeholder="Month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Months</SelectItem>
-                        {monthsForFilter.map(month => (
-                             <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-              </div>
+              <FormField control={editForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes</FormLabel><FormControl><Textarea placeholder="e.g., Initial details added." {...field} value={field.value ?? ""} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
+              <DialogFooter className="pt-4">
+                  <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                  <Button type="submit" disabled={isLoading || !canManagePayments} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                      Save Changes
+                  </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <div className="space-y-4 mt-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h2 className="text-2xl font-headline font-semibold">Generated Bills</h2>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Filter by tenant, space..."
+                className="pl-10 h-9"
+                value={billFilterTerm}
+                onChange={(e) => setBillFilterTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={String(filterYear)} onValueChange={(val) => { setFilterYear(val === 'all' ? 'all' : Number(val)); if(val === 'all') setFilterMonth('all'); }}>
+                  <SelectTrigger className="w-full sm:w-[120px] h-9">
+                      <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      {yearsForFilter.map(year => (
+                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              <Select value={String(filterMonth)} onValueChange={(val) => setFilterMonth(val === 'all' ? 'all' : Number(val))} disabled={filterYear === 'all'}>
+                  <SelectTrigger className="w-full sm:w-[150px] h-9">
+                      <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Months</SelectItem>
+                      {monthsForFilter.map(month => (
+                           <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
             </div>
           </div>
-
-          {isLoading && bills.length > 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-          
-          {paginatedBills.length === 0 && !isLoading ? (
-              <Card className="text-center py-12 shadow-sm">
-                  <CardContent>
-                      <DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2 font-headline">{billFilterTerm || filterYear !== 'all' ? 'No Bills Match Filter' : 'No Bills Yet'}</h3>
-                      <p className="text-muted-foreground">{billFilterTerm || filterYear !== 'all' ? 'Try different filter options.' : 'Generate bills to see them here.'}</p>
-                  </CardContent>
-              </Card>
-          ) : (
-            <>
-              <Card className="shadow-md">
-                <CardContent className="p-0">
-                  <div className="w-full overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Tenant</TableHead>
-                          <TableHead className="hidden md:table-cell">Space</TableHead>
-                          <TableHead className="hidden lg:table-cell">Bill Date</TableHead>
-                          <TableHead>Due Date</TableHead>
-                          <TableHead className="hidden xl:table-cell text-right">Rent</TableHead>
-                          <TableHead className="hidden xl:table-cell text-right">Utilities</TableHead>
-                          <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                          <TableHead className="text-center">Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedBills.map((bill) => (
-                          <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                            <TableCell className="font-medium">
-                              <div className="w-24 break-words">{bill.tenantName}</div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-xs">
-                              <div>{bill.agreement?.space?.spaceIdName},</div>
-                              <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell">
-                               <div className="flex flex-col text-xs">
-                                <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
-                                <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
-                               <div className="flex flex-col text-xs font-medium">
-                                <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
-                                <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)}</TableCell>
-                            <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">
-                              {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('0.00')}
-                            </TableCell>
-                            <TableCell className={`hidden xl:table-cell text-right whitespace-nowrap ${bill.penaltyAmount ? 'text-destructive' : ''}`}>{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)}` : '0.00'}</TableCell>
-                            <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
-                                {getStatusIcon(bill.currentStatus || bill.status)}
-                                <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {bill.currentStatus === 'Paid' ? (
-                                  <>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8" disabled={isLoading}>
-                                          <Eye className="h-4 w-4 text-blue-600" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent><p>View Details</p></TooltipContent>
-                                    </Tooltip>
-                                    {canDeleteBills && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Delete Bill</p></TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </>
-                                ) : bill.currentStatus === 'PendingVerification' ? (
-                                  <>
-                                    {canManagePayments && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenVerificationDialog(bill)} className="h-8 w-8" disabled={isLoading}>
-                                            <ShieldCheck className="h-4 w-4 text-blue-600" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Verify Payment</p></TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                    {canDeleteBills && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Delete Bill</p></TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </>
-                                ) : ( // Pending or Overdue
-                                  <>
-                                    {canManagePayments && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8" disabled={isLoading}>
-                                            <CreditCard className="h-4 w-4 text-green-600" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Record Payment</p></TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                    {canManagePayments && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(bill)} className="h-8 w-8" disabled={isLoading}>
-                                            <Edit className="h-4 w-4 text-blue-600" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Edit Details</p></TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                    {canDeleteBills && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Delete Bill</p></TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                itemsPerPage={itemsPerPage}
-                onItemsPerPageChange={handleItemsPerPageChange}
-                className="mt-4"
-              />
-            </>
-          )}
         </div>
+
+        {isLoading && bills.length > 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
+        
+        {paginatedBills.length === 0 && !isLoading ? (
+            <Card className="text-center py-12 shadow-sm">
+                <CardContent>
+                    <DollarSign className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-semibold mb-2 font-headline">{billFilterTerm || filterYear !== 'all' ? 'No Bills Match Filter' : 'No Bills Yet'}</h3>
+                    <p className="text-muted-foreground">{billFilterTerm || filterYear !== 'all' ? 'Try different filter options.' : 'Generate bills to see them here.'}</p>
+                </CardContent>
+            </Card>
+        ) : (
+          <>
+            <Card className="shadow-md">
+              <CardContent className="p-0">
+                <div className="w-full overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tenant</TableHead>
+                        <TableHead className="hidden md:table-cell">Space</TableHead>
+                        <TableHead className="hidden lg:table-cell">Bill Date</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead className="hidden xl:table-cell text-right">Rent</TableHead>
+                        <TableHead className="hidden xl:table-cell text-right">Utilities</TableHead>
+                        <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedBills.map((bill) => (
+                        <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
+                          <TableCell className="font-medium">
+                            <div className="w-24 break-words">{bill.tenantName}</div>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-xs">
+                            <div>{bill.agreement?.space?.spaceIdName},</div>
+                            <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                             <div className="flex flex-col text-xs">
+                              <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
+                              <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
+                             <div className="flex flex-col text-xs font-medium">
+                              <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
+                              <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)}</TableCell>
+                          <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">
+                            {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('0.00')}
+                          </TableCell>
+                          <TableCell className={`hidden xl:table-cell text-right whitespace-nowrap ${bill.penaltyAmount ? 'text-destructive' : ''}`}>{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)}` : '0.00'}</TableCell>
+                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-[110px] justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                              {getStatusIcon(bill.currentStatus || bill.status)}
+                              <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:justify-end">
+                              {bill.currentStatus === 'Paid' ? (
+                                <>
+                                  <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="h-8" disabled={isLoading}>
+                                    <Eye className="mr-2 h-4 w-4" />View
+                                  </Button>
+                                  {canDeleteBills && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </>
+                              ) : bill.currentStatus === 'PendingVerification' ? (
+                                <>
+                                  {canManagePayments && (
+                                    <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="h-8 bg-blue-600 hover:bg-blue-700 text-white" disabled={isLoading}>
+                                      <ShieldCheck className="mr-2 h-4 w-4" />Verify
+                                    </Button>
+                                  )}
+                                  {canDeleteBills && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </>
+                              ) : ( // Pending or Overdue
+                                <>
+                                  {canManagePayments && (
+                                    <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 bg-green-600 hover:bg-green-700 text-white" disabled={isLoading}>
+                                      <CreditCard className="mr-2 h-4 w-4" />Record
+                                    </Button>
+                                  )}
+                                  {canManagePayments && (
+                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(bill)} className="h-8" disabled={isLoading}>
+                                      <Edit className="mr-2 h-4 w-4" />Edit
+                                    </Button>
+                                  )}
+                                  {canDeleteBills && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              className="mt-4"
+            />
+          </>
+        )}
       </div>
-    </TooltipProvider>
+    </div>
   );
 }
