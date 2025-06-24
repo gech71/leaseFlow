@@ -90,7 +90,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
               <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
            )}
         </CardContent>
-      <CardFooter className="border-t pt-4 flex items-center justify-end gap-1">
+      <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
         {canEdit ? (
           <Tooltip>
             <TooltipTrigger asChild>

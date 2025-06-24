@@ -247,7 +247,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
                   </CardContent>
                   <CardFooter className="border-t pt-4">
-                    <div className="flex w-full items-center justify-end gap-1">
+                    <div className="flex w-full flex-wrap items-center justify-end gap-2">
                       {canViewAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>

@@ -407,7 +407,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                   )}
                 </CardContent>
                 <CardFooter className="border-t pt-4">
-                  <div className="flex w-full items-center justify-end gap-1">
+                  <div className="flex w-full flex-wrap items-center justify-end gap-2">
                     {(canEditSpaces || canViewSpaces) && (
                       <Tooltip>
                         <TooltipTrigger asChild>
