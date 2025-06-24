@@ -11,7 +11,7 @@ import { RoleManagementClientPage, type ClientRole } from './client-page';
 const serializeRolesForClient = (roles: any[]): ClientRole[] => {
   return roles.map(role => ({
     ...role,
-    createdAt: role.createdAt.toISOString(),
+    createdAt: role.createdAt ? role.createdAt.toISOString() : new Date().toISOString(),
     updatedAt: role.updatedAt?.toISOString() || null,
   }));
 };
