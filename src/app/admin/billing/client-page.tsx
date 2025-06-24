@@ -41,6 +41,13 @@ import { getBillingPageDataAction, generateBillAndUpdateAgreementAction, recordP
 import type { SerializedBillingPageData, ClientBill, ClientAgreement, ClientBuilding } from './page'; 
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 
 const paymentFormSchema = z.object({
@@ -525,31 +532,55 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <CardHeader> <CardTitle className="font-headline">Generate Bills</CardTitle> <CardDescription>Generate bills for individual agreements or all due agreements. Utility costs must be entered on 'Building Utilities'. Late fees apply based on building policies.</CardDescription> </CardHeader>
           <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
           <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {agreements.map(agreement => {
-              if (!agreement.tenant || !agreement.space) return null; 
-              
-              const agreementStartDate = startOfDay(parseISO(agreement.startDate));
-              const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-              const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
-              const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
-              const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
-              
-              return (
-                <Card key={agreement.id} className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="flex-grow pb-2 pt-3">
-                    <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
-                    <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
-                    <CardDescription className="text-xs pt-1"> Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}
-                      {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive)</span>}
-                      {isAgreementActive && isDueForGeneration && <Badge variant="default" className="ml-1 text-xs bg-green-100 text-green-700">Due for Gen</Badge>}
-                      {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardFooter className="pt-2 pb-3"> <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button> </CardFooter>
-                </Card>
-              );
-            })}
+          <CardContent>
+            {agreements.length > 0 ? (
+              <Carousel
+                opts={{
+                  align: "start",
+                  loop: agreements.length > 4,
+                }}
+                className="w-full px-12"
+              >
+                <CarouselContent className="-ml-4">
+                  {agreements.map(agreement => {
+                    if (!agreement.tenant || !agreement.space) return null; 
+                    
+                    const agreementStartDate = startOfDay(parseISO(agreement.startDate));
+                    const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
+                    const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
+                    const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+                    const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
+                    
+                    return (
+                      <CarouselItem key={agreement.id} className="pl-4 sm:basis-1/2 md:basis-1/3 lg:basis-1/4">
+                        <div className="p-1 h-full">
+                          <Card className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow h-full">
+                            <CardHeader className="flex-grow pb-2 pt-3">
+                              <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
+                              <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
+                              <CardDescription className="text-xs pt-1"> Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}
+                                {!isAgreementActive && <span className="text-red-500 ml-1">(Inactive)</span>}
+                                {isAgreementActive && isDueForGeneration && <Badge variant="default" className="ml-1 text-xs bg-green-100 text-green-700">Due for Gen</Badge>}
+                                {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="ml-1 text-xs">Upcoming</Badge>}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardFooter className="pt-2 pb-3 mt-auto">
+                              <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button>
+                            </CardFooter>
+                          </Card>
+                        </div>
+                      </CarouselItem>
+                    );
+                  })}
+                </CarouselContent>
+                <CarouselPrevious className="left-0" />
+                <CarouselNext className="right-0" />
+              </Carousel>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                <p>No active agreements available for bill generation.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
