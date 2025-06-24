@@ -631,7 +631,7 @@ export async function updateBillAdminDetailsAction(
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     const bill = await databaseService.getBillById(billId, {
-      include: { agreement: { include: { space: true } } },
+      agreement: { include: { space: true } },
     });
 
     if (!bill) {
@@ -689,7 +689,7 @@ export async function deleteBillAction(billId: string) {
         const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
         const bill = await databaseService.getBillById(billId, {
-            include: { agreement: { include: { space: true } } },
+            agreement: { include: { space: true } },
         });
 
         if (!bill) {
@@ -711,3 +711,5 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
+
+    
