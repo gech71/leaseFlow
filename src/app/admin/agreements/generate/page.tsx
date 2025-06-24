@@ -82,12 +82,10 @@ async function GenerateAgreementDataFetcher() {
       managedBuildingIds = managedBuildings.map(b => b.id);
   }
 
+  // The correct logic is simpler: any tenant not currently in a space is available for a new agreement.
+  // The user's ability to create the agreement is limited by the spaces they manage, not the tenants they can see.
   const tenantWhereClause: Prisma.TenantWhereInput = {
-    // Show all unassigned tenants, and tenants assigned to the manager's buildings
-    OR: [
-      { rentedSpace: null },
-      ...(managedBuildingIds ? [{ rentedSpace: { buildingId: { in: managedBuildingIds } } }] : []),
-    ],
+    rentedSpace: null,
   };
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {

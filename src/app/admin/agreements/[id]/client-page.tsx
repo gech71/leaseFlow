@@ -12,6 +12,12 @@ import { FileText, ArrowLeft, User, HomeIcon, CalendarDays, Sigma, Printer, Down
 import type { Agreement as AgreementPrisma, Tenant, Space } from '@prisma/client';
 import { format, parseISO } from 'date-fns';
 import React from 'react';
+import { useToast } from '@/hooks/use-toast';
+
+// Helper to create a safe filename
+const sanitizeFilename = (name: string) => {
+  return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
+};
 
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
@@ -30,6 +36,7 @@ interface ViewAgreementClientPageProps {
 
 export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgreementClientPageProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [agreement, setAgreement] = useState<AgreementWithRelations | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -38,22 +45,31 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
     if (initialAgreement) {
         setAgreement(initialAgreement);
     } else if (isMounted) { 
-      // toast({ title: "Error", description: "Agreement not found or failed to load.", variant: "destructive" });
+      toast({ title: "Error", description: "Agreement not found or failed to load.", variant: "destructive" });
       router.push('/admin/agreements');
     }
-  }, [initialAgreement, router, isMounted]);
+  }, [initialAgreement, router, isMounted, toast]);
 
   const handleDownloadAgreement = () => {
-    if (!agreement) return;
-    const blob = new Blob([agreement.agreementText], { type: 'text/plain' });
+    if (!agreement || !agreement.agreementText) {
+      toast({ title: "Cannot Download", description: "Agreement text is empty or not available.", variant: "destructive"});
+      return;
+    }
+
+    const blob = new Blob([agreement.agreementText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+
+    const tenantName = agreement.tenant?.name || 'UnknownTenant';
+    const safeTenantName = sanitizeFilename(tenantName);
+
     a.href = url;
-    a.download = `Agreement-${agreement.tenant?.name}-${agreement.id}.txt`;
+    a.download = `Agreement-${safeTenantName}-${agreement.id}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    toast({ title: "Download Started", description: "Your agreement file is downloading." });
   };
 
   const getPaymentMethodIcon = (method?: string | null) => {

@@ -28,6 +28,11 @@ import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
+// Helper to create a safe filename
+const sanitizeFilename = (name: string) => {
+  return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
+};
+
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
   space: Space | null;
@@ -128,7 +133,12 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     const blob = new Blob([agreement.agreementText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.download = `Agreement-${agreement.tenant?.name}-${agreement.id}.txt`;
+    
+    const tenantName = agreement.tenant?.name || 'UnknownTenant';
+    const safeTenantName = sanitizeFilename(tenantName);
+
+    a.href = url;
+    a.download = `Agreement-${safeTenantName}-${agreement.id}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

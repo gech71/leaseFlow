@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -23,6 +24,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/contexts/PermissionContext';
+
+// Helper to create a safe filename
+const sanitizeFilename = (name: string) => {
+  return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
+};
 
 // Client-side representation of Tenant and Space with serialized dates
 interface ClientTenant extends Omit<TenantPrismaType, 'createdAt' | 'updatedAt'> {
@@ -178,11 +184,15 @@ Landlord/Authorized Representative
   
   const handleDownloadAgreement = () => {
     if (!generatedAgreementText) return;
-    const blob = new Blob([generatedAgreementText], { type: 'text/plain' });
+    const blob = new Blob([generatedAgreementText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const selectedTenant = tenants.find(t => t.id === form.getValues().tenantId);
-    a.download = `Draft-Agreement-${selectedTenant?.name || 'Tenant'}.txt`;
+
+    const tenantName = tenants.find(t => t.id === form.getValues().tenantId)?.name || 'Tenant';
+    const safeTenantName = sanitizeFilename(tenantName);
+
+    a.href = url;
+    a.download = `Draft-Agreement-${safeTenantName}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
