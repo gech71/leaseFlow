@@ -72,8 +72,8 @@ export function PaginationControls({
   };
 
   return (
-    <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-4", className)}>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className={cn("grid grid-cols-1 sm:grid-cols-3 items-center gap-4", className)}>
+      <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-muted-foreground">
         <span>Rows per page</span>
         <Select
           value={String(itemsPerPage)}
@@ -89,7 +89,7 @@ export function PaginationControls({
           </SelectContent>
         </Select>
       </div>
-      <Pagination>
+      <Pagination className="sm:col-start-2 sm:justify-self-center">
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
