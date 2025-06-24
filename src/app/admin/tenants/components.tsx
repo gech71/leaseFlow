@@ -104,7 +104,7 @@ export function TenantsClientPage({
   const [isSaving, setIsSaving] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateTenants = isSuperAdmin || hasPermission('tenant:create');

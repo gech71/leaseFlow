@@ -121,7 +121,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const router = useRouter();
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(9);
 
   const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
   const canEditBuildings = isSuperAdmin || hasPermission('building:edit');
