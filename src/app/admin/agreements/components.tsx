@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw, Trash2, Loader2, EyeOff } from 'lucide-react';
+import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw, Trash2, Loader2, EyeOff, MoreHorizontal } from 'lucide-react';
 import type { Agreement as AgreementPrisma, Tenant, Space } from '@prisma/client';
 import { Input } from '@/components/ui/input';
 import { addMonths, format, isBefore, startOfDay, subDays, isAfter, parseISO } from 'date-fns';
@@ -24,6 +24,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 
@@ -245,27 +252,46 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                     <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex flex-wrap justify-end items-center gap-2">
-                    {eligibleForRenewal && canEditAgreements && (
-                      <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                        <RefreshCw className="mr-1 h-4 w-4" /> Renew
-                      </Button>
-                    )}
+                  <CardFooter className="border-t pt-4 flex items-center justify-end gap-2">
                     {canViewAgreements && (
                       <Link href={`/admin/agreements/${agreement.id}`} passHref>
                         <Button variant="outline" size="sm">
-                          <Eye className="mr-1 h-4 w-4" /> View
+                          <Eye className="mr-2 h-4 w-4" /> View
                         </Button>
                       </Link>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)}>
-                      <Download className="mr-1 h-4 w-4" /> Download
-                    </Button>
-                    {canDeleteAgreements && (
-                      <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)}>
-                        <Trash2 className="mr-1 h-4 w-4" /> Delete
-                      </Button>
-                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">More actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {eligibleForRenewal && canEditAgreements && (
+                          <DropdownMenuItem onSelect={() => handleRenewAgreement(agreement)}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            <span>Renew</span>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onSelect={() => handleDownloadTxt(agreement.id)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          <span>Download</span>
+                        </DropdownMenuItem>
+                        {canDeleteAgreements && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={() => setAgreementToDelete(agreement)}
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </CardFooter>
                 </Card>
               );

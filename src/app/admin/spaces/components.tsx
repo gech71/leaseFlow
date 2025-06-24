@@ -405,15 +405,17 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="border-t pt-4 flex flex-wrap justify-end gap-2">
+                <CardFooter className="border-t pt-4 flex justify-end gap-2">
                   {(canEditSpaces || canViewSpaces) && (
                     <Button variant="outline" size="sm" onClick={() => openEditForm(space)} disabled={isSaving}>
-                      {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}
+                      {canEditSpaces ? <Edit3 className="h-4 w-4 sm:mr-2" /> : <Eye className="h-4 w-4 sm:mr-2" />}
+                      <span className="hidden sm:inline">{canEditSpaces ? 'Edit' : 'View'}</span>
                     </Button>
                   )}
                   {canDeleteSpaces && (
-                    <Button variant="destructive" size="sm" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
-                      <Trash2 className="mr-1 h-4 w-4" /> Delete
+                    <Button variant="destructive" size="icon" className="h-9 w-9" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Delete Space</span>
                     </Button>
                   )}
                 </CardFooter>

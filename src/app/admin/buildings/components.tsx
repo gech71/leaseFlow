@@ -89,23 +89,26 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
               <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
            )}
         </CardContent>
-      <CardFooter className="border-t pt-4 flex flex-col sm:flex-row justify-end gap-2">
+      <CardFooter className="border-t pt-4 flex justify-end gap-2">
         {canEdit ? (
-          <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref className="w-full sm:w-auto">
-            <Button variant="outline" size="sm" className="w-full">
-              <Edit3 className="mr-1 h-4 w-4" /> Edit
+          <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
+            <Button variant="outline" size="sm">
+              <Edit3 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Edit</span>
             </Button>
           </Link>
         ) : canViewDetails ? (
-           <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref className="w-full sm:w-auto">
-              <Button variant="outline" size="sm" className="w-full">
-                <Eye className="mr-1 h-4 w-4" /> View Details
+           <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref>
+              <Button variant="outline" size="sm">
+                <Eye className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">View Details</span>
               </Button>
             </Link>
         ) : null }
         {canDelete && (
-            <Button variant="destructive" size="sm" onClick={() => onDelete(building)} className="w-full sm:w-auto">
-              <Trash2 className="mr-1 h-4 w-4" /> Delete
+            <Button variant="destructive" size="icon" className="h-9 w-9" onClick={() => onDelete(building)}>
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Delete Building</span>
             </Button>
         )}
       </CardFooter>

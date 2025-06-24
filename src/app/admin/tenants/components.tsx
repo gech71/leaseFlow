@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff } from 'lucide-react';
+import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, MoreHorizontal } from 'lucide-react';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -30,6 +30,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -386,30 +393,47 @@ export function TenantsClientPage({
                     </div>
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
-                      <div className="w-full sm:w-auto text-left">
-                        {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
-                          <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                            <Button variant="outline" size="sm" disabled={isSaving} className="w-full sm:w-auto">
-                              <Eye className="mr-1 h-4 w-4" /> Agreement
-                            </Button>
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">{tenantActiveAgreement ? 'View Agreement' : 'No active agreement'}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 self-end sm:self-center">
+                  <CardFooter className="border-t pt-4 flex items-center justify-between gap-2 w-full">
+                    <div className="flex-1 min-w-0">
+                      {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
+                        <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
+                          <Button variant="outline" size="sm" disabled={isSaving} className="w-full sm:w-auto">
+                            <Eye className="mr-0 h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline truncate">Agreement</span>
+                          </Button>
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">{tenantActiveAgreement ? 'View Agreement' : 'No active agreement'}</span>
+                      )}
+                    </div>
+                    
+                    <div className="shrink-0">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">More actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
                           {(canEditTenants || canViewTenants) && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)} disabled={isSaving}>
-                                {canEditTenants ? <Edit3 className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
-                            </Button>
+                            <DropdownMenuItem onSelect={() => handleOpenEditForm(tenant)}>
+                              {canEditTenants ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                              <span>{canEditTenants ? 'Edit Tenant' : 'View Details'}</span>
+                            </DropdownMenuItem>
                           )}
                           {canDeleteTenants && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTenantToDelete(tenant)} disabled={isSaving}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <>
+                              {(canEditTenants || canViewTenants) && <DropdownMenuSeparator />}
+                              <DropdownMenuItem onSelect={() => setTenantToDelete(tenant)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete Tenant</span>
+                              </DropdownMenuItem>
+                            </>
                           )}
-                      </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </CardFooter>
                 </Card>
               );
