@@ -253,7 +253,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                           <TooltipTrigger asChild>
                             <Link href={`/admin/agreements/${agreement.id}`} passHref>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <Eye className="h-4 w-4" />
+                                <Eye className="h-4 w-4 text-blue-600" />
                                 <span className="sr-only">View Agreement</span>
                               </Button>
                             </Link>
@@ -265,7 +265,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRenewAgreement(agreement)}>
-                              <RefreshCw className="h-4 w-4" />
+                              <RefreshCw className="h-4 w-4 text-purple-600" />
                               <span className="sr-only">Renew Agreement</span>
                             </Button>
                           </TooltipTrigger>
@@ -275,7 +275,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadTxt(agreement.id)}>
-                            <Download className="h-4 w-4" />
+                            <Download className="h-4 w-4 text-green-600" />
                             <span className="sr-only">Download Agreement</span>
                           </Button>
                         </TooltipTrigger>
@@ -284,7 +284,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                       {canDeleteAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setAgreementToDelete(agreement)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setAgreementToDelete(agreement)}>
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Delete Agreement</span>
                             </Button>

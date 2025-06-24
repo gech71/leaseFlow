@@ -410,7 +410,7 @@ export function TenantsClientPage({
                            <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
-                                {canEditTenants ? <Edit3 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                {canEditTenants ? <Edit3 className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
                                 <span className="sr-only">{canEditTenants ? 'Edit Tenant' : 'View Tenant'}</span>
                               </Button>
                             </TooltipTrigger>
@@ -420,7 +420,7 @@ export function TenantsClientPage({
                         {canDeleteTenants && (
                            <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setTenantToDelete(tenant)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setTenantToDelete(tenant)}>
                                 <Trash2 className="h-4 w-4" />
                                 <span className="sr-only">Delete Tenant</span>
                               </Button>

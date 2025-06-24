@@ -412,7 +412,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditForm(space)} disabled={isSaving}>
-                            {canEditSpaces ? <Edit3 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {canEditSpaces ? <Edit3 className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
                             <span className="sr-only">{canEditSpaces ? 'Edit Space' : 'View Space'}</span>
                           </Button>
                         </TooltipTrigger>
@@ -422,7 +422,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                     {canDeleteSpaces && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setSpaceToDelete(space)} disabled={space.isOccupied || isSaving}>
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Delete Space</span>
                           </Button>

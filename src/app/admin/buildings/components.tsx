@@ -96,7 +96,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
             <TooltipTrigger asChild>
               <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Edit3 className="h-4 w-4" />
+                  <Edit3 className="h-4 w-4 text-blue-600" />
                   <span className="sr-only">Edit Building</span>
                 </Button>
               </Link>
@@ -108,7 +108,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
             <TooltipTrigger asChild>
               <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-4 w-4 text-blue-600" />
                   <span className="sr-only">View Building</span>
                 </Button>
               </Link>
@@ -119,7 +119,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
         {canDelete && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(building)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(building)}>
                 <Trash2 className="h-4 w-4" />
                 <span className="sr-only">Delete Building</span>
               </Button>
