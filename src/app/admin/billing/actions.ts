@@ -637,9 +637,7 @@ export async function updateBillAdminDetailsAction(
     if (!bill) {
       return { success: false, error: "Bill not found." };
     }
-    if (bill.status === 'Paid') {
-      return { success: false, error: "Cannot edit details for a paid bill." };
-    }
+    
     if (!isSuperAdmin && (!bill.agreement?.space?.buildingId || !managedBuildingIds?.includes(bill.agreement.space.buildingId))) {
       return { success: false, error: "Permission denied." };
     }

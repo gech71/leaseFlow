@@ -782,6 +782,17 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                   </TooltipTrigger>
                                   <TooltipContent><p>View Details</p></TooltipContent>
                                 </Tooltip>
+                                {canManagePayments && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(bill)} className="h-8 w-8" disabled={isLoading}>
+                                        <Edit className="h-4 w-4" />
+                                        <span className="sr-only">Edit Details</span>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Edit Details</p></TooltipContent>
+                                  </Tooltip>
+                                )}
                               </>
                             ) : bill.currentStatus === 'PendingVerification' ? (
                               <>
@@ -810,20 +821,9 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                     <TooltipContent><p>Record Payment</p></TooltipContent>
                                   </Tooltip>
                                 )}
-                                {canManagePayments && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(bill)} className="h-8 w-8" disabled={isLoading}>
-                                        <Edit className="h-4 w-4" />
-                                        <span className="sr-only">Edit Details</span>
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent><p>Edit Details</p></TooltipContent>
-                                  </Tooltip>
-                                )}
                               </>
                             )}
-                            {canDeleteBills && (
+                            {canDeleteBills && bill.currentStatus !== 'Paid' && (
                                <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
