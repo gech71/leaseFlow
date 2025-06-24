@@ -5,6 +5,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, User, Role } from '@prisma/client';
 import { TenantsClientPage, type TenantWithRelations, type SpaceWithTenant, type ClientAgreement } from './components';
 import { cookies } from 'next/headers';
+import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
 
 // Insecure JWT payload decoder
 function decodeJwtPayload(token: string): any | null {
@@ -51,14 +52,19 @@ export default async function TenantsPage() {
       managedBuildingIds = managedBuildings.map(b => b.id);
   }
 
-  // A user can see tenants in their managed buildings. Unassigned tenants are only visible to SUPER_ADMIN on this page.
+  // A user can see unassigned tenants, and tenants assigned to buildings they manage.
   const tenantWhere: Prisma.TenantWhereInput = managedBuildingIds
     ? {
-        rentedSpace: {
-          buildingId: {
-            in: managedBuildingIds,
+        OR: [
+          { rentedSpace: null },
+          {
+            rentedSpace: {
+              buildingId: {
+                in: managedBuildingIds,
+              },
+            },
           },
-        },
+        ],
       }
     : {};
   
