@@ -55,7 +55,7 @@ export default function GenerateAgreementPage() {
        <PageHeader
         title="Generate Rental Agreement"
         icon={FileText}
-        description="Select tenant and space, generate agreement text with AI, then save the complete record."
+        description="Select tenant and space, generate agreement text, then save the complete record."
         actions={
             <Link href="/admin/agreements" passHref>
                 <Button variant="outline">
@@ -82,11 +82,9 @@ async function GenerateAgreementDataFetcher() {
       managedBuildingIds = managedBuildings.map(b => b.id);
   }
 
-  // The correct logic is simpler: any tenant not currently in a space is available for a new agreement.
-  // The user's ability to create the agreement is limited by the spaces they manage, not the tenants they can see.
-  const tenantWhereClause: Prisma.TenantWhereInput = {
-    rentedSpace: null,
-  };
+  // A tenant can have multiple agreements, so list all tenants.
+  // The user's ability to create the agreement is limited by the available spaces they manage.
+  const tenantWhereClause: Prisma.TenantWhereInput = {};
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {
     isOccupied: false,

@@ -24,6 +24,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/contexts/PermissionContext';
+import { jsPDF } from 'jspdf';
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -183,20 +184,24 @@ Landlord/Authorized Representative
   };
   
   const handleDownloadAgreement = () => {
-    if (!generatedAgreementText) return;
-    const blob = new Blob([generatedAgreementText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    if (!generatedAgreementText) {
+      toast({ title: "Cannot Download", description: "No agreement text has been generated.", variant: "destructive"});
+      return;
+    }
+    
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+
+    const textLines = doc.splitTextToSize(generatedAgreementText, 180);
+    doc.text(textLines, 15, 15);
 
     const tenantName = tenants.find(t => t.id === form.getValues().tenantId)?.name || 'Tenant';
     const safeTenantName = sanitizeFilename(tenantName);
 
-    a.href = url;
-    a.download = `Draft-Agreement-${safeTenantName}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    doc.save(`Draft-Agreement-${safeTenantName}.pdf`);
+    
+    toast({ title: "Download Started", description: "Your draft agreement PDF is downloading." });
   };
 
   const handleSaveFullAgreement = async () => {

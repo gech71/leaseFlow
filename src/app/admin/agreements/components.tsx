@@ -27,6 +27,7 @@ import {
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { jsPDF } from "jspdf";
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -118,7 +119,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     return !isBefore(today, renewalEligibilityStartDate) && !isAfter(today, agreementEndDate);
   };
 
-  const handleDownloadTxt = (agreementId: string) => {
+  const handleDownloadPdf = (agreementId: string) => {
     const agreement = agreements.find(a => a.id === agreementId);
     if (!agreement) {
         toast({ title: "Error", description: "Could not find agreement to download.", variant: "destructive" });
@@ -129,21 +130,20 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
         toast({ title: "Error", description: "Agreement text is empty and cannot be downloaded.", variant: "destructive" });
         return;
     }
-
-    const blob = new Blob([agreement.agreementText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
     
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+
+    const textLines = doc.splitTextToSize(agreement.agreementText, 180);
+    doc.text(textLines, 15, 15);
+
     const tenantName = agreement.tenant?.name || 'UnknownTenant';
     const safeTenantName = sanitizeFilename(tenantName);
 
-    a.href = url;
-    a.download = `Agreement-${safeTenantName}-${agreement.id}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast({ title: "Download Started", description: "The agreement text file is downloading." });
+    doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+    
+    toast({ title: "Download Started", description: "The agreement PDF is downloading." });
   };
 
   const handleRenewAgreement = (agreement: AgreementWithRelations) => {
@@ -284,7 +284,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                       )}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadTxt(agreement.id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadPdf(agreement.id)}>
                             <Download className="h-4 w-4 text-green-600" />
                             <span className="sr-only">Download Agreement</span>
                           </Button>

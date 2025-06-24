@@ -13,6 +13,7 @@ import type { Agreement as AgreementPrisma, Tenant, Space } from '@prisma/client
 import { format, parseISO } from 'date-fns';
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { jsPDF } from 'jspdf';
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -56,20 +57,19 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
       return;
     }
 
-    const blob = new Blob([agreement.agreementText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    
+    const textLines = doc.splitTextToSize(agreement.agreementText, 180);
+    doc.text(textLines, 15, 15);
 
     const tenantName = agreement.tenant?.name || 'UnknownTenant';
     const safeTenantName = sanitizeFilename(tenantName);
 
-    a.href = url;
-    a.download = `Agreement-${safeTenantName}-${agreement.id}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast({ title: "Download Started", description: "Your agreement file is downloading." });
+    doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+    
+    toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
   };
 
   const getPaymentMethodIcon = (method?: string | null) => {
