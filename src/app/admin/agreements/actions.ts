@@ -99,7 +99,6 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     });
 
     revalidatePath('/admin/agreements');
-    revalidatePath('/admin/agreements/generate');
     revalidatePath('/admin/spaces'); // Space occupancy changed
     revalidatePath('/admin/tenants'); // Tenant's rentedSpace changed
     revalidatePath('/admin/billing'); // Invalidate billing page data
