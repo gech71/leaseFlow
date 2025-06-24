@@ -48,6 +48,11 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 
 const paymentFormSchema = z.object({
@@ -717,108 +722,124 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <>
             <Card className="shadow-md">
               <CardContent className="p-0">
-                <div className="w-full overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tenant</TableHead>
-                        <TableHead className="hidden md:table-cell">Space</TableHead>
-                        <TableHead className="hidden lg:table-cell">Bill Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead className="hidden xl:table-cell text-right">Rent</TableHead>
-                        <TableHead className="hidden xl:table-cell text-right">Utilities</TableHead>
-                        <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedBills.map((bill) => (
-                        <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                          <TableCell className="font-medium">
-                            <div className="w-24 break-words">{bill.tenantName}</div>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-xs">
-                            <div>{bill.agreement?.space?.spaceIdName},</div>
-                            <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                             <div className="flex flex-col text-xs">
-                              <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
-                              <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
-                             <div className="flex flex-col text-xs font-medium">
-                              <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
-                              <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)}</TableCell>
-                          <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">
-                            {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('0.00')}
-                          </TableCell>
-                          <TableCell className={`hidden xl:table-cell text-right whitespace-nowrap ${bill.penaltyAmount ? 'text-destructive' : ''}`}>{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)}` : '0.00'}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-[110px] justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
-                              {getStatusIcon(bill.currentStatus || bill.status)}
-                              <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:justify-end">
-                              {bill.currentStatus === 'Paid' ? (
-                                <>
-                                  <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="h-8" disabled={isLoading}>
-                                    <Eye className="mr-2 h-4 w-4" />View
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tenant</TableHead>
+                      <TableHead className="hidden sm:table-cell">Space</TableHead>
+                      <TableHead className="hidden md:table-cell">Bill Date</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead className="text-right">Total Amount</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedBills.map((bill) => (
+                      <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
+                        <TableCell className="font-medium">
+                          <div className="w-24 break-words">{bill.tenantName}</div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell text-xs">
+                          <div>{bill.agreement?.space?.spaceIdName},</div>
+                          <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                            <div className="flex flex-col text-xs">
+                            <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
+                            <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
+                            <div className="flex flex-col text-xs font-medium">
+                            <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
+                            <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
+                          <div className="text-xs text-muted-foreground whitespace-nowrap">
+                            {`R: ${bill.rentAmount.toFixed(0)} | U: ${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(0)}`}
+                            {bill.penaltyAmount ? <span className="text-destructive">{` | P: ${bill.penaltyAmount.toFixed(0)}`}</span> : ''}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-auto justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                            {getStatusIcon(bill.currentStatus || bill.status)}
+                            <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-0">
+                            {bill.currentStatus === 'Paid' ? (
+                              <>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8" disabled={isLoading}>
+                                      <Eye className="h-4 w-4 text-blue-600" />
+                                      <span className="sr-only">View Details</span>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>View Details</p></TooltipContent>
+                                </Tooltip>
+                              </>
+                            ) : bill.currentStatus === 'PendingVerification' ? (
+                              <>
+                                {canManagePayments && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenVerificationDialog(bill)} className="h-8 w-8 text-blue-600" disabled={isLoading}>
+                                        <ShieldCheck className="h-4 w-4" />
+                                        <span className="sr-only">Verify Payment</span>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Verify Payment</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </>
+                            ) : ( // Pending or Overdue
+                              <>
+                                {canManagePayments && (
+                                   <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8 text-green-600" disabled={isLoading}>
+                                        <CreditCard className="h-4 w-4" />
+                                        <span className="sr-only">Record Payment</span>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Record Payment</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {canManagePayments && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(bill)} className="h-8 w-8" disabled={isLoading}>
+                                        <Edit className="h-4 w-4" />
+                                        <span className="sr-only">Edit Details</span>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Edit Details</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </>
+                            )}
+                            {canDeleteBills && (
+                               <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
+                                    <Trash2 className="h-4 w-4" />
+                                     <span className="sr-only">Delete Bill</span>
                                   </Button>
-                                  {canDeleteBills && (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </>
-                              ) : bill.currentStatus === 'PendingVerification' ? (
-                                <>
-                                  {canManagePayments && (
-                                    <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="h-8 bg-blue-600 hover:bg-blue-700 text-white" disabled={isLoading}>
-                                      <ShieldCheck className="mr-2 h-4 w-4" />Verify
-                                    </Button>
-                                  )}
-                                  {canDeleteBills && (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </>
-                              ) : ( // Pending or Overdue
-                                <>
-                                  {canManagePayments && (
-                                    <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 bg-green-600 hover:bg-green-700 text-white" disabled={isLoading}>
-                                      <CreditCard className="mr-2 h-4 w-4" />Record
-                                    </Button>
-                                  )}
-                                  {canManagePayments && (
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(bill)} className="h-8" disabled={isLoading}>
-                                      <Edit className="mr-2 h-4 w-4" />Edit
-                                    </Button>
-                                  )}
-                                  {canDeleteBills && (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Delete Bill</p></TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
             <PaginationControls
