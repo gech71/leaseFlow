@@ -716,48 +716,68 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <>
             <Card className="shadow-md">
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader><TableRow>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
                       <TableHead>Tenant</TableHead>
                       <TableHead className="hidden md:table-cell">Space</TableHead>
-                      <TableHead>Bill Date</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead className="hidden lg:table-cell text-right">Rent</TableHead>
+                      <TableHead className="hidden lg:table-cell">Bill Date</TableHead>
+                      <TableHead className="hidden sm:table-cell">Due Date</TableHead>
+                      <TableHead className="hidden xl:table-cell text-right">Rent</TableHead>
                       <TableHead className="hidden lg:table-cell text-right">Utilities</TableHead>
                       <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right pr-2 sm:pr-4">Actions</TableHead>
-                    </TableRow></TableHeader>
-                    <TableBody>
-                      {paginatedBills.map((bill) => (
-                        <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                          <TableCell className="font-medium">{bill.tenantName}</TableCell>
-                          <TableCell className="hidden md:table-cell text-xs">{bill.agreement?.space?.spaceIdName}, {bill.agreement?.space?.buildingName}</TableCell>
-                          <TableCell>{format(parseISO(bill.billDate), 'PP')}</TableCell>
-                          <TableCell className={bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                          <TableCell className="hidden lg:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)} Birr</TableCell>
-                          <TableCell className="hidden lg:table-cell text-right whitespace-nowrap">
-                            {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)} Birr</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)} Birr</span></li>))}</ul></PopoverContent></Popover>) : ('0.00 Birr')}
-                          </TableCell>
-                          <TableCell className="hidden xl:table-cell text-right text-destructive whitespace-nowrap">{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : '0.00 Birr'}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
-                          <TableCell className="text-center"><Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span></Badge></TableCell>
-                          <TableCell className="text-right pr-2 sm:pr-4">
-                            <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">
-                              {bill.currentStatus === 'PendingVerification' && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" disabled={isLoading}><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button> )}
-                              {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button> )}
-                              {bill.status !== 'Paid' && canManagePayments && (<Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Edit</span><span className="sm:hidden">Edit</span></Button>)}
-                              {bill.currentStatus === 'Paid' && canManagePayments && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Eye className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View Details</span><span className="sm:hidden">View</span></Button> )}
-                              {canDeleteBills && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive/10 self-center sm:self-auto" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading || bill.status === 'Paid'}><Trash2 className="h-4 w-4"/></Button>}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedBills.map((bill) => (
+                      <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
+                        <TableCell className="font-medium">
+                          <div className="w-24 break-words">{bill.tenantName}</div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-xs">
+                          <div>{bill.agreement?.space?.spaceIdName},</div>
+                          <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <div className="flex flex-col text-sm">
+                            <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
+                            <span className="text-xs text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className={`hidden sm:table-cell ${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
+                          <div className="flex flex-col text-sm font-medium">
+                            <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
+                            <span className={`text-xs ${bill.currentStatus === 'Overdue' ? 'font-normal' : 'text-muted-foreground font-normal'}`}>{format(parseISO(bill.dueDate), 'yyyy')}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)} Birr</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right whitespace-nowrap">
+                          {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)} Birr</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)} Birr</span></li>))}</ul></PopoverContent></Popover>) : ('0.00 Birr')}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-right text-destructive whitespace-nowrap">{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : '0.00 Birr'}</TableCell>
+                        <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-[110px] justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                            {getStatusIcon(bill.currentStatus || bill.status)}
+                            <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-col sm:flex-row gap-1 justify-end items-stretch sm:items-center">
+                            {bill.currentStatus === 'PendingVerification' && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenVerificationDialog(bill)} className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto" disabled={isLoading}><ShieldCheck className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Verify</span><span className="sm:hidden">Verify</span></Button> )}
+                            {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && canManagePayments && ( <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}><CreditCard className="mr-1 h-3.5 w-3.5" /><span className="hidden sm:inline">Record Pymt</span><span className="sm:hidden">Pay</span></Button> )}
+                            {bill.status !== 'Paid' && canManagePayments && (<Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Edit className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">Edit</span><span className="sm:hidden">Edit</span></Button>)}
+                            {bill.currentStatus === 'Paid' && canManagePayments && ( <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="w-full sm:w-auto" disabled={isLoading}><Eye className="mr-1 h-3.5 w-3.5"/><span className="hidden sm:inline">View Details</span><span className="sm:hidden">View</span></Button> )}
+                            {canDeleteBills && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive/10 self-center sm:self-auto" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading || bill.status === 'Paid'}><Trash2 className="h-4 w-4"/></Button>}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
             <PaginationControls
