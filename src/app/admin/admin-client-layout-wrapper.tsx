@@ -65,8 +65,8 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermissions: ['dashboard:view'] },
-  { href: '/admin/buildings', label: 'Buildings', icon: LayoutGrid, requiredPermissions: ['building:view', 'building:create', 'building:edit', 'building:delete'] },
+  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid, requiredPermissions: ['dashboard:view'] },
+  { href: '/admin/buildings', label: 'Buildings', icon: Building2, requiredPermissions: ['building:view', 'building:create', 'building:edit', 'building:delete'] },
   { href: '/admin/spaces', label: 'Spaces', icon: Building, requiredPermissions: ['space:view', 'space:create', 'space:edit', 'space:delete'] },
   { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:view', 'tenant:create', 'tenant:edit', 'tenant:delete'] },
   { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:view', 'agreement:create', 'agreement:edit', 'agreement:delete'] },
