@@ -362,38 +362,40 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
           <>
             <Card className="shadow-md">
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tenant</TableHead>
-                      <TableHead className="hidden md:table-cell">Space</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
-                      <TableHead className="text-right">Amount Due</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedUpcomingBills.map(bill => (
-                      <TableRow key={bill.id} className={`${bill.status === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                        <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
-                        <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
-                        <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
-                          {format(parseISO(bill.dueDate), 'PP')}
-                        </TableCell>
-                        <TableCell className="hidden xl:table-cell text-xs text-destructive text-right whitespace-nowrap">
-                          {bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : ''}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize ${bill.status === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
-                            {getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification',' Ver.')}</span>
-                          </Badge>
-                        </TableCell>
+                <div className="w-full overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tenant</TableHead>
+                        <TableHead className="hidden md:table-cell">Space</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
+                        <TableHead className="text-right">Amount Due</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedUpcomingBills.map(bill => (
+                        <TableRow key={bill.id} className={`${bill.status === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
+                          <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
+                          <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
+                            {format(parseISO(bill.dueDate), 'PP')}
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell text-xs text-destructive text-right whitespace-nowrap">
+                            {bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : ''}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={getStatusBadgeVariant(bill.status)} className={`capitalize ${bill.status === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                              {getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace(' Verification',' Ver.')}</span>
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
             <PaginationControls
@@ -458,32 +460,34 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
           <>
             <Card className="shadow-md">
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tenant</TableHead>
-                      <TableHead className="hidden md:table-cell">Space</TableHead>
-                      <TableHead>Payment Date</TableHead>
-                      <TableHead className="hidden lg:table-cell">Method</TableHead>
-                      <TableHead className="text-right">Amount Paid</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedPaidBills.map(bill => (
-                      <TableRow key={bill.id}>
-                        <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
-                        <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
-                        <TableCell>{bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}</TableCell>
-                        <TableCell className="hidden lg:table-cell text-xs">
-                          {bill.paymentMethod || 'N/A'}
-                          {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
-                          {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-green-600 whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
+                <div className="w-full overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tenant</TableHead>
+                        <TableHead className="hidden md:table-cell">Space</TableHead>
+                        <TableHead>Payment Date</TableHead>
+                        <TableHead className="hidden lg:table-cell">Method</TableHead>
+                        <TableHead className="text-right">Amount Paid</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedPaidBills.map(bill => (
+                        <TableRow key={bill.id}>
+                          <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
+                          <TableCell>{bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}</TableCell>
+                          <TableCell className="hidden lg:table-cell text-xs">
+                            {bill.paymentMethod || 'N/A'}
+                            {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
+                            {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-green-600 whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
             <PaginationControls

@@ -47,7 +47,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
-} from "@/components/ui/carousel";
+} from "@/components/ui/carousel"
 
 
 const paymentFormSchema = z.object({
@@ -533,15 +533,15 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <CardContent> <Button onClick={handleGenerateAllDueBills} className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading || agreements.length === 0}> {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Zap className="mr-2 h-5 w-5" />} Generate All Due Bills </Button> </CardContent>
           <CardHeader className="pt-4"> <CardTitle className="font-headline text-lg">Individual Bill Generation</CardTitle> <CardDescription>Select an active agreement to generate its next due bill.</CardDescription> </CardHeader>
           <CardContent>
-             {agreements.length > 0 ? (
+            {agreements.length > 0 ? (
               <Carousel
                 opts={{
                   align: "start",
-                  loop: agreements.length > 4, // Loop only if there are enough items
+                  loop: agreements.length > 4,
                 }}
                 className="w-full"
               >
-                <CarouselContent className="-ml-2 md:-ml-4">
+                <CarouselContent className="-ml-2">
                   {agreements.map(agreement => {
                     if (!agreement.tenant || !agreement.space) return null; 
                     
@@ -552,32 +552,32 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                     const isDueForGeneration = isAgreementActive && nextDueDateString <= todayUtcDateString;
                     
                     return (
-                      <CarouselItem key={agreement.id} className="pl-2 md:pl-4 basis-full sm:basis-1/2 md:basis-1/3 lg:basis-1/4">
-                        <div className="p-1 h-full">
-                            <Card className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow h-full">
-                              <CardHeader className="flex-grow pb-2 pt-3">
-                                <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
-                                <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
-                                <CardDescription className="text-xs pt-1 flex flex-col items-start">
-                                  <span>Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span>
-                                  {!isAgreementActive && <Badge variant="destructive" className="mt-1 text-xs">Inactive</Badge>}
-                                  {isAgreementActive && isDueForGeneration && <Badge variant="default" className="mt-1 text-xs bg-green-100 text-green-700">Ready</Badge>}
-                                  {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="mt-1 text-xs">Upcoming</Badge>}
-                                </CardDescription>
-                              </CardHeader>
-                              <CardFooter className="pt-2 pb-3 mt-auto">
-                                <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button>
-                              </CardFooter>
-                            </Card>
-                          </div>
+                      <CarouselItem key={agreement.id} className="pl-2 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                          <div className="p-1 h-full">
+                              <Card className="flex flex-col bg-secondary/30 shadow-sm hover:shadow-md transition-shadow h-full">
+                                <CardHeader className="flex-grow pb-2 pt-3">
+                                  <CardTitle className="text-base font-semibold">{agreement.tenant.name}</CardTitle>
+                                  <CardDescription className="text-xs">{agreement.space.spaceIdName}, {agreement.space.buildingName}</CardDescription>
+                                  <CardDescription className="text-xs pt-1 flex flex-col items-start">
+                                    <span>Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span>
+                                    {!isAgreementActive && <Badge variant="destructive" className="mt-1 text-xs">Inactive</Badge>}
+                                    {isAgreementActive && isDueForGeneration && <Badge variant="default" className="mt-1 text-xs bg-green-100 text-green-700">Ready</Badge>}
+                                    {isAgreementActive && !isDueForGeneration && <Badge variant="outline" className="mt-1 text-xs">Upcoming</Badge>}
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardFooter className="pt-2 pb-3 mt-auto">
+                                  <Button size="sm" onClick={() => handleGenerateSingleBill(agreement.id)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={!isAgreementActive || isLoading}>Generate Bill</Button>
+                                </CardFooter>
+                              </Card>
+                            </div>
                       </CarouselItem>
                     );
                   })}
                 </CarouselContent>
-                <CarouselPrevious className="hidden sm:flex" />
-                <CarouselNext className="hidden sm:flex" />
+                <CarouselPrevious />
+                <CarouselNext />
               </Carousel>
-             ) : (
+            ) : (
               <div className="text-center py-4 text-muted-foreground">
                 <p>No active agreements available for bill generation.</p>
               </div>
@@ -717,15 +717,18 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           <>
             <Card className="shadow-md">
               <CardContent className="p-0">
-                <div className="w-full">
+                <div className="w-full overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Tenant</TableHead>
-                        <TableHead className="hidden sm:table-cell">Space</TableHead>
-                        <TableHead className="hidden md:table-cell">Bill Date</TableHead>
+                        <TableHead className="hidden md:table-cell">Space</TableHead>
+                        <TableHead className="hidden lg:table-cell">Bill Date</TableHead>
                         <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right">Total Amount</TableHead>
+                        <TableHead className="hidden xl:table-cell text-right">Rent</TableHead>
+                        <TableHead className="hidden xl:table-cell text-right">Utilities</TableHead>
+                        <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-center">Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -736,11 +739,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                           <TableCell className="font-medium">
                             <div className="w-24 break-words">{bill.tenantName}</div>
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-xs">
+                          <TableCell className="hidden md:table-cell text-xs">
                             <div>{bill.agreement?.space?.spaceIdName},</div>
                             <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
                           </TableCell>
-                          <TableCell className="hidden md:table-cell">
+                          <TableCell className="hidden lg:table-cell">
                              <div className="flex flex-col text-xs">
                               <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
                               <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
@@ -752,17 +755,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                               <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
-                                (R: {bill.rentAmount.toFixed(2)} U: {(bill.utilityBreakdown?.reduce((s, u) => s + u.amount, 0) || 0).toFixed(2)})
-                            </div>
-                            {(bill.penaltyAmount ?? 0) > 0 && (
-                                <div className="text-xs text-destructive whitespace-nowrap">
-                                  Penalty: {(bill.penaltyAmount ?? 0).toFixed(2)}
-                                </div>
-                            )}
+                          <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">{bill.rentAmount.toFixed(2)}</TableCell>
+                          <TableCell className="hidden xl:table-cell text-right whitespace-nowrap">
+                            {bill.utilityBreakdown?.length > 0 ? (<Popover><PopoverTrigger asChild><Button variant="link" size="sm" className="p-0 h-auto font-normal text-primary hover:underline">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</Button></PopoverTrigger><PopoverContent className="w-auto text-xs p-2" side="top"><ul className="space-y-0.5">{bill.utilityBreakdown.map(u => (<li key={u.id || u.name} className="flex justify-between"><span>{u.name}:</span><span className="font-medium ml-2">{u.amount.toFixed(2)}</span></li>))}</ul></PopoverContent></Popover>) : ('0.00')}
                           </TableCell>
+                          <TableCell className={`hidden xl:table-cell text-right whitespace-nowrap ${bill.penaltyAmount ? 'text-destructive' : ''}`}>{bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)}` : '0.00'}</TableCell>
+                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
                           <TableCell className="text-center">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-[110px] justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
                               {getStatusIcon(bill.currentStatus || bill.status)}
@@ -770,11 +768,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex flex-col sm:flex-row items-end justify-end gap-1">
+                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:justify-end">
                               {bill.currentStatus === 'Paid' ? (
                                 <>
                                   <Button variant="outline" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="h-8" disabled={isLoading}>
-                                    <Eye className="mr-2 h-4 w-4" />View Details
+                                    <Eye className="mr-2 h-4 w-4" />View
                                   </Button>
                                   {canDeleteBills && (
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
@@ -799,7 +797,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                 <>
                                   {canManagePayments && (
                                     <Button variant="default" size="sm" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 bg-green-600 hover:bg-green-700 text-white" disabled={isLoading}>
-                                      <CreditCard className="mr-2 h-4 w-4" />Record Pymt
+                                      <CreditCard className="mr-2 h-4 w-4" />Record
                                     </Button>
                                   )}
                                   {canManagePayments && (

@@ -388,7 +388,7 @@ export function TenantsClientPage({
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
                   <CardFooter className="border-t pt-4">
-                    <div className="flex w-full items-center justify-between">
+                    <div className="flex w-full flex-wrap items-center justify-between gap-2">
                       <div>
                         {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
                           <Tooltip>
