@@ -311,7 +311,7 @@ export default async function AdminDashboardPage() {
         )}
         {financials.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {financials.map((summary) => (
+            {financials.slice(0, 3).map((summary) => (
               <BuildingFinancialCard
                 key={summary.buildingId}
                 buildingName={summary.buildingName}
