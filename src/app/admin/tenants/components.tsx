@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, MoreHorizontal } from 'lucide-react';
+import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff } from 'lucide-react';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -30,13 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -46,6 +39,11 @@ import { createTenantAction, updateTenantAction, deleteTenantAction } from './ac
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Client-side specific types ensuring dates are strings
 export interface ClientSpace extends Omit<SpaceTypePrisma, 'createdAt' | 'updatedAt' | 'tenantId'> {
@@ -393,47 +391,39 @@ export function TenantsClientPage({
                     </div>
                      <p className="text-xs text-muted-foreground pt-2">Joined: {tenant.createdAt ? format(parseISO(tenant.createdAt), 'PP') : 'N/A'}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex items-center justify-between gap-2 w-full">
-                    <div className="flex-1 min-w-0">
-                      {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
-                        <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                          <Button variant="outline" size="sm" disabled={isSaving} className="w-full sm:w-auto">
-                            <Eye className="mr-0 h-4 w-4 sm:mr-2" />
-                            <span className="hidden sm:inline truncate">Agreement</span>
+                  <CardFooter className="border-t pt-4 flex items-center justify-end gap-1">
+                    {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
+                      <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
+                        <Button variant="outline" size="sm" disabled={isSaving} className="h-8 mr-auto">
+                          <Eye className="mr-2 h-4 w-4" />
+                          <span className="truncate">Agreement</span>
+                        </Button>
+                      </Link>
+                    ) : (
+                      <div className="mr-auto"></div> 
+                    )}
+                    {(canEditTenants || canViewTenants) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditForm(tenant)}>
+                            {canEditTenants ? <Edit3 className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            <span className="sr-only">{canEditTenants ? 'Edit Tenant' : 'View Details'}</span>
                           </Button>
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">{tenantActiveAgreement ? 'View Agreement' : 'No active agreement'}</span>
-                      )}
-                    </div>
-                    
-                    <div className="shrink-0">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">More actions</span>
+                        </TooltipTrigger>
+                        <TooltipContent><p>{canEditTenants ? 'Edit Tenant' : 'View Details'}</p></TooltipContent>
+                      </Tooltip>
+                    )}
+                    {canDeleteTenants && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setTenantToDelete(tenant)}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete Tenant</span>
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {(canEditTenants || canViewTenants) && (
-                            <DropdownMenuItem onSelect={() => handleOpenEditForm(tenant)}>
-                              {canEditTenants ? <Edit3 className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                              <span>{canEditTenants ? 'Edit Tenant' : 'View Details'}</span>
-                            </DropdownMenuItem>
-                          )}
-                          {canDeleteTenants && (
-                            <>
-                              {(canEditTenants || canViewTenants) && <DropdownMenuSeparator />}
-                              <DropdownMenuItem onSelect={() => setTenantToDelete(tenant)} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Delete Tenant</span>
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Delete Tenant</p></TooltipContent>
+                      </Tooltip>
+                    )}
                   </CardFooter>
                 </Card>
               );
