@@ -72,6 +72,13 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     setBuildings(initialBuildings);
   }, [initialSpaces, initialBuildings]);
   
+  useEffect(() => {
+    const newTotalPages = Math.ceil(spaces.length / itemsPerPage);
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+  }, [spaces.length, itemsPerPage, currentPage]);
+  
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
     setCurrentPage(1);

@@ -121,6 +121,21 @@ export function TenantsClientPage({
   });
 
   const totalPages = Math.ceil(tenants.length / itemsPerPage);
+  
+  useEffect(() => {
+    setIsMounted(true);
+    setTenantsState(initialTenants);
+    setSpacesState(initialSpaces);
+    setAgreementsState(initialAgreements);
+  }, [initialTenants, initialSpaces, initialAgreements]);
+
+  useEffect(() => {
+    const newTotalPages = Math.ceil(tenants.length / itemsPerPage);
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+  }, [tenants.length, itemsPerPage, currentPage]);
+  
   const paginatedTenants = tenants.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -130,13 +145,6 @@ export function TenantsClientPage({
     setItemsPerPage(newSize);
     setCurrentPage(1);
   };
-
-  useEffect(() => {
-    setIsMounted(true);
-    setTenantsState(initialTenants);
-    setSpacesState(initialSpaces);
-    setAgreementsState(initialAgreements);
-  }, [initialTenants, initialSpaces, initialAgreements]);
 
   const getSpaceDetails = (space: ClientSpace | null | undefined): string => {
     if (!space) return "No space assigned";

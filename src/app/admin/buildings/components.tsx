@@ -129,6 +129,18 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings; // If can do anything, can view
 
   const totalPages = Math.ceil(buildings.length / itemsPerPage);
+  
+  useEffect(() => {
+    setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
+  }, [initialBuildings]);
+
+  useEffect(() => {
+    const newTotalPages = Math.ceil(buildings.length / itemsPerPage);
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+  }, [buildings.length, itemsPerPage, currentPage]);
+  
   const paginatedBuildings = buildings.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -138,10 +150,6 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     setItemsPerPage(newSize);
     setCurrentPage(1);
   };
-
-  useEffect(() => {
-    setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
-  }, [initialBuildings]);
   
   const handleDeleteBuilding = async () => {
     if (!buildingToDelete) return;
