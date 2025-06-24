@@ -11,6 +11,7 @@ import { getMonth, getYear, format, isAfter, addMonths, subMonths, isValid } fro
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cookies } from 'next/headers';
 import type { User as UserPrisma, Role, Prisma } from '@prisma/client';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
@@ -310,19 +311,31 @@ export default async function AdminDashboardPage() {
             </Card>
         )}
         {financials.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {financials.slice(0, 3).map((summary) => (
-              <BuildingFinancialCard
-                key={summary.buildingId}
-                buildingName={summary.buildingName}
-                currentMonthExpenses={summary.currentMonthExpenses}
-                currentMonthIncomeCollected={summary.currentMonthIncomeCollected}
-                currentMonthIncomePendingConfirmation={summary.currentMonthIncomePendingConfirmation}
-                currentMonthIncomeToBeCollected={summary.currentMonthIncomeToBeCollected}
-                periodDescription={periodDescription}
-              />
-            ))}
-          </div>
+          <Carousel
+            opts={{
+              align: "start",
+            }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-4">
+              {financials.map((summary) => (
+                <CarouselItem key={summary.buildingId} className="pl-4 md:basis-1/2 lg:basis-1/3">
+                  <div className="p-1 h-full flex">
+                    <BuildingFinancialCard
+                      buildingName={summary.buildingName}
+                      currentMonthExpenses={summary.currentMonthExpenses}
+                      currentMonthIncomeCollected={summary.currentMonthIncomeCollected}
+                      currentMonthIncomePendingConfirmation={summary.currentMonthIncomePendingConfirmation}
+                      currentMonthIncomeToBeCollected={summary.currentMonthIncomeToBeCollected}
+                      periodDescription={periodDescription}
+                    />
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="hidden sm:flex" />
+            <CarouselNext className="hidden sm:flex" />
+          </Carousel>
         )}
       </div>
 
