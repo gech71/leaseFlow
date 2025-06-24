@@ -125,7 +125,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
           }
         }
       },
-      orderBy: { billDate: 'desc' }
+      orderBy: { createdAt: 'desc' }
     }),
     databaseService.getAllBuildingMonthlyUtilities({
       where: buildingMonthlyUtilityWhere,
@@ -711,5 +711,7 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
+
+    
 
     

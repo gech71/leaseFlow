@@ -195,7 +195,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
         tenantName: bill.agreement?.tenant?.name || 'N/A',
         spaceDescription: bill.agreement?.space ? `${bill.agreement.space.spaceIdName}, ${bill.agreement.space.building?.name || 'N/A'}` : 'N/A'
       };
-    }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
+    }).sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
   }, [bills, today, calculatePenalty]); 
   
   const upcomingAndPendingBills = useMemo(() => processedBills.filter(b => b.status === 'Pending' || b.status === 'Overdue' || b.status === 'PendingVerification'), [processedBills]);
@@ -504,3 +504,5 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
     </div>
   );
 }
+
+    

@@ -102,7 +102,7 @@ export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewD
         }
       },
     },
-    orderBy: { billDate: 'desc' }
+    orderBy: { createdAt: 'desc' }
   });
 
   const bills: PaymentsOverviewBill[] = rawBills.map(rawBill => {
@@ -147,3 +147,5 @@ export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewD
 
   return { bills, spaces };
 }
+
+    

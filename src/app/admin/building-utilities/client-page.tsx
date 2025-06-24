@@ -126,9 +126,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   
   const paginatedUtilityRecords = useMemo(() => {
     const sortedRecords = [...filteredRecords].sort((a, b) => {
-      if (a.year !== b.year) return b.year - a.year;
-      if (a.month !== b.month) return b.month - a.month;
-      return a.buildingName.localeCompare(b.buildingName);
+      return parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime();
     });
     return sortedRecords.slice(
       (recordsCurrentPage - 1) * recordsItemsPerPage,
@@ -739,7 +737,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                       <TableHead>Period</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-center hidden sm:table-cell">Items</TableHead>
-                      <TableHead className="hidden md:table-cell">Last Updated</TableHead>
+                      <TableHead className="hidden md:table-cell">Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -752,7 +750,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                           <TableCell>{format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</TableCell>
                           <TableCell className="text-right whitespace-nowrap">{totalCost.toFixed(2)} Birr</TableCell>
                           <TableCell className="text-center hidden sm:table-cell">{entry.utilities.length}</TableCell>
-                          <TableCell className="hidden md:table-cell text-xs">{format(parseISO(entry.updatedAt as unknown as string), 'PPp')}</TableCell>
+                          <TableCell className="hidden md:table-cell text-xs">{format(parseISO(entry.createdAt), 'PP')}</TableCell>
                           <TableCell className="text-right">
                               <Button variant="ghost" size="icon" onClick={() => { setSelectedBuildingId(entry.buildingId); setSelectedYear(entry.year); setSelectedMonth(entry.month);}} className="h-8 w-8 text-blue-600 hover:text-blue-700">
                                   <Edit className="h-4 w-4" />
@@ -786,3 +784,5 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     </div>
   );
 }
+
+    

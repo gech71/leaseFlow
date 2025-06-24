@@ -62,7 +62,7 @@ export async function getUserManagementPageData() {
         roles: true, 
         managedBuildings: true
       },
-      orderBy: { name: 'asc' }
+      orderBy: { createdAt: 'desc' }
     });
     const allRoles = await databaseService.getAllRoles({ orderBy: { name: 'asc' } });
     const allBuildings = await databaseService.getAllBuildings({ orderBy: { name: 'asc' } });
@@ -134,3 +134,5 @@ export async function updateUserAssignments(
     return { success: false, error: errorMessage };
   }
 }
+
+    

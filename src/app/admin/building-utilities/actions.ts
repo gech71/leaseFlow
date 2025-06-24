@@ -188,7 +188,7 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMo
     return await databaseService.getAllBuildingMonthlyUtilities({
       where: whereClause,
       include: { utilities: true, building: { select: { name: true }} },
-      orderBy: [{ year: 'desc' }, { month: 'desc' }, { buildingName: 'asc' }],
+      orderBy: { createdAt: 'desc' },
     });
   } catch (error: any) {
     console.error("Error fetching all building utilities:", error);
@@ -222,3 +222,5 @@ export async function deleteBuildingUtilitiesAction(id: string) {
     return { success: false, error: error.message || "Failed to delete utility record." };
   }
 }
+
+    

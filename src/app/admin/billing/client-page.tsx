@@ -246,7 +246,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         }
 
         return true;
-    }).sort((a,b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
+    }).sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
   }, [bills, calculatePenalty, today, billFilterTerm, filterYear, filterMonth]);
 
   const totalPages = Math.ceil(processedClientBills.length / itemsPerPage);
@@ -856,3 +856,5 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     </div>
   );
 }
+
+    
