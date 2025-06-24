@@ -317,9 +317,9 @@ export default async function AdminDashboardPage() {
             }}
             className="w-full"
           >
-            <CarouselContent className="-ml-4">
+            <CarouselContent className="-ml-2">
               {financials.map((summary) => (
-                <CarouselItem key={summary.buildingId} className="pl-4 md:basis-1/2 lg:basis-1/3">
+                <CarouselItem key={summary.buildingId} className="pl-2 md:basis-1/2 lg:basis-1/3">
                   <div className="p-1 h-full flex">
                     <BuildingFinancialCard
                       buildingName={summary.buildingName}
