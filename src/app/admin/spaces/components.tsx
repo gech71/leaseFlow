@@ -405,7 +405,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="border-t pt-4 flex justify-end gap-2">
+                <CardFooter className="border-t pt-4 flex flex-wrap justify-end gap-2">
                   {(canEditSpaces || canViewSpaces) && (
                     <Button variant="outline" size="sm" onClick={() => openEditForm(space)} disabled={isSaving}>
                       {canEditSpaces ? <Edit3 className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />} {canEditSpaces ? 'Edit' : 'View'}

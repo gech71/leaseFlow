@@ -238,27 +238,25 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                     <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
                   </CardContent>
-                  <CardFooter className="border-t pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                    <div className="flex-shrink-0">
-                      {eligibleForRenewal && canEditAgreements && (
-                        <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto">
-                          <RefreshCw className="mr-1 h-4 w-4" /> Renew
-                        </Button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 justify-end w-full">
+                  <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-between gap-2">
+                    {eligibleForRenewal && canEditAgreements && (
+                      <Button size="sm" onClick={() => handleRenewAgreement(agreement)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                        <RefreshCw className="mr-1 h-4 w-4" /> Renew
+                      </Button>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 justify-end grow sm:grow-0">
                       {canViewAgreements && (
                         <Link href={`/admin/agreements/${agreement.id}`} passHref>
-                          <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
+                          <Button variant="outline" size="sm">
                             <Eye className="mr-1 h-4 w-4" /> View
                           </Button>
                         </Link>
                       )}
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)} className="flex-1 sm:flex-initial">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(agreement.id)}>
                         <Download className="mr-1 h-4 w-4" /> Download
                       </Button>
                       {canDeleteAgreements && (
-                        <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)} className="flex-1 sm:flex-initial">
+                        <Button variant="destructive" size="sm" onClick={() => setAgreementToDelete(agreement)}>
                           <Trash2 className="mr-1 h-4 w-4" /> Delete
                         </Button>
                       )}
