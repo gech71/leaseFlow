@@ -65,12 +65,6 @@ export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
     return { success: true, building: newBuilding };
   } catch (error: any) {
     console.error("Error creating building:", error);
-    // Consider more specific error handling if Prisma throws known errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') { // Unique constraint violation
-        return { success: false, error: `Failed to create building. A building with similar unique fields (e.g., name) might already exist.` };
-      }
-    }
     return { success: false, error: error.message || "Failed to create building." };
   }
 }
@@ -93,9 +87,6 @@ export async function updateBuildingAction(id: string, data: Prisma.BuildingUpda
   } catch (error: any) {
     console.error("Error updating building:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        return { success: false, error: `Failed to update building. A building with similar unique fields (e.g., name) might already exist.` };
-      }
       if (error.code === 'P2025') { // Record to update not found
         return { success: false, error: "Failed to update building. Record not found." };
       }

@@ -15,15 +15,6 @@ export async function createTenantAction(
     return { success: true, tenant: newTenant };
   } catch (error: any) {
     console.error("Error creating tenant:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      let fieldName = "email or another unique field";
-      if (error.meta && typeof error.meta.target === 'string') {
-        fieldName = error.meta.target;
-      } else if (Array.isArray(error.meta?.target)) {
-        fieldName = error.meta.target.join(', ');
-      }
-      return { success: false, error: `Failed to create tenant. A tenant with the same ${fieldName} might already exist.` };
-    }
     return { success: false, error: error.message || "Failed to create tenant." };
   }
 }
@@ -39,15 +30,6 @@ export async function updateTenantAction(
   } catch (error: any) {
     console.error("Error updating tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        let fieldName = "email or another unique field";
-        if (error.meta && typeof error.meta.target === 'string') {
-            fieldName = error.meta.target;
-        } else if (Array.isArray(error.meta?.target)) {
-            fieldName = error.meta.target.join(', ');
-        }
-        return { success: false, error: `Failed to update tenant. A tenant with the same ${fieldName} might already exist.` };
-      }
       if (error.code === 'P2025') { 
         return { success: false, error: "Failed to update tenant. Record not found." };
       }
