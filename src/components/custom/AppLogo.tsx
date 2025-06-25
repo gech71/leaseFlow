@@ -12,7 +12,7 @@ export function AppLogo() {
   return (
     <Link href="/admin/dashboard" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors">
       <Image 
-        src="https://asset.brandfetch.io/id20mS0X9V/idZt585Odk.png"
+        src="https://cdn.brandfetch.io/id3xwknDM-/w/2048/h/2048/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1745154169756"
         alt="LeaseFlow Logo" 
         width={32}
         height={32}
