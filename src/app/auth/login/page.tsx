@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building, LogIn, Phone, Loader2 } from 'lucide-react';
+import { LogIn, Phone, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { AppLogo } from '@/components/custom/AppLogo';
+import Image from 'next/image';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -66,10 +66,8 @@ export default function AdminLoginPage() {
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
         <CardHeader className="text-center space-y-3 pt-8">
           <div className="mx-auto">
-            {/* AppLogo can be used if it's purely visual or if Link works for current context */}
-            {/* For direct text and icon: */}
             <Link href="/" className="flex items-center justify-center gap-2 text-foreground hover:text-primary transition-colors">
-              <Building className="h-10 w-10 text-primary" />
+               <Image src="https://findvectorlogo.com/wp-content/uploads/2020/09/nib-international-bank-vector-logo.png" alt="LeaseFlow Logo" width={40} height={40} />
               <h1 className="text-3xl font-headline font-bold">LeaseFlow</h1>
             </Link>
           </div>

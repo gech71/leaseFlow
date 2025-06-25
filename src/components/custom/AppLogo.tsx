@@ -1,6 +1,6 @@
 "use client";
 
-import { Home } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,7 @@ export function AppLogo() {
 
   return (
     <Link href="/admin/dashboard" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors">
-      <Home className="h-7 w-7 text-sidebar-primary" />
+      <Image src="https://findvectorlogo.com/wp-content/uploads/2020/09/nib-international-bank-vector-logo.png" alt="LeaseFlow Logo" width={28} height={28} />
       <h1 
         className={cn(
             "text-xl font-headline font-semibold whitespace-nowrap",
