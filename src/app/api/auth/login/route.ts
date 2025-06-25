@@ -124,8 +124,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["User not provisioned in this system. Please contact support."] }, { status: 403 });
       }
 
-      // User found locally, proceed to set cookies
-      // console.log("Local user found:", localUser.email, "Roles:", localUser.roles.map(r => r.name)); // For debugging
+      // User found locally, determine redirect path based on permissions
+      const effectivePermissions = new Set<string>();
+      localUser.roles.forEach(role => {
+          role.permissions.forEach(permission => {
+              effectivePermissions.add(permission);
+          });
+      });
+      const permissionsArray = Array.from(effectivePermissions);
+      
+      let redirectPath = '/admin/dashboard';
+      if (permissionsArray.length === 1 && permissionsArray[0] === 'portal:view') {
+          redirectPath = '/portal/dashboard';
+      }
 
       const cookieStore = await cookies();
       
@@ -145,7 +156,7 @@ export async function POST(request: NextRequest) {
         maxAge: REFRESH_TOKEN_MAX_AGE,
       });
 
-      return NextResponse.json({ isSuccess: true, message: "Login successful" });
+      return NextResponse.json({ isSuccess: true, message: "Login successful", redirectPath });
 
     } catch (dbError: any) {
       console.error("Database error during login user retrieval:", dbError.message);

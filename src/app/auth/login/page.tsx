@@ -40,7 +40,7 @@ export default function AdminLoginPage() {
           title: "Login Successful",
           description: "Welcome!",
         });
-        router.push('/admin/dashboard');
+        router.push(data.redirectPath || '/admin/dashboard');
       } else {
         const errorMessages = data.errors?.join(', ') || "Invalid phone number or password. Please try again.";
         toast({

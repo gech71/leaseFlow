@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -108,6 +109,15 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       router.push('/auth/login');
     }
   }, [permissionsLoading, currentUser, router, toast]);
+
+  useEffect(() => {
+    if (!permissionsLoading && currentUser?.effectivePermissions) {
+      const permissions = currentUser.effectivePermissions;
+      if (permissions.length === 1 && permissions[0] === 'portal:view') {
+        router.push('/portal/dashboard');
+      }
+    }
+  }, [permissionsLoading, currentUser, router]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
