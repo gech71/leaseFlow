@@ -10,22 +10,17 @@ export function AppLogo() {
   const { isMobile, state: sidebarState } = useSidebar();
 
   return (
-    <Link href="/admin/dashboard" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors">
+    <Link href="/admin/dashboard" className="flex items-center justify-center text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
       <Image 
-        src="https://cdn.brandfetch.io/id3xwknDM-/w/2048/h/2048/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1745154169756"
-        alt="LeaseFlow Logo" 
-        width={32}
-        height={32}
-        className="h-8 w-8"
-      />
-      <h1 
+        src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png"
+        alt="Nib Bank Logo" 
+        width={150}
+        height={40}
         className={cn(
-            "text-xl font-headline font-semibold whitespace-nowrap",
-            (!isMobile && sidebarState === 'collapsed') && 'hidden'
+          "h-8 w-auto object-contain transition-all duration-300",
+          (!isMobile && sidebarState === 'collapsed') && 'w-8'
         )}
-      >
-        LeaseFlow
-      </h1>
+      />
     </Link>
   );
 }

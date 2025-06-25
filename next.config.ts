@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'cdn.brandfetch.io',
+        hostname: 'upload.wikimedia.org',
         port: '',
         pathname: '/**',
       },

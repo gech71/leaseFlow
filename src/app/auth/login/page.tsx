@@ -67,8 +67,7 @@ export default function AdminLoginPage() {
         <CardHeader className="text-center space-y-3 pt-8">
           <div className="mx-auto">
             <Link href="/" className="flex items-center justify-center gap-2 text-foreground hover:text-primary transition-colors">
-               <Image src="https://cdn.brandfetch.io/id3xwknDM-/w/2048/h/2048/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1745154169756" alt="LeaseFlow Logo" width={40} height={40} />
-              <h1 className="text-3xl font-headline font-bold">LeaseFlow</h1>
+               <Image src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png" alt="Nib International Bank Logo" width={160} height={44} className="object-contain" />
             </Link>
           </div>
           <CardTitle className="text-2xl font-semibold">Admin & Staff Login</CardTitle>
