@@ -47,6 +47,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'asset.brandfetch.io',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async headers() {
