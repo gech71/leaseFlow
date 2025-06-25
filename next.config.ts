@@ -43,12 +43,6 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'findvectorlogo.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
         hostname: 'asset.brandfetch.io',
         port: '',
         pathname: '/**',

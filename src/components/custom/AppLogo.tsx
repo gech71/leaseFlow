@@ -12,14 +12,11 @@ export function AppLogo() {
   return (
     <Link href="/admin/dashboard" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors">
       <Image 
-        src="https://findvectorlogo.com/wp-content/uploads/2019/03/nib-international-bank-s-c-vector-logo.png" 
+        src="https://asset.brandfetch.io/id20mS0X9V/idZt585Odk.png"
         alt="LeaseFlow Logo" 
-        width={95}
-        height={28}
-        className={cn(
-            "h-7 w-auto", // expanded state
-            sidebarState === 'collapsed' && "h-auto w-7" // collapsed state
-        )}
+        width={32}
+        height={32}
+        className="h-8 w-8"
       />
       <h1 
         className={cn(
