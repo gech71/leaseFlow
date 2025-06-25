@@ -77,6 +77,18 @@ export class DatabaseService {
     return prisma.tenant.create({ data });
   }
 
+  async findTenantByEmail(email: string): Promise<Tenant | null> {
+    if (!email) return null;
+    return prisma.tenant.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive' // case-insensitive match
+        }
+      }
+    });
+  }
+
   async getTenantById(id: string, include?: Prisma.TenantInclude): Promise<Tenant | null> {
     return prisma.tenant.findUnique({ where: { id }, include });
   }
@@ -333,4 +345,3 @@ export class DatabaseService {
 }
 
 export const databaseService = new DatabaseService();
-

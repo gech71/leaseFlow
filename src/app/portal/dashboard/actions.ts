@@ -3,8 +3,9 @@
 "use server";
 
 import { databaseService } from '@/lib/services/databaseService';
-import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, Prisma } from '@prisma/client';
+import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, User, Role } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns';
+import { cookies } from 'next/headers';
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -14,7 +15,6 @@ interface ParsedUtilityItemForAction {
 }
 
 // Types that match the structure of data fetched with Prisma, including relations
-// These are the rich types returned by Prisma. Serialization to client-friendly types happens in the page component.
 export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
   space: SpacePrisma & {
     building: BuildingPrisma & {
@@ -28,16 +28,75 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
 
 export interface TenantPortalData {
   agreement: PortalAgreementWithRelations | null;
-  aiGeneratedAgreementText: string | null; // This will now just be the agreementText from the DB
-  // Bills are now part of the agreement object, so no separate bills array here.
+  aiGeneratedAgreementText: string | null;
   error?: string;
 }
 
+// --- User Authentication Helpers ---
+const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+
+// Insecure JWT payload decoder
+async function decodeJwtPayload(token: string): Promise<any | null> {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
+// Gets current user from cookie
+async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    if (!accessToken) return null;
+    
+    const tokenPayload = await decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) return null;
+
+    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+}
+
+
 export async function getTenantPortalDashboardDataAction(): Promise<TenantPortalData> {
   try {
-    // For now, fetch the first tenant with an active agreement
-    // In a real app, you'd get the logged-in tenant's ID
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return { agreement: null, aiGeneratedAgreementText: null, error: "Not authenticated. Please log in to view your portal." };
+    }
+
+    // Find the tenant record associated with the logged-in user's email
+    const associatedTenant = await databaseService.findTenantByEmail(currentUser.email);
+    
+    let whereClause = {};
+    let finalErrorMessage: string | undefined = undefined;
+
+    if (associatedTenant) {
+      whereClause = { tenantId: associatedTenant.id };
+    } else {
+      const isSuperAdmin = currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
+      if (isSuperAdmin) {
+        // Super Admin Fallback: Show the first tenant with an active agreement for preview
+        whereClause = {}; // No filter, will find first available
+      } else {
+        return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant record. Please contact support." };
+      }
+    }
+    
     const allAgreementsRaw = await databaseService.getAllAgreements({
+      where: whereClause,
       include: {
         tenant: true,
         space: {
@@ -47,7 +106,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
             },
           },
         },
-        bills: { // Bills are included, but utilityBreakdown within bills will be processed manually
+        bills: {
           orderBy: { billDate: 'desc' },
         },
       },
@@ -57,7 +116,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     const processedAgreements = allAgreementsRaw.map(ag => {
       const processedBills = ag.bills.map(rawBill => {
         let parsedItems: ParsedUtilityItemForAction[] = [];
-        const rawUtilityData = (rawBill as any).utilityBreakdown; // Access the raw field
+        const rawUtilityData = (rawBill as any).utilityBreakdown;
 
         if (typeof rawUtilityData === 'string') {
           try {
@@ -84,7 +143,6 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
                 }));
         }
         
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { utilityBreakdown: _originalScalarUtilityData, ...billData } = rawBill;
         return { ...billData, utilityBreakdown: parsedItems };
       });
@@ -93,25 +151,29 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
 
     let targetAgreement: PortalAgreementWithRelations | null = null;
-    for (const ag of processedAgreements) { // Iterate over processedAgreements
+    for (const ag of processedAgreements) { 
         const agreementEndDate = addMonths(new Date(ag.startDate), ag.paymentTermMonths);
         if (isAfter(agreementEndDate, new Date())) {
-            targetAgreement = ag as PortalAgreementWithRelations; // Cast is now safer
+            targetAgreement = ag as PortalAgreementWithRelations;
             break;
         }
     }
-
+    
     if (!targetAgreement) {
-      return { agreement: null, aiGeneratedAgreementText: null, error: "No active agreement found for any tenant." };
+      const errorMessage = associatedTenant ? "You do not have an active agreement." : "No active agreements found in the system to preview.";
+      return { agreement: null, aiGeneratedAgreementText: null, error: errorMessage };
+    }
+    
+    if (!associatedTenant && currentUser.roles.some(role => role.name === 'SUPER_ADMIN')) {
+         finalErrorMessage = `As a Super Admin, you are viewing a sample portal for tenant: ${targetAgreement.tenant.name}. No tenant record is directly associated with your user account.`;
     }
 
-    // The "AI Generated Text" is now simply the agreement text stored in the database.
     const agreementText = targetAgreement.agreementText;
     
     return {
       agreement: targetAgreement,
       aiGeneratedAgreementText: agreementText,
-      error: undefined,
+      error: finalErrorMessage,
     };
 
   } catch (error: any) {
@@ -144,8 +206,6 @@ export async function submitPaymentProofAction(input: SubmitPaymentProofInput) {
       status: 'PendingVerification',
       paymentProofUrl: input.paymentProofUrl,
       tenantPaymentNotes: input.tenantPaymentNotes,
-      // Payment date, method, etc., are usually set by admin during verification or if tenant pre-fills.
-      // For this simulation, we just update status and proof.
     });
     return { success: true, bill: updatedBill };
   } catch (error: any) {
