@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils';
 
 export function AppLogo() {
   const { isMobile, state: sidebarState } = useSidebar();
+  const isCollapsed = !isMobile && sidebarState === 'collapsed';
 
   return (
-    <Link href="/admin/dashboard" className="flex items-center justify-center text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
+    <Link href="/admin/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
       <Image 
         src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png"
         alt="Nib Bank Logo" 
@@ -18,9 +19,15 @@ export function AppLogo() {
         height={40}
         className={cn(
           "h-8 w-auto object-contain transition-all duration-300",
-          (!isMobile && sidebarState === 'collapsed') && 'w-8'
+          isCollapsed && "w-8"
         )}
       />
+      <span className={cn(
+        "font-headline text-lg font-bold text-sidebar-primary transition-all duration-300 whitespace-nowrap",
+        isCollapsed ? "opacity-0 w-0" : "opacity-100"
+      )}>
+        LeaseFlow
+      </span>
     </Link>
   );
 }
