@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
         <CardHeader className="text-center space-y-3 pt-8">
           <div className="mx-auto">
             <Link href="/" className="flex items-center justify-center gap-2 text-foreground hover:text-primary transition-colors">
-               <Image src="https://asset.brandfetch.io/id_5xxedCU/id-w27lqU.svg" alt="LeaseFlow Logo" width={40} height={40} />
+               <Image src="https://findvectorlogo.com/wp-content/uploads/2019/03/nib-international-bank-s-c-vector-logo.png" alt="LeaseFlow Logo" width={150} height={44} />
               <h1 className="text-3xl font-headline font-bold">LeaseFlow</h1>
             </Link>
           </div>
