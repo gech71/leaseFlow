@@ -95,56 +95,58 @@ export default async function TenantsPage() {
     }
   });
 
+  const fallbackDate = new Date().toISOString();
+
   // Serialize date fields for client component props
   const serializableTenants: TenantWithRelations[] = tenantsData.map(tenant => ({
     ...tenant,
-    createdAt: tenant.createdAt.toISOString(),
-    updatedAt: tenant.updatedAt?.toISOString() || tenant.createdAt.toISOString(), // Fallback to createdAt
+    createdAt: tenant.createdAt?.toISOString() || fallbackDate,
+    updatedAt: tenant.updatedAt?.toISOString() || tenant.createdAt?.toISOString() || fallbackDate,
     rentedSpace: tenant.rentedSpace ? {
       ...tenant.rentedSpace,
-      createdAt: tenant.rentedSpace.createdAt.toISOString(),
-      updatedAt: tenant.rentedSpace.updatedAt?.toISOString() || tenant.rentedSpace.createdAt.toISOString(), // Fallback
+      createdAt: tenant.rentedSpace.createdAt?.toISOString() || fallbackDate,
+      updatedAt: tenant.rentedSpace.updatedAt?.toISOString() || tenant.rentedSpace.createdAt?.toISOString() || fallbackDate,
     } : null,
     agreements: tenant.agreements.map(ag => ({
       ...ag,
-      startDate: ag.startDate.toISOString(),
+      startDate: ag.startDate?.toISOString() || fallbackDate,
       endDate: ag.endDate?.toISOString() || null,
-      nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
-      createdAt: ag.createdAt.toISOString(),
-      updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Fallback
+      nextPaymentDueDate: ag.nextPaymentDueDate?.toISOString() || fallbackDate,
+      createdAt: ag.createdAt?.toISOString() || fallbackDate,
+      updatedAt: ag.updatedAt?.toISOString() || ag.createdAt?.toISOString() || fallbackDate,
       initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
       space: ag.space ? {
         ...ag.space,
-        createdAt: ag.space.createdAt.toISOString(),
-        updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString()
+        createdAt: ag.space.createdAt?.toISOString() || fallbackDate,
+        updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt?.toISOString() || fallbackDate
       } : null,
     })),
   }));
 
   const serializableSpaces: SpaceWithTenant[] = spacesData.map(space => ({
     ...space,
-    createdAt: space.createdAt.toISOString(),
-    updatedAt: space.updatedAt?.toISOString() || space.createdAt.toISOString(), // Fallback
+    createdAt: space.createdAt?.toISOString() || fallbackDate,
+    updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || fallbackDate,
     tenant: space.tenant ? {
       ...space.tenant,
-      createdAt: space.tenant.createdAt.toISOString(),
-      updatedAt: space.tenant.updatedAt?.toISOString() || space.tenant.createdAt.toISOString(), // Fallback
+      createdAt: space.tenant.createdAt?.toISOString() || fallbackDate,
+      updatedAt: space.tenant.updatedAt?.toISOString() || space.tenant.createdAt?.toISOString() || fallbackDate,
       rentedSpaceId: space.tenant.rentedSpaceId || null, 
     } : null,
   }));
   
   const serializableAgreements: ClientAgreement[] = agreementsData.map(ag => ({
       ...ag,
-      startDate: ag.startDate.toISOString(),
+      startDate: ag.startDate?.toISOString() || fallbackDate,
       endDate: ag.endDate?.toISOString() || null,
-      nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
-      createdAt: ag.createdAt.toISOString(),
-      updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Fallback
+      nextPaymentDueDate: ag.nextPaymentDueDate?.toISOString() || fallbackDate,
+      createdAt: ag.createdAt?.toISOString() || fallbackDate,
+      updatedAt: ag.updatedAt?.toISOString() || ag.createdAt?.toISOString() || fallbackDate,
       initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
       space: ag.space ? {
         ...ag.space,
-        createdAt: ag.space.createdAt.toISOString(),
-        updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString()
+        createdAt: ag.space.createdAt?.toISOString() || fallbackDate,
+        updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt?.toISOString() || fallbackDate
       } : null,
   }));
 
