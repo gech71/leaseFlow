@@ -309,12 +309,18 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
               ) : (
                 <ScrollArea className="h-[400px]">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Due Date</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Due Date</TableHead><TableHead>Total</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {processedBills.map(bill => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                          <TableCell className={bill.currentStatus === 'Overdue' ? 'font-semibold text-destructive' : ''}>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.calculatedTotal?.toFixed(2)} Birr</TableCell>
+                          <TableCell className={bill.currentStatus === 'Overdue' ? 'font-semibold text-destructive' : ''}>
+                             <div className="flex flex-col text-sm leading-tight">
+                                <span>{format(parseISO(bill.dueDate), 'MMM')}</span>
+                                <span>{format(parseISO(bill.dueDate), 'dd,')}</span>
+                                <span className="text-xs text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
+                              </div>
+                          </TableCell>
+                          <TableCell className="font-semibold text-primary whitespace-nowrap">{bill.calculatedTotal?.toFixed(2)} Birr</TableCell>
                           <TableCell className="text-center">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification',' Ver.')}</span></Badge>
                             {bill.calculatedPenalty && bill.calculatedPenalty > 0 && (<Popover><PopoverTrigger asChild><AlertTriangle className="h-3.5 w-3.5 text-destructive inline-block ml-1 cursor-help"/></PopoverTrigger><PopoverContent className="text-xs w-auto p-2" side="top">Penalty: {bill.calculatedPenalty.toFixed(2)} Birr</PopoverContent></Popover>)}
