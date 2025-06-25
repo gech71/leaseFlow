@@ -7,58 +7,69 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Home, LogIn } from 'lucide-react';
+import { LogIn, Phone, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    if (email === "tenant@leaseflow.com" && password === "password") {
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
-      router.push('/portal/dashboard');
-    } else {
-      toast({
-        title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
-        variant: "destructive",
-      });
-    }
+    // In a real application, you would make an API call to your authentication service.
+    // For this prototype, we are still using a simulated login for the tenant.
+    // The previous implementation used an email. We now use a phone number.
+    // This is a placeholder and should be integrated with your actual tenant auth logic.
+    const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber, password }),
+    });
+    
+    const data = await response.json();
     setIsLoading(false);
+
+    if (response.ok && data.isSuccess) {
+        toast({
+            title: "Login Successful",
+            description: "Welcome back!",
+        });
+        router.push(data.redirectPath || '/portal/dashboard');
+    } else {
+        toast({
+            title: "Login Failed",
+            description: data.errors?.join(', ') || "Invalid phone number or password. Please try again.",
+            variant: "destructive",
+        });
+    }
   };
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-8rem)] py-12">
       <Card className="w-full max-w-md shadow-xl animate-fadeIn">
         <CardHeader className="text-center">
-          <Home className="mx-auto h-12 w-12 text-primary mb-3" />
-          <CardTitle className="text-3xl font-headline">LeaseFlow Portal Login</CardTitle>
-          <CardDescription>Access your tenant dashboard to view payments and lease details.</CardDescription>
+          <LogIn className="mx-auto h-12 w-12 text-primary mb-3" />
+          <CardTitle className="text-3xl font-headline">Tenant Portal Login</CardTitle>
+          <CardDescription>Enter your phone number and password to access your dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="phoneNumber" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number</Label>
               <Input 
-                id="email" 
-                type="email" 
-                placeholder="you@example.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="phoneNumber" 
+                type="tel" 
+                placeholder="e.g. 0912345678" 
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
                 required 
+                disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
@@ -70,11 +81,12 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required 
+                disabled={isLoading}
               />
             </div>
             <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground" disabled={isLoading}>
               {isLoading ? (
-                <LogIn className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <LogIn className="mr-2 h-4 w-4" />
               )}
@@ -87,7 +99,7 @@ export default function LoginPage() {
             Forgot password?
           </Link>
           <p className="text-muted-foreground">
-            Property Manager? <Link href="/admin/dashboard" className="text-primary hover:underline">Admin Login</Link>
+            Property Manager? <Link href="/auth/login" className="text-primary hover:underline">Admin Login</Link>
           </p>
         </CardFooter>
       </Card>

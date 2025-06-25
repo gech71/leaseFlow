@@ -8,6 +8,7 @@ import {
   SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
+import Image from 'next/image';
 
 const navLinks = [
   { href: "/portal/dashboard", label: "Dashboard", icon: Home },
@@ -24,9 +25,9 @@ export default function PortalLayout({
     <div className="min-h-screen flex flex-col bg-background">
       <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/portal/dashboard" className="flex items-center gap-2">
-            <Home className="h-7 w-7" />
-            <h1 className="text-xl font-headline font-semibold">LeaseFlow Portal</h1>
+          <Link href="/portal/dashboard" className="flex items-center gap-3">
+            <Image src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png" alt="Nib International Bank Logo" width={100} height={28} className="h-7 w-auto object-contain" />
+            <span className="text-xl font-headline font-semibold">LeaseFlow</span>
           </Link>
           
           {/* Desktop Navigation */}
