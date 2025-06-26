@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff, Eye, Clock } from 'lucide-react'; // Added Clock
+import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff, Eye, Clock, Search } from 'lucide-react';
 import type { Building as BuildingTypePrisma, Space as SpaceTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createSpaceAction, updateSpaceAction, deleteSpaceAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
-import { formatDistanceToNow, parseISO } from 'date-fns'; // Added date-fns imports
+import { formatDistanceToNow, parseISO } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface SpaceWithBuildingName extends SpaceTypePrisma {
@@ -57,6 +57,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [spaceToDelete, setSpaceToDelete] = useState<SpaceWithBuildingName | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(9);
 
@@ -67,6 +68,13 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const canViewSpaces = isSuperAdmin || hasPermission('space:view') || canCreateSpaces || canEditSpaces || canDeleteSpaces;
 
 
+  const filteredSpaces = spaces.filter(space =>
+    space.spaceIdName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    space.buildingName.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const totalPages = Math.ceil(filteredSpaces.length / itemsPerPage);
+
   useEffect(() => {
     setIsMounted(true);
     setSpaces(initialSpaces); 
@@ -74,19 +82,22 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   }, [initialSpaces, initialBuildings]);
   
   useEffect(() => {
-    const newTotalPages = Math.ceil(spaces.length / itemsPerPage);
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const newTotalPages = Math.ceil(filteredSpaces.length / itemsPerPage);
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(newTotalPages);
     }
-  }, [spaces.length, itemsPerPage, currentPage]);
+  }, [filteredSpaces.length, itemsPerPage, currentPage]);
   
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
     setCurrentPage(1);
   };
   
-  const totalPages = Math.ceil(spaces.length / itemsPerPage);
-  const paginatedSpaces = spaces.slice(
+  const paginatedSpaces = filteredSpaces.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -363,15 +374,29 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
         </AlertDialogContent>
       </AlertDialog>
 
-      {spaces.length === 0 && isMounted ? ( 
+      <Card className="mb-6 shadow-sm">
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Filter by space name or building..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {filteredSpaces.length === 0 && isMounted ? ( 
          <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Building2 className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">No Spaces Yet</h3>
+            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm ? 'No Spaces Found' : 'No Spaces Yet'}</h3>
             <p className="text-muted-foreground mb-4">
-              {buildings.length > 0 ? "Get started by adding your first rental space." : "Please add buildings first."}
+              {searchTerm ? 'No spaces match your search.' : (buildings.length > 0 ? "Get started by adding your first rental space." : "Please add buildings first.")}
             </p>
-            {buildings.length > 0 && canCreateSpaces && (
+            {!searchTerm && buildings.length > 0 && canCreateSpaces && (
                 <Button onClick={openAddForm} disabled={isSaving}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Add Space
                 </Button>

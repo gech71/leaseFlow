@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, DollarSign as DollarSignLucide, AlertTriangle, Layers, HomeIcon, Eye, EyeOff } from 'lucide-react'; // Added Eye
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, DollarSign as DollarSignLucide, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search } from 'lucide-react';
 import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -25,6 +25,7 @@ import { deleteBuildingAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext'; 
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Input } from '@/components/ui/input';
 
 export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
@@ -139,6 +140,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const { hasPermission, isSuperAdmin } = usePermissions(); 
   const router = useRouter();
 
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(9);
 
@@ -147,20 +149,29 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const canDeleteBuildings = isSuperAdmin || hasPermission('building:delete');
   const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings; // If can do anything, can view
 
-  const totalPages = Math.ceil(buildings.length / itemsPerPage);
+  const filteredBuildings = buildings.filter(building =>
+    building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (building.address && building.address.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const totalPages = Math.ceil(filteredBuildings.length / itemsPerPage);
   
   useEffect(() => {
     setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
   }, [initialBuildings]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   useEffect(() => {
-    const newTotalPages = Math.ceil(buildings.length / itemsPerPage);
+    const newTotalPages = Math.ceil(filteredBuildings.length / itemsPerPage);
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(newTotalPages);
     }
-  }, [buildings.length, itemsPerPage, currentPage]);
+  }, [filteredBuildings.length, itemsPerPage, currentPage]);
   
-  const paginatedBuildings = buildings.slice(
+  const paginatedBuildings = filteredBuildings.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -213,6 +224,20 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           )
         }
       />
+      
+      <Card className="mb-6 shadow-sm">
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Filter buildings by name or address..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <AlertDialog open={!!buildingToDelete} onOpenChange={(open) => { if (!open) setBuildingToDelete(null); }}>
         <AlertDialogContent>
@@ -232,13 +257,13 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
         </AlertDialogContent>
       </AlertDialog>
 
-      {buildings.length === 0 ? (
+      {filteredBuildings.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <BuildingIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">No Buildings Yet</h3>
-            <p className="text-muted-foreground mb-4">Get started by adding your first building.</p>
-            {canCreateBuildings && (
+            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm ? 'No Buildings Found' : 'No Buildings Yet'}</h3>
+            <p className="text-muted-foreground mb-4">{searchTerm ? 'No buildings match your search.' : 'Get started by adding your first building.'}</p>
+            {!searchTerm && canCreateBuildings && (
               <Link href="/admin/buildings/upsert" passHref>
                   <Button>
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Building

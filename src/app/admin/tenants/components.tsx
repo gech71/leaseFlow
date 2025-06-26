@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff } from 'lucide-react';
+import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search } from 'lucide-react';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -105,6 +105,7 @@ export function TenantsClientPage({
   const [tenantToDelete, setTenantToDelete] = useState<TenantWithRelations | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(9);
 
@@ -122,7 +123,13 @@ export function TenantsClientPage({
     },
   });
 
-  const totalPages = Math.ceil(tenants.length / itemsPerPage);
+  const filteredTenants = tenants.filter(tenant =>
+    tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (tenant.phone && tenant.phone.includes(searchTerm))
+  );
+
+  const totalPages = Math.ceil(filteredTenants.length / itemsPerPage);
   
   useEffect(() => {
     setIsMounted(true);
@@ -132,13 +139,17 @@ export function TenantsClientPage({
   }, [initialTenants, initialSpaces, initialAgreements]);
 
   useEffect(() => {
-    const newTotalPages = Math.ceil(tenants.length / itemsPerPage);
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    const newTotalPages = Math.ceil(filteredTenants.length / itemsPerPage);
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(newTotalPages);
     }
-  }, [tenants.length, itemsPerPage, currentPage]);
+  }, [filteredTenants.length, itemsPerPage, currentPage]);
   
-  const paginatedTenants = tenants.slice(
+  const paginatedTenants = filteredTenants.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -347,13 +358,27 @@ export function TenantsClientPage({
         </AlertDialogContent>
       </AlertDialog>
 
-      {tenants.length === 0 && !isSaving && isMounted ? ( 
+      <Card className="mb-6 shadow-sm">
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Filter by name, email, or phone..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {filteredTenants.length === 0 && !isSaving && isMounted ? ( 
          <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">No Tenants Yet</h3>
-            <p className="text-muted-foreground mb-4">Add tenants by clicking the button above.</p>
-            {canCreateTenants && (
+            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm ? 'No Tenants Found' : 'No Tenants Yet'}</h3>
+            <p className="text-muted-foreground mb-4">{searchTerm ? 'No tenants match your search.' : 'Add tenants by clicking the button above.'}</p>
+            {!searchTerm && canCreateTenants && (
                 <Button onClick={handleOpenAddForm} disabled={isSaving}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Add New Tenant
                 </Button>
@@ -370,7 +395,6 @@ export function TenantsClientPage({
                 return isAfter(agreementEndDate, new Date());
               });
 
-              // Get unique spaces from active agreements
               const rentedSpaces = [...new Map(activeAgreements.map(ag => ag.space).filter(Boolean).map(space => [space!.id, space])).values()];
               
               const tenantActiveAgreement = findActiveAgreementForTenant(tenant.id);
