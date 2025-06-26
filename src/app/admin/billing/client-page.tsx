@@ -104,7 +104,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [billFilterTerm, setBillFilterTerm] = useState('');
   const [filterYear, setFilterYear] = useState<number | 'all'>('all');
   const [filterMonth, setFilterMonth] = useState<number | 'all'>('all');
+  
   const [individualBillFilter, setIndividualBillFilter] = useState('');
+  const [generationFilterStatus, setGenerationFilterStatus] = useState<'all' | 'ready' | 'upcoming'>('all');
+  const [generationCurrentPage, setGenerationCurrentPage] = useState(1);
+  const generationItemsPerPage = 8;
 
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -145,6 +149,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   useEffect(() => {
     setCurrentPage(1);
   }, [billFilterTerm, filterYear, filterMonth]);
+  
+  useEffect(() => {
+    setGenerationCurrentPage(1);
+  }, [individualBillFilter, generationFilterStatus]);
 
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
@@ -251,6 +259,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   }, [bills, calculatePenalty, today, billFilterTerm, filterYear, filterMonth]);
   
   const filteredAgreementsForGeneration = useMemo(() => {
+    const todayUtcDateString = new Date().toISOString().substring(0, 10);
     return agreements.filter(agreement => {
       if (!agreement.tenant || !agreement.space) return false;
       
@@ -258,6 +267,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
       const isAgreementActive = !isBefore(today, agreementStartDate) && !isAfter(today, agreementEndDate);
       if (!isAgreementActive) return false;
+
+      const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+      const isDueForGeneration = nextDueDateString <= todayUtcDateString;
+      if (generationFilterStatus === 'ready' && !isDueForGeneration) return false;
+      if (generationFilterStatus === 'upcoming' && isDueForGeneration) return false;
       
       const searchTerm = individualBillFilter.toLowerCase();
       if (!searchTerm) return true;
@@ -268,7 +282,14 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
       return tenantName.includes(searchTerm) || spaceName.includes(searchTerm) || buildingName.includes(searchTerm);
     });
-  }, [agreements, individualBillFilter, today]);
+  }, [agreements, individualBillFilter, today, generationFilterStatus]);
+
+  const generationTotalPages = Math.ceil(filteredAgreementsForGeneration.length / generationItemsPerPage);
+  const paginatedAgreementsForGeneration = filteredAgreementsForGeneration.slice(
+    (generationCurrentPage - 1) * generationItemsPerPage,
+    generationCurrentPage * generationItemsPerPage
+  );
+
 
   const totalPages = Math.ceil(processedClientBills.length / itemsPerPage);
   const paginatedBills = processedClientBills.slice(
@@ -574,56 +595,75 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
               <p className="text-muted-foreground mt-1 text-sm">Find an active agreement to generate its next due bill.</p>
             </div>
             
-            <div className="mt-4 mb-6">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row gap-2 mt-4 mb-6">
+              <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   placeholder="Filter by tenant, space, or building..."
-                  className="pl-10 w-full md:w-1/2 lg:w-1/3"
+                  className="pl-10 h-9"
                   value={individualBillFilter}
                   onChange={(e) => setIndividualBillFilter(e.target.value)}
                 />
               </div>
+              <Select value={generationFilterStatus} onValueChange={(value) => setGenerationFilterStatus(value as any)}>
+                  <SelectTrigger className="w-full sm:w-[200px] h-9">
+                      <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Active Agreements</SelectItem>
+                      <SelectItem value="ready">Ready for Generation</SelectItem>
+                      <SelectItem value="upcoming">Upcoming</SelectItem>
+                  </SelectContent>
+              </Select>
             </div>
 
-            {filteredAgreementsForGeneration.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredAgreementsForGeneration.map(agreement => {
-                  if (!agreement.tenant || !agreement.space) return null;
+            {paginatedAgreementsForGeneration.length > 0 ? (
+             <>
+                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {paginatedAgreementsForGeneration.map(agreement => {
+                    if (!agreement.tenant || !agreement.space) return null;
 
-                  const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
-                  const isDueForGeneration = nextDueDateString <= todayUtcDateString;
-                  
-                  return (
-                    <Card key={agreement.id} className="flex flex-col h-full shadow-md border">
-                      <CardContent className="pt-5 pb-4 flex-grow flex flex-col">
-                        <p className="font-semibold text-base leading-tight">{agreement.tenant.name}</p>
-                        <p className="text-sm text-muted-foreground mt-1">{agreement.space.spaceIdName}, {agreement.space.buildingName}</p>
-                        <div className="flex-grow" />
-                        <div className="mt-4 space-y-2">
-                          <p className="text-sm text-muted-foreground">Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</p>
-                          <div>
-                            {isDueForGeneration ? (
-                              <Badge className="font-medium text-xs bg-green-100 text-green-800 border-transparent hover:bg-green-200">Ready for Generation</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="font-normal text-xs">Upcoming</Badge>
-                            )}
+                    const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
+                    const isDueForGeneration = nextDueDateString <= todayUtcDateString;
+                    
+                    return (
+                      <Card key={agreement.id} className="flex flex-col h-full shadow-md border">
+                        <CardContent className="pt-5 pb-4 flex-grow flex flex-col">
+                          <p className="font-semibold text-base leading-tight">{agreement.tenant.name}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{agreement.space.spaceIdName}, {agreement.space.buildingName}</p>
+                          <div className="flex-grow" />
+                          <div className="mt-4 space-y-2">
+                            <p className="text-sm text-muted-foreground">Next Due: {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</p>
+                            <div>
+                              {isDueForGeneration ? (
+                                <Badge className="font-medium text-xs bg-green-100 text-green-800 border-transparent hover:bg-green-200">Ready for Generation</Badge>
+                              ) : (
+                                <Badge variant="secondary" className="font-normal text-xs">Upcoming</Badge>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="pb-4">
-                        <Button
-                          className="w-full"
-                          onClick={() => handleGenerateSingleBill(agreement.id)}
-                          disabled={isLoading}
-                        >
-                          Generate Bill
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  );
-                })}
-              </div>
+                        </CardContent>
+                        <CardFooter className="pb-4">
+                          <Button
+                            className="w-full"
+                            onClick={() => handleGenerateSingleBill(agreement.id)}
+                            disabled={isLoading}
+                          >
+                            Generate Bill
+                          </Button>
+                        </CardFooter>
+                      </Card>
+                    );
+                  })}
+                </div>
+                 <PaginationControls
+                    currentPage={generationCurrentPage}
+                    totalPages={generationTotalPages}
+                    onPageChange={setGenerationCurrentPage}
+                    itemsPerPage={generationItemsPerPage}
+                    className="mt-6"
+                 />
+              </>
             ) : (
               <div className="text-center py-8 text-muted-foreground border rounded-md mt-4">
                 <p>No active agreements match your filter.</p>

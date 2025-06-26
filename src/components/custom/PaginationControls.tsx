@@ -24,7 +24,7 @@ interface PaginationControlsProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   itemsPerPage: number;
-  onItemsPerPageChange: (value: number) => void;
+  onItemsPerPageChange?: (value: number) => void;
   className?: string;
 }
 
@@ -77,20 +77,24 @@ export function PaginationControls({
   return (
     <div className={cn("grid grid-cols-1 sm:grid-cols-3 items-center gap-4", className)}>
       <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-muted-foreground">
-        <span>Rows per page</span>
-        <Select
-          value={String(itemsPerPage)}
-          onValueChange={(value) => onItemsPerPageChange(Number(value))}
-        >
-          <SelectTrigger className="w-[70px] h-8">
-            <SelectValue placeholder={String(itemsPerPage)} />
-          </SelectTrigger>
-          <SelectContent>
-            {[5, 9, 10, 15, 20, 50].map(size => (
-              <SelectItem key={size} value={String(size)}>{size}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {onItemsPerPageChange && (
+          <>
+            <span>Rows per page</span>
+            <Select
+              value={String(itemsPerPage)}
+              onValueChange={(value) => onItemsPerPageChange(Number(value))}
+            >
+              <SelectTrigger className="w-[70px] h-8">
+                <SelectValue placeholder={String(itemsPerPage)} />
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 8, 9, 10, 15, 20, 50].map(size => (
+                  <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
       </div>
       
       {/* Conditionally render the pagination links only if there's more than one page */}
