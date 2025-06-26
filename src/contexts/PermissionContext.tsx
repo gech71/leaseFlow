@@ -2,7 +2,7 @@
 "use client";
 
 import type { CurrentUser, PermissionId } from '@/lib/types';
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react'; // useMemo removed from destructuring
+import React, { createContext, useContext, useState, useEffect, type ReactNode, useCallback, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 
 interface PermissionContextType {
@@ -32,8 +32,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchCurrentUser = async () => {
-    setIsLoading(true);
+  const fetchCurrentUser = useCallback(async () => {
     try {
       const response = await fetch('/api/user/me');
       if (response.ok) {
@@ -54,31 +53,46 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
   
   useEffect(() => {
+    setIsLoading(true);
     fetchCurrentUser();
-  }, []);
+  }, [fetchCurrentUser]);
 
-  const hasPermission = (permission: PermissionId | PermissionId[]): boolean => {
+  const hasPermission = useCallback((permission: PermissionId | PermissionId[]): boolean => {
     if (!currentUser || !currentUser.effectivePermissions) return false;
     if (Array.isArray(permission)) {
       return permission.every(p => currentUser.effectivePermissions.includes(p));
     }
     return currentUser.effectivePermissions.includes(permission);
-  };
+  }, [currentUser]);
 
-  const hasAnyPermission = (permissions: PermissionId[]): boolean => {
+  const hasAnyPermission = useCallback((permissions: PermissionId[]): boolean => {
     if (!currentUser || !currentUser.effectivePermissions) return false;
     return permissions.some(p => currentUser.effectivePermissions.includes(p));
-  };
+  }, [currentUser]);
   
-  const isSuperAdmin = React.useMemo(() => { // Changed to React.useMemo
+  const isSuperAdmin = useMemo(() => {
     return currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') || false;
   }, [currentUser]);
 
+  const refetchUser = useCallback(async () => {
+    setIsLoading(true);
+    await fetchCurrentUser();
+  }, [fetchCurrentUser]);
 
-  if (isLoading) {
+  const contextValue = useMemo(() => ({
+    currentUser,
+    isLoading,
+    hasPermission,
+    hasAnyPermission,
+    isSuperAdmin,
+    refetchUser
+  }), [currentUser, isLoading, hasPermission, hasAnyPermission, isSuperAdmin, refetchUser]);
+
+
+  if (isLoading && !currentUser) { // Only show full-screen loader on initial load
     return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -87,7 +101,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   }
 
   return (
-    <PermissionContext.Provider value={{ currentUser, isLoading, hasPermission, hasAnyPermission, isSuperAdmin, refetchUser: fetchCurrentUser }}>
+    <PermissionContext.Provider value={contextValue}>
       {children}
     </PermissionContext.Provider>
   );
