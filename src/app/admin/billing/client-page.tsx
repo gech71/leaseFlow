@@ -108,7 +108,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [individualBillFilter, setIndividualBillFilter] = useState('');
   const [generationFilterStatus, setGenerationFilterStatus] = useState<'all' | 'ready' | 'upcoming'>('all');
   const [generationCurrentPage, setGenerationCurrentPage] = useState(1);
-  const generationItemsPerPage = 8;
+  const [generationItemsPerPage, setGenerationItemsPerPage] = useState(8);
 
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -136,6 +136,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
     setCurrentPage(1);
+  };
+
+  const handleGenerationItemsPerPageChange = (newSize: number) => {
+    setGenerationItemsPerPage(newSize);
+    setGenerationCurrentPage(1);
   };
 
   useEffect(() => {
@@ -661,6 +666,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                     totalPages={generationTotalPages}
                     onPageChange={setGenerationCurrentPage}
                     itemsPerPage={generationItemsPerPage}
+                    onItemsPerPageChange={handleGenerationItemsPerPageChange}
                     className="mt-6"
                  />
               </>
