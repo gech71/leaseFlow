@@ -808,52 +808,58 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="px-2">Tenant</TableHead>
-                        <TableHead className="hidden sm:table-cell px-2">Space</TableHead>
-                        <TableHead className="hidden md:table-cell px-2">Bill Date</TableHead>
-                        <TableHead className="px-2">Due Date</TableHead>
-                        <TableHead className="text-right whitespace-nowrap px-2">Total Amount</TableHead>
-                        <TableHead className="text-center px-2">Status</TableHead>
-                        <TableHead className="text-right px-2">Actions</TableHead>
+                        <TableHead className="px-3 py-2 h-10">Tenant / Space</TableHead>
+                        <TableHead className="hidden md:table-cell px-3 py-2 h-10">Dates (Bill / Due)</TableHead>
+                        <TableHead className="text-right px-3 py-2 h-10">Amount</TableHead>
+                        <TableHead className="text-center px-3 py-2 h-10">Status</TableHead>
+                        <TableHead className="text-right px-3 py-2 h-10">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedBills.map((bill) => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                          <TableCell className="font-medium px-2 py-2">
-                            <div className="truncate" title={bill.tenantName}>{bill.tenantName}</div>
+                          <TableCell className="font-medium px-3 py-2">
+                             <div>{bill.tenantName}</div>
+                             <div className="text-xs text-muted-foreground truncate">{bill.agreement?.space?.spaceIdName}, {bill.agreement?.space?.buildingName}</div>
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-xs px-2 py-2">
-                            <div>{bill.agreement?.space?.spaceIdName},</div>
-                            <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
+                          <TableCell className="hidden md:table-cell px-3 py-2 text-xs">
+                             <div>Bill: {format(parseISO(bill.billDate), 'PP')}</div>
+                             <div className={`${bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>Due: {format(parseISO(bill.dueDate), 'PP')}</div>
                           </TableCell>
-                          <TableCell className="hidden md:table-cell px-2 py-2">
-                              <div className="flex flex-col text-xs">
-                              <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
-                              <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
-                            </div>
+                          <TableCell className="text-right px-3 py-2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-auto px-2 py-1 font-semibold text-primary whitespace-nowrap hover:bg-secondary/50">
+                                  {bill.totalAmount.toFixed(2)} Birr
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-56 text-sm">
+                                <div className="grid gap-2">
+                                  <div className="grid grid-cols-2 items-center gap-2">
+                                    <span className="text-muted-foreground">Rent</span>
+                                    <span className="font-medium text-right">{bill.rentAmount.toFixed(2)}</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 items-center gap-2">
+                                    <span className="text-muted-foreground">Utility</span>
+                                    <span className="font-medium text-right">{bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</span>
+                                  </div>
+                                  {bill.penaltyAmount ? (
+                                    <div className="grid grid-cols-2 items-center gap-2">
+                                      <span className="text-muted-foreground text-destructive">Penalty</span>
+                                      <span className="font-medium text-right text-destructive">{bill.penaltyAmount.toFixed(2)}</span>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                           </TableCell>
-                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''} px-2 py-2`}>
-                              <div className="flex flex-col text-xs font-medium">
-                              <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
-                              <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right px-2 py-2">
-                            <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
-                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5 text-right">
-                              <div>Rent: {bill.rentAmount.toFixed(2)}</div>
-                              <div>Utility: {bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</div>
-                              {bill.penaltyAmount ? <div className="text-destructive">Penalty: {bill.penaltyAmount.toFixed(2)}</div> : null}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center px-2 py-2">
+                          <TableCell className="text-center px-3 py-2">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-auto justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
                               {getStatusIcon(bill.currentStatus || bill.status)}
                               <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right px-2 py-2">
+                          <TableCell className="text-right px-3 py-2">
                             <div className="flex items-center justify-end gap-0">
                               {bill.currentStatus === 'Paid' ? (
                                 <>
