@@ -36,7 +36,10 @@ export function PaginationControls({
   onItemsPerPageChange,
   className 
 }: PaginationControlsProps) {
-  if (totalPages <= 1) return null;
+  // Return null only if there are no pages at all.
+  if (totalPages < 1) {
+    return null;
+  }
 
   const pageNumbers = () => {
     const delta = 1;
@@ -89,37 +92,41 @@ export function PaginationControls({
           </SelectContent>
         </Select>
       </div>
-      <Pagination className="sm:col-start-2 sm:justify-self-center">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              href="#"
-              onClick={(e) => { e.preventDefault(); onPageChange(Math.max(1, currentPage - 1)); }}
-              className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-            />
-          </PaginationItem>
-          {pageNumbers().map((page, index) =>
-            typeof page === "number" ? (
-              <PaginationItem key={page}>
-                <PaginationLink href="#" onClick={(e) => { e.preventDefault(); onPageChange(page); }} isActive={currentPage === page}>
-                  {page}
-                </PaginationLink>
-              </PaginationItem>
-            ) : (
-              <PaginationItem key={`ellipsis-${index}`}>
-                <PaginationEllipsis />
-              </PaginationItem>
-            )
-          )}
-          <PaginationItem>
-            <PaginationNext
-              href="#"
-              onClick={(e) => { e.preventDefault(); onPageChange(Math.min(totalPages, currentPage + 1)); }}
-              className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+      
+      {/* Conditionally render the pagination links only if there's more than one page */}
+      {totalPages > 1 && (
+        <Pagination className="sm:col-start-2 sm:justify-self-center">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => { e.preventDefault(); onPageChange(Math.max(1, currentPage - 1)); }}
+                className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+            {pageNumbers().map((page, index) =>
+              typeof page === "number" ? (
+                <PaginationItem key={page}>
+                  <PaginationLink href="#" onClick={(e) => { e.preventDefault(); onPageChange(page); }} isActive={currentPage === page}>
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ) : (
+                <PaginationItem key={`ellipsis-${index}`}>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              )
+            )}
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => { e.preventDefault(); onPageChange(Math.min(totalPages, currentPage + 1)); }}
+                className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }
