@@ -756,38 +756,38 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="px-3">Tenant</TableHead>
-                        <TableHead className="hidden sm:table-cell px-3">Space</TableHead>
-                        <TableHead className="hidden md:table-cell px-3">Bill Date</TableHead>
-                        <TableHead className="px-3">Due Date</TableHead>
-                        <TableHead className="text-right whitespace-nowrap px-3">Total Amount</TableHead>
-                        <TableHead className="text-center px-3">Status</TableHead>
-                        <TableHead className="text-right px-3">Actions</TableHead>
+                        <TableHead className="px-2">Tenant</TableHead>
+                        <TableHead className="hidden sm:table-cell px-2">Space</TableHead>
+                        <TableHead className="hidden md:table-cell px-2">Bill Date</TableHead>
+                        <TableHead className="px-2">Due Date</TableHead>
+                        <TableHead className="text-right whitespace-nowrap px-2">Total Amount</TableHead>
+                        <TableHead className="text-center px-2">Status</TableHead>
+                        <TableHead className="text-right px-2">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedBills.map((bill) => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                          <TableCell className="font-medium p-3">
+                          <TableCell className="font-medium px-2 py-2">
                             <div className="truncate" title={bill.tenantName}>{bill.tenantName}</div>
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-xs p-3">
+                          <TableCell className="hidden sm:table-cell text-xs px-2 py-2">
                             <div>{bill.agreement?.space?.spaceIdName},</div>
                             <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
                           </TableCell>
-                          <TableCell className="hidden md:table-cell p-3">
+                          <TableCell className="hidden md:table-cell px-2 py-2">
                               <div className="flex flex-col text-xs">
                               <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
                               <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
                             </div>
                           </TableCell>
-                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''} p-3`}>
+                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''} px-2 py-2`}>
                               <div className="flex flex-col text-xs font-medium">
                               <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
                               <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right p-3">
+                          <TableCell className="text-right px-2 py-2">
                             <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
                             <div className="text-xs text-muted-foreground mt-1 space-y-0.5 text-right">
                               <div>Rent: {bill.rentAmount.toFixed(2)}</div>
@@ -795,13 +795,13 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                               {bill.penaltyAmount ? <div className="text-destructive">Penalty: {bill.penaltyAmount.toFixed(2)}</div> : null}
                             </div>
                           </TableCell>
-                          <TableCell className="text-center p-3">
+                          <TableCell className="text-center px-2 py-2">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-auto justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
                               {getStatusIcon(bill.currentStatus || bill.status)}
                               <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right p-3">
+                          <TableCell className="text-right px-2 py-2">
                             <div className="flex items-center justify-end gap-0">
                               {bill.currentStatus === 'Paid' ? (
                                 <>
