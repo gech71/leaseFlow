@@ -72,22 +72,23 @@ export default async function ViewAgreementPage({ params }: PageParams) {
 
   let serializableAgreement: AgreementWithRelations | null = null;
   if (agreementData) {
+    const fallbackDate = new Date(0).toISOString(); // Use epoch as a fallback for any null dates
     serializableAgreement = {
       ...agreementData,
-      startDate: agreementData.startDate.toISOString(),
-      nextPaymentDueDate: agreementData.nextPaymentDueDate.toISOString(),
-      createdAt: agreementData.createdAt.toISOString(),
-      updatedAt: agreementData.updatedAt?.toISOString() || agreementData.createdAt.toISOString(), // Safe serialization
+      startDate: agreementData.startDate?.toISOString() || fallbackDate,
+      nextPaymentDueDate: agreementData.nextPaymentDueDate?.toISOString() || fallbackDate,
+      createdAt: agreementData.createdAt?.toISOString() || fallbackDate,
+      updatedAt: agreementData.updatedAt?.toISOString() || agreementData.createdAt?.toISOString() || fallbackDate,
       initialPaymentDate: agreementData.initialPaymentDate?.toISOString() || undefined,
       tenant: agreementData.tenant ? { 
         ...agreementData.tenant, 
-        createdAt: agreementData.tenant.createdAt.toISOString(), 
-        updatedAt: agreementData.tenant.updatedAt?.toISOString() || agreementData.tenant.createdAt.toISOString() // Safe serialization
+        createdAt: agreementData.tenant.createdAt?.toISOString() || fallbackDate, 
+        updatedAt: agreementData.tenant.updatedAt?.toISOString() || agreementData.tenant.createdAt?.toISOString() || fallbackDate
       } : null,
       space: agreementData.space ? { 
         ...agreementData.space, 
-        createdAt: agreementData.space.createdAt.toISOString(), 
-        updatedAt: agreementData.space.updatedAt?.toISOString() || agreementData.space.createdAt.toISOString() // Safe serialization
+        createdAt: agreementData.space.createdAt?.toISOString() || fallbackDate, 
+        updatedAt: agreementData.space.updatedAt?.toISOString() || agreementData.space.createdAt?.toISOString() || fallbackDate
       } : null,
     } as AgreementWithRelations;
   }
