@@ -51,7 +51,8 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
 
 // Server Component to fetch initial data
 export default async function ViewAgreementPage({ params }: PageParams) {
-  let agreementData = await databaseService.getAgreementById(params.id, {
+  const { id } = params; // Destructure ID from params first
+  let agreementData = await databaseService.getAgreementById(id, {
     tenant: true, 
     space: true 
   });
