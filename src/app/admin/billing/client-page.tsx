@@ -756,51 +756,52 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[150px]">Tenant</TableHead>
-                        <TableHead className="hidden sm:table-cell">Space</TableHead>
-                        <TableHead className="hidden md:table-cell">Bill Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right whitespace-nowrap">Total Amount</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="px-3">Tenant</TableHead>
+                        <TableHead className="hidden sm:table-cell px-3">Space</TableHead>
+                        <TableHead className="hidden md:table-cell px-3">Bill Date</TableHead>
+                        <TableHead className="px-3">Due Date</TableHead>
+                        <TableHead className="text-right whitespace-nowrap px-3">Total Amount</TableHead>
+                        <TableHead className="text-center px-3">Status</TableHead>
+                        <TableHead className="text-right px-3">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedBills.map((bill) => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : ''} ${bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                          <TableCell className="font-medium">
-                            <div className="w-28 truncate" title={bill.tenantName}>{bill.tenantName}</div>
+                          <TableCell className="font-medium p-3">
+                            <div className="truncate" title={bill.tenantName}>{bill.tenantName}</div>
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-xs">
+                          <TableCell className="hidden sm:table-cell text-xs p-3">
                             <div>{bill.agreement?.space?.spaceIdName},</div>
                             <div className="text-muted-foreground">{bill.agreement?.space?.buildingName}</div>
                           </TableCell>
-                          <TableCell className="hidden md:table-cell">
+                          <TableCell className="hidden md:table-cell p-3">
                               <div className="flex flex-col text-xs">
                               <span>{format(parseISO(bill.billDate), 'MMM dd,')}</span>
                               <span className="text-muted-foreground">{format(parseISO(bill.billDate), 'yyyy')}</span>
                             </div>
                           </TableCell>
-                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''}`}>
+                          <TableCell className={`${bill.currentStatus === 'Overdue' ? 'text-destructive' : ''} p-3`}>
                               <div className="flex flex-col text-xs font-medium">
                               <span>{format(parseISO(bill.dueDate), 'MMM dd,')}</span>
                               <span className="font-normal text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right p-3">
                             <div className="font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</div>
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
-                              {`R: ${bill.rentAmount.toFixed(0)} | U: ${bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(0)}`}
-                              {bill.penaltyAmount ? <span className="text-destructive">{` | P: ${bill.penaltyAmount.toFixed(0)}`}</span> : ''}
+                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5 text-right">
+                              <div>Rent: {bill.rentAmount.toFixed(2)}</div>
+                              <div>Utility: {bill.utilityBreakdown.reduce((s, u) => s + u.amount, 0).toFixed(2)}</div>
+                              {bill.penaltyAmount ? <div className="text-destructive">Penalty: {bill.penaltyAmount.toFixed(2)}</div> : null}
                             </div>
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center p-3">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs w-auto justify-center ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
                               {getStatusIcon(bill.currentStatus || bill.status)}
                               <span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right p-3">
                             <div className="flex items-center justify-end gap-0">
                               {bill.currentStatus === 'Paid' ? (
                                 <>
