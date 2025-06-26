@@ -117,9 +117,6 @@ export default function AdminLoginPage() {
           <Link href="#" className="text-primary hover:underline">
             Forgot password?
           </Link>
-          <p className="text-muted-foreground">
-            Tenant? <Link href="/portal/login" className="text-primary hover:underline">Tenant Portal Login</Link>
-          </p>
         </CardFooter>
       </Card>
     </div>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -98,9 +97,6 @@ export default function LoginPage() {
           <Link href="#" className="text-primary hover:underline">
             Forgot password?
           </Link>
-          <p className="text-muted-foreground">
-            Property Manager? <Link href="/auth/login" className="text-primary hover:underline">Admin Login</Link>
-          </p>
         </CardFooter>
       </Card>
     </div>
