@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, FileText, DollarSign, LayoutGrid, AlertCircle, User } from 'lucide-react';
+import { Building, Building2, FileText, DollarSign, LayoutGrid, AlertCircle, User } from 'lucide-react';
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart';
 import { databaseService } from '@/lib/services/databaseService';
@@ -284,7 +284,7 @@ export default async function AdminDashboardPage() {
       <PageHeader title="Admin Dashboard" icon={LayoutGrid} description="Overview of your rental properties and finances." />
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-        <StatCard title="Total Buildings" value={String(stats.totalBuildings)} icon={Building2} description="Number of managed buildings." />
+        <StatCard title="Total Buildings" value={String(stats.totalBuildings)} icon={Building} description="Number of managed buildings." />
         <StatCard title="Occupied Spaces" value={`${stats.occupiedSpaces} / ${stats.totalSpaces}`} icon={Building2} description={`${stats.occupancyRate} occupancy rate.`} />
         <StatCard title="Active Tenants" value={String(stats.totalTenants)} icon={User} description="Currently active tenants." />
         <StatCard title="Active Agreements" value={String(stats.activeAgreements)} icon={FileText} description="Currently active leases." />
