@@ -306,7 +306,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
             <div className="space-y-4 border-b pb-6">
               <div>
                 <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
-                  Name
+                  Name<span className="text-destructive ml-1">*</span>
                 </Label>
                 <Input
                   id="buildingNameMain"
@@ -375,14 +375,14 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                               <p className="text-xs text-muted-foreground mt-0.5">For last rule in scope, leave blank/0 for indefinite.</p>
                           </div>
                           <div>
-                              <Label htmlFor={`ruleFeeType-${uiRule.id}`} className="text-xs flex items-center"><DollarSignLucide className="mr-1 h-3 w-3"/>Fee Type</Label>
+                              <Label htmlFor={`ruleFeeType-${uiRule.id}`} className="text-xs flex items-center"><DollarSignLucide className="mr-1 h-3 w-3"/>Fee Type<span className="text-destructive ml-1">*</span></Label>
                               <Select value={uiRule.feeType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as UIPenaltyRule['feeType'])} disabled={isSaving || !canManageThisForm}>
                                   <SelectTrigger id={`ruleFeeType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue /></SelectTrigger>
                                   <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
                               </Select>
                           </div>
                           <div>
-                              <Label htmlFor={`ruleFeeValue-${uiRule.id}`} className="text-xs flex items-center"><DollarSignLucide className="mr-1 h-3 w-3"/>Fee Value</Label>
+                              <Label htmlFor={`ruleFeeValue-${uiRule.id}`} className="text-xs flex items-center"><DollarSignLucide className="mr-1 h-3 w-3"/>Fee Value<span className="text-destructive ml-1">*</span></Label>
                               <Input id={`ruleFeeValue-${uiRule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5"
                                       value={uiRule.feeValue ?? ''} 
                                       onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'feeValue', e.target.value)}
@@ -391,7 +391,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                              <Label htmlFor={`scopeType-${uiRule.id}`} className="text-xs flex items-center"><Layers className="mr-1 h-3 w-3"/>Scope</Label>
+                              <Label htmlFor={`scopeType-${uiRule.id}`} className="text-xs flex items-center"><Layers className="mr-1 h-3 w-3"/>Scope<span className="text-destructive ml-1">*</span></Label>
                               <Select value={uiRule.scope} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'scope', value as UIPenaltyRule['scope'])} disabled={isSaving || !canManageThisForm}>
                                   <SelectTrigger id={`scopeType-${uiRule.id}`} className="mt-1 h-9"><SelectValue /></SelectTrigger>
                                   <SelectContent>
@@ -403,7 +403,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                           </div>
                           {uiRule.scope === 'Floor' && (
                               <div>
-                                  <Label htmlFor={`applicableFloor-${uiRule.id}`} className="text-xs">Floor Name</Label>
+                                  <Label htmlFor={`applicableFloor-${uiRule.id}`} className="text-xs">Floor Name<span className="text-destructive ml-1">*</span></Label>
                                   <Input id={`applicableFloor-${uiRule.id}`} placeholder="e.g., 5th Floor" value={uiRule.applicableFloor || ''}
                                           onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableFloor', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
                               </div>
@@ -411,7 +411,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                       </div>
                       {uiRule.scope === 'SpecificSpaces' && (
                           <div>
-                              <Label htmlFor={`applicableSpaces-${uiRule.id}`} className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)</Label>
+                              <Label htmlFor={`applicableSpaces-${uiRule.id}`} className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)<span className="text-destructive ml-1">*</span></Label>
                               <Input id={`applicableSpaces-${uiRule.id}`} placeholder="e.g., Unit 10A, Office 202B" value={uiRule.applicableSpaceIdNamesStr || ''}
                                       onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableSpaceIdNamesStr', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
                               <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>

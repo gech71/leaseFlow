@@ -295,7 +295,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 py-2 overflow-y-auto flex-grow pr-1">
               <div>
-                <FormLabel htmlFor="roleName">Role Name</FormLabel>
+                <FormLabel htmlFor="roleName">Role Name<span className="text-destructive ml-1">*</span></FormLabel>
                 <FormControl>
                   <Input id="roleName" {...form.register("name")} placeholder="E.g., PROPERTY_MANAGER" className="mt-1" disabled={isSaving || !canManageRoles || (formMode === 'edit' && (currentRoleForForm?.name === 'SUPER_ADMIN' || currentRoleForForm?.name === 'PROPERTY_MANAGER' || currentRoleForForm?.name === 'ACCOUNTANT' || currentRoleForForm?.name === 'SUPPORT_STAFF'))} />
                 </FormControl>

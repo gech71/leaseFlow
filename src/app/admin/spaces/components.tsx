@@ -271,7 +271,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
           <form onSubmit={handleFormSubmit}>
             <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <div>
-                <Label htmlFor="buildingId">Building</Label>
+                <Label htmlFor="buildingId">Building<span className="text-destructive ml-1">*</span></Label>
                 <Select 
                   value={currentSpaceData.buildingId || ""}
                   onValueChange={(value) => setCurrentSpaceData(prev => ({...prev, buildingId: value}))}
@@ -291,11 +291,11 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 </Select>
               </div>
               <div>
-                <Label htmlFor="spaceIdName">Space ID/Name</Label>
+                <Label htmlFor="spaceIdName">Space ID/Name<span className="text-destructive ml-1">*</span></Label>
                 <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
-                <Label htmlFor="area">Area (sq ft)</Label>
+                <Label htmlFor="area">Area (sq ft)<span className="text-destructive ml-1">*</span></Label>
                 <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
@@ -303,7 +303,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
-                <Label htmlFor="utilityProrationShare">Proration Share (e.g., 10 for 10%)</Label>
+                <Label htmlFor="utilityProrationShare">Proration Share (e.g., 10 for 10%)<span className="text-destructive ml-1">*</span></Label>
                 <Input 
                     id="utilityProrationShare" 
                     type="number" 
@@ -325,7 +325,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 />
               </div>
               <div>
-                <Label htmlFor="monthlyRentalPrice">Monthly Rent</Label>
+                <Label htmlFor="monthlyRentalPrice">Monthly Rent<span className="text-destructive ml-1">*</span></Label>
                 <Input id="monthlyRentalPrice" type="number" value={currentSpaceData.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 2500" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
             </div>

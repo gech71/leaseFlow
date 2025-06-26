@@ -287,7 +287,7 @@ Landlord/Authorized Representative
                 name="tenantId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" />Select Tenant</FormLabel>
+                    <FormLabel className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" />Select Tenant<span className="text-destructive ml-1">*</span></FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Choose an existing tenant" /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -305,7 +305,7 @@ Landlord/Authorized Representative
                 name="selectedSpaceId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center"><Home className="mr-2 h-4 w-4 text-primary" />Select Space</FormLabel>
+                    <FormLabel className="flex items-center"><Home className="mr-2 h-4 w-4 text-primary" />Select Space<span className="text-destructive ml-1">*</span></FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Choose an available space" /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -325,7 +325,7 @@ Landlord/Authorized Representative
                 name="startDate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary"/>Agreement Start Date</FormLabel>
+                    <FormLabel className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary"/>Agreement Start Date<span className="text-destructive ml-1">*</span></FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -348,8 +348,8 @@ Landlord/Authorized Representative
                 )}
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="paymentTermMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary" />Total Term (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 12" {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
-                  <FormField control={form.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" />Initial Payment (Months)</FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
+                  <FormField control={form.control} name="paymentTermMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary" />Total Term (Months)<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="e.g., 12" {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
+                  <FormField control={form.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" />Initial Payment (Months)<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
               </div>
               {calculatedInitialPaymentAmount > 0 && (
                 <div className="p-3 bg-secondary/50 rounded-md border border-border">
@@ -360,7 +360,7 @@ Landlord/Authorized Representative
               )}
               <FormField control={form.control} name="paymentMethod" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary" />Initial Payment Method</FormLabel>
+                    <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary" />Initial Payment Method<span className="text-destructive ml-1">*</span></FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="Card"><CreditCard className="mr-2 h-4 w-4 inline-block"/>Card</SelectItem>
@@ -375,7 +375,7 @@ Landlord/Authorized Representative
               {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
                  <FormField control={form.control} name="bankOrWalletName" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center"> {paymentMethod === "Bank Transfer" ? <Landmark className="mr-2 h-4 w-4 text-primary"/> : <Wallet className="mr-2 h-4 w-4 text-primary"/>} {paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"} </FormLabel>
+                      <FormLabel className="flex items-center"> {paymentMethod === "Bank Transfer" ? <Landmark className="mr-2 h-4 w-4 text-primary"/> : <Wallet className="mr-2 h-4 w-4 text-primary"/>} {paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"} <span className="text-destructive ml-1">*</span></FormLabel>
                       <FormControl><Input placeholder={`Enter ${paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"}`} {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage />
                     </FormItem>
                   )}/>
