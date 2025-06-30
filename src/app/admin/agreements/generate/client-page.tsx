@@ -150,7 +150,7 @@ This Rental Agreement ("Agreement") is made and entered into on ${format(data.st
     -   Building: ${selectedSpace.buildingName}
     -   Space: ${selectedSpace.spaceIdName}
     -   Floor: ${selectedSpace.floor}
-    -   Area: ${selectedSpace.area} sq ft
+    -   Area: ${selectedSpace.area} m²
 
 3.  TERM
     This Agreement shall commence on ${format(data.startDate, 'PPP')} and continue for a term of ${data.paymentTermMonths} month(s).

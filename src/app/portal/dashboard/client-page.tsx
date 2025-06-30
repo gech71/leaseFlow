@@ -267,7 +267,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
             <CardContent className="text-sm space-y-2">
               <p><strong>Property:</strong> {agreement.space.spaceIdName}, {agreement.space.building.name}</p>
               <p><strong>Address:</strong> {agreement.space.building.address || 'N/A'}</p>
-              <p><strong>Floor:</strong> {agreement.space.floor}, <strong>Area:</strong> {agreement.space.area} sq ft</p>
+              <p><strong>Floor:</strong> {agreement.space.floor}, <strong>Area:</strong> {agreement.space.area} m²</p>
               <p><strong>Monthly Rent:</strong> {agreement.monthlyRentalPrice.toLocaleString()} Birr</p>
               <p><strong>Lease Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
               <p><strong>Lease End Date:</strong> {format(agreementEndDate, 'PP')}</p>

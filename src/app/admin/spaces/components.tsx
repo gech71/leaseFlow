@@ -311,8 +311,8 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
-                <Label htmlFor="area">Area (sq ft)<span className="text-destructive ml-1">*</span></Label>
-                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
+                <Label htmlFor="area">Area (m²)<span className="text-destructive ml-1">*</span></Label>
+                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 120" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="floor">Floor<span className="text-destructive ml-1">*</span></Label>
@@ -426,7 +426,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> Floor: {space.floor}</div>
-                  <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} sq ft</div>
+                  <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} m²</div>
                   <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(Number(space.utilityProrationShare) * 100).toFixed(0)}%</div>
                   <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: {Number(space.monthlyRentalPrice).toLocaleString()} Birr/month</div>
                   {space.isOccupied && space.availabilityDate && (
