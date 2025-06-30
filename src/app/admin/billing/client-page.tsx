@@ -108,7 +108,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [individualBillFilter, setIndividualBillFilter] = useState('');
   const [generationFilterStatus, setGenerationFilterStatus] = useState<'all' | 'ready' | 'upcoming'>('all');
   const [generationCurrentPage, setGenerationCurrentPage] = useState(1);
-  const [generationItemsPerPage, setGenerationItemsPerPage] = useState(8);
+  const [generationItemsPerPage, setGenerationItemsPerPage] = useState(5);
 
 
   const [currentPage, setCurrentPage] = useState(1);
