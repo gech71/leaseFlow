@@ -9,6 +9,15 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import Image from 'next/image';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'NIB Rental',
+  description: 'Building rental management solution by Firebase Studio',
+  icons: {
+    icon: 'https://play-lh.googleusercontent.com/bXqMt9ROsGd0H9vPhib5hG-0NB-EJcAwZy6UUDhvlP-ykE595IMQtzr14R6IRWtJiGTh',
+  },
+};
 
 const navLinks = [
   { href: "/portal/dashboard", label: "Dashboard", icon: Home },
