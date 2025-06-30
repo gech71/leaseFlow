@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -346,9 +345,9 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                         </AccordionPrimitive.Header>
                         <AccordionContent className="bg-muted/30 border-t">
                             <div className="p-6">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
+                                <div className="flex flex-row flex-wrap gap-x-6 gap-y-3">
                                   {group.permissions.map((permission) => (
-                                    <FormItem key={permission.id} className="flex flex-row items-start space-x-3 space-y-0">
+                                    <FormItem key={permission.id} className="flex flex-row items-center space-x-2 space-y-0">
                                       <FormControl>
                                         <Checkbox
                                           checked={selectedPermissions?.includes(permission.id)}
@@ -356,11 +355,9 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                                           disabled={isSaving || !canManageRoles}
                                         />
                                       </FormControl>
-                                      <div className="space-y-1 leading-none">
-                                        <FormLabel className="text-sm font-normal cursor-pointer">
-                                          {permission.label}
-                                        </FormLabel>
-                                      </div>
+                                      <FormLabel className="text-sm font-normal cursor-pointer">
+                                        {permission.label}
+                                      </FormLabel>
                                     </FormItem>
                                   ))}
                                 </div>
