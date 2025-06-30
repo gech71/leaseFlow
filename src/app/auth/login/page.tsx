@@ -71,7 +71,7 @@ export default function AdminLoginPage() {
             </Link>
           </div>
           <CardTitle className="text-2xl font-semibold">Admin & Staff Login</CardTitle>
-          <CardDescription>Enter your phone number and password to access the admin panel.</CardDescription>
+          <CardDescription>Enter your phone number and password</CardDescription>
         </CardHeader>
         <CardContent className="pb-8">
           <form onSubmit={handleLogin} className="space-y-6">
