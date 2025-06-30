@@ -4,6 +4,15 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Settings as SettingsIcon, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'NIB Rental',
+  description: 'Building rental management solution by Firebase Studio',
+  icons: {
+    icon: 'https://play-lh.googleusercontent.com/bXqMt9ROsGd0H9vPhib5hG-0NB-EJcAwZy6UUDhvlP-ykE595IMQtzr14R6IRWtJiGTh',
+  },
+};
 
 export default function SettingsLayout({
   children,
@@ -18,7 +27,6 @@ export default function SettingsLayout({
         description="Manage users and other application configurations."
       />
       {/* Add navigation for sub-settings pages if needed in the future */}
-      {/* e.g., a Tabs component or a simple list of links */}
       {/* 
       <nav className="mb-6">
         <Link href="/admin/settings/user-registration" className="mr-4 hover:underline">User Registration</Link>
