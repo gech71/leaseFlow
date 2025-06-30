@@ -25,7 +25,7 @@ export function AppLogo() {
         "font-headline text-lg font-bold text-sidebar-primary transition-all duration-300 whitespace-nowrap",
         isCollapsed ? "opacity-0 w-0" : "opacity-100"
       )}>
-        LeaseFlow
+        NIB Rental
       </span>
     </Link>
   );

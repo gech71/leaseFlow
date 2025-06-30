@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
           <div className="mx-auto">
             <Link href="/" className="flex items-center justify-center gap-3 text-foreground hover:text-primary transition-colors">
                <Image src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png" alt="Nib International Bank Logo" width={160} height={44} className="h-11 w-auto object-contain" />
-               <span className="text-2xl font-bold font-headline text-primary">LeaseFlow</span>
+               <span className="text-2xl font-bold font-headline text-primary">NIB Rental</span>
             </Link>
           </div>
           <CardTitle className="text-2xl font-semibold">Admin & Staff Login</CardTitle>
