@@ -125,6 +125,11 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       setIsSaving(false);
       return;
     }
+    if (!currentSpaceData.floor?.trim()) {
+      toast({ title: "Validation Error", description: "Floor is required.", variant: "destructive" });
+      setIsSaving(false);
+      return;
+    }
     const prorationShareValue = currentSpaceData.utilityProrationShare;
     if (prorationShareValue === undefined || prorationShareValue < 0 || prorationShareValue > 1) {
       toast({ title: "Validation Error", description: "Proration share must be between 0 and 1 (e.g., 0.1 for 10%).", variant: "destructive" });
@@ -144,7 +149,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       buildingName: selectedBuilding?.name || 'Unknown Building',
       spaceIdName: currentSpaceData.spaceIdName.trim(),
       area: Number(currentSpaceData.area),
-      floor: currentSpaceData.floor || 'N/A',
+      floor: currentSpaceData.floor!.trim(),
       utilityProrationShare: Number(prorationShareValue),
       monthlyRentalPrice: Number(currentSpaceData.monthlyRentalPrice),
       isOccupied: currentSpaceData.isOccupied || false,
@@ -310,8 +315,8 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 1200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
-                <Label htmlFor="floor">Floor</Label>
-                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
+                <Label htmlFor="floor">Floor<span className="text-destructive ml-1">*</span></Label>
+                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="utilityProrationShare">Proration Share (e.g., 10 for 10%)<span className="text-destructive ml-1">*</span></Label>
