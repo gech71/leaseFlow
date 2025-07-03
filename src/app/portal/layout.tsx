@@ -12,8 +12,8 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'NIB Rental',
-  description: 'Building rental management solution by Firebase Studio',
+  title: 'Building Management Solution',
+  description: 'A comprehensive building management solution.',
   icons: {
     icon: 'https://play-lh.googleusercontent.com/bXqMt9ROsGd0H9vPhib5hG-0NB-EJcAwZy6UUDhvlP-ykE595IMQtzr14R6IRWtJiGTh',
   },
@@ -36,7 +36,7 @@ export default function PortalLayout({
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/portal/dashboard" className="flex items-center gap-3">
             <Image src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png" alt="Nib International Bank Logo" width={100} height={28} className="h-7 w-auto object-contain" />
-            <span className="text-xl font-headline font-semibold">NIB Rental</span>
+            <span className="text-xl font-headline font-semibold">Building Management</span>
           </Link>
           
           {/* Desktop Navigation */}
@@ -76,7 +76,7 @@ export default function PortalLayout({
         {children}
       </main>
       <footer className="bg-muted text-muted-foreground py-4 text-center text-sm">
-        © {new Date().getFullYear()} NIB Rental. All rights reserved.
+        © {new Date().getFullYear()} Building Management. All rights reserved.
       </footer>
     </div>
   );

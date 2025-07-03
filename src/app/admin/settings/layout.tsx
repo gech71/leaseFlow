@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'NIB Rental',
-  description: 'Building rental management solution by Firebase Studio',
+  title: 'Building Management Solution',
+  description: 'A comprehensive building management solution.',
   icons: {
     icon: 'https://play-lh.googleusercontent.com/bXqMt9ROsGd0H9vPhib5hG-0NB-EJcAwZy6UUDhvlP-ykE595IMQtzr14R6IRWtJiGTh',
   },
