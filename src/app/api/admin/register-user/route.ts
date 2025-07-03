@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["User registration service is not configured."] }, { status: 500 });
   }
 
-  // 1. Verify requester is SUPER_ADMIN
+  // 1. Verify requester has permission
   const cookieStore = await cookies();
   const adminAccessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
 
@@ -55,9 +55,12 @@ export async function POST(request: NextRequest) {
   }
   
   const isSuperAdmin = adminUser.roles.some(r => r.name === 'SUPER_ADMIN');
-  if (!isSuperAdmin) {
-    return NextResponse.json({ isSuccess: false, errors: ["Unauthorized: Only Super Admins can register users."] }, { status: 403 });
+  const hasPermission = adminUser.roles.some(role => role.permissions.includes('settings:user_registration:manage'));
+
+  if (!isSuperAdmin && !hasPermission) {
+    return NextResponse.json({ isSuccess: false, errors: ["Unauthorized: You do not have permission to register users."] }, { status: 403 });
   }
+
 
   // 2. Get new user data from request body
   let newUserRegistrationData;
@@ -165,4 +168,3 @@ export async function POST(request: NextRequest) {
     
 
     
-
