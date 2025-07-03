@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Phone, Loader2, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Phone, Loader2, Eye, EyeOff, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -64,7 +64,7 @@ export default function AdminLoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
         <CardHeader className="text-center space-y-4 pt-8">
-          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={150} height={40} className="mx-auto object-contain" />
+          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={200} height={40} className="mx-auto object-contain" />
           <div className="space-y-1">
               <CardTitle className="text-2xl font-bold font-headline text-primary whitespace-nowrap">Building Management Solution</CardTitle>
           </div>
@@ -87,7 +87,9 @@ export default function AdminLoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="flex items-center">
+                <Key className="mr-2 h-4 w-4 text-primary" /> Password
+              </Label>
               <div className="relative">
                 <Input 
                   id="password" 
