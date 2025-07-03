@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cookies } from 'next/headers';
 import type { User as UserPrisma, Role, Prisma } from '@prisma/client';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { OccupancyCard } from '@/components/custom/OccupancyCard';
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
@@ -122,8 +123,6 @@ export default async function AdminDashboardPage() {
   ]);
 
   const totalBuildingsCount = buildings.length;
-  const occupiedSpacesCount = spaces.filter(s => s.isOccupied).length;
-  const occupancyRateValue = spaces.length > 0 ? (occupiedSpacesCount / spaces.length) * 100 : 0;
   
   const activeAgreements = allAgreements.filter(ag => {
       const agreementEndDate = addMonths(ag.startDate, ag.paymentTermMonths);
@@ -146,9 +145,7 @@ export default async function AdminDashboardPage() {
   const stats = {
     totalBuildings: totalBuildingsCount,
     totalSpaces: spaces.length,
-    occupiedSpaces: occupiedSpacesCount,
     totalTenants: uniqueActiveTenantIds.size,
-    occupancyRate: `${occupancyRateValue.toFixed(1)}%`,
     totalRevenueMTD: `${totalRevenueMTDValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Birr`,
     activeAgreements: activeAgreements.length,
   };
@@ -285,7 +282,10 @@ export default async function AdminDashboardPage() {
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-8">
         <StatCard title="Total Buildings" value={String(stats.totalBuildings)} icon={Building} description="Number of managed buildings." />
-        <StatCard title="Occupied Spaces" value={`${stats.occupiedSpaces} / ${stats.totalSpaces}`} icon={Building2} description={`${stats.occupancyRate} occupancy rate.`} />
+        <OccupancyCard 
+          spaces={spaces.map(s => ({id: s.id, buildingId: s.buildingId, isOccupied: s.isOccupied, area: s.area}))} 
+          buildings={buildings.map(b => ({id: b.id, name: b.name}))}
+        />
         <StatCard title="Active Tenants" value={String(stats.totalTenants)} icon={User} description="Currently active tenants." />
         <StatCard title="Active Agreements" value={String(stats.activeAgreements)} icon={FileText} description="Currently active leases." />
         <StatCard title="Revenue (This Month)" value={stats.totalRevenueMTD} icon={DollarSign} description={`Collected in ${periodDescription}.`} />
