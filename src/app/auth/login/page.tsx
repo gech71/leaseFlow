@@ -64,7 +64,7 @@ export default function AdminLoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
         <CardHeader className="text-center space-y-4 pt-8">
-          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={80} height={80} className="mx-auto h-24 w-24 object-contain" />
+          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={100} height={100} className="mx-auto object-contain" />
           <div className="space-y-1">
               <CardTitle className="text-2xl font-bold font-headline text-primary whitespace-nowrap">Building Management Solution</CardTitle>
               <CardDescription>Enter your phone number and password to sign in</CardDescription>
