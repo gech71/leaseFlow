@@ -78,6 +78,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
   const [generatedAgreementText, setGeneratedAgreementText] = useState<string | null>(null);
   const [finalizedAgreement, setFinalizedAgreement] = useState<AgreementPrismaType | null>(null);
   const [validatedData, setValidatedData] = useState<AgreementFormValues | null>(null);
+  const [finalizedSpace, setFinalizedSpace] = useState<ClientSpace | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -248,16 +249,14 @@ Landlord/Authorized Representative
 
     if (result.success && result.agreement) {
       setFinalizedAgreement(result.agreement as AgreementPrismaType);
+      setFinalizedSpace(selectedSpace);
       toast({ title: "Agreement Saved Successfully!", description: "The agreement is now active." });
       setGeneratedAgreementText(null);
-      // Keep validatedData so we can display details, but don't reset the main form yet
     } else {
       setError(result.error || "Failed to save agreement to database.");
       toast({ title: "Database Save Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
     }
   };
-  
-  const selectedSpaceOnSuccess = validatedData ? availableSpaces.find(s => s.id === validatedData.selectedSpaceId) : null;
 
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
@@ -425,9 +424,9 @@ Landlord/Authorized Representative
                   <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md border border-green-200"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">Agreement successfully saved to database!</p></div>
                   <h3 className="text-lg font-semibold font-headline">Agreement ID: {finalizedAgreement.id}</h3>
                   <p className="text-sm font-medium">Tenant: <span className="font-normal">{tenants.find(t => t.id === finalizedAgreement.tenantId)?.name || 'N/A'}</span></p>
-                  <p className="text-sm font-medium">Space: <span className="font-normal">{selectedSpaceOnSuccess ? `${selectedSpaceOnSuccess.spaceIdName} (${selectedSpaceOnSuccess.buildingName})` : 'N/A'}</span></p>
+                  <p className="text-sm font-medium">Space: <span className="font-normal">{finalizedSpace ? `${finalizedSpace.spaceIdName} (${finalizedSpace.buildingName})` : 'N/A'}</span></p>
                   <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
-                      <Button onClick={() => { setFinalizedAgreement(null); setValidatedData(null); form.reset(); }} variant="outline">Create Another Agreement</Button>
+                      <Button onClick={() => { setFinalizedAgreement(null); setValidatedData(null); setFinalizedSpace(null); form.reset(); }} variant="outline">Create Another Agreement</Button>
                       <Link href={`/admin/agreements/${finalizedAgreement.id}`} passHref>
                           <Button><Eye className="mr-2 h-4 w-4" /> View Saved Agreement</Button>
                       </Link>
