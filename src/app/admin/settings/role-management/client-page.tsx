@@ -89,11 +89,9 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const fetchRoles = async () => {
     const result = await getAllRolesAction();
     if (result.success && result.roles) {
-        setRoles(result.roles.map(r => ({
-            ...r,
-            createdAt: r.createdAt.toISOString(),
-            updatedAt: r.updatedAt?.toISOString() ?? null,
-        })));
+        // Data from server actions has dates serialized to strings.
+        // We just need to cast it to the client-side type.
+        setRoles(result.roles as ClientRole[]);
     } else {
         toast({ title: "Error", description: result.error || "Failed to refresh roles.", variant: "destructive" });
     }
