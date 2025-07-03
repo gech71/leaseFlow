@@ -192,7 +192,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               
               const sidebarButtonContent = (
                 <>
-                  <item.icon className="h-3.5 w-3.5 shrink-0" />
+                  <item.icon className="h-4 w-4 shrink-0" />
                   <span
                     className={cn(
                       "flex-1 min-w-0",
@@ -215,7 +215,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                 className: cn(
                   item.isPortal && 'mt-auto border-t border-sidebar-border pt-2'
                 ),
-                size: 'sm' as const,
+                size: 'default' as const,
               };
 
               if (!isMobile && sidebarState === "collapsed") {

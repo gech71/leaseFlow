@@ -11,23 +11,27 @@ export function AppLogo() {
   const isCollapsed = !isMobile && sidebarState === 'collapsed';
 
   return (
-    <Link href="/admin/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
+    <Link href="/admin/dashboard" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
       <Image 
         src="https://i.imgur.com/JTzGpIH.png"
         alt="Building Management Solution Logo" 
-        width={150}
+        width={40}
         height={40}
         className={cn(
-          "h-8 w-auto object-contain transition-all duration-300",
-          isCollapsed && "w-8"
+          "h-10 w-10 object-contain transition-all duration-300 shrink-0",
+          isCollapsed && "w-8 h-8"
         )}
       />
-      <span className={cn(
-        "font-headline text-base leading-normal font-bold text-sidebar-primary transition-all duration-300 whitespace-nowrap",
-        isCollapsed ? "opacity-0 w-0" : "opacity-100"
+      <div className={cn(
+        "transition-all duration-300",
+        isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
       )}>
-        Building Management Solution
-      </span>
+        <h1 className={cn(
+          "font-headline text-base leading-tight font-bold text-sidebar-primary",
+        )}>
+          Building Management Solution
+        </h1>
+      </div>
     </Link>
   );
 }
