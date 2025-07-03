@@ -9,7 +9,7 @@ const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 // DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
-async function decodeJwtPayload(token: string): Promise<any | null> {
+function decodeJwtPayload(token: string): any | null {
   try {
     const base64Url = token.split('.')[1];
     if (!base64Url) return null;
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required. Please log in as an administrator."] }, { status: 401 });
   }
 
-  const adminPayload = await decodeJwtPayload(adminAccessToken);
+  const adminPayload = decodeJwtPayload(adminAccessToken);
   if (!adminPayload || !adminPayload.sub) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid admin token."] }, { status: 401 });
   }
@@ -54,10 +54,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Admin user not found in local system."] }, { status: 403 });
   }
   
+  // Refactored Permission Check
   const isSuperAdmin = adminUser.roles.some(r => r.name === 'SUPER_ADMIN');
-  const hasPermission = adminUser.roles.some(role => role.permissions.includes('settings:user_registration:manage'));
+  const effectivePermissions = new Set<string>();
+  adminUser.roles.forEach(role => {
+      role.permissions.forEach(permission => effectivePermissions.add(permission));
+  });
+  const canRegisterUsers = isSuperAdmin || effectivePermissions.has('settings:user_registration:manage');
 
-  if (!isSuperAdmin && !hasPermission) {
+  if (!canRegisterUsers) {
     return NextResponse.json({ isSuccess: false, errors: ["Unauthorized: You do not have permission to register users."] }, { status: 403 });
   }
 
@@ -129,7 +134,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Identity server did not return an access token for the new user."] }, { status: 500 });
   }
 
-  const newUserPayload = await decodeJwtPayload(newUserAccessToken);
+  const newUserPayload = decodeJwtPayload(newUserAccessToken);
   if (!newUserPayload || !newUserPayload.sub) {
     return NextResponse.json({ isSuccess: false, errors: ["Failed to decode new user's token or extract user ID (sub)."] }, { status: 500 });
   }
