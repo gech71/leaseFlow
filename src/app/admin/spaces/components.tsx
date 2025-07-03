@@ -132,7 +132,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     }
     const prorationShareValue = currentSpaceData.utilityProrationShare;
     if (prorationShareValue === undefined || prorationShareValue < 0 || prorationShareValue > 1) {
-      toast({ title: "Validation Error", description: "Proration share must be between 0 and 1 (e.g., 0.1 for 10%).", variant: "destructive" });
+      toast({ title: "Validation Error", description: "Proration share must be between 0% and 100%.", variant: "destructive" });
       setIsSaving(false);
       return;
     }
@@ -279,7 +279,10 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Space' : (canEditSpaces ? 'Edit Space' : 'View Space')}</DialogTitle>
+            <DialogTitle className="font-headline flex items-center gap-2">
+              <Building2 className="h-6 w-6 text-primary" />
+              {formMode === 'add' ? 'Add New Space' : (canEditSpaces ? 'Edit Space' : 'View Space')}
+            </DialogTitle>
             <DialogDescription>
               {formMode === 'add' ? "Fill in the details for the rental space." : (canEditSpaces ? "Update the space details." : "Viewing space details.")}
             </DialogDescription>
@@ -319,7 +322,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                 <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
-                <Label htmlFor="utilityProrationShare">Proration Share (e.g., 10 for 10%)<span className="text-destructive ml-1">*</span></Label>
+                <Label htmlFor="utilityProrationShare">Proration Share (%)<span className="text-destructive ml-1">*</span></Label>
                 <Input 
                     id="utilityProrationShare" 
                     type="number" 
@@ -335,7 +338,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                         }
                     }}
                     className="mt-1" 
-                    placeholder="e.g., 10 for 10%" 
+                    placeholder="e.g., 10" 
                     required 
                     disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}
                 />
