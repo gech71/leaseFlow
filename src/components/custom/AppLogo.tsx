@@ -13,8 +13,8 @@ export function AppLogo() {
   return (
     <Link href="/admin/dashboard" className="flex items-center justify-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
       <Image 
-        src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png"
-        alt="Nib Bank Logo" 
+        src="https://i.imgur.com/JTzGpIH.png"
+        alt="Building Management Solution Logo" 
         width={150}
         height={40}
         className={cn(

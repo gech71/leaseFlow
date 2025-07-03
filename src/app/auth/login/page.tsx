@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
         <CardHeader className="text-center space-y-3 pt-8">
           <div className="mx-auto">
             <Link href="/" className="flex items-center justify-center gap-3 text-foreground hover:text-primary transition-colors">
-               <Image src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png" alt="Nib International Bank Logo" width={160} height={44} className="h-11 w-auto object-contain" />
+               <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={160} height={44} className="h-11 w-auto object-contain" />
                <span className="text-2xl font-bold font-headline text-primary">Building Management</span>
             </Link>
           </div>

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   title: 'Building Management Solution',
   description: 'A comprehensive building management solution.',
   icons: {
-    icon: 'https://play-lh.googleusercontent.com/bXqMt9ROsGd0H9vPhib5hG-0NB-EJcAwZy6UUDhvlP-ykE595IMQtzr14R6IRWtJiGTh',
+    icon: 'https://i.imgur.com/JTzGpIH.png',
   },
 };
 
@@ -35,7 +35,7 @@ export default function PortalLayout({
       <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/portal/dashboard" className="flex items-center gap-3">
-            <Image src="https://upload.wikimedia.org/wikipedia/commons/d/df/Nib_International_Bank.png" alt="Nib International Bank Logo" width={100} height={28} className="h-7 w-auto object-contain" />
+            <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={100} height={28} className="h-7 w-auto object-contain" />
             <span className="text-xl font-headline font-semibold">Building Management</span>
           </Link>
           
