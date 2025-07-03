@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Phone, Loader2, Eye, EyeOff, Key } from 'lucide-react';
+import { LogIn, Phone, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -88,7 +88,7 @@ export default function AdminLoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="flex items-center">
-                <Key className="mr-2 h-4 w-4 text-primary" /> Password
+                <Lock className="mr-2 h-4 w-4 text-primary" /> Password
               </Label>
               <div className="relative">
                 <Input 
