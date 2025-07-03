@@ -23,7 +23,7 @@ export function AppLogo() {
         )}
       />
       <span className={cn(
-        "font-headline text-lg font-bold text-sidebar-primary transition-all duration-300 whitespace-nowrap",
+        "font-headline text-lg leading-normal font-bold text-sidebar-primary transition-all duration-300 whitespace-nowrap",
         isCollapsed ? "opacity-0 w-0" : "opacity-100"
       )}>
         Building Management Solution
