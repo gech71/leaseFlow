@@ -39,8 +39,8 @@ export function OccupancyCard({ spaces, buildings }: OccupancyCardProps) {
     };
   }, [selectedBuildingId, spaces]);
 
-  const formatArea = (area: number) => {
-      return `${area.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} m²`;
+  const formatNumber = (area: number) => {
+      return area.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   }
 
   return (
@@ -65,7 +65,10 @@ export function OccupancyCard({ spaces, buildings }: OccupancyCardProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold font-headline text-foreground">{formatArea(stats.occupiedArea)}</div>
+        <div className="text-2xl font-bold font-headline text-foreground">
+          <span>{formatNumber(stats.occupiedArea)}</span>
+          <span className="text-lg font-medium text-muted-foreground"> / {formatNumber(stats.totalArea)} m²</span>
+        </div>
         <p className="text-xs text-muted-foreground pt-1">
           {stats.occupancyRate.toFixed(1)}% of total area is occupied.
         </p>
