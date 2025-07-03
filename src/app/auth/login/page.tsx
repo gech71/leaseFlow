@@ -68,7 +68,7 @@ export default function AdminLoginPage() {
           <div className="mx-auto">
             <Link href="/" className="flex items-center justify-center gap-3 text-foreground hover:text-primary transition-colors">
                <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={160} height={44} className="h-11 w-auto object-contain" />
-               <span className="text-2xl font-bold font-headline text-primary">Building Management</span>
+               <span className="text-2xl font-bold font-headline text-primary">Building Management Solution</span>
             </Link>
           </div>
           <CardTitle className="text-2xl font-semibold">Admin & Staff Login</CardTitle>
