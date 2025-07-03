@@ -52,6 +52,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const router = useRouter();
 
   const [currentSpaceData, setCurrentSpaceData] = useState<Partial<SpaceTypePrisma & { buildingName?: string }>>({});
+  const [prorationInput, setProrationInput] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [spaceToDelete, setSpaceToDelete] = useState<SpaceWithBuildingName | null>(null);
@@ -198,7 +199,8 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       return;
     }
     setFormMode('add');
-    setCurrentSpaceData({ utilityProrationShare: 0.1, buildingId: buildings[0]?.id || "" }); 
+    setCurrentSpaceData({ utilityProrationShare: 0.1, buildingId: buildings[0]?.id || "" });
+    setProrationInput('10');
     setIsFormOpen(true);
   };
 
@@ -214,6 +216,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       area: Number(space.area),
       monthlyRentalPrice: Number(space.monthlyRentalPrice),
     });
+    setProrationInput((Number(space.utilityProrationShare || 0) * 100).toString());
     setIsFormOpen(true);
   };
 
@@ -323,24 +326,26 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
               </div>
               <div>
                 <Label htmlFor="utilityProrationShare">Proration Share (%)<span className="text-destructive ml-1">*</span></Label>
-                <Input 
-                    id="utilityProrationShare" 
-                    type="number" 
-                    step="0.01" 
-                    min="0" max="100"
-                    value={currentSpaceData.utilityProrationShare !== undefined ? (Number(currentSpaceData.utilityProrationShare) * 100).toFixed(2) : ''} 
-                    onChange={(e) => {
-                        const percentageValue = parseFloat(e.target.value);
-                        if (!isNaN(percentageValue)) {
-                            setCurrentSpaceData(prev => ({...prev, utilityProrationShare: percentageValue / 100 }));
-                        } else {
-                            setCurrentSpaceData(prev => ({...prev, utilityProrationShare: undefined }));
-                        }
-                    }}
-                    className="mt-1" 
-                    placeholder="e.g., 10" 
-                    required 
-                    disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}
+                <Input
+                  id="utilityProrationShare"
+                  type="text"
+                  value={prorationInput}
+                  onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^[0-9]*(\.[0-9]*)?$/.test(val)) {
+                          setProrationInput(val);
+                          const numVal = parseFloat(val);
+                          if (val === '') {
+                              setCurrentSpaceData(prev => ({ ...prev, utilityProrationShare: undefined }));
+                          } else if (!isNaN(numVal)) {
+                              setCurrentSpaceData(prev => ({ ...prev, utilityProrationShare: numVal / 100 }));
+                          }
+                      }
+                  }}
+                  className="mt-1"
+                  placeholder="e.g., 10"
+                  required
+                  disabled={isSaving || (!canCreateSpaces && formMode === 'add') || (!canEditSpaces && formMode === 'edit')}
                 />
               </div>
               <div>
