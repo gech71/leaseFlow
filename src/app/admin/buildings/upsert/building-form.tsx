@@ -173,10 +173,15 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
     const groupedUIRules: Record<string, UIPenaltyRule[]> = {};
 
     try {
-      currentBuildingForm.uiPenaltyRules.forEach(uiRule => {
-        if (!uiRule.feeType || uiRule.feeValue === undefined || uiRule.feeValue < 0) {
-            toast({ title: "Validation Error", description: `Rule for scope '${uiRule.scope}' is incomplete. Fee Type and non-negative Fee Value are required.`, variant: "destructive" });
-            throw new Error("Incomplete UI rule.");
+      // Filter out incomplete rules before processing. A rule is considered complete if it has a fee value.
+      const configuredRules = currentBuildingForm.uiPenaltyRules.filter(
+        rule => rule.feeValue !== undefined && rule.feeValue >= 0
+      );
+
+      configuredRules.forEach(uiRule => {
+        if (!uiRule.feeType) {
+            toast({ title: "Validation Error", description: `A rule is missing a 'Fee Type'.`, variant: "destructive" });
+            throw new Error("Incomplete UI rule: missing fee type.");
         }
 
         let scopeKey = uiRule.scope;
