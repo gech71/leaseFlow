@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Phone, Loader2, Eye, EyeOff } from 'lucide-react';
-import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -64,15 +63,12 @@ export default function AdminLoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
-        <CardHeader className="text-center space-y-3 pt-8">
-          <div className="mx-auto">
-            <Link href="/" className="flex items-center justify-center gap-3 text-foreground hover:text-primary transition-colors">
-               <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={160} height={44} className="h-11 w-auto object-contain" />
-               <span className="text-2xl font-bold font-headline text-primary !leading-tight">Building Management Solution</span>
-            </Link>
+        <CardHeader className="text-center space-y-4 pt-8">
+          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={56} height={56} className="mx-auto h-14 w-14 object-contain" />
+          <div className="space-y-1">
+              <CardTitle className="text-2xl font-bold font-headline text-primary whitespace-nowrap">Building Management Solution</CardTitle>
+              <CardDescription>Enter your phone number and password to sign in</CardDescription>
           </div>
-          <CardTitle className="text-2xl font-semibold">Login</CardTitle>
-          <CardDescription>Enter your phone number and password</CardDescription>
         </CardHeader>
         <CardContent className="pb-8">
           <form onSubmit={handleLogin} className="space-y-6">
