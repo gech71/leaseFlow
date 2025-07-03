@@ -71,7 +71,7 @@ export default function AdminLoginPage() {
                <span className="text-2xl font-bold font-headline text-primary !leading-tight">Building Management Solution</span>
             </Link>
           </div>
-          <CardTitle className="text-2xl font-semibold">Admin & Staff Login</CardTitle>
+          <CardTitle className="text-2xl font-semibold">Login</CardTitle>
           <CardDescription>Enter your phone number and password</CardDescription>
         </CardHeader>
         <CardContent className="pb-8">
