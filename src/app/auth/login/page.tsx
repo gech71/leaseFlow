@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Phone, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -128,11 +127,6 @@ export default function AdminLoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col items-center space-y-3 text-sm pb-8">
-          <Link href="#" className="text-primary hover:underline">
-            Forgot password?
-          </Link>
-        </CardFooter>
       </Card>
     </div>
   );
