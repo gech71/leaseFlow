@@ -141,9 +141,21 @@ async function main() {
   console.log('Creating Users...');
   const user1 = await prisma.user.create({
     data: {
-      // This userId must match the 'sub' claim in the JWT from your external authentication provider.
-      // After you log in with the phone number '0912345678' and password 'Admin@123', the auth service should return a token where the user ID is 'b1e55c84-9055-4eb5-8bd4-a262538f7e66'.
-      userId: 'b1e55c84-9055-4eb5-8bd4-a262538f7e66', 
+      // IMPORTANT: This 'userId' MUST match the 'sub' (subject) claim from the JWT issued by your external authentication provider.
+      //
+      // WHY YOU MIGHT SEE A "USER NOT FOUND" ERROR:
+      // When you log in, the auth service gives you a token. This application reads the user ID from that token.
+      // If the ID in the token does not exactly match a 'userId' in this database table, you will get a "User not found" error.
+      // This is the most common setup issue.
+      //
+      // HOW TO FIX IT:
+      // 1. Log in to your application.
+      // 2. Your auth provider will give your app a JWT access token.
+      // 3. Decode this JWT (you can use online tools like jwt.io).
+      // 4. Find the 'sub' claim in the decoded payload. That is your user ID.
+      // 5. Replace the value below ('default-super-admin-user-id') with the actual user ID from your token.
+      // 6. Rerun the database seed command (`npm run prisma:seed`).
+      userId: 'default-super-admin-user-id',
       email: 'superadmin@leaseflow.com',
       name: 'Default Super Admin',
       firstName: 'Default',
@@ -154,7 +166,7 @@ async function main() {
   });
   const user2 = await prisma.user.create({
     data: {
-      userId: 'google|user456_manager', 
+      userId: 'default-property-manager-user-id',
       email: 'manager.user@leaseflow.com',
       name: 'Property Manager User',
       firstName: 'Manager',
@@ -165,7 +177,7 @@ async function main() {
   });
    const user3 = await prisma.user.create({
     data: {
-      userId: 'firebase|user789_support', 
+      userId: 'default-support-staff-user-id',
       email: 'support.staff@leaseflow.com',
       name: 'Support Staff User',
       firstName: 'Support',
@@ -176,7 +188,7 @@ async function main() {
   });
    const user4 = await prisma.user.create({
     data: {
-      userId: 'local|user000_accountant', 
+      userId: 'default-accountant-user-id',
       email: 'accountant.user@leaseflow.com',
       name: 'Accountant User',
       firstName: 'Accy',
@@ -194,7 +206,7 @@ async function main() {
   // 'alice@example.com' and a chosen password in your identity system.
   const tenantUser1 = await prisma.user.create({
     data: {
-      userId: 'auth-provider|tenant-alice-wonderland', // Example external ID
+      userId: 'default-tenant-user-id', // Example external ID. Update this with the real one from your auth provider.
       email: 'alice@example.com', // This MUST MATCH the tenant's email to link them
       name: 'Alice Wonderland',
       firstName: 'Alice',
