@@ -51,7 +51,7 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
     );
     return JSON.parse(jsonPayload);
   } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
+    console.error('Portal Auth Error: Failed to decode JWT payload:', e);
     return null;
   }
 }
@@ -63,19 +63,42 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const authHeader = headerList.get('Authorization');
 
     let accessToken: string | undefined;
+    let authMethod: 'cookie' | 'bearer' | 'none' = 'none';
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
         accessToken = authHeader.substring(7);
+        authMethod = 'bearer';
+        console.log("Portal Auth: Attempting authentication via Bearer token.");
     } else {
         accessToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
+        if (accessToken) {
+            authMethod = 'cookie';
+            console.log("Portal Auth: Attempting authentication via cookie.");
+        }
     }
 
-    if (!accessToken) return null;
-    
-    const tokenPayload = await decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
+    if (!accessToken) {
+        console.error("Portal Auth Error: No access token found in cookie or Authorization header.");
+        return null;
+    }
 
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+    const tokenPayload = await decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) {
+        console.error(`Portal Auth Error: Failed to decode access token or 'sub' claim is missing. Method: ${authMethod}.`);
+        return null;
+    }
+    
+    console.log(`Portal Auth: Token decoded successfully for sub: ${tokenPayload.sub}. Fetching user from DB.`);
+
+    const user = await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+
+    if (!user) {
+        console.error(`Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local database.`);
+    } else {
+        console.log(`Portal Auth: Successfully found local user '${user.name}' for external ID '${tokenPayload.sub}'.`);
+    }
+
+    return user;
 }
 
 
@@ -84,7 +107,8 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return { agreement: null, aiGeneratedAgreementText: null, error: "Not authenticated. Please log in to view your portal." };
+      // The detailed error is logged in getCurrentUser, so the client gets a clean message.
+      return { agreement: null, aiGeneratedAgreementText: null, error: "Authentication failed. Please log in again." };
     }
 
     // Find the tenant record associated with the logged-in user's email or phone number
@@ -92,8 +116,10 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     
     // If no tenant record matches the logged-in user's details, return an error.
     if (!associatedTenant) {
+        console.error(`Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`);
         return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant record. Please contact property management to have your portal access configured." };
     }
+    console.log(`Portal Data: Found tenant '${associatedTenant.name}' for user '${currentUser.email}'.`);
     
     const allAgreementsRaw = await databaseService.getAllAgreements({
       where: { tenantId: associatedTenant.id },
