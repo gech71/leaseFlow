@@ -171,7 +171,7 @@ async function main() {
       name: 'Property Manager User',
       firstName: 'Manager',
       lastName: 'User',
-      phoneNumber: '555-1111',
+      phoneNumber: '0911111111',
       roles: { connect: { id: propertyManagerRole.id } },
     },
   });
@@ -182,7 +182,7 @@ async function main() {
       name: 'Support Staff User',
       firstName: 'Support',
       lastName: 'Staff',
-      phoneNumber: '555-2222',
+      phoneNumber: '0922222222',
       roles: { connect: { id: supportStaffRole.id } },
     },
   });
@@ -193,7 +193,7 @@ async function main() {
       name: 'Accountant User',
       firstName: 'Accy',
       lastName: 'User',
-      phoneNumber: '555-3333',
+      phoneNumber: '0933333333',
       roles: { connect: { id: accountantRole.id } },
     },
   });
@@ -211,7 +211,7 @@ async function main() {
       name: 'Alice Wonderland',
       firstName: 'Alice',
       lastName: 'Wonderland',
-      phoneNumber: '555-0101', // This can also be used for matching
+      phoneNumber: '0901010101', // This can also be used for matching
       roles: { connect: { id: tenantRole.id } },
     },
   });
@@ -267,10 +267,10 @@ async function main() {
     data: {
       name: 'Alice Wonderland',
       email: 'alice@example.com',
-      phone: '555-0101',
+      phone: '0901010101',
       nationalId: 'AW12345X',
       representativeName: 'Cheshire Cat',
-      representativePhone: '555-0199',
+      representativePhone: '0901999999',
     },
   });
 
@@ -278,7 +278,7 @@ async function main() {
     data: {
       name: 'Bob The Builder',
       email: 'bob@example.com',
-      phone: '555-0202',
+      phone: '0902020202',
     },
   });
 
@@ -286,7 +286,7 @@ async function main() {
     data: {
       name: 'Carol Danvers',
       email: 'carol@example.com',
-      phone: '555-0303',
+      phone: '0903030303',
       nationalId: 'CD98765Z',
     },
   });
