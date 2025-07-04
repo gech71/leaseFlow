@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -67,7 +66,7 @@ export default function UserRegistrationPage() {
       if (response.ok && data.isSuccess) {
         toast({
           title: "User Registered Successfully",
-          description: `User ${values.email} (ID: ${data.userId}) has been created.`,
+          description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management.`,
         });
         form.reset(); 
       } else {
