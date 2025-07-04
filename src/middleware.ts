@@ -1,7 +1,9 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
+
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
 const ADMIN_LOGIN_PATH = '/auth/login';
 const PORTAL_DASHBOARD_PATH = '/portal/dashboard';
@@ -10,55 +12,68 @@ const PORTAL_LOGIN_PATH = '/portal/login';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Read token from both potential sources
-  const cookieToken = request.cookies.get(ACCESS_TOKEN_KEY)?.value;
+  // Read tokens from cookies
+  const adminToken = request.cookies.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+  const portalToken = request.cookies.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
+  
+  // Read Bearer token for Mini App case
   const authHeader = request.headers.get('Authorization');
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-  const accessToken = bearerToken || cookieToken;
 
-  const publicApiPaths = ['/api/auth/login', '/api/auth/logout'];
-  const isPublicApiPath = publicApiPaths.some(path => pathname.startsWith(path));
+  const publicApiPaths = [
+    '/api/auth/login', // Admin login
+    '/api/auth/logout', // Admin logout
+    '/api/auth/portal/login', // Portal login
+    '/api/auth/portal/logout', // Portal logout
+  ];
 
-  if (isPublicApiPath) {
+  if (publicApiPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
-  // If the user has an access token (from either source)
-  if (accessToken) {
-    // Context: Mini App using Bearer Token
-    if (bearerToken) {
-      if (pathname.startsWith('/admin') || pathname.startsWith('/auth')) {
-        return new NextResponse('Unauthorized: Mini App access is restricted to the portal.', { status: 403 });
-      }
-      if (pathname === '/') {
+  // Handle portal paths
+  if (pathname.startsWith('/portal')) {
+    // If trying to access login page but already logged in (via cookie or bearer), redirect to dashboard
+    if (pathname === PORTAL_LOGIN_PATH) {
+      if (portalToken || bearerToken) {
         return NextResponse.redirect(new URL(PORTAL_DASHBOARD_PATH, request.url));
       }
-      // Allow access to /portal/* and other necessary APIs
       return NextResponse.next();
     }
-
-    // Context: Web App using Cookie
-    if (cookieToken) {
-      if (pathname === ADMIN_LOGIN_PATH || pathname === PORTAL_LOGIN_PATH || pathname === '/') {
-        return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
-      }
-      return NextResponse.next();
-    }
-  }
-
-  // If the user does NOT have an access token
-  if (!accessToken) {
-    if (pathname.startsWith('/admin')) {
-      return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
-    }
-    if (pathname.startsWith('/portal') && pathname !== PORTAL_LOGIN_PATH) {
+    // If not logged in, redirect to portal login
+    if (!portalToken && !bearerToken) {
       return NextResponse.redirect(new URL(PORTAL_LOGIN_PATH, request.url));
     }
-    if (pathname === '/') {
-      return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
-    }
+    return NextResponse.next();
   }
 
+  // Handle admin paths
+  if (pathname.startsWith('/admin') || pathname === ADMIN_LOGIN_PATH) {
+    // If trying to access login page but already logged in, redirect to dashboard
+    if (pathname === ADMIN_LOGIN_PATH && adminToken) {
+      return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
+    }
+    // If not logged in and not on login page, redirect to admin login
+    if (!adminToken && pathname !== ADMIN_LOGIN_PATH) {
+      return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Handle root path
+  if (pathname === '/') {
+    // Prioritize admin session
+    if (adminToken) {
+      return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
+    }
+    // Fallback to portal session
+    if (portalToken) {
+      return NextResponse.redirect(new URL(PORTAL_DASHBOARD_PATH, request.url));
+    }
+    // Default to admin login if no session exists
+    return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+  }
+  
   return NextResponse.next();
 }
 

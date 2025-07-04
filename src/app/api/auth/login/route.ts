@@ -3,10 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService'; // Import databaseService
 
+// ADMIN SPECIFIC LOGIN
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
-const REFRESH_TOKEN_KEY = 'leaseflow_refresh_token';
-
+const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
 const ACCESS_TOKEN_MAX_AGE = 60 * 60; // 1 hour in seconds
 const REFRESH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
 
@@ -106,7 +106,6 @@ export async function POST(request: NextRequest) {
   }
 
   if (externalApiResponse.ok && responseData && responseData.isSuccess && responseData.accessToken && responseData.refreshToken) {
-    // External authentication successful, now fetch user from local DB
     const externalTokenPayload = decodeJwtPayload(responseData.accessToken);
     if (!externalTokenPayload || !externalTokenPayload.sub) {
       console.error("Failed to decode external access token or 'sub' claim is missing.");
@@ -116,7 +115,6 @@ export async function POST(request: NextRequest) {
     const externalUserId = externalTokenPayload.sub;
 
     try {
-      // Corrected the structure of the include object here
       const localUser = await databaseService.getUserByExternalId(externalUserId, { roles: true });
 
       if (!localUser) {
@@ -124,20 +122,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["User not provisioned in this system. Please contact support."] }, { status: 403 });
       }
 
-      // User found locally, determine redirect path based on permissions
       const effectivePermissions = new Set<string>();
       localUser.roles.forEach(role => {
           role.permissions.forEach(permission => {
               effectivePermissions.add(permission);
           });
       });
-      const permissionsArray = Array.from(effectivePermissions);
       
-      let redirectPath = '/admin/dashboard';
-      if (permissionsArray.length === 1 && permissionsArray[0] === 'portal:view') {
-          redirectPath = '/portal/dashboard';
+      if (effectivePermissions.size === 1 && effectivePermissions.has('portal:view')) {
+          return NextResponse.json({ isSuccess: false, errors: ["This account is for the tenant portal. Please use the tenant login page."] }, { status: 403 });
       }
-
+      
+      if (effectivePermissions.size === 0) {
+          return NextResponse.json({ isSuccess: false, errors: ["Your account does not have any permissions assigned. Please contact an administrator."] }, { status: 403 });
+      }
+      
       const cookieStore = await cookies();
       
       cookieStore.set(ACCESS_TOKEN_KEY, responseData.accessToken, {
@@ -156,7 +155,7 @@ export async function POST(request: NextRequest) {
         maxAge: REFRESH_TOKEN_MAX_AGE,
       });
 
-      return NextResponse.json({ isSuccess: true, message: "Login successful", redirectPath });
+      return NextResponse.json({ isSuccess: true, message: "Login successful", redirectPath: '/admin/dashboard' });
 
     } catch (dbError: any) {
       console.error("Database error during login user retrieval:", dbError.message);

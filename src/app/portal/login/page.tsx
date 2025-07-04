@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -21,11 +22,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     
-    // In a real application, you would make an API call to your authentication service.
-    // For this prototype, we are still using a simulated login for the tenant.
-    // The previous implementation used an email. We now use a phone number.
-    // This is a placeholder and should be integrated with your actual tenant auth logic.
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch('/api/auth/portal/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber, password }),

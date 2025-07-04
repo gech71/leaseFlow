@@ -33,7 +33,7 @@ export interface TenantPortalData {
 }
 
 // --- User Authentication Helpers ---
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
 
 // Insecure JWT payload decoder
 async function decodeJwtPayload(token: string): Promise<any | null> {
@@ -56,7 +56,7 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
   }
 }
 
-// Gets current user from cookie
+// Gets current user from cookie or Bearer token
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const cookieStore = cookies();
     const headerList = headers();
@@ -67,7 +67,7 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     if (authHeader && authHeader.startsWith('Bearer ')) {
         accessToken = authHeader.substring(7);
     } else {
-        accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+        accessToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
     }
 
     if (!accessToken) return null;
