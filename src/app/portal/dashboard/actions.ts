@@ -185,6 +185,7 @@ export interface SubmitPaymentProofInput {
   billId: string;
   paymentProofUrl: string; // Simulate URL, actual upload not handled
   tenantPaymentNotes?: string;
+  paymentMethod: string;
 }
 
 export async function submitPaymentProofAction(input: SubmitPaymentProofInput) {
@@ -201,6 +202,7 @@ export async function submitPaymentProofAction(input: SubmitPaymentProofInput) {
       status: 'PendingVerification',
       paymentProofUrl: input.paymentProofUrl,
       tenantPaymentNotes: input.tenantPaymentNotes,
+      paymentMethod: input.paymentMethod,
     });
     return { success: true, bill: updatedBill };
   } catch (error: any) {

@@ -176,19 +176,33 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
   const handleOpenPayDialog = (bill: ClientBill) => { setSelectedBillForDialog(bill); setPayBillDialogOpen(true); };
   const handleOpenProofDialog = (bill: ClientBill) => { setSelectedBillForDialog(bill); setProofDialogOpen(true); };
 
-  const handleSimulatedPayment = () => {
+  const handleSimulatedPayment = async () => {
     if (!selectedBillForDialog) return;
     setIsLoadingAction(true);
-    setTimeout(() => {
+
+    const simulatedProofUrl = `card_payment_ref_${Date.now()}`;
+    const notes = `Simulated card payment.`;
+
+    const result = await submitPaymentProofAction({
+      billId: selectedBillForDialog.id,
+      paymentProofUrl: simulatedProofUrl,
+      tenantPaymentNotes: notes,
+      paymentMethod: "Card",
+    });
+    
+    setIsLoadingAction(false);
+
+    if (result.success && result.bill) {
       setDisplayBills(prevBills => prevBills.map(b => 
-        b.id === selectedBillForDialog.id ? { ...b, currentStatus: 'Paid', paymentDate: new Date().toISOString(), paymentMethod: paymentMethod } : b
+        b.id === selectedBillForDialog.id ? { ...b, currentStatus: 'PendingVerification', paymentProofUrl: simulatedProofUrl, tenantPaymentNotes: notes, paymentMethod: 'Card' } : b
       ));
-      toast({ title: "Payment Successful (Simulated)", description: `Bill ${selectedBillForDialog.id} marked as paid with ${paymentMethod}.` });
+      toast({ title: "Payment Submitted", description: `Payment for bill ${selectedBillForDialog.id} submitted for verification.` });
       setPayBillDialogOpen(false);
       setSelectedBillForDialog(null);
       setPaymentMethod("Card"); 
-      setIsLoadingAction(false);
-    }, 1000);
+    } else {
+      toast({ title: "Payment Submission Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
+    }
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -211,12 +225,13 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
       billId: selectedBillForDialog.id,
       paymentProofUrl: simulatedProofUrl,
       tenantPaymentNotes: paymentNotes,
+      paymentMethod: paymentMethod,
     });
     setIsLoadingAction(false);
 
     if (result.success && result.bill) {
       setDisplayBills(prevBills => prevBills.map(b => 
-        b.id === selectedBillForDialog.id ? { ...b, currentStatus: 'PendingVerification', paymentProofUrl: simulatedProofUrl, tenantPaymentNotes: paymentNotes } : b
+        b.id === selectedBillForDialog.id ? { ...b, currentStatus: 'PendingVerification', paymentProofUrl: simulatedProofUrl, tenantPaymentNotes: paymentNotes, paymentMethod: paymentMethod } : b
       ));
       toast({ title: "Proof Submitted", description: `Payment proof for bill ${selectedBillForDialog.id} submitted for verification.` });
       setProofDialogOpen(false);
@@ -229,7 +244,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
     }
   };
 
-  const getStatusBadgeVariant = (status: ClientBill['status']): "default" | "destructive" | "secondary" | "outline" => {
+  const getStatusBadgeVariant = (status: BillStatus): "default" | "destructive" | "secondary" | "outline" => {
     switch (status) {
       case 'Paid': return 'secondary';
       case 'Pending': return 'default';
@@ -238,7 +253,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
       default: return 'default';
     }
   };
-  const getStatusIcon = (status: ClientBill['status']) => {
+  const getStatusIcon = (status: BillStatus) => {
     switch (status) {
       case 'Paid': return <CheckCircle className="mr-1 h-3 w-3 text-green-600" />;
       case 'Pending': return <Info className="mr-1 h-3 w-3" />;
@@ -456,7 +471,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
               </div>
             )}
             {paymentMethod === "Card" && (
-                 <p className="text-sm text-muted-foreground">This is a simulated payment. No actual transaction will occur.</p>
+                 <p className="text-sm text-muted-foreground">This is a simulated payment. It will be submitted for verification by an administrator.</p>
             )}
 
           </div>
@@ -464,7 +479,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
             <DialogClose asChild><Button variant="outline" disabled={isLoadingAction}>Cancel</Button></DialogClose>
             {paymentMethod === "Card" && (
                 <Button onClick={handleSimulatedPayment} disabled={isLoadingAction}>
-                    {isLoadingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Confirm Payment
+                    {isLoadingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Submit Card Payment
                 </Button>
             )}
              {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
