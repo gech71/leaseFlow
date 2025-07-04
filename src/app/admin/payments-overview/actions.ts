@@ -59,7 +59,7 @@ function decodeJwtPayload(token: string): any | null {
 
 // Gets current user from cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
     if (!accessToken) return null;
@@ -147,5 +147,3 @@ export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewD
 
   return { bills, spaces };
 }
-
-    

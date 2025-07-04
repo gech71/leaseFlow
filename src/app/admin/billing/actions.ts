@@ -33,7 +33,7 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
 
 // Gets current user from cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
     if (!accessToken) return null;
@@ -711,7 +711,3 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
-
-    
-
-    

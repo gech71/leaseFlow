@@ -5,7 +5,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import { Prisma } from '@prisma/client'; // Import Prisma namespace for error types
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 // DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   // 1. Verify requester has permission
   const cookieStore = await cookies();
-  const adminAccessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+  const adminAccessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
 
   if (!adminAccessToken) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required. Please log in as an administrator."] }, { status: 401 });
