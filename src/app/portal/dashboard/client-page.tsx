@@ -69,13 +69,31 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
   useEffect(() => {
     setIsMounted(true);
     setToday(startOfDay(new Date()));
-    if (initialData?.agreement?.bills) {
-      setDisplayBills(initialData.agreement.bills.map(bill => ({
-        ...bill,
-        currentStatus: bill.status, 
-      })));
+    if (initialData) {
+      if (initialData.error) {
+        toast({
+          title: "Authentication Failed",
+          description: initialData.error,
+          variant: "destructive",
+        });
+      } else if (initialData.agreement) {
+        toast({
+          title: "Authentication Successful",
+          description: "Welcome to your tenant portal.",
+        });
+        setDisplayBills(initialData.agreement.bills.map(bill => ({
+          ...bill,
+          currentStatus: bill.status, 
+        })));
+      }
+    } else {
+        toast({
+          title: "Error",
+          description: "Could not load portal data. Please try again.",
+          variant: "destructive",
+        });
     }
-  }, [initialData]);
+  }, [initialData, toast]);
 
   const agreement = initialData?.agreement;
   const aiGeneratedAgreementText = initialData?.aiGeneratedAgreementText;

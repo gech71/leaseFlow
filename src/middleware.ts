@@ -14,7 +14,6 @@ export function middleware(request: NextRequest) {
   
   // Read tokens from cookies
   const adminToken = request.cookies.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-  const portalToken = request.cookies.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
   
   // Read Bearer token for Mini App case
   const authHeader = request.headers.get('Authorization');
@@ -23,7 +22,6 @@ export function middleware(request: NextRequest) {
   const publicApiPaths = [
     '/api/auth/login', // Admin login
     '/api/auth/logout', // Admin logout
-    '/api/auth/portal/login', // Portal login
     '/api/auth/portal/logout', // Portal logout
   ];
 
@@ -33,17 +31,10 @@ export function middleware(request: NextRequest) {
 
   // Handle portal paths
   if (pathname.startsWith('/portal')) {
-    // If trying to access login page but already logged in (via cookie or bearer), redirect to dashboard
-    if (pathname === PORTAL_LOGIN_PATH) {
-      if (portalToken || bearerToken) {
-        return NextResponse.redirect(new URL(PORTAL_DASHBOARD_PATH, request.url));
-      }
-      return NextResponse.next();
-    }
-    // If not logged in, redirect to portal login
-    if (!portalToken && !bearerToken) {
-      return NextResponse.redirect(new URL(PORTAL_LOGIN_PATH, request.url));
-    }
+    // We no longer check for a token here. We let the request go to the page,
+    // which will show a loading state and then handle auth itself.
+    // This allows the page to be the single source of truth for portal auth state.
+    // The old login page at /portal/login will now be deleted.
     return NextResponse.next();
   }
 
@@ -65,10 +56,6 @@ export function middleware(request: NextRequest) {
     // Prioritize admin session
     if (adminToken) {
       return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
-    }
-    // Fallback to portal session
-    if (portalToken) {
-      return NextResponse.redirect(new URL(PORTAL_DASHBOARD_PATH, request.url));
     }
     // Default to admin login if no session exists
     return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));

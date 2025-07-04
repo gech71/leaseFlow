@@ -79,7 +79,7 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
 
     if (!accessToken) {
         console.error("Portal Auth Error: No access token found in cookie or Authorization header.");
-        return null;
+        return null; // The action will handle the user-facing error message.
     }
 
     const tokenPayload = await decodeJwtPayload(accessToken);
@@ -108,7 +108,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
     if (!currentUser) {
       // The detailed error is logged in getCurrentUser, so the client gets a clean message.
-      return { agreement: null, aiGeneratedAgreementText: null, error: "Authentication failed. Please log in again." };
+      return { agreement: null, aiGeneratedAgreementText: null, error: "Authentication token missing or invalid. Please ensure the token is provided in the 'Authorization' header." };
     }
 
     // Find the tenant record associated with the logged-in user's email or phone number
@@ -117,7 +117,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     // If no tenant record matches the logged-in user's details, return an error.
     if (!associatedTenant) {
         console.error(`Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`);
-        return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant record. Please contact property management to have your portal access configured." };
+        return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant profile. Please contact property management." };
     }
     console.log(`Portal Data: Found tenant '${associatedTenant.name}' for user '${currentUser.email}'.`);
     
@@ -186,7 +186,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     }
     
     if (!targetAgreement) {
-      return { agreement: null, aiGeneratedAgreementText: null, error: "You do not have an active agreement." };
+      return { agreement: null, aiGeneratedAgreementText: null, error: "You do not have an active rental agreement on file." };
     }
     
     const agreementText = targetAgreement.agreementText;
