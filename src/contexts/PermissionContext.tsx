@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 interface PermissionContextType {
   currentUser: CurrentUser | null;
   isLoading: boolean;
+  error: string | null; // <-- Add error state
   hasPermission: (permission: PermissionId | PermissionId[]) => boolean;
   hasAnyPermission: (permissions: PermissionId[]) => boolean;
   isSuperAdmin: boolean;
@@ -31,8 +32,10 @@ interface PermissionProviderProps {
 export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // <-- Add error state
 
   const fetchCurrentUser = useCallback(async () => {
+    setError(null); // <-- Reset error on new fetch
     try {
       const response = await fetch('/api/user/me');
       if (response.ok) {
@@ -41,15 +44,27 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
           setCurrentUser(data.user);
         } else {
           setCurrentUser(null);
-          console.error("Failed to fetch user or user data missing:", data.errors || "No user data");
+          const errorMessage = data.errors?.join(', ') || 'User data not found.';
+          setError(errorMessage); // <-- Set error
+          console.error("Failed to fetch user or user data missing:", errorMessage);
         }
       } else {
+        let errorText = `Authentication failed. Status: ${response.status}`;
+        try {
+            const errorData = await response.json();
+            errorText = errorData.errors?.join(', ') || errorText;
+        } catch (e) {
+            // Could not parse error JSON, stick with status code message
+        }
         setCurrentUser(null);
-        console.error("Failed to fetch user, status:", response.status);
+        setError(errorText); // <-- Set error
+        console.error(errorText);
       }
     } catch (error) {
+      const errorMessage = (error as Error).message || 'A network error occurred while fetching user data.';
       console.error('Error fetching current user:', error);
       setCurrentUser(null);
+      setError(errorMessage); // <-- Set error
     } finally {
       setIsLoading(false);
     }
@@ -85,11 +100,12 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   const contextValue = useMemo(() => ({
     currentUser,
     isLoading,
+    error,
     hasPermission,
     hasAnyPermission,
     isSuperAdmin,
     refetchUser
-  }), [currentUser, isLoading, hasPermission, hasAnyPermission, isSuperAdmin, refetchUser]);
+  }), [currentUser, isLoading, error, hasPermission, hasAnyPermission, isSuperAdmin, refetchUser]);
 
 
   if (isLoading && !currentUser) { // Only show full-screen loader on initial load

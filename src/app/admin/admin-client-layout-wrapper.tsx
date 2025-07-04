@@ -95,20 +95,24 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, state: sidebarState } = useSidebar();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
-  const { currentUser, hasAnyPermission, isLoading: permissionsLoading, isSuperAdmin } = usePermissions();
+  const { currentUser, hasAnyPermission, isLoading: permissionsLoading, isSuperAdmin, error: permissionError } = usePermissions();
 
   useEffect(() => {
-    // If loading is complete and there's no user, it means auth failed (e.g., expired token).
-    // Redirect to the login page. This handles client-side auth checks.
+    // This effect handles redirection for unauthenticated or unauthorized users.
     if (!permissionsLoading && !currentUser) {
+      // Determine the error message. If a specific error was captured (like 404 Not Found), use it.
+      // Otherwise, fall back to a generic session expiration message.
+      const title = permissionError ? "Access Denied" : "Session Expired";
+      const description = permissionError || "Please log in again to continue.";
+
       toast({
-        title: "Session Expired",
-        description: "Please log in again to continue.",
-        variant: "default",
+        title: title,
+        description: description,
+        variant: "destructive", // Use destructive to highlight the error
       });
       router.push('/auth/login');
     }
-  }, [permissionsLoading, currentUser, router, toast]);
+  }, [permissionsLoading, currentUser, router, toast, permissionError]);
 
   useEffect(() => {
     if (!permissionsLoading && currentUser?.effectivePermissions) {
