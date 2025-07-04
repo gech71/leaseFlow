@@ -278,7 +278,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                 {agreement.initialPaymentAmount && <p className="mt-2 pt-2 border-t"><strong>Initial Payment Made:</strong> {agreement.initialPaymentAmount.toLocaleString()} Birr for {agreement.initialPaymentMonths} month(s) on {agreement.initialPaymentDate ? format(parseISO(agreement.initialPaymentDate), 'PP') : 'N/A'}</p>}
             </CardContent>
              <CardFooter>
-                <Button onClick={() => toast({ title: "Download Agreement", description: "PDF download simulated."})} variant="outline">
+                <Button onClick={() => toast({ title: "Download Agreement", description: "PDF download simulated."})} variant="outline" className="w-full sm:w-auto">
                     <Download className="mr-2 h-4 w-4"/> Download Full Agreement PDF
                 </Button>
             </CardFooter>
