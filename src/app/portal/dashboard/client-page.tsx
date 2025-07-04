@@ -39,6 +39,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { submitPaymentProofAction } from './actions';
 import type { ClientAgreement, ClientBill, SerializedTenantPortalData, ClientPenaltyTier } from './page'; 
 import type { BillStatus } from '@prisma/client';
+import { jsPDF } from 'jspdf';
+
+// Helper to create a safe filename
+const sanitizeFilename = (name: string) => {
+  return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
+};
 
 
 // This component handles the client-side rendering and interactivity
@@ -73,6 +79,27 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
 
   const agreement = initialData?.agreement;
   const aiGeneratedAgreementText = initialData?.aiGeneratedAgreementText;
+
+  const handleDownloadAgreement = () => {
+    if (!agreement || !agreement.agreementText) {
+      toast({ title: "Cannot Download", description: "Agreement text is not available.", variant: "destructive"});
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    
+    const textLines = doc.splitTextToSize(agreement.agreementText, 180);
+    doc.text(textLines, 15, 15);
+
+    const tenantName = agreement.tenant?.name || 'UnknownTenant';
+    const safeTenantName = sanitizeFilename(tenantName);
+
+    doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+    
+    toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
+  };
 
   const calculatePenaltyForTenant = useCallback((bill: ClientBill, penaltyTiers: ClientPenaltyTier[]): number => {
     if (!agreement || !agreement.space || !agreement.space.building || !penaltyTiers || penaltyTiers.length === 0) {
@@ -278,7 +305,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                 {agreement.initialPaymentAmount && <p className="mt-2 pt-2 border-t"><strong>Initial Payment Made:</strong> {agreement.initialPaymentAmount.toLocaleString()} Birr for {agreement.initialPaymentMonths} month(s) on {agreement.initialPaymentDate ? format(parseISO(agreement.initialPaymentDate), 'PP') : 'N/A'}</p>}
             </CardContent>
              <CardFooter>
-                <Button onClick={() => toast({ title: "Download Agreement", description: "PDF download simulated."})} variant="outline" className="w-full sm:w-auto">
+                <Button onClick={handleDownloadAgreement} variant="outline" className="w-full sm:w-auto">
                     <Download className="mr-2 h-4 w-4"/> Download Full Agreement PDF
                 </Button>
             </CardFooter>
@@ -286,7 +313,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
 
           {aiGeneratedAgreementText && (
             <Card className="shadow-lg">
-              <CardHeader><CardTitle className="font-headline text-xl flex items-center"><FileText className="mr-2 text-primary"/>Agreement Summary (AI Generated)</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="font-headline text-xl flex items-center"><FileText className="mr-2 text-primary"/>Agreement Summary</CardTitle></CardHeader>
               <CardContent>
                 <ScrollArea className="h-[200px] w-full rounded-md border p-3 bg-secondary/30">
                   <pre className="whitespace-pre-wrap text-xs font-mono leading-relaxed">{aiGeneratedAgreementText}</pre>
@@ -296,7 +323,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
           )}
           {initialData?.error && !aiGeneratedAgreementText && (
              <Card className="shadow-sm bg-destructive/10">
-                <CardHeader><CardTitle className="text-sm text-destructive-foreground">AI Agreement Summary Error</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-sm text-destructive-foreground">Agreement Summary Error</CardTitle></CardHeader>
                 <CardContent><p className="text-xs text-destructive-foreground">{initialData.error}</p></CardContent>
             </Card>
           )}
