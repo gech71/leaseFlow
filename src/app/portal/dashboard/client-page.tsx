@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileText, Home as HomeIcon, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare, Loader2, Download, User } from 'lucide-react';
+import { FileText, Home as HomeIcon, FileSignature, DollarSign, CreditCard, AlertTriangle, CheckCircle, Info, UploadCloud, MessageSquare, Loader2, Download, User, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths, formatDistanceToNow } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -264,16 +264,18 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
               <CardTitle className="font-headline text-xl flex items-center"><FileSignature className="mr-2 text-primary"/>Current Lease Agreement</CardTitle>
               <CardDescription>Details of your active rental agreement.</CardDescription>
             </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <p><strong>Property:</strong> {agreement.space.spaceIdName}, {agreement.space.building.name}</p>
-              <p><strong>Address:</strong> {agreement.space.building.address || 'N/A'}</p>
-              <p><strong>Floor:</strong> {agreement.space.floor}, <strong>Area:</strong> {agreement.space.area} m²</p>
-              <p><strong>Monthly Rent:</strong> {agreement.monthlyRentalPrice.toLocaleString()} Birr</p>
-              <p><strong>Lease Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
-              <p><strong>Lease End Date:</strong> {format(agreementEndDate, 'PP')}</p>
-              <p><strong>Payment Term:</strong> {agreement.paymentTermMonths} months</p>
-              <p><strong>Next Lease Payment Due:</strong> {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</p>
-              {agreement.initialPaymentAmount && <p><strong>Initial Payment Made:</strong> {agreement.initialPaymentAmount.toLocaleString()} Birr for {agreement.initialPaymentMonths} month(s) on {agreement.initialPaymentDate ? format(parseISO(agreement.initialPaymentDate), 'PP') : 'N/A'}</p>}
+            <CardContent className="text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                    <p><strong>Property:</strong> {agreement.space.spaceIdName}, {agreement.space.building.name}</p>
+                    <p><strong>Address:</strong> {agreement.space.building.address || 'N/A'}</p>
+                    <p><strong>Floor:</strong> {agreement.space.floor}, <strong>Area:</strong> {agreement.space.area} m²</p>
+                    <p><strong>Monthly Rent:</strong> {agreement.monthlyRentalPrice.toLocaleString()} Birr</p>
+                    <p><strong>Lease Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
+                    <p><strong>Lease End Date:</strong> {format(agreementEndDate, 'PP')}</p>
+                    <p><strong>Payment Term:</strong> {agreement.paymentTermMonths} months</p>
+                    <p><strong>Next Lease Payment Due:</strong> {format(parseISO(agreement.nextPaymentDueDate), 'PP')}</p>
+                </div>
+                {agreement.initialPaymentAmount && <p className="mt-2 pt-2 border-t"><strong>Initial Payment Made:</strong> {agreement.initialPaymentAmount.toLocaleString()} Birr for {agreement.initialPaymentMonths} month(s) on {agreement.initialPaymentDate ? format(parseISO(agreement.initialPaymentDate), 'PP') : 'N/A'}</p>}
             </CardContent>
              <CardFooter>
                 <Button onClick={() => toast({ title: "Download Agreement", description: "PDF download simulated."})} variant="outline">
@@ -307,25 +309,62 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
               {processedBills.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No bills found for this agreement yet.</p>
               ) : (
-                <ScrollArea className="h-[400px]">
+                <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                  {processedBills.map(bill => (
+                    <Card key={`mobile-${bill.id}`} className={`p-4 shadow-md ${bill.currentStatus === 'Overdue' ? 'border-destructive' : bill.currentStatus === 'PendingVerification' ? 'border-blue-500' : 'border-border'}`}>
+                      <div className="flex justify-between items-baseline">
+                        <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
+                          {getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
+                        </Badge>
+                        <span className="font-semibold text-xl text-primary">{bill.calculatedTotal?.toFixed(2)} Birr</span>
+                      </div>
+                      <div className="mt-2">
+                        <p className={`text-sm ${bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : ''}`}>
+                          Due: {format(parseISO(bill.dueDate), 'PP')}
+                        </p>
+                        {bill.calculatedPenalty && bill.calculatedPenalty > 0 && (
+                          <p className="text-xs text-destructive">Penalty Applied: {bill.calculatedPenalty.toFixed(2)} Birr</p>
+                        )}
+                      </div>
+                      <div className="mt-3 pt-3 border-t">
+                        {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && (
+                          <Button size="sm" variant="default" onClick={() => handleOpenPayDialog(bill)} className="w-full text-xs h-9 px-3 bg-green-600 hover:bg-green-700" disabled={isLoadingAction}>Pay Now</Button>
+                        )}
+                        {bill.currentStatus === 'Paid' && (
+                          <div className="text-sm text-green-600 flex items-center justify-center w-full">
+                            <CheckCircle className="mr-2 h-4 w-4"/>
+                             Paid on {bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}
+                          </div>
+                        )}
+                        {bill.currentStatus === 'PendingVerification' && (
+                          <Button size="sm" variant="outline" className="text-xs h-9 px-3 w-full" disabled>
+                            <Clock className="mr-2 h-4 w-4"/>
+                            Verification in Progress
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block">
                   <Table>
-                    <TableHeader><TableRow><TableHead className="p-1 sm:p-2">Due Date</TableHead><TableHead className="hidden sm:table-cell p-1 sm:p-2">Total</TableHead><TableHead className="p-1 sm:p-2 text-center">Status</TableHead><TableHead className="hidden sm:table-cell p-1 sm:p-2 text-right">Action</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Due Date</TableHead><TableHead>Total</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {processedBills.map(bill => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
-                          <TableCell className={`p-1 sm:p-2 ${bill.currentStatus === 'Overdue' ? 'font-semibold text-destructive' : ''}`}>
-                             <div className="flex flex-col text-xs sm:text-sm leading-tight">
-                                <span>{format(parseISO(bill.dueDate), 'MMM')}</span>
-                                <span>{format(parseISO(bill.dueDate), 'dd,')}</span>
-                                <span className="text-xs text-muted-foreground">{format(parseISO(bill.dueDate), 'yyyy')}</span>
-                              </div>
+                          <TableCell className={`p-2 ${bill.currentStatus === 'Overdue' ? 'font-semibold text-destructive' : ''}`}>
+                            {format(parseISO(bill.dueDate), 'PP')}
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell p-1 sm:p-2 text-sm sm:text-base font-semibold text-primary whitespace-nowrap">{bill.calculatedTotal?.toFixed(2)} Birr</TableCell>
-                          <TableCell className="p-1 sm:p-2 text-center">
+                          <TableCell className="p-2 text-base font-semibold text-primary whitespace-nowrap">{bill.calculatedTotal?.toFixed(2)} Birr</TableCell>
+                          <TableCell className="p-2 text-center">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification',' Ver.')}</span></Badge>
                             {bill.calculatedPenalty && bill.calculatedPenalty > 0 && (<Popover><PopoverTrigger asChild><AlertTriangle className="h-3.5 w-3.5 text-destructive inline-block ml-1 cursor-help"/></PopoverTrigger><PopoverContent className="text-xs w-auto p-2" side="top">Penalty: {bill.calculatedPenalty.toFixed(2)} Birr</PopoverContent></Popover>)}
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell p-1 sm:p-2 text-right">
+                          <TableCell className="p-2 text-right">
                             {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && (
                               <Button size="sm" variant="default" onClick={() => handleOpenPayDialog(bill)} className="text-xs h-7 px-2 bg-green-600 hover:bg-green-700" disabled={isLoadingAction}>Pay</Button>
                             )}
@@ -340,7 +379,8 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                       ))}
                     </TableBody>
                   </Table>
-                </ScrollArea>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>
