@@ -280,7 +280,7 @@ export default async function AdminDashboardPage() {
     <div className="animate-fadeIn">
       <PageHeader title="Admin Dashboard" icon={LayoutGrid} description="Overview of your rental properties and finances." />
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-8">
         <StatCard title="Total Buildings" value={String(stats.totalBuildings)} icon={Building} description="Number of managed buildings." />
         <OccupancyCard 
           spaces={spaces.map(s => ({id: s.id, buildingId: s.buildingId, isOccupied: s.isOccupied, area: s.area}))} 

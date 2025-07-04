@@ -65,9 +65,9 @@ export function OccupancyCard({ spaces, buildings }: OccupancyCardProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold font-headline text-foreground">
+        <div className="text-2xl sm:text-3xl font-bold font-headline text-foreground">
           <span>{formatNumber(stats.occupiedArea)}</span>
-          <span className="text-lg font-medium text-muted-foreground"> / {formatNumber(stats.totalArea)} m²</span>
+          <span className="text-lg sm:text-xl font-medium text-muted-foreground"> / {formatNumber(stats.totalArea)} m²</span>
         </div>
         <p className="text-xs text-muted-foreground pt-1">
           {stats.occupancyRate.toFixed(1)}% of total area is occupied.
