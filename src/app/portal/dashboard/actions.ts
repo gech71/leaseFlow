@@ -5,7 +5,7 @@
 import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, User, Role } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -58,8 +58,18 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
 
 // Gets current user from cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    const cookieStore = cookies();
+    const headerList = headers();
+    const authHeader = headerList.get('Authorization');
+
+    let accessToken: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        accessToken = authHeader.substring(7);
+    } else {
+        accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    }
+
     if (!accessToken) return null;
     
     const tokenPayload = await decodeJwtPayload(accessToken);
@@ -81,7 +91,6 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     const associatedTenant = await databaseService.findTenantByEmailOrPhone(currentUser.email, currentUser.phoneNumber);
     
     // If no tenant record matches the logged-in user's details, return an error.
-    // This applies to all users, including admins, to avoid showing a confusing/incorrect portal.
     if (!associatedTenant) {
         return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant record. Please contact property management to have your portal access configured." };
     }

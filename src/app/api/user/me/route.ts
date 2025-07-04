@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -28,8 +29,16 @@ function decodeJwtPayload(token: string): any | null {
 }
 
 export async function GET(request: NextRequest) {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+  const cookieStore = cookies();
+  const authHeader = request.headers.get('Authorization');
+  
+  let accessToken: string | undefined;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    accessToken = authHeader.substring(7);
+  } else {
+    accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+  }
 
   if (!accessToken) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required."] }, { status: 401 });
