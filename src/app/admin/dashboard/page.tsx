@@ -21,7 +21,7 @@ const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: 
       <Icon className="h-5 w-5 text-primary" />
     </CardHeader>
     <CardContent>
-      <div className="text-3xl font-bold font-headline text-foreground">{value}</div>
+      <div className="text-2xl sm:text-3xl font-bold font-headline text-foreground">{value}</div>
       {description && <p className="text-xs text-muted-foreground pt-1">{description}</p>}
       {trend && <p className={`text-xs pt-1 ${trendColor || 'text-green-500'}`}>{trend}</p>}
     </CardContent>
@@ -317,7 +317,7 @@ export default async function AdminDashboardPage() {
             }}
             className="w-full"
           >
-            <CarouselContent className="-ml-1">
+            <CarouselContent className="-ml-1 py-4">
               {financials.map((summary) => (
                 <CarouselItem key={summary.buildingId} className="pl-1 md:basis-1/2 lg:basis-1/3">
                   <BuildingFinancialCard
@@ -342,7 +342,7 @@ export default async function AdminDashboardPage() {
           <CardHeader>
             <CardTitle className="font-headline text-xl">Monthly Overview</CardTitle>
           </CardHeader>
-          <CardContent className="h-[350px]">
+          <CardContent className="h-[350px] p-2 sm:p-6">
             <DashboardChart data={chartData} />
           </CardContent>
         </Card>

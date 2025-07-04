@@ -192,10 +192,10 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               
               const sidebarButtonContent = (
                 <>
-                  <item.icon className="h-4 w-4 shrink-0" />
+                  <item.icon className="h-5 w-5 shrink-0" />
                   <span
                     className={cn(
-                      "flex-1 min-w-0",
+                      "flex-1 min-w-0 text-base",
                       (!isMobile && sidebarState === "collapsed") ? "hidden" : "truncate"
                     )}
                   >
@@ -213,6 +213,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               const sidebarMenuButtonProps = {
                 isActive: isActive,
                 className: cn(
+                  "h-10",
                   item.isPortal && 'mt-auto border-t border-sidebar-border pt-2'
                 ),
                 size: 'default' as const,
@@ -252,12 +253,12 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center group-data-[state=expanded]/sidebar-wrapper:justify-start group-data-[state=collapsed]/sidebar-wrapper:justify-center gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                <Avatar className="h-7 w-7">
+                <Avatar className="h-8 w-8">
                   <AvatarImage src="https://placehold.co/100x100.png" alt={currentUser?.name || "User"} data-ai-hint="user avatar"/>
                   <AvatarFallback>{currentUser?.name?.substring(0,2).toUpperCase() || 'AU'}</AvatarFallback>
                 </Avatar>
                 <div className={cn("text-left", "group-data-[state=collapsed]/sidebar-wrapper:hidden")}>
-                  <p className="text-xs font-medium">{currentUser?.name || "User"}</p>
+                  <p className="text-sm font-medium">{currentUser?.name || "User"}</p>
                   <p className="text-xs text-sidebar-foreground/70">{currentUser?.email || "user@example.com"}</p>
                 </div>
               </Button>
@@ -285,13 +286,13 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex flex-1 flex-col transition-[margin-left] duration-300 ease-in-out md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)]">
-        <header className="flex h-[3.7rem] shrink-0 items-center border-b bg-background px-4 md:px-1">
+        <header className="flex h-[3.7rem] shrink-0 items-center border-b bg-background px-4 sm:px-6 lg:px-8">
           {/* This trigger is for mobile view */}
           <SidebarTrigger className="md:hidden" />
           {/* This trigger is for desktop only, and only when collapsed */}
           <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
         </header>
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
         </div>
       </main>

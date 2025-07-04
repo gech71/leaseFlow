@@ -729,7 +729,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
           {!isLoadingData && filteredRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">{utilityFilterTerm || filterYear !== 'all' ? "No records match your filters." : "No utility records saved yet."}</p>)}
           {filteredRecords.length > 0 && (
             <>
-              <div className="border rounded-md">
+              <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -784,5 +784,3 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     </div>
   );
 }
-
-    

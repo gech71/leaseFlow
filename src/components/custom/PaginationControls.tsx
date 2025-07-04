@@ -37,7 +37,7 @@ export function PaginationControls({
   className 
 }: PaginationControlsProps) {
   // Return null only if there are no pages at all.
-  if (totalPages < 1) {
+  if (totalPages <= 1 && !onItemsPerPageChange) {
     return null;
   }
 
@@ -75,7 +75,7 @@ export function PaginationControls({
   };
 
   return (
-    <div className={cn("grid grid-cols-1 sm:grid-cols-3 items-center gap-4", className)}>
+    <div className={cn("flex flex-col-reverse sm:flex-row items-center justify-between gap-4", className)}>
       <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-muted-foreground">
         {onItemsPerPageChange && (
           <>
@@ -88,7 +88,7 @@ export function PaginationControls({
                 <SelectValue placeholder={String(itemsPerPage)} />
               </SelectTrigger>
               <SelectContent>
-                {[5, 10, 15, 20, 25, 50].map(size => (
+                {[3, 5, 9, 10, 15, 20, 25, 50].filter((v, i, a) => a.indexOf(v) === i).sort((a,b) => a-b).map(size => (
                   <SelectItem key={size} value={String(size)}>{size}</SelectItem>
                 ))}
               </SelectContent>
