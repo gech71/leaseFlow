@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 import type { CurrentUser, UserRole } from '@/lib/types'; // Import shared types
 
-const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 // DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
@@ -29,15 +29,17 @@ function decodeJwtPayload(token: string): any | null {
 }
 
 export async function GET(request: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const authHeader = request.headers.get('Authorization');
   
   let accessToken: string | undefined;
 
+  // This endpoint is for the admin panel, so it primarily uses the admin cookie.
+  // A Bearer token could also be used for admin API calls from other clients.
   if (authHeader && authHeader.startsWith('Bearer ')) {
     accessToken = authHeader.substring(7);
   } else {
-    accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    accessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
   }
 
   if (!accessToken) {
@@ -69,12 +71,7 @@ export async function GET(request: NextRequest) {
         }
       });
     }
-    // If SUPER_ADMIN, ensure all known permissions are granted
-    // This assumes AVAILABLE_PERMISSIONS list is accessible or hardcoded for SUPER_ADMIN case
-    // For simplicity here, we rely on DB roles. A more robust SUPER_ADMIN would bypass permission checks.
-    const isSuper = localUser.roles.some(r => r.name === 'SUPER_ADMIN');
-
-
+    
     const currentUserData: CurrentUser = {
       id: localUser.id, // Prisma internal ID
       userId: localUser.userId, // External ID from token's sub
