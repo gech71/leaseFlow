@@ -1,6 +1,7 @@
+"use client";
 
 import Link from 'next/link';
-import { Home, UserCircle, LogOut, Menu } from 'lucide-react';
+import { UserCircle, LogOut, Menu, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -9,26 +10,55 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import Image from 'next/image';
-import type { Metadata } from 'next';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
-export const metadata: Metadata = {
-  title: 'Building Management Solution',
-  description: 'A comprehensive building management solution.',
-  icons: {
-    icon: 'https://i.imgur.com/JTzGpIH.png',
-  },
-};
-
-const navLinks = [
-  { href: "#", label: "My Account", icon: UserCircle },
-  { href: "/portal/login", label: "Logout", icon: LogOut },
-];
+// Metadata cannot be exported from a Client Component, so it has been removed.
+// The root layout's metadata will be used instead.
 
 export default function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+      setIsLoggingOut(true);
+      try {
+          const response = await fetch('/api/auth/logout', {
+              method: 'POST',
+          });
+          const data = await response.json();
+
+          if (response.ok && data.isSuccess) {
+              toast({
+                  title: "Logged Out",
+                  description: "You have been successfully logged out.",
+              });
+          } else {
+              toast({
+                  title: "Logout Issue",
+                  description: data.errors?.join(', ') || "Could not fully complete server logout. Local session cleared.",
+                  variant: "default",
+              });
+          }
+      } catch (error) {
+          console.error("Logout API call error:", error);
+          toast({
+              title: "Logout Error",
+              description: "Could not connect to the logout service. Cleared local session.",
+              variant: "default"
+          });
+      } finally {
+          router.push('/auth/login');
+          setIsLoggingOut(false);
+      }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
@@ -40,11 +70,13 @@ export default function PortalLayout({
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-4">
-            {navLinks.map(link => (
-              <Link key={link.label} href={link.href} className="text-sm font-medium hover:underline flex items-center gap-1">
-                <link.icon size={18} /> {link.label}
-              </Link>
-            ))}
+            <Link href="#" className="text-sm font-medium hover:underline flex items-center gap-1">
+              <UserCircle size={18} /> My Account
+            </Link>
+            <Button variant="ghost" size="sm" onClick={handleLogout} disabled={isLoggingOut} className="text-sm font-medium hover:underline flex items-center gap-1 p-2 h-auto text-primary-foreground">
+              {isLoggingOut ? <Loader2 size={18} className="animate-spin" /> : <LogOut size={18} />} 
+              <span className="ml-1">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+            </Button>
           </nav>
 
           {/* Mobile Navigation Trigger */}
@@ -58,13 +90,17 @@ export default function PortalLayout({
               </SheetTrigger>
               <SheetContent side="right" className="w-[240px] bg-primary text-primary-foreground p-4">
                 <nav className="flex flex-col space-y-4 mt-8">
-                  {navLinks.map(link => (
-                    <SheetClose asChild key={link.label}>
-                      <Link href={link.href} className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80">
-                        <link.icon size={20} /> {link.label}
-                      </Link>
-                    </SheetClose>
-                  ))}
+                  <SheetClose asChild>
+                    <Link href="#" className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80">
+                      <UserCircle size={20} /> My Account
+                    </Link>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <Button variant="ghost" onClick={handleLogout} disabled={isLoggingOut} className="text-base font-medium hover:underline flex items-center justify-start gap-2 p-2 rounded-md hover:bg-primary/80 w-full">
+                      {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
+                      <span className="ml-1">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                    </Button>
+                  </SheetClose>
                 </nav>
               </SheetContent>
             </Sheet>
