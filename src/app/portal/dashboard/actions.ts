@@ -77,8 +77,8 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       return { agreement: null, aiGeneratedAgreementText: null, error: "Not authenticated. Please log in to view your portal." };
     }
 
-    // Find the tenant record associated with the logged-in user's email
-    const associatedTenant = await databaseService.findTenantByEmail(currentUser.email);
+    // Find the tenant record associated with the logged-in user's email or phone number
+    const associatedTenant = await databaseService.findTenantByEmailOrPhone(currentUser.email, currentUser.phoneNumber);
     
     let whereClause = {};
     let finalErrorMessage: string | undefined = undefined;

@@ -89,6 +89,29 @@ export class DatabaseService {
     });
   }
 
+  async findTenantByEmailOrPhone(email: string | null, phone: string | null): Promise<Tenant | null> {
+    if (!email && !phone) return null;
+
+    const whereClauses: Prisma.TenantWhereInput[] = [];
+    if (email) {
+      whereClauses.push({ email: { equals: email, mode: 'insensitive' as const } });
+    }
+    if (phone) {
+      whereClauses.push({ phone: { equals: phone } });
+      whereClauses.push({ alternativePhone: { equals: phone } });
+    }
+
+    if (whereClauses.length === 0) {
+      return null;
+    }
+
+    return prisma.tenant.findFirst({
+      where: {
+        OR: whereClauses
+      }
+    });
+  }
+
   async getTenantById(id: string, include?: Prisma.TenantInclude): Promise<Tenant | null> {
     return prisma.tenant.findUnique({ where: { id }, include });
   }
