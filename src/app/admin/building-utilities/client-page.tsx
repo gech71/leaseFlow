@@ -205,27 +205,38 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                   });
                 }
                 
-                // Infer if it was originally a 'Floor' item.
                 let inferredScope: 'Floor' | 'SpecificSpaces' = 'SpecificSpaces';
                 let inferredFloor: string | undefined = undefined;
 
                 if (selectedBuilding) {
-                  const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
-                  const firstSpaceInGroup = selectedBuilding.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
+                    const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
+                    const firstSpaceInGroup = selectedBuilding.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
 
-                  if (firstSpaceInGroup?.floor) {
-                      const commonFloor = firstSpaceInGroup.floor;
-                      const allOnSameFloor = itemsInGroup.every(item => {
-                          const spaceName = item.applicableSpaceIdNames?.[0];
-                          const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
-                          return space?.floor === commonFloor;
-                      });
+                    if (firstSpaceInGroup?.floor) {
+                        const commonFloor = firstSpaceInGroup.floor;
+                        // Check if ALL items in this group are on the same floor
+                        const allOnSameFloor = itemsInGroup.every(item => {
+                            const spaceName = item.applicableSpaceIdNames?.[0];
+                            const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
+                            return space?.floor === commonFloor;
+                        });
 
-                      if (allOnSameFloor) {
-                          inferredScope = 'Floor';
-                          inferredFloor = commonFloor;
-                      }
-                  }
+                        // If they are on the same floor, check if they represent ALL spaces on that floor
+                        if (allOnSameFloor) {
+                            const spacesOnThisFloor = selectedBuilding.spaces.filter(s => s.floor === commonFloor);
+                            const spaceNamesInGroup = new Set(itemsInGroup.flatMap(i => i.applicableSpaceIdNames || []));
+                            
+                            // Check if the number of unique spaces in the group matches the total number of spaces on that floor
+                            if (spacesOnThisFloor.length === spaceNamesInGroup.size) {
+                                 const allSpacesOnFloorAreInGroup = spacesOnThisFloor.every(s => spaceNamesInGroup.has(s.spaceIdName));
+                                 if (allSpacesOnFloorAreInGroup) {
+                                    // This is a much safer heuristic. It's very likely a Floor-scoped item.
+                                    inferredScope = 'Floor';
+                                    inferredFloor = commonFloor;
+                                 }
+                            }
+                        }
+                    }
                 }
                 
                 uiItems.push({
