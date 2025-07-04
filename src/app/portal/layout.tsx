@@ -36,7 +36,7 @@ export default function PortalLayout({
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/portal/dashboard" className="flex items-center gap-3">
             <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={100} height={28} className="h-7 w-auto object-contain" />
-            <span className="text-lg font-headline font-semibold">Building Management Solution</span>
+            <span className="hidden sm:inline text-lg font-headline font-semibold">Building Management Solution</span>
           </Link>
           
           {/* Desktop Navigation */}
