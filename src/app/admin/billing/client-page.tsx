@@ -703,29 +703,35 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       </Dialog>
 
       <Dialog open={isVerificationDialogOpen} onOpenChange={(isOpen) => { setIsVerificationDialogOpen(isOpen); if (!isOpen) { setBillForVerification(null); paymentForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
-          <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                  <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
-                  {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: {processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount?.toFixed(2)} Birr</DialogDescription>}
-              </DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+            <DialogHeader>
+                <DialogTitle className="font-headline text-xl">Verify Tenant Payment</DialogTitle>
+                {billForVerification && <DialogDescription>Bill for {processedClientBills.find(pb => pb.id === billForVerification.id)?.tenantName} - Amount: {processedClientBills.find(pb => pb.id === billForVerification.id)?.totalAmount?.toFixed(2)} Birr</DialogDescription>}
+            </DialogHeader>
+            <div className="flex-shrink-0 border-b pb-4">
               {billForVerification && ( <div className="text-sm space-y-2 py-2"> <p><strong>Tenant Notes:</strong> {billForVerification.tenantPaymentNotes || <span className="italic text-muted-foreground">No notes provided.</span>}</p> <p><strong>Submitted Proof:</strong> {billForVerification.paymentProofUrl ? <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => toast({title:"View Proof (Simulated)", description:`Displaying ${billForVerification.paymentProofUrl}`})}> {billForVerification.paymentProofUrl} (Click to view - simulated) </Button> : <span className="italic text-muted-foreground">No proof URL found.</span>} </p> </div> )}
+            </div>
+
+            <div className="flex-grow overflow-y-auto pr-4 py-2">
               <Form {...paymentForm}>
-                  <form className="space-y-4 py-1"> 
+                  <form className="space-y-4"> 
                       <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Actual Payment Date<span className="text-destructive ml-1">*</span></FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`} disabled={isLoading || !canManagePayments}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
                       <FormField control={paymentForm.control} name="paymentMethod" render={({ field }) => ( <FormItem><FormLabel>Actual Payment Method<span className="text-destructive ml-1">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isLoading || !canManagePayments}><FormControl><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Card">Card</SelectItem><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Bank Transfer">Bank Transfer</SelectItem><SelectItem value="Wallet">Wallet</SelectItem><SelectItem value="Check">Check</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                       {(paymentMethodWatcher === "Bank Transfer" || paymentMethodWatcher === "Wallet") && ( <FormField control={paymentForm.control} name="bankOrWalletName" render={({ field }) => ( <FormItem><FormLabel>{paymentMethodWatcher === "Bank Transfer" ? "Bank Name" : "Wallet Name"}<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input placeholder={`Enter Name`} {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} /> )}
                       <FormField control={paymentForm.control} name="paymentReference" render={({ field }) => ( <FormItem><FormLabel>Actual Reference</FormLabel><FormControl><Input placeholder="e.g., TXN ID" {...field} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                      {canManagePayments && <div> <Label htmlFor="adminVerificationProofFile" className="flex items-center mb-1 text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated) </Label> <Input id="adminVerificationProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>} </div>}
+                      {canManagePayments && <div className="space-y-2"> <Label htmlFor="adminVerificationProofFile" className="flex items-center text-sm font-medium"> <Paperclip className="mr-2 h-4 w-4 text-primary" /> Replace/Add Payment Slip (Simulated) </Label> <Input id="adminVerificationProofFile" type="file" ref={adminProofFileInputRef} onChange={handleAdminFileSelect} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" disabled={isLoading}/> {adminSelectedProofFile && <p className="text-xs text-muted-foreground mt-1">New file selected: {adminSelectedProofFile.name}</p>} </div>}
                       <FormField control={paymentForm.control} name="adminVerificationNotes" render={({ field }) => ( <FormItem><FormLabel>Admin Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Verification notes..." {...field} rows={2} disabled={isLoading || !canManagePayments}/></FormControl><FormMessage /></FormItem>)} />
-                      <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
-                          {canManagePayments && <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'rejectVerification'))()} disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}Reject Payment</Button>}
-                          <div className="flex-grow"></div>
-                          <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
-                          {canManagePayments && <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirmVerification'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}Confirm Payment</Button>}
-                      </DialogFooter>
                   </form>
               </Form>
-          </DialogContent>
+            </div>
+            
+            <DialogFooter className="pt-4 mt-auto border-t flex-col sm:flex-row gap-2">
+                {canManagePayments && <Button type="button" variant="destructive" className="w-full sm:w-auto" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'rejectVerification'))()} disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}Reject Payment</Button>}
+                <div className="flex-grow"></div>
+                <DialogClose asChild><Button type="button" variant="outline" disabled={isLoading}>Cancel</Button></DialogClose>
+                {canManagePayments && <Button type="button" onClick={() => paymentForm.handleSubmit((data) => handleVerificationSubmit(data, 'confirmVerification'))()} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" disabled={isLoading}>{isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}Confirm Payment</Button>}
+            </DialogFooter>
+        </DialogContent>
       </Dialog>
       
       <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => { setIsEditDialogOpen(isOpen); if (!isOpen) { setBillForEdit(null); editForm.reset(); setAdminSelectedProofFile(null); if(adminProofFileInputRef.current) adminProofFileInputRef.current.value = ""; }}}>
