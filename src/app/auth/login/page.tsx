@@ -63,14 +63,14 @@ export default function AdminLoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
-        <CardHeader className="text-center space-y-4 pt-8">
-          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={200} height={40} className="mx-auto object-contain" />
-          <div className="space-y-1">
-              <CardTitle className="text-2xl font-bold font-headline text-primary whitespace-nowrap">Building Management Solution</CardTitle>
+        <CardHeader className="text-center space-y-4 pt-6 sm:pt-8">
+          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={200} height={50} className="mx-auto h-auto object-contain" />
+          <div className="space-y-1 px-2">
+              <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Building Management Solution</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="pb-8">
-          <form onSubmit={handleLogin} className="space-y-6">
+        <CardContent className="px-4 sm:px-6 pb-6">
+          <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
             <div className="space-y-2">
               <Label htmlFor="phoneNumber" className="flex items-center">
                 <Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number
