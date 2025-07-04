@@ -20,7 +20,6 @@ export const metadata: Metadata = {
 };
 
 const navLinks = [
-  { href: "/portal/dashboard", label: "Dashboard", icon: Home },
   { href: "#", label: "My Account", icon: UserCircle },
   { href: "/portal/login", label: "Logout", icon: LogOut },
 ];
