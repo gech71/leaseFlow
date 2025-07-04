@@ -153,9 +153,9 @@ async function main() {
       // 2. Your auth provider will give your app a JWT access token.
       // 3. Decode this JWT (you can use online tools like jwt.io).
       // 4. Find the 'sub' claim in the decoded payload. That is your user ID.
-      // 5. Replace the value below ('default-super-admin-user-id') with the actual user ID from your token.
+      // 5. Replace the value below with the actual user ID from your token.
       // 6. Rerun the database seed command (`npm run prisma:seed`).
-      userId: 'default-super-admin-user-id',
+      userId: 'fda67c29-7753-4a81-bb1c-b25a63b29bc7',
       email: 'superadmin@leaseflow.com',
       name: 'Default Super Admin',
       firstName: 'Default',
