@@ -127,7 +127,14 @@ async function main() {
       ],
     },
   });
-  console.log(`Created Roles: ${superAdminRole.name}, ${propertyManagerRole.name}, ${accountantRole.name}, ${supportStaffRole.name}`);
+  const tenantRole = await prisma.role.create({
+    data: {
+      name: 'TENANT',
+      description: 'Access to the tenant portal to view lease and billing information.',
+      permissions: ['portal:view'],
+    },
+  });
+  console.log(`Created Roles: ${superAdminRole.name}, ${propertyManagerRole.name}, ${accountantRole.name}, ${supportStaffRole.name}, ${tenantRole.name}`);
 
 
   // 3. Create Users and assign roles
@@ -178,7 +185,26 @@ async function main() {
       roles: { connect: { id: accountantRole.id } },
     },
   });
-  console.log(`Created Users: ${user1.email}, ${user2.email}, ${user3.email}, ${user4.email}`);
+  
+  // Note: For a tenant to log into the portal, a corresponding User must be created
+  // with an email and/or phone number that matches the Tenant record.
+  // The password for this user would be managed by your external identity provider.
+  // The example below links a User record to the 'Alice Wonderland' Tenant record.
+  // To log in as this tenant, you would need to register a user with the email 
+  // 'alice@example.com' and a chosen password in your identity system.
+  const tenantUser1 = await prisma.user.create({
+    data: {
+      userId: 'auth-provider|tenant-alice-wonderland', // Example external ID
+      email: 'alice@example.com', // This MUST MATCH the tenant's email to link them
+      name: 'Alice Wonderland',
+      firstName: 'Alice',
+      lastName: 'Wonderland',
+      phoneNumber: '555-0101', // This can also be used for matching
+      roles: { connect: { id: tenantRole.id } },
+    },
+  });
+  
+  console.log(`Created Users: ${user1.email}, ${user2.email}, ${user3.email}, ${user4.email}, ${tenantUser1.email} (Tenant)`);
 
 
   // 4. Create Buildings with Penalty Tiers and assign managers

@@ -80,23 +80,14 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     // Find the tenant record associated with the logged-in user's email or phone number
     const associatedTenant = await databaseService.findTenantByEmailOrPhone(currentUser.email, currentUser.phoneNumber);
     
-    let whereClause = {};
-    let finalErrorMessage: string | undefined = undefined;
-
-    if (associatedTenant) {
-      whereClause = { tenantId: associatedTenant.id };
-    } else {
-      const isSuperAdmin = currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
-      if (isSuperAdmin) {
-        // Super Admin Fallback: Show the first tenant with an active agreement for preview
-        whereClause = {}; // No filter, will find first available
-      } else {
-        return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant record. Please contact support." };
-      }
+    // If no tenant record matches the logged-in user's details, return an error.
+    // This applies to all users, including admins, to avoid showing a confusing/incorrect portal.
+    if (!associatedTenant) {
+        return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant record. Please contact property management to have your portal access configured." };
     }
     
     const allAgreementsRaw = await databaseService.getAllAgreements({
-      where: whereClause,
+      where: { tenantId: associatedTenant.id },
       include: {
         tenant: true,
         space: {
@@ -160,20 +151,15 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     }
     
     if (!targetAgreement) {
-      const errorMessage = associatedTenant ? "You do not have an active agreement." : "No active agreements found in the system to preview.";
-      return { agreement: null, aiGeneratedAgreementText: null, error: errorMessage };
+      return { agreement: null, aiGeneratedAgreementText: null, error: "You do not have an active agreement." };
     }
     
-    if (!associatedTenant && currentUser.roles.some(role => role.name === 'SUPER_ADMIN')) {
-         finalErrorMessage = `As a Super Admin, you are viewing a sample portal for tenant: ${targetAgreement.tenant.name}. No tenant record is directly associated with your user account.`;
-    }
-
     const agreementText = targetAgreement.agreementText;
     
     return {
       agreement: targetAgreement,
       aiGeneratedAgreementText: agreementText,
-      error: finalErrorMessage,
+      error: undefined,
     };
 
   } catch (error: any) {
