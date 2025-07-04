@@ -70,15 +70,21 @@ export interface SpaceWithTenant extends Omit<SpaceTypePrisma, 'createdAt' | 'up
   tenant: (Omit<TenantTypePrisma, 'createdAt' | 'updatedAt' | 'rentedSpaceId'> & { createdAt: string; updatedAt: string; rentedSpaceId?: string | null}) | null;
 }
 
+const phoneRegex = /^(09|07)\d{8}$/;
+const phoneErrorMessage = "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678).";
 
 const tenantFormSchema = z.object({
   name: z.string().min(2, { message: "Tenant name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email address." }),
-  phone: z.string().min(1, { message: "Phone number is required." }),
-  alternativePhone: z.string().optional().or(z.literal('')),
+  phone: z.string().regex(phoneRegex, { message: phoneErrorMessage }),
+  alternativePhone: z.string().optional().or(z.literal('')).refine(val => !val || phoneRegex.test(val), {
+    message: phoneErrorMessage
+  }),
   nationalId: z.string().optional().or(z.literal('')),
   representativeName: z.string().optional().or(z.literal('')),
-  representativePhone: z.string().optional().or(z.literal('')),
+  representativePhone: z.string().optional().or(z.literal('')).refine(val => !val || phoneRegex.test(val), {
+    message: phoneErrorMessage
+  }),
 });
 type TenantFormValues = z.infer<typeof tenantFormSchema>;
 
@@ -318,11 +324,11 @@ export function TenantsClientPage({
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-2">
               <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><UserSquare className="mr-2 h-4 w-4 text-primary" />Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="e.g., John Doe" {...field} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" />Email<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="e.g., john.doe@example.com" {...field} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="e.g., 555-123-4567" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="alternativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><PhoneIncoming className="mr-2 h-4 w-4 text-primary" />Alternative Phone</FormLabel> <FormControl><Input placeholder="e.g., 555-987-6543" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="e.g., 0912345678" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="alternativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><PhoneIncoming className="mr-2 h-4 w-4 text-primary" />Alternative Phone</FormLabel> <FormControl><Input type="tel" placeholder="e.g., 0987654321" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="nationalId" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number</FormLabel> <FormControl><Input placeholder="e.g., AB1234567" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="representativeName" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" />Representative Name</FormLabel> <FormControl><Input placeholder="e.g., Jane Smith (Spouse, Agent)" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="representativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Representative Phone</FormLabel> <FormControl><Input placeholder="e.g., 555- representative phone" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="representativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Representative Phone</FormLabel> <FormControl><Input type="tel" placeholder="e.g., 0712345678" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               
               <DialogFooter className="pt-4">
                 <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
