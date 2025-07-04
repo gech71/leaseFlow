@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -54,7 +55,7 @@ export default function PortalLayout({
               variant: "default"
           });
       } finally {
-          router.push('/auth/login');
+          router.push('/portal/login');
           setIsLoggingOut(false);
       }
   };

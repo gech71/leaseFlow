@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const ACCESS_TOKEN_KEY = 'leaseflow_access_token';
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
-const LOGIN_PATH = '/auth/login';
+const ADMIN_LOGIN_PATH = '/auth/login';
+const PORTAL_LOGIN_PATH = '/portal/login';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -25,23 +26,30 @@ export function middleware(request: NextRequest) {
 
   // If the user has an access token
   if (accessToken) {
-    // If they are trying to access the login page or the root page, redirect them to the admin dashboard
-    if (pathname === LOGIN_PATH || pathname === '/') {
+    // If authenticated, redirect from any login page or the root to the main admin dashboard.
+    // The admin dashboard's client-side logic will handle redirecting tenants to the portal.
+    if (pathname === ADMIN_LOGIN_PATH || pathname === PORTAL_LOGIN_PATH || pathname === '/') {
       return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
     }
-    // Otherwise, allow them to proceed to the requested page (e.g., /admin/*, /portal/*)
     return NextResponse.next();
   }
 
   // If the user does NOT have an access token
   if (!accessToken) {
-    // If they are trying to access any /admin/* or /portal/* path, redirect to login
-    if (pathname.startsWith('/admin') || pathname.startsWith('/portal')) {
-      return NextResponse.redirect(new URL(LOGIN_PATH, request.url));
+    // If trying to access /admin/*, redirect to the admin login page
+    if (pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
     }
-    // Allow access to the login page itself, or the root (which will redirect to login via page.tsx)
-    // and any other non-protected, non-API public pages (if any existed)
-    return NextResponse.next();
+
+    // If trying to access /portal/* (but not the portal login page itself), redirect to the portal login page
+    if (pathname.startsWith('/portal') && pathname !== PORTAL_LOGIN_PATH) {
+      return NextResponse.redirect(new URL(PORTAL_LOGIN_PATH, request.url));
+    }
+    
+    // Redirect root to admin login if not authenticated
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+    }
   }
 
   return NextResponse.next();
@@ -56,7 +64,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - Any other static assets like .svg, .png, etc. if served directly
+     * - Any other static assets like .svg, .png, .jpg, .jpeg, .gif, .webp)$).*)',
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

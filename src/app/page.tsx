@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
 
 export default function RootPage() {
-  redirect('/auth/login'); // Changed redirect to the new login page
+  // Middleware handles redirection. This page is effectively a placeholder.
   return null;
 }
