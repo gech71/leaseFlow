@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
+const VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
+
 interface ConnectionResult {
   status: 'success' | 'error';
   message: string;
@@ -12,11 +14,11 @@ interface ConnectionResult {
 
 /**
  * Extracts the Bearer token from the Authorization header and validates it
- * by calling the internal /api/portal/validate-token endpoint.
+ * by calling the EXTERNAL validation service directly.
  * @returns {Promise<ConnectionResult>} An object containing the status, a message, and relevant data.
  */
 async function validateConnection(): Promise<ConnectionResult> {
-  const headerList = await headers();
+  const headerList = headers();
   const authHeader = headerList.get('Authorization');
 
   if (!authHeader) {
@@ -30,32 +32,39 @@ async function validateConnection(): Promise<ConnectionResult> {
     return { status: 'error', message: 'Token is missing from the Authorization header after "Bearer ".', token };
   }
 
-  // Now, validate the extracted token by calling our internal API route
+  // --- Direct External Validation ---
+  if (!VALIDATE_TOKEN_URL) {
+    console.error("Token validation service URL (NIB_VALIDATE_TOKEN_URL) is not configured.");
+    return { status: 'error', message: "Token validation service is not configured on the server.", token };
+  }
+
   try {
-    const host = headerList.get('host');
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const validationUrl = `${protocol}://${host}/api/portal/validate-token`;
-    
-    const validationResponse = await fetch(validationUrl, {
+    const externalResponse = await fetch(VALIDATE_TOKEN_URL, {
       method: 'GET',
       headers: {
-        'Authorization': authHeader, // Forward the header
+        'Authorization': authHeader, // Forward the entire header
         'Accept': 'application/json',
       },
-      // Important for server-to-server fetch to avoid caching issues with dynamic data
-      cache: 'no-store', 
+      cache: 'no-store',
     });
 
-    const responseData = await validationResponse.json();
-
-    if (!validationResponse.ok) {
-      return {
-        status: 'error',
-        message: `Token validation failed: ${responseData.errors?.join(', ') || 'Unknown validation error.'}`,
-        token,
-      };
+    // Handle cases where the response might not have a body
+    if (externalResponse.status === 204 || !externalResponse.headers.get('content-length') || externalResponse.headers.get('content-length') === '0') {
+      console.error(`External token validation returned status ${externalResponse.status} with an empty body.`);
+      return { status: 'error', message: 'Token validation failed with an empty response from the server.', token };
     }
 
+    const responseData = await externalResponse.json();
+
+    if (!externalResponse.ok) {
+        console.error(`External token validation failed with status ${externalResponse.status}:`, responseData);
+        return {
+            status: 'error',
+            message: `Token validation failed: ${responseData.errors?.join(', ') || 'The provided token is invalid or expired.'}`,
+            token,
+        };
+    }
+    
     if (responseData.phone) {
       return {
         status: 'success',
@@ -64,6 +73,7 @@ async function validateConnection(): Promise<ConnectionResult> {
         phone: responseData.phone,
       };
     } else {
+      console.error("External validation success, but 'phone' field is missing in the response:", responseData);
       return {
         status: 'error',
         message: 'Token was validated, but the response did not include a phone number.',
@@ -71,7 +81,7 @@ async function validateConnection(): Promise<ConnectionResult> {
       };
     }
   } catch (error: any) {
-    console.error("Error during connection validation fetch:", error.message);
+    console.error("Error during direct external validation fetch:", error.message);
     return {
       status: 'error',
       message: 'An internal server error occurred while trying to validate the token.',
