@@ -16,7 +16,7 @@ interface ConnectionResult {
  * @returns {Promise<ConnectionResult>} An object containing the status, a message, and relevant data.
  */
 async function validateConnection(): Promise<ConnectionResult> {
-  const headerList = headers();
+  const headerList = await headers();
   const authHeader = headerList.get('Authorization');
 
   if (!authHeader) {
