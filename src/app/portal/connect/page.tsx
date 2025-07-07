@@ -7,45 +7,77 @@ interface ConnectionResult {
   status: 'success' | 'error';
   message: string;
   token?: string | null;
+  phone?: string | null; // Add phone number to result
 }
 
 /**
- * Extracts and validates the Bearer token from the Authorization header.
- * @returns {ConnectionResult} An object containing the status, a message, and the token if found.
+ * Extracts the Bearer token from the Authorization header and validates it
+ * by calling the internal /api/portal/validate-token endpoint.
+ * @returns {Promise<ConnectionResult>} An object containing the status, a message, and relevant data.
  */
-function getTokenFromHeader(): ConnectionResult {
+async function validateConnection(): Promise<ConnectionResult> {
   const headerList = headers();
   const authHeader = headerList.get('Authorization');
 
   if (!authHeader) {
-    return {
-      status: 'error',
-      message: 'Authorization header is missing from the request.',
-    };
+    return { status: 'error', message: 'Authorization header is missing from the request.' };
   }
-
   if (!authHeader.startsWith('Bearer ')) {
-    return {
-      status: 'error',
-      message: 'Authorization header is malformed. It must start with "Bearer ".',
-    };
+    return { status: 'error', message: 'Authorization header is malformed. It must start with "Bearer ".' };
   }
-
-  // Extracts the token part from "Bearer <token>"
   const token = authHeader.substring(7);
-
   if (!token) {
-    return {
-      status: 'error',
-      message: 'Token is missing from the Authorization header after "Bearer ".',
-    };
+    return { status: 'error', message: 'Token is missing from the Authorization header after "Bearer ".', token };
   }
 
-  return {
-    status: 'success',
-    message: 'Token successfully extracted from the header.',
-    token: token,
-  };
+  // Now, validate the extracted token by calling our internal API route
+  try {
+    const host = headerList.get('host');
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const validationUrl = `${protocol}://${host}/api/portal/validate-token`;
+    
+    const validationResponse = await fetch(validationUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader, // Forward the header
+        'Accept': 'application/json',
+      },
+      // Important for server-to-server fetch to avoid caching issues with dynamic data
+      cache: 'no-store', 
+    });
+
+    const responseData = await validationResponse.json();
+
+    if (!validationResponse.ok) {
+      return {
+        status: 'error',
+        message: `Token validation failed: ${responseData.errors?.join(', ') || 'Unknown validation error.'}`,
+        token,
+      };
+    }
+
+    if (responseData.phone) {
+      return {
+        status: 'success',
+        message: 'Token successfully extracted and validated.',
+        token,
+        phone: responseData.phone,
+      };
+    } else {
+      return {
+        status: 'error',
+        message: 'Token was validated, but the response did not include a phone number.',
+        token,
+      };
+    }
+  } catch (error: any) {
+    console.error("Error during connection validation fetch:", error.message);
+    return {
+      status: 'error',
+      message: 'An internal server error occurred while trying to validate the token.',
+      token,
+    };
+  }
 }
 
 /**
@@ -55,7 +87,7 @@ export default async function MiniAppConnectionPage() {
     let result: ConnectionResult;
 
     try {
-        result = getTokenFromHeader();
+        result = await validateConnection();
     } catch (error) {
         console.error("Unexpected error on Mini App connection test page:", error);
         result = {
@@ -75,7 +107,7 @@ export default async function MiniAppConnectionPage() {
                         Mini App Connection Status
                     </CardTitle>
                     <CardDescription>
-                        This page tests the connection from your main application by reading the Authorization header.
+                        This page tests the connection by reading the Authorization header and validating the token.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -83,11 +115,21 @@ export default async function MiniAppConnectionPage() {
                         <h3 className="font-semibold">Result: {isSuccess ? 'Success' : 'Error'}</h3>
                         <p className="text-sm mt-1">{result.message}</p>
                     </div>
-                    {isSuccess && result.token && (
+                    
+                    {result.token && (
                         <div>
                             <h4 className="font-semibold text-foreground mb-2">Received Token:</h4>
                             <p className="p-4 bg-muted rounded-md text-sm break-all font-mono text-muted-foreground">
                                 {result.token}
+                            </p>
+                        </div>
+                    )}
+
+                    {isSuccess && result.phone && (
+                        <div>
+                            <h4 className="font-semibold text-foreground mb-2">Validated Phone Number:</h4>
+                             <p className="p-4 bg-muted rounded-md text-sm font-mono text-foreground">
+                                {result.phone}
                             </p>
                         </div>
                     )}
