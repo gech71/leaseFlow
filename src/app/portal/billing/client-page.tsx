@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -14,11 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { CheckCircle, Phone, Loader2, DollarSign, AlertCircle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getBillingAmountForPhoneNumberAction } from './actions';
+import { getBillingAmountForPhoneNumberAction, initiatePaymentAction } from './actions';
 
 interface BillingInfo {
   amount: number | null;
   message: string | null;
+  billId: string | null;
 }
 
 export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
@@ -36,12 +38,35 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
     const result = await getBillingAmountForPhoneNumberAction(phone);
 
     if (result.success) {
-      setBillingInfo({ amount: result.amount, message: result.message || null });
+      setBillingInfo({ amount: result.amount ?? null, message: result.message ?? null, billId: result.billId ?? null });
     } else {
       setError(result.error || 'An unknown error occurred.');
     }
 
     setIsLoading(false);
+  };
+  
+  const handlePayNow = async () => {
+      if (!billingInfo?.billId || billingInfo.amount === null) {
+          toast({ title: "Error", description: "No bill selected for payment.", variant: "destructive" });
+          return;
+      }
+      setIsLoading(true);
+      const result = await initiatePaymentAction(billingInfo.billId, billingInfo.amount);
+      setIsLoading(false);
+      
+      if (result.success) {
+          toast({ title: "Payment Initiated", description: result.message });
+          // Optionally redirect if the bank provides a URL
+          if (result.redirectUrl) {
+              window.location.href = result.redirectUrl;
+          } else {
+              // Refresh billing info if no redirect
+              handleGetBillingAmount();
+          }
+      } else {
+          toast({ title: "Payment Failed", description: result.error, variant: "destructive" });
+      }
   };
 
   return (
@@ -78,7 +103,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                 disabled={isLoading || !phone}
                 className="h-12 text-base px-6"
               >
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Get Bill'}
+                {isLoading && !billingInfo ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Get Bill'}
               </Button>
             </div>
           </div>
@@ -102,7 +127,10 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                       <span className="text-2xl text-muted-foreground font-medium">Birr</span>
                     </p>
                   </div>
-                  <Button className="w-full h-12 text-lg" disabled>Pay Now (Not Functional)</Button>
+                  <Button onClick={handlePayNow} className="w-full h-12 text-lg" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                    Pay Now
+                  </Button>
                 </>
               ) : (
                 <div className="flex items-center gap-3 text-green-700">
