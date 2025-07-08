@@ -5,7 +5,7 @@
 import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, User, Role } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -56,39 +56,23 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
   }
 }
 
-// Gets current user from cookie or Bearer token
+// Gets current user from the session cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const cookieStore = cookies();
-    const headerList = headers();
-    const authHeader = headerList.get('Authorization');
-
-    let accessToken: string | undefined;
-    let authMethod: 'cookie' | 'bearer' | 'none' = 'none';
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        accessToken = authHeader.substring(7);
-        authMethod = 'bearer';
-        console.log("Portal Auth: Attempting authentication via Bearer token.");
-    } else {
-        accessToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
-        if (accessToken) {
-            authMethod = 'cookie';
-            console.log("Portal Auth: Attempting authentication via cookie.");
-        }
-    }
+    const accessToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
 
     if (!accessToken) {
-        console.error("Portal Auth Error: No access token found in cookie or Authorization header.");
-        return null; // The action will handle the user-facing error message.
+        console.error("Portal Auth Error: No session access token found in cookie.");
+        return null;
     }
 
     const tokenPayload = await decodeJwtPayload(accessToken);
     if (!tokenPayload || !tokenPayload.sub) {
-        console.error(`Portal Auth Error: Failed to decode access token or 'sub' claim is missing. Method: ${authMethod}.`);
+        console.error(`Portal Auth Error: Failed to decode session token or 'sub' claim is missing.`);
         return null;
     }
     
-    console.log(`Portal Auth: Token decoded successfully for sub: ${tokenPayload.sub}. Fetching user from DB.`);
+    console.log(`Portal Auth: Token from cookie decoded successfully for sub: ${tokenPayload.sub}. Fetching user from DB.`);
 
     const user = await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
 
@@ -107,14 +91,12 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      // The detailed error is logged in getCurrentUser, so the client gets a clean message.
-      return { agreement: null, aiGeneratedAgreementText: null, error: "Authentication token missing or invalid. Please ensure the token is provided in the 'Authorization' header." };
+      return { agreement: null, aiGeneratedAgreementText: null, error: "Your session is invalid or has expired. Please re-enter from the Mini App." };
     }
 
     // Find the tenant record associated with the logged-in user's email or phone number
     const associatedTenant = await databaseService.findTenantByEmailOrPhone(currentUser.email, currentUser.phoneNumber);
     
-    // If no tenant record matches the logged-in user's details, return an error.
     if (!associatedTenant) {
         console.error(`Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`);
         return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant profile. Please contact property management." };

@@ -95,7 +95,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
     const token = cookieStore.get('leaseflow_portal_access_token')?.value;
 
     if (!token) {
-        return { success: false, error: "Authentication token not found. Please log in again." };
+        return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };
     }
 
     try {

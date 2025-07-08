@@ -1,4 +1,4 @@
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
   Card,
@@ -10,46 +10,34 @@ import {
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
 const VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
+const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
+const PORTAL_ACCESS_TOKEN_MAX_AGE = 60 * 60; // 1 hour
 
 interface ConnectionResult {
   status: 'success' | 'error';
   message: string;
   token?: string | null;
-  phone?: string | null; // Changed from email to phone
+  phone?: string | null;
 }
 
 /**
- * Extracts the Bearer token from the Authorization header and validates it
- * by calling the EXTERNAL validation service directly.
- * @returns {Promise<ConnectionResult>} An object containing the status, a message, and relevant data.
+ * Extracts the Bearer token, validates it, and sets a secure cookie on success.
+ * @returns {Promise<ConnectionResult>} An object containing the status and a message.
  */
-async function validateConnection(): Promise<ConnectionResult> {
+async function validateConnectionAndSetCookie(): Promise<ConnectionResult> {
   const headerList = await headers();
   const authHeader = headerList.get('Authorization');
 
-  if (!authHeader) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
       status: 'error',
-      message: 'Authorization header is missing from the request.',
-    };
-  }
-
-  if (!authHeader.startsWith('Bearer ')) {
-    return {
-      status: 'error',
-      message:
-        'Authorization header is malformed. It must start with "Bearer ".',
+      message: 'Authorization header is missing or malformed.',
     };
   }
 
   const token = authHeader.substring(7);
   if (!token) {
-    return {
-      status: 'error',
-      message:
-        'Token is missing from the Authorization header after "Bearer ".',
-      token,
-    };
+    return { status: 'error', message: 'Token is missing.', token };
   }
 
   if (!VALIDATE_TOKEN_URL) {
@@ -64,127 +52,76 @@ async function validateConnection(): Promise<ConnectionResult> {
   try {
     const externalResponse = await fetch(VALIDATE_TOKEN_URL, {
       method: 'GET',
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json',
-      },
+      headers: { Authorization: authHeader, Accept: 'application/json' },
       cache: 'no-store',
     });
 
     const raw = await externalResponse.text();
-
     if (!raw) {
+      return { status: 'error', message: 'Token validation failed: empty response from server.', token };
+    }
+
+    const responseData = JSON.parse(raw);
+
+    if (!externalResponse.ok || !responseData.phone) {
       return {
         status: 'error',
-        message: 'Token validation failed: empty response from server.',
+        message: responseData?.message || 'The provided token is invalid, expired, or did not return a phone number.',
         token,
       };
     }
 
-    let responseData: any;
-    try {
-      responseData = JSON.parse(raw);
-    } catch (err) {
-      return {
-        status: 'error',
-        message:
-          'Token validation failed: backend response was not valid JSON.',
-        token,
-      };
-    }
+    // On success, set the secure cookie
+    cookies().set(PORTAL_ACCESS_TOKEN_KEY, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
+      maxAge: PORTAL_ACCESS_TOKEN_MAX_AGE,
+    });
+    
+    // Return success with phone number for redirection
+    return {
+      status: 'success',
+      message: 'Token successfully validated.',
+      token,
+      phone: responseData.phone,
+    };
 
-    if (!externalResponse.ok) {
-      return {
-        status: 'error',
-        message:
-          responseData?.message ||
-          'The provided token is invalid or expired.',
-        token,
-      };
-    }
-
-    if (responseData.phone) {
-      return {
-        status: 'success',
-        message: 'Token successfully validated.',
-        token,
-        phone: responseData.phone,
-      };
-    } else {
-      return {
-        status: 'error',
-        message: "Token validated but 'phone' was missing from the response.",
-        token,
-      };
-    }
   } catch (error: any) {
     console.error('❌ Error during token validation:', error.message);
-    return {
-      status: 'error',
-      message: 'An internal error occurred while validating the token.',
-      token,
-    };
+    return { status: 'error', message: 'An internal error occurred while validating the token.', token };
   }
 }
 
 /**
- * A server component page to test the Mini App connection by validating the Authorization header.
- * On success, it redirects to the billing page. On failure, it shows an error.
+ * A server component page that acts as the entry point for the Mini App.
+ * It validates the token and redirects on success or shows an error.
  */
 export default async function MiniAppConnectionPage() {
-  let result: ConnectionResult;
-
-  try {
-    result = await validateConnection();
-  } catch (error) {
-    console.error('Unexpected error on Mini App connection test page:', error);
-    result = {
-      status: 'error',
-      message:
-        'An unexpected server error occurred while processing the request.',
-    };
-  }
+  const result = await validateConnectionAndSetCookie();
   
   // If validation is successful and we have a phone number, redirect.
   if (result.status === 'success' && result.phone) {
     redirect(`/portal/billing?phone=${encodeURIComponent(result.phone)}`);
   }
 
-  const isSuccess = result.status === 'success';
-
-  // This part of the component will now only render if the validation fails.
+  // This part of the component will only render if the validation fails.
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-background p-4">
-      <Card
-        className={`w-full max-w-2xl shadow-lg animate-fadeIn ${
-          isSuccess ? 'border-green-500/50' : 'border-destructive/50'
-        }`}
-      >
+      <Card className="w-full max-w-2xl shadow-lg animate-fadeIn border-destructive/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-2xl font-headline">
-            {isSuccess ? (
-              <CheckCircle className="h-7 w-7 text-green-500" />
-            ) : (
-              <AlertTriangle className="h-7 w-7 text-destructive" />
-            )}
-            Mini App Connection Status
+            <AlertTriangle className="h-7 w-7 text-destructive" />
+            Mini App Connection Failed
           </CardTitle>
           <CardDescription>
-            This page tests the connection by reading the Authorization header
-            and validating the token.
+            This page tests the connection by reading the Authorization header from the Mini App.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div
-            className={`p-4 rounded-md ${
-              isSuccess
-                ? 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                : 'bg-destructive/10 text-destructive'
-            }`}
-          >
-            <h3 className="font-semibold">
-              Result: {isSuccess ? 'Success' : 'Error'}
-            </h3>
+          <div className="p-4 rounded-md bg-destructive/10 text-destructive">
+            <h3 className="font-semibold">Error Details:</h3>
             <p className="text-sm mt-1">{result.message}</p>
           </div>
 
