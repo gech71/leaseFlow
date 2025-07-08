@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -14,7 +15,7 @@ interface ConnectionResult {
   status: 'success' | 'error';
   message: string;
   token?: string | null;
-  phone?: string | null; // Changed from email to phone
+  phone?: string | null;
 }
 
 /**
@@ -23,7 +24,8 @@ interface ConnectionResult {
  * @returns {Promise<ConnectionResult>} An object containing the status, a message, and relevant data.
  */
 async function validateConnection(): Promise<ConnectionResult> {
-  const headerList = await headers();
+  // Note: headers() is a dynamic function. Using it opts the page into dynamic rendering.
+  const headerList = headers();
   const authHeader = headerList.get('Authorization');
 
   if (!authHeader) {
@@ -70,27 +72,16 @@ async function validateConnection(): Promise<ConnectionResult> {
       cache: 'no-store',
     });
 
-    const raw = await externalResponse.text();
-
-    if (!raw) {
+    // Handle cases where the response might not have a body
+    if (externalResponse.status === 204 || !externalResponse.headers.get('content-length') || externalResponse.headers.get('content-length') === '0') {
       return {
         status: 'error',
         message: 'Token validation failed: empty response from server.',
         token,
       };
     }
-
-    let responseData: any;
-    try {
-      responseData = JSON.parse(raw);
-    } catch (err) {
-      return {
-        status: 'error',
-        message:
-          'Token validation failed: backend response was not valid JSON.',
-        token,
-      };
-    }
+    
+    const responseData = await externalResponse.json();
 
     if (!externalResponse.ok) {
       return {
@@ -105,7 +96,7 @@ async function validateConnection(): Promise<ConnectionResult> {
     if (responseData.phone) {
       return {
         status: 'success',
-        message: 'Token successfully validated.',
+        message: 'Token successfully validated. Redirecting...',
         token,
         phone: responseData.phone,
       };
@@ -128,54 +119,37 @@ async function validateConnection(): Promise<ConnectionResult> {
 
 /**
  * A server component page to test the Mini App connection by validating the Authorization header.
+ * On success, it redirects to the billing page.
  */
 export default async function MiniAppConnectionPage() {
-  let result: ConnectionResult;
+  const result = await validateConnection();
 
-  try {
-    result = await validateConnection();
-  } catch (error) {
-    console.error('Unexpected error on Mini App connection test page:', error);
-    result = {
-      status: 'error',
-      message:
-        'An unexpected server error occurred while processing the request.',
-    };
+  // If validation is successful, redirect to the billing page.
+  if (result.status === 'success' && result.phone) {
+    redirect(`/portal/billing?phone=${encodeURIComponent(result.phone)}`);
   }
-
-  const isSuccess = result.status === 'success';
-
+  
+  // This UI will only be shown if the validation fails, as a success will trigger the redirect.
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-background p-4">
       <Card
-        className={`w-full max-w-2xl shadow-lg animate-fadeIn ${
-          isSuccess ? 'border-green-500/50' : 'border-destructive/50'
-        }`}
+        className={`w-full max-w-2xl shadow-lg animate-fadeIn border-destructive/50`}
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-2xl font-headline">
-            {isSuccess ? (
-              <CheckCircle className="h-7 w-7 text-green-500" />
-            ) : (
-              <AlertTriangle className="h-7 w-7 text-destructive" />
-            )}
-            Mini App Connection Status
+            <AlertTriangle className="h-7 w-7 text-destructive" />
+            Connection Failed
           </CardTitle>
           <CardDescription>
-            This page tests the connection by reading the Authorization header
-            and validating the token.
+            Could not establish a secure connection. Please see the error below.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div
-            className={`p-4 rounded-md ${
-              isSuccess
-                ? 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                : 'bg-destructive/10 text-destructive'
-            }`}
+            className={`p-4 rounded-md bg-destructive/10 text-destructive`}
           >
             <h3 className="font-semibold">
-              Result: {isSuccess ? 'Success' : 'Error'}
+              Error
             </h3>
             <p className="text-sm mt-1">{result.message}</p>
           </div>
@@ -183,21 +157,10 @@ export default async function MiniAppConnectionPage() {
           {result.token && (
             <div>
               <h4 className="font-semibold text-foreground mb-2">
-                Received Token:
+                Received Token (for debugging):
               </h4>
               <p className="p-4 bg-muted rounded-md text-sm break-all font-mono text-muted-foreground">
                 {result.token}
-              </p>
-            </div>
-          )}
-
-          {isSuccess && result.phone && (
-            <div>
-              <h4 className="font-semibold text-foreground mb-2">
-                Validated Phone Number:
-              </h4>
-              <p className="p-4 bg-muted rounded-md text-sm font-mono text-foreground">
-                {result.phone}
               </p>
             </div>
           )}
