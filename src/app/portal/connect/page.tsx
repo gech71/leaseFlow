@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle, Phone, Loader2, Wallet, CircleDollarSign, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { validateTokenFromHeaderAction, type ConnectionResult } from '../dashboard/actions';
+import { getBillingInfoByPhoneAction } from './actions';
 
 export default function MiniAppConnectionPage() {
   const [validationResult, setValidationResult] = useState<ConnectionResult | null>(null);
@@ -33,17 +33,36 @@ export default function MiniAppConnectionPage() {
 
   const handleGetBilling = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsFetchingBilling(true);
-    // Simulate API call to fetch billing info
-    setTimeout(() => {
-      const randomAmount = Math.floor(Math.random() * (5000 - 500 + 1)) + 500;
-      setBillingAmount(randomAmount);
-      setIsFetchingBilling(false);
+    if (!phoneNumber) {
       toast({
-        title: "Billing Amount Fetched",
-        description: `The amount due for phone number ${phoneNumber} is ${randomAmount.toFixed(2)} Birr.`,
+        title: "Phone Number Required",
+        description: "Please enter a phone number to fetch billing information.",
+        variant: "destructive",
       });
-    }, 1500);
+      return;
+    }
+    setIsFetchingBilling(true);
+    setBillingAmount(null);
+
+    const result = await getBillingInfoByPhoneAction(phoneNumber);
+
+    if (result.success) {
+      setBillingAmount(result.amount);
+      const message = result.amount > 0 
+        ? `The amount due for phone number ${phoneNumber} is ${result.amount.toFixed(2)} Birr.`
+        : "No outstanding payment found for this number.";
+      toast({
+        title: "Billing Information Fetched",
+        description: message,
+      });
+    } else {
+      toast({
+        title: "Could Not Fetch Billing Info",
+        description: result.error || "An unknown error occurred.",
+        variant: "destructive",
+      });
+    }
+    setIsFetchingBilling(false);
   };
 
   if (isLoading) {
