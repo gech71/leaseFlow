@@ -236,3 +236,68 @@ export async function submitPaymentProofAction(input: SubmitPaymentProofInput) {
     return { success: false, error: error.message || "Failed to submit payment proof." };
   }
 }
+
+const VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
+
+export interface ConnectionResult {
+  status: 'success' | 'error';
+  message: string;
+  token?: string | null;
+  phone?: string | null;
+}
+
+export async function validateTokenFromHeaderAction(): Promise<ConnectionResult> {
+  const headerList = headers();
+  const authHeader = headerList.get('Authorization');
+
+  if (!authHeader) {
+    return { status: 'error', message: 'Authorization header is missing from the request.' };
+  }
+
+  if (!authHeader.startsWith('Bearer ')) {
+    return { status: 'error', message: 'Authorization header is malformed. It must start with "Bearer ".' };
+  }
+
+  const token = authHeader.substring(7);
+  if (!token) {
+    return { status: 'error', message: 'Token is missing from the Authorization header after "Bearer ".', token };
+  }
+
+  if (!VALIDATE_TOKEN_URL) {
+    console.error('❌ VALIDATE_TOKEN_URL is not configured.');
+    return { status: 'error', message: 'Token validation service is not configured on the server.', token };
+  }
+
+  try {
+    const externalResponse = await fetch(VALIDATE_TOKEN_URL, {
+      method: 'GET',
+      headers: { Authorization: authHeader, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+
+    const raw = await externalResponse.text();
+    if (!raw) {
+      return { status: 'error', message: 'Token validation failed: empty response from server.', token };
+    }
+
+    let responseData: any;
+    try {
+      responseData = JSON.parse(raw);
+    } catch (err) {
+      return { status: 'error', message: 'Token validation failed: backend response was not valid JSON.', token };
+    }
+
+    if (!externalResponse.ok) {
+      return { status: 'error', message: responseData?.message || 'The provided token is invalid or expired.', token };
+    }
+
+    if (responseData.phone) {
+      return { status: 'success', message: 'Token successfully validated.', token, phone: responseData.phone };
+    } else {
+      return { status: 'error', message: "Token validated but 'phone' was missing from the response.", token };
+    }
+  } catch (error: any) {
+    console.error('❌ Error during token validation:', error.message);
+    return { status: 'error', message: 'An internal error occurred while validating the token.', token };
+  }
+}

@@ -1,208 +1,155 @@
-import { headers } from 'next/headers';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
 
-const VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
+"use client";
 
-interface ConnectionResult {
-  status: 'success' | 'error';
-  message: string;
-  token?: string | null;
-  phone?: string | null; // Changed from email to phone
-}
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { CheckCircle, Phone, Loader2, Wallet, CircleDollarSign, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { validateTokenFromHeaderAction, type ConnectionResult } from '../dashboard/actions';
 
-/**
- * Extracts the Bearer token from the Authorization header and validates it
- * by calling the EXTERNAL validation service directly.
- * @returns {Promise<ConnectionResult>} An object containing the status, a message, and relevant data.
- */
-async function validateConnection(): Promise<ConnectionResult> {
-  const headerList = await headers();
-  const authHeader = headerList.get('Authorization');
+export default function MiniAppConnectionPage() {
+  const [validationResult, setValidationResult] = useState<ConnectionResult | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isFetchingBilling, setIsFetchingBilling] = useState(false);
+  const [billingAmount, setBillingAmount] = useState<number | null>(null);
+  const { toast } = useToast();
 
-  if (!authHeader) {
-    return {
-      status: 'error',
-      message: 'Authorization header is missing from the request.',
+  useEffect(() => {
+    const validate = async () => {
+      setIsLoading(true);
+      const result = await validateTokenFromHeaderAction();
+      setValidationResult(result);
+      if (result.status === 'success' && result.phone) {
+        setPhoneNumber(result.phone);
+      }
+      setIsLoading(false);
     };
+    validate();
+  }, []);
+
+  const handleGetBilling = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsFetchingBilling(true);
+    // Simulate API call to fetch billing info
+    setTimeout(() => {
+      const randomAmount = Math.floor(Math.random() * (5000 - 500 + 1)) + 500;
+      setBillingAmount(randomAmount);
+      setIsFetchingBilling(false);
+      toast({
+        title: "Billing Amount Fetched",
+        description: `The amount due for phone number ${phoneNumber} is ${randomAmount.toFixed(2)} Birr.`,
+      });
+    }, 1500);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] bg-background p-4 text-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Verifying connection...</p>
+      </div>
+    );
   }
 
-  if (!authHeader.startsWith('Bearer ')) {
-    return {
-      status: 'error',
-      message:
-        'Authorization header is malformed. It must start with "Bearer ".',
-    };
+  if (validationResult?.status === 'error') {
+    return (
+        <div className="flex items-center justify-center min-h-[80vh] bg-background p-4">
+        <Card className="w-full max-w-2xl shadow-lg animate-fadeIn border-destructive/50">
+            <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-2xl font-headline text-destructive">
+                <AlertTriangle className="h-7 w-7" />
+                Connection Error
+            </CardTitle>
+            <CardDescription>
+                There was a problem validating your connection.
+            </CardDescription>
+            </CardHeader>
+            <CardContent>
+            <div className="p-4 rounded-md bg-destructive/10 text-destructive">
+                <h3 className="font-semibold">Error Details:</h3>
+                <p className="text-sm mt-1">{validationResult.message}</p>
+            </div>
+            {validationResult.token && (
+                <div className="mt-4">
+                <h4 className="font-semibold text-foreground mb-2">Received Token (for debugging):</h4>
+                <p className="p-4 bg-muted rounded-md text-sm break-all font-mono text-muted-foreground">{validationResult.token}</p>
+                </div>
+            )}
+            </CardContent>
+        </Card>
+        </div>
+    );
   }
-
-  const token = authHeader.substring(7);
-  if (!token) {
-    return {
-      status: 'error',
-      message:
-        'Token is missing from the Authorization header after "Bearer ".',
-      token,
-    };
-  }
-
-  if (!VALIDATE_TOKEN_URL) {
-    console.error('❌ VALIDATE_TOKEN_URL is not configured.');
-    return {
-      status: 'error',
-      message: 'Token validation service is not configured on the server.',
-      token,
-    };
-  }
-
-  try {
-    const externalResponse = await fetch(VALIDATE_TOKEN_URL, {
-      method: 'GET',
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    const raw = await externalResponse.text();
-
-    if (!raw) {
-      return {
-        status: 'error',
-        message: 'Token validation failed: empty response from server.',
-        token,
-      };
-    }
-
-    let responseData: any;
-    try {
-      responseData = JSON.parse(raw);
-    } catch (err) {
-      return {
-        status: 'error',
-        message:
-          'Token validation failed: backend response was not valid JSON.',
-        token,
-      };
-    }
-
-    if (!externalResponse.ok) {
-      return {
-        status: 'error',
-        message:
-          responseData?.message ||
-          'The provided token is invalid or expired.',
-        token,
-      };
-    }
-
-    if (responseData.phone) {
-      return {
-        status: 'success',
-        message: 'Token successfully validated.',
-        token,
-        phone: responseData.phone,
-      };
-    } else {
-      return {
-        status: 'error',
-        message: "Token validated but 'phone' was missing from the response.",
-        token,
-      };
-    }
-  } catch (error: any) {
-    console.error('❌ Error during token validation:', error.message);
-    return {
-      status: 'error',
-      message: 'An internal error occurred while validating the token.',
-      token,
-    };
-  }
-}
-
-/**
- * A server component page to test the Mini App connection by validating the Authorization header.
- */
-export default async function MiniAppConnectionPage() {
-  let result: ConnectionResult;
-
-  try {
-    result = await validateConnection();
-  } catch (error) {
-    console.error('Unexpected error on Mini App connection test page:', error);
-    result = {
-      status: 'error',
-      message:
-        'An unexpected server error occurred while processing the request.',
-    };
-  }
-
-  const isSuccess = result.status === 'success';
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-background p-4">
-      <Card
-        className={`w-full max-w-2xl shadow-lg animate-fadeIn ${
-          isSuccess ? 'border-green-500/50' : 'border-destructive/50'
-        }`}
-      >
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-2xl font-headline">
-            {isSuccess ? (
-              <CheckCircle className="h-7 w-7 text-green-500" />
-            ) : (
-              <AlertTriangle className="h-7 w-7 text-destructive" />
+        <div className="w-full max-w-md">
+        <div className="flex items-center justify-center gap-2 mb-4 text-green-600 animate-fadeIn">
+            <CheckCircle className="h-5 w-5" />
+            <span className="text-sm font-medium">Connection Verified</span>
+        </div>
+        <Card className="shadow-2xl animate-fadeIn border-primary/20">
+            <CardHeader>
+            <CardTitle className="font-headline text-2xl">Confirm Your Number</CardTitle>
+            <CardDescription>
+                We've successfully verified the connection. To proceed, please confirm your phone number below to retrieve the billing amount associated with it.
+            </CardDescription>
+            </CardHeader>
+            <form onSubmit={handleGetBilling}>
+            <CardContent className="space-y-4">
+                <div className="space-y-2">
+                <Label htmlFor="phoneNumber" className="flex items-center">
+                    <Phone className="mr-2 h-4 w-4 text-primary" />
+                    Your phone number
+                </Label>
+                <Input
+                    id="phoneNumber"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="e.g., 0912345678"
+                    required
+                    disabled={isFetchingBilling}
+                />
+                </div>
+
+                {billingAmount === null && (
+                <Button type="submit" className="w-full" disabled={isFetchingBilling}>
+                    {isFetchingBilling ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                    <CircleDollarSign className="mr-2 h-4 w-4" />
+                    )}
+                    Get Billing Amount
+                </Button>
+                )}
+            </CardContent>
+            </form>
+
+            {billingAmount !== null && (
+            <CardContent className="space-y-4 border-t pt-6">
+                <h3 className="font-semibold text-lg text-center">Amount Due</h3>
+                <div className="p-4 bg-secondary/50 rounded-lg text-center">
+                <p className="text-4xl font-bold text-primary font-headline">
+                    {billingAmount.toFixed(2)}
+                </p>
+                <p className="text-sm text-muted-foreground">Birr</p>
+                </div>
+                <p className="text-xs text-center text-muted-foreground pt-2">
+                  Once the billing amount is fetched, you’ll be able to review it and click the Pay button to proceed. (Note: The Pay button is currently not functional.)
+                </p>
+                <Button className="w-full bg-green-600 hover:bg-green-700" disabled>
+                  <Wallet className="mr-2 h-4 w-4" />
+                  Pay Now (Not Functional)
+                </Button>
+            </CardContent>
             )}
-            Mini App Connection Status
-          </CardTitle>
-          <CardDescription>
-            This page tests the connection by reading the Authorization header
-            and validating the token.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div
-            className={`p-4 rounded-md ${
-              isSuccess
-                ? 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                : 'bg-destructive/10 text-destructive'
-            }`}
-          >
-            <h3 className="font-semibold">
-              Result: {isSuccess ? 'Success' : 'Error'}
-            </h3>
-            <p className="text-sm mt-1">{result.message}</p>
-          </div>
-
-          {result.token && (
-            <div>
-              <h4 className="font-semibold text-foreground mb-2">
-                Received Token:
-              </h4>
-              <p className="p-4 bg-muted rounded-md text-sm break-all font-mono text-muted-foreground">
-                {result.token}
-              </p>
-            </div>
-          )}
-
-          {isSuccess && result.phone && (
-            <div>
-              <h4 className="font-semibold text-foreground mb-2">
-                Validated Phone Number:
-              </h4>
-              <p className="p-4 bg-muted rounded-md text-sm font-mono text-foreground">
-                {result.phone}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </Card>
+        </div>
     </div>
   );
 }
