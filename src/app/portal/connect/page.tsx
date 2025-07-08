@@ -1,3 +1,6 @@
+
+export const dynamic = 'force-dynamic';
+
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
@@ -24,8 +27,7 @@ interface ConnectionResult {
  * @returns {Promise<ConnectionResult>} An object containing the status, a message, and relevant data.
  */
 async function validateConnection(): Promise<ConnectionResult> {
-  // Note: headers() is a dynamic function. Using it opts the page into dynamic rendering.
-  const headerList = headers();
+  const headerList = await headers();
   const authHeader = headerList.get('Authorization');
 
   if (!authHeader) {
