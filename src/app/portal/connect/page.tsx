@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -128,6 +129,7 @@ async function validateConnection(): Promise<ConnectionResult> {
 
 /**
  * A server component page to test the Mini App connection by validating the Authorization header.
+ * On success, it redirects to the billing page. On failure, it shows an error.
  */
 export default async function MiniAppConnectionPage() {
   let result: ConnectionResult;
@@ -142,9 +144,15 @@ export default async function MiniAppConnectionPage() {
         'An unexpected server error occurred while processing the request.',
     };
   }
+  
+  // If validation is successful and we have a phone number, redirect.
+  if (result.status === 'success' && result.phone) {
+    redirect(`/portal/billing?phone=${encodeURIComponent(result.phone)}`);
+  }
 
   const isSuccess = result.status === 'success';
 
+  // This part of the component will now only render if the validation fails.
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-background p-4">
       <Card
@@ -187,17 +195,6 @@ export default async function MiniAppConnectionPage() {
               </h4>
               <p className="p-4 bg-muted rounded-md text-sm break-all font-mono text-muted-foreground">
                 {result.token}
-              </p>
-            </div>
-          )}
-
-          {isSuccess && result.phone && (
-            <div>
-              <h4 className="font-semibold text-foreground mb-2">
-                Validated Phone Number:
-              </h4>
-              <p className="p-4 bg-muted rounded-md text-sm font-mono text-foreground">
-                {result.phone}
               </p>
             </div>
           )}
