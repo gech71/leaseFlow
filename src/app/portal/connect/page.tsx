@@ -1,5 +1,5 @@
-import { headers, cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import {headers, cookies} from 'next/headers';
+import {redirect} from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -7,7 +7,9 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import {CheckCircle, AlertTriangle} from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
 
 const VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
 const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
@@ -37,7 +39,7 @@ async function validateConnectionAndSetCookie(): Promise<ConnectionResult> {
 
   const token = authHeader.substring(7);
   if (!token) {
-    return { status: 'error', message: 'Token is missing.', token };
+    return {status: 'error', message: 'Token is missing.', token};
   }
 
   if (!VALIDATE_TOKEN_URL) {
@@ -52,13 +54,17 @@ async function validateConnectionAndSetCookie(): Promise<ConnectionResult> {
   try {
     const externalResponse = await fetch(VALIDATE_TOKEN_URL, {
       method: 'GET',
-      headers: { Authorization: authHeader, Accept: 'application/json' },
+      headers: {Authorization: authHeader, Accept: 'application/json'},
       cache: 'no-store',
     });
 
     const raw = await externalResponse.text();
     if (!raw) {
-      return { status: 'error', message: 'Token validation failed: empty response from server.', token };
+      return {
+        status: 'error',
+        message: 'Token validation failed: empty response from server.',
+        token,
+      };
     }
 
     const responseData = JSON.parse(raw);
@@ -66,20 +72,23 @@ async function validateConnectionAndSetCookie(): Promise<ConnectionResult> {
     if (!externalResponse.ok || !responseData.phone) {
       return {
         status: 'error',
-        message: responseData?.message || 'The provided token is invalid, expired, or did not return a phone number.',
+        message:
+          responseData?.message ||
+          'The provided token is invalid, expired, or did not return a phone number.',
         token,
       };
     }
 
     // On success, set the secure cookie
-    cookies().set(PORTAL_ACCESS_TOKEN_KEY, token, {
+    const cookieStore = await cookies();
+    cookieStore.set(PORTAL_ACCESS_TOKEN_KEY, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       sameSite: 'lax',
       maxAge: PORTAL_ACCESS_TOKEN_MAX_AGE,
     });
-    
+
     // Return success with phone number for redirection
     return {
       status: 'success',
@@ -87,10 +96,13 @@ async function validateConnectionAndSetCookie(): Promise<ConnectionResult> {
       token,
       phone: responseData.phone,
     };
-
   } catch (error: any) {
     console.error('❌ Error during token validation:', error.message);
-    return { status: 'error', message: 'An internal error occurred while validating the token.', token };
+    return {
+      status: 'error',
+      message: 'An internal error occurred while validating the token.',
+      token,
+    };
   }
 }
 
@@ -100,7 +112,7 @@ async function validateConnectionAndSetCookie(): Promise<ConnectionResult> {
  */
 export default async function MiniAppConnectionPage() {
   const result = await validateConnectionAndSetCookie();
-  
+
   // If validation is successful and we have a phone number, redirect.
   if (result.status === 'success' && result.phone) {
     redirect(`/portal/billing?phone=${encodeURIComponent(result.phone)}`);
@@ -116,7 +128,8 @@ export default async function MiniAppConnectionPage() {
             Mini App Connection Failed
           </CardTitle>
           <CardDescription>
-            This page tests the connection by reading the Authorization header from the Mini App.
+            This page tests the connection by reading the Authorization header
+            from the Mini App.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

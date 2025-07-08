@@ -10,7 +10,6 @@ interface BillingResult {
   success: boolean;
   amount?: number | null;
   message?: string | null;
-  error?: string | null;
   billId?: string | null;
 }
 
@@ -91,7 +90,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         return { success: false, error: "Payment service is not configured correctly." };
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get('leaseflow_portal_access_token')?.value;
 
     if (!token) {
