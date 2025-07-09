@@ -11,6 +11,7 @@ interface BillingResult {
   amount?: number | null;
   message?: string | null;
   billId?: string | null;
+  error?: string;
 }
 
 export async function getBillingAmountForPhoneNumberAction(phone: string): Promise<BillingResult> {
@@ -100,7 +101,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
     try {
         const signatureData = {
             accountNo: ACCOUNT_NO,
-            amount: amount.toString(),
+            amount: "5", // Using fixed amount as per request
             callBackURL: CALLBACK_URL,
             companyName: COMPANY_NAME,
             Key: NIB_PAYMENT_KEY,
@@ -110,8 +111,9 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         };
 
         const sortedKeys = Object.keys(signatureData).sort() as (keyof typeof signatureData)[];
-        
-        const signatureString = sortedKeys.map(key => signatureData[key]).join('');
+        const signatureString = sortedKeys
+            .map(key => `${key}=${signatureData[key]}`)
+            .join('&');
 
         const signature = crypto.createHash('sha256').update(signatureString).digest('hex');
 

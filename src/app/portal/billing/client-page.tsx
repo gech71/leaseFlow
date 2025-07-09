@@ -28,12 +28,14 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [paymentResponseToken, setPaymentResponseToken] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleGetBillingAmount = async () => {
     setIsLoading(true);
     setBillingInfo(null);
     setError(null);
+    setPaymentResponseToken(null);
 
     const result = await getBillingAmountForPhoneNumberAction(phone);
 
@@ -57,11 +59,14 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
       
       if (result.success) {
           toast({ title: "Payment Initiated", description: result.message });
-          // Optionally redirect if the bank provides a URL
+          
+          if (result.data?.token) {
+            setPaymentResponseToken(result.data.token);
+          }
+
           if (result.redirectUrl) {
               window.location.href = result.redirectUrl;
           } else {
-              // Refresh billing info if no redirect
               handleGetBillingAmount();
           }
       } else {
@@ -140,6 +145,16 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
               )}
             </div>
           )}
+
+          {paymentResponseToken && (
+            <div className="mt-4 space-y-2">
+              <Label className="font-semibold text-foreground">Payment Response Token</Label>
+              <p className="mt-2 p-3 bg-muted rounded-md text-sm break-all font-mono text-muted-foreground">
+                {paymentResponseToken}
+              </p>
+            </div>
+          )}
+
         </CardContent>
       </Card>
     </div>
