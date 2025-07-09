@@ -99,7 +99,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
     }
 
     try {
-        const signatureData = {
+        const signatureData: { [key: string]: string } = {
             accountNo: ACCOUNT_NO,
             amount: "5", // Using fixed amount as per request
             callBackURL: CALLBACK_URL,
@@ -110,12 +110,19 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
             transactionTime: format(new Date(), 'yyyyMMddHHmmss'),
         };
 
-        const sortedKeys = Object.keys(signatureData).sort() as (keyof typeof signatureData)[];
+        // Sort keys alphabetically
+        const sortedKeys = Object.keys(signatureData).sort();
+
+        // Construct the signature string
         const signatureString = sortedKeys
             .map(key => `${key}=${signatureData[key]}`)
             .join('&');
 
-        const signature = crypto.createHash('sha256').update(signatureString).digest('hex');
+        // SHA256 hash of the final string
+        const signature = crypto
+            .createHash('sha256')
+            .update(signatureString, 'utf8') // Always use utf8 encoding
+            .digest('hex');
 
         const payload = {
             accountNo: signatureData.accountNo,
