@@ -99,31 +99,31 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
     }
 
     try {
-        const signatureData = {
+        const transactionId = crypto.randomUUID();
+        const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
+
+        // Construct the signature string in the exact specified order, without sorting.
+        const signatureString = [
+            `accountNo=${ACCOUNT_NO}`,
+            `amount=5`,
+            `callBackURL=${CALLBACK_URL}`,
+            `companyName=${COMPANY_NAME}`,
+            `Key=${NIB_PAYMENT_KEY}`,
+            `token=${token}`,
+            `transactionId=${transactionId}`,
+            `transactionTime=${transactionTime}`
+        ].join('&');
+        
+        const signature = crypto.createHash('sha256').update(signatureString).digest('hex');
+        
+        const payload = {
             accountNo: ACCOUNT_NO,
             amount: "5",
             callBackURL: CALLBACK_URL,
             companyName: COMPANY_NAME,
             token: token,
-            transactionId: crypto.randomUUID(),
-            transactionTime: format(new Date(), 'yyyyMMddHHmmss'),
-        };
-
-        const sortedKeys = Object.keys(signatureData).sort() as (keyof typeof signatureData)[];
-        const signatureString = sortedKeys
-            .map(key => `${key}=${signatureData[key]}`)
-            .join('&') + `&Key=${NIB_PAYMENT_KEY}`; //  Append Key at the end
-
-        const signature = crypto.createHash('sha256').update(signatureString).digest('hex');
-        
-        const payload = {
-            accountNo: signatureData.accountNo,
-            amount: signatureData.amount,
-            callBackURL: signatureData.callBackURL,
-            companyName: signatureData.companyName,
-            token: signatureData.token,
-            transactionId: signatureData.transactionId,
-            transactionTime: signatureData.transactionTime,
+            transactionId: transactionId,
+            transactionTime: transactionTime,
             signature: signature
         };
         
