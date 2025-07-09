@@ -83,7 +83,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
     const NIB_PAYMENT_URL = process.env.NIB_PAYMENT_URL;
     const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
     const ACCOUNT_NO = process.env.NIB_ACCOUNT_NO;
-    const COMPANY_NAME = process.env.NIB_COMPANY_NAME || 'LeaseFlow Solutions';
+    const COMPANY_NAME = process.env.NIB_COMPANY_NAME || 'BUILDING';
     const CALLBACK_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/api/portal/payment-callback`;
 
     if (!NIB_PAYMENT_URL || !NIB_PAYMENT_KEY || !ACCOUNT_NO) {
@@ -105,7 +105,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         // Construct the signature string in the exact specified order, without sorting.
         const signatureString = [
             `accountNo=${ACCOUNT_NO}`,
-            `amount=5`,
+            `amount=300`,
             `callBackURL=${CALLBACK_URL}`,
             `companyName=${COMPANY_NAME}`,
             `Key=${NIB_PAYMENT_KEY}`,
@@ -118,7 +118,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         
         const payload = {
             accountNo: ACCOUNT_NO,
-            amount: "5",
+            amount: "300",
             callBackURL: CALLBACK_URL,
             companyName: COMPANY_NAME,
             token: token,
