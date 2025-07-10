@@ -23,6 +23,18 @@ interface BillingInfo {
   billId: string | null;
 }
 
+// Add this interface to support the NIB Super App communication channel
+interface MyJsChannel {
+  postMessage(message: any): void;
+}
+
+declare global {
+  interface Window {
+    myJsChannel?: MyJsChannel;
+  }
+}
+
+
 export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   const [phone, setPhone] = useState(initialPhone);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,6 +74,15 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
           
           if (result.data?.token) {
             setPaymentResponseToken(result.data.token);
+            // Step 4: Send the received token back to the Super App.
+            if (typeof window !== 'undefined' && window.myJsChannel?.postMessage) {
+              window.myJsChannel.postMessage({
+                token: result.data.token
+              });
+              console.log("Successfully posted token to NIB Super App channel.");
+            } else {
+              console.error("NIB Super App channel (window.myJsChannel) not found.");
+            }
           }
 
           if (result.redirectUrl) {
