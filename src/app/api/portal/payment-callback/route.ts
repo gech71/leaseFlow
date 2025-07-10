@@ -1,12 +1,11 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { databaseService } from '@/lib/services/databaseService';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 
-const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
 const NIB_VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
-
 
 // Helper to validate the Authorization token from NIB
 async function validateNibToken(authHeader: string | null): Promise<boolean> {
@@ -32,14 +31,8 @@ async function validateNibToken(authHeader: string | null): Promise<boolean> {
     }
 }
 
-
 export async function POST(request: NextRequest) {
-    if (!NIB_PAYMENT_KEY) {
-        console.error("Callback Error: NIB payment key (NIB_PAYMENT_KEY) is not configured.");
-        return NextResponse.json({ message: "Payment confirmation service is not configured." }, { status: 500 });
-    }
-    
-    // --- Token Validation (as per documentation) ---
+    // --- Step 1: Token Validation ---
     const authHeader = request.headers.get('Authorization');
     const isTokenValid = await validateNibToken(authHeader);
     if (!isTokenValid) {
@@ -70,48 +63,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: "Missing required fields." }, { status: 400 });
     }
 
-    // --- Signature Verification ---
-    // Reconstruct the signature data from the received payload.
-    const signatureData: Record<string, any> = {
-        paidAmount,
-        paidByNumber,
-        txnRef,
-        transactionId,
-        transactionTime,
-        accountNo,
-        token,
-    };
-    
-    // Filter out any null or undefined values to avoid "key=undefined" in the string
-    const validSignatureData: Record<string, string> = Object.entries(signatureData)
-        .filter(([, value]) => value !== null && value !== undefined)
-        .reduce((obj, [key, value]) => {
-            obj[key] = String(value); // Ensure all values are strings
-            return obj;
-        }, {} as Record<string, string>);
-
-    // Sort keys alphabetically
-    const sortedKeys = Object.keys(validSignatureData).sort();
-
-    // Construct the signature string by joining key-value pairs
-    const signatureBaseString = sortedKeys
-        .map(key => `${key}=${validSignatureData[key]}`)
-        .join('&');
-    
-    // Append the secret Key at the end
-    const finalStringToHash = `${signatureBaseString}&Key=${NIB_PAYMENT_KEY}`;
-
-    const expectedSignature = crypto
-        .createHash('sha256')
-        .update(finalStringToHash, 'utf8')
-        .digest('hex');
-
-    if (expectedSignature !== receivedSignature) {
-        console.warn(`Callback Signature Mismatch. Received: ${receivedSignature}, Expected: ${expectedSignature}. String: "${finalStringToHash}"`);
-        return NextResponse.json({ message: "Invalid signature." }, { status: 400 });
-    }
-    
-    // --- Database Update ---
+    // --- Step 2 & 3: Find the Bill and Compare Signatures ---
     try {
         const bill = await prisma.bill.findFirst({
             where: {
@@ -123,26 +75,44 @@ export async function POST(request: NextRequest) {
 
         if (!bill) {
             console.warn(`Callback Success: Received valid callback for transaction ${transactionId}, but no matching bill was found.`);
-            // Acknowledge receipt to NIB even if we can't find the bill to prevent retries.
             return NextResponse.json({ message: "Callback acknowledged, no action taken." }, { status: 200 });
         }
+
+        // The original signature was stored in the `paymentReference` field during initiation.
+        const originalSignature = bill.paymentReference;
+
+        if (!originalSignature) {
+            console.error(`Callback Error: Bill ${bill.id} is missing the original signature for validation.`);
+            // Acknowledge to prevent retries, but log as a critical error.
+            return NextResponse.json({ message: "Callback acknowledged, internal error occurred (missing signature)." }, { status: 200 });
+        }
+
+        if (originalSignature !== receivedSignature) {
+            console.warn(`Callback Signature Mismatch for transaction ${transactionId}. Received: ${receivedSignature}, Expected: ${originalSignature}.`);
+            // The signature is invalid, so we reject the callback.
+            return NextResponse.json({ message: "Invalid signature." }, { status: 400 });
+        }
         
-        // Update the bill to 'Paid'
+        // --- Step 4: Update Database ---
+        // If we reach here, the signature is valid.
         await databaseService.updateBill(bill.id, {
             status: 'Paid',
             paymentDate: new Date(), 
-            paymentReference: txnRef, // Store NIB's main transaction reference
+            paymentReference: txnRef, // Overwrite the stored signature with the final NIB transaction reference.
             adminVerifiedPayment: true, 
-            adminVerificationNotes: `Payment confirmed via NIB callback on ${new Date().toISOString()}. Paid by: ${paidByNumber}.`,
-            totalAmount: paidAmount ? parseFloat(paidAmount) : bill.totalAmount, // Update amount if provided
+            adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Ref: ${txnRef}.`,
+            totalAmount: paidAmount ? parseFloat(paidAmount) : bill.totalAmount,
+            // Reset tenant notes to clean up the stored transaction ID.
+            tenantPaymentNotes: `Paid via NIB. Original Transaction ID: ${transactionId}.`,
         });
 
         console.log(`Successfully updated bill ${bill.id} to 'Paid' via NIB callback for transaction ${transactionId}.`);
         
+        // --- Step 5: Respond with 200 OK ---
         return NextResponse.json({ message: "Payment confirmed and updated." }, { status: 200 });
 
     } catch (dbError: any) {
-        console.error("Callback DB Error: Failed to update bill status after successful validation.", dbError);
+        console.error("Callback DB Error: Failed to process bill after successful validation.", dbError);
         // Important: Still return 200 OK to NIB to prevent them from retrying.
         // We will need to handle this reconciliation separately (e.g., via logging/monitoring).
         return NextResponse.json({ message: "Callback acknowledged, but an internal processing error occurred." }, { status: 200 });

@@ -9,8 +9,8 @@ import crypto from 'crypto';
 interface BillingResult {
   success: boolean;
   amount?: number | null;
-  message?: string | null;
   billId?: string | null;
+  message?: string | null;
   error?: string;
 }
 
@@ -114,7 +114,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
             `transactionTime=${transactionTime}`
         ].join('&');
         
-        const signature = crypto.createHash('sha256').update(signatureString).digest('hex');
+        const signature = crypto.createHash('sha256').update(signatureString, 'utf8').digest('hex');
         
         const payload = {
             accountNo: ACCOUNT_NO,
@@ -143,10 +143,14 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
             return { success: false, error: responseData.message || `Payment initiation failed with status ${response.status}.` };
         }
         
-        // Mark the bill as 'PendingVerification' locally upon successful initiation
+        // Store the transaction ID and the generated signature on the bill for later validation.
         await prisma.bill.update({
             where: { id: billId },
-            data: { status: 'PendingVerification', tenantPaymentNotes: `Payment initiated with NIB. Transaction ID: ${payload.transactionId}` }
+            data: { 
+              status: 'PendingVerification', 
+              tenantPaymentNotes: `Payment initiated with NIB. Transaction ID: ${payload.transactionId}`,
+              paymentReference: signature // Store the signature we created
+            }
         });
 
 
