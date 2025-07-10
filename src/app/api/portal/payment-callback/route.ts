@@ -5,96 +5,146 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 
 const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
+const NIB_VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
+
+
+// Helper to validate the Authorization token from NIB
+async function validateNibToken(authHeader: string | null): Promise<boolean> {
+    if (!NIB_VALIDATE_TOKEN_URL) {
+        console.error("Callback Error: Token validation URL is not configured.");
+        return false;
+    }
+    if (!authHeader) {
+        console.error("Callback Error: Authorization header missing from NIB callback.");
+        return false;
+    }
+
+    try {
+        const externalResponse = await fetch(NIB_VALIDATE_TOKEN_URL, {
+            method: 'GET',
+            headers: { 'Authorization': authHeader, 'Accept': 'application/json' },
+            cache: 'no-store',
+        });
+        return externalResponse.ok;
+    } catch (error) {
+        console.error("Callback Error: Network error during NIB token validation:", error);
+        return false;
+    }
+}
+
 
 export async function POST(request: NextRequest) {
     if (!NIB_PAYMENT_KEY) {
-        console.error("NIB payment key (NIB_PAYMENT_KEY) is not configured.");
-        return NextResponse.json({ success: false, message: "Payment confirmation service is not configured." }, { status: 500 });
+        console.error("Callback Error: NIB payment key (NIB_PAYMENT_KEY) is not configured.");
+        return NextResponse.json({ message: "Payment confirmation service is not configured." }, { status: 500 });
     }
     
+    // --- Token Validation (as per documentation) ---
+    const authHeader = request.headers.get('Authorization');
+    const isTokenValid = await validateNibToken(authHeader);
+    if (!isTokenValid) {
+        return NextResponse.json({ message: "Invalid or missing authorization token." }, { status: 401 });
+    }
+
     let requestBody;
     try {
         requestBody = await request.json();
     } catch (e) {
         console.error("Callback Error: Invalid JSON in request body.", e);
-        return NextResponse.json({ success: false, message: "Invalid request format." }, { status: 400 });
+        return NextResponse.json({ message: "Invalid request format." }, { status: 400 });
     }
 
     const {
+        paidAmount,
+        paidByNumber,
+        txnRef,
         transactionId,
-        companyName,
-        accountNo,
-        amount,
         transactionTime,
+        accountNo,
+        token,
         signature: receivedSignature
     } = requestBody;
 
-    if (!transactionId || !companyName || !accountNo || !amount || !transactionTime || !receivedSignature) {
-        console.error("Callback Error: Missing required fields in callback data.", requestBody);
-        return NextResponse.json({ success: false, message: "Missing required fields." }, { status: 400 });
+    if (!transactionId || !receivedSignature) {
+        console.error("Callback Error: Missing required fields (transactionId, signature) in callback data.", requestBody);
+        return NextResponse.json({ message: "Missing required fields." }, { status: 400 });
     }
 
     // --- Signature Verification ---
-    // The signature string must be reconstructed in the exact same fixed order as payment initiation.
-    const signatureString = [
-        `accountNo=${accountNo}`,
-        `amount=${amount}`,
-        `companyName=${companyName}`,
-        `Key=${NIB_PAYMENT_KEY}`,
-        `transactionId=${transactionId}`,
-        `transactionTime=${transactionTime}`
-    ].join('&');
+    // Reconstruct the signature data from the received payload.
+    const signatureData: Record<string, any> = {
+        paidAmount,
+        paidByNumber,
+        txnRef,
+        transactionId,
+        transactionTime,
+        accountNo,
+        token,
+    };
+    
+    // Filter out any null or undefined values to avoid "key=undefined" in the string
+    const validSignatureData: Record<string, string> = Object.entries(signatureData)
+        .filter(([, value]) => value !== null && value !== undefined)
+        .reduce((obj, [key, value]) => {
+            obj[key] = String(value); // Ensure all values are strings
+            return obj;
+        }, {} as Record<string, string>);
 
-    const expectedSignature = crypto.createHash('sha256').update(signatureString).digest('hex');
+    // Sort keys alphabetically
+    const sortedKeys = Object.keys(validSignatureData).sort();
+
+    // Construct the signature string by joining key-value pairs
+    const signatureBaseString = sortedKeys
+        .map(key => `${key}=${validSignatureData[key]}`)
+        .join('&');
+    
+    // Append the secret Key at the end
+    const finalStringToHash = `${signatureBaseString}&Key=${NIB_PAYMENT_KEY}`;
+
+    const expectedSignature = crypto
+        .createHash('sha256')
+        .update(finalStringToHash, 'utf8')
+        .digest('hex');
 
     if (expectedSignature !== receivedSignature) {
-        console.warn(`Callback Signature Mismatch. Received: ${receivedSignature}, Expected: ${expectedSignature}`);
-        return NextResponse.json({ success: false, message: "Invalid signature." }, { status: 400 });
+        console.warn(`Callback Signature Mismatch. Received: ${receivedSignature}, Expected: ${expectedSignature}. String: "${finalStringToHash}"`);
+        return NextResponse.json({ message: "Invalid signature." }, { status: 400 });
     }
     
     // --- Database Update ---
     try {
-        // Find the bill that was marked for verification with this transaction ID
-        const bill = await databaseService.getAllBills({
+        const bill = await prisma.bill.findFirst({
             where: {
-                status: 'PendingVerification',
                 tenantPaymentNotes: {
                     contains: `Transaction ID: ${transactionId}`
                 }
             }
         });
 
-        if (!bill || bill.length === 0) {
-            console.warn(`Callback Success: Received valid callback for transaction ${transactionId}, but no matching bill was found in 'PendingVerification' state.`);
-            // This can happen if the callback is delayed and an admin already verified it.
-            // It's still a success from NIB's perspective, so we return 200 OK.
-            return NextResponse.json({ success: true, message: "Callback received, no action needed." });
+        if (!bill) {
+            console.warn(`Callback Success: Received valid callback for transaction ${transactionId}, but no matching bill was found.`);
+            // Acknowledge receipt to NIB even if we can't find the bill to prevent retries.
+            return NextResponse.json({ message: "Callback acknowledged, no action taken." }, { status: 200 });
         }
-        
-        if (bill.length > 1) {
-             console.warn(`Callback Warning: Multiple bills found for transaction ID ${transactionId}. Updating the first one.`);
-        }
-
-        const billToUpdate = bill[0];
         
         // Update the bill to 'Paid'
-        await databaseService.updateBill(billToUpdate.id, {
+        await databaseService.updateBill(bill.id, {
             status: 'Paid',
-            paymentDate: new Date(), // Mark payment as of now
-            paymentReference: `NIB-${transactionId}`, // Store NIB's transaction ID as the reference
-            adminVerifiedPayment: true, // Auto-verified by callback
-            adminVerificationNotes: `Payment confirmed via NIB callback on ${new Date().toISOString()}.`,
+            paymentDate: new Date(), 
+            paymentReference: txnRef, // Store NIB's main transaction reference
+            adminVerifiedPayment: true, 
+            adminVerificationNotes: `Payment confirmed via NIB callback on ${new Date().toISOString()}. Paid by: ${paidByNumber}.`,
+            totalAmount: paidAmount ? parseFloat(paidAmount) : bill.totalAmount, // Update amount if provided
         });
 
-        console.log(`Successfully updated bill ${billToUpdate.id} to 'Paid' via NIB callback.`);
+        console.log(`Successfully updated bill ${bill.id} to 'Paid' via NIB callback for transaction ${transactionId}.`);
         
-        // Respond with success
-        return NextResponse.json({ success: true, message: "Payment confirmed and updated." });
+        return NextResponse.json({ message: "Payment confirmed and updated." }, { status: 200 });
 
     } catch (dbError: any) {
         console.error("Callback DB Error: Failed to update bill status after successful validation.", dbError);
-        // Even if our DB fails, we must return a 200 OK to NIB to prevent them from retrying.
+        // Important: Still return 200 OK to NIB to prevent them from retrying.
         // We will need to handle this reconciliation separately (e.g., via logging/monitoring).
-        return NextResponse.json({ success: true, message: "Callback acknowledged, internal processing error." });
+        return NextResponse.json({ message: "Callback acknowledged, but an internal processing error occurred." }, { status: 200 });
     }
 }
