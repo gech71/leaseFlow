@@ -97,7 +97,10 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
 
   return (
     <div className="flex justify-center items-start min-h-[80vh] bg-background pt-8 sm:pt-16">
-      <Card className="w-full max-w-lg shadow-2xl animate-fadeIn border-t-4 border-primary">
+      <Card
+        className="w-full max-w-lg shadow-2xl animate-fadeIn border-t-4"
+        style={{ borderColor: '#fdb913' }}
+      >
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 text-green-600">
             <CheckCircle className="h-5 w-5" />
@@ -127,7 +130,8 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
               <Button
                 onClick={handleGetBillingAmount}
                 disabled={isLoading || !phone}
-                className="h-12 text-base px-6"
+                className="h-12 text-base px-6 text-white"
+                style={{ backgroundColor: '#fdb913' }}
               >
                 {isLoading && !billingInfo ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Get Bill'}
               </Button>
@@ -153,7 +157,12 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                       <span className="text-2xl text-muted-foreground font-medium">Birr</span>
                     </p>
                   </div>
-                  <Button onClick={handlePayNow} className="w-full h-12 text-lg" disabled={isLoading}>
+                  <Button
+                    onClick={handlePayNow}
+                    className="w-full h-12 text-lg text-white"
+                    disabled={isLoading}
+                    style={{ backgroundColor: '#fdb913' }}
+                  >
                     {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                     Pay Now
                   </Button>
