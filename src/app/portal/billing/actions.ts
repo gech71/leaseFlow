@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { addMonths, isAfter, format } from 'date-fns';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
+import type { BillStatus } from '@prisma/client';
 
 interface BillingResult {
   success: boolean;
@@ -69,14 +70,12 @@ export async function getBillingAmountForPhoneNumberAction(phone: string): Promi
 }
 
 
-// --- New Payment Action ---
-
 interface PaymentInitiationResult {
     success: boolean;
     message?: string;
     error?: string;
-    redirectUrl?: string; // NIB might return a URL to redirect the user to
-    data?: any; // To return any other data from NIB
+    redirectUrl?: string; 
+    data?: any; 
 }
 
 export async function initiatePaymentAction(billId: string, amount: number): Promise<PaymentInitiationResult> {
@@ -102,10 +101,9 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         const transactionId = crypto.randomUUID();
         const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
 
-        // Construct the signature string in the exact specified order, without sorting.
         const signatureString = [
             `accountNo=${ACCOUNT_NO}`,
-            `amount=300`,
+            `amount=${amount}`,
             `callBackURL=${CALLBACK_URL}`,
             `companyName=${COMPANY_NAME}`,
             `Key=${NIB_PAYMENT_KEY}`,
@@ -118,7 +116,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         
         const payload = {
             accountNo: ACCOUNT_NO,
-            amount: "300",
+            amount: String(amount),
             callBackURL: CALLBACK_URL,
             companyName: COMPANY_NAME,
             token: token,
@@ -143,13 +141,12 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
             return { success: false, error: responseData.message || `Payment initiation failed with status ${response.status}.` };
         }
         
-        // Store the transaction ID and the generated signature on the bill for later validation.
         await prisma.bill.update({
             where: { id: billId },
             data: { 
               status: 'PendingVerification', 
               tenantPaymentNotes: `Payment initiated with NIB. Transaction ID: ${payload.transactionId}`,
-              paymentReference: signature // Store the signature we created
+              paymentReference: signature
             }
         });
 
@@ -157,7 +154,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         return {
             success: true,
             message: "Payment initiated successfully!",
-            redirectUrl: responseData.redirectUrl, // Assuming NIB sends a URL
+            redirectUrl: responseData.redirectUrl,
             data: responseData
         };
 
@@ -165,4 +162,23 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         console.error("Error in initiatePaymentAction:", error);
         return { success: false, error: 'An unexpected error occurred while initiating payment.' };
     }
+}
+
+// --- New Bill Status Action ---
+export async function getBillStatusAction(billId: string): Promise<{ status: BillStatus | null, error?: string }> {
+  try {
+    const bill = await prisma.bill.findUnique({
+      where: { id: billId },
+      select: { status: true },
+    });
+
+    if (!bill) {
+      return { status: null, error: "Bill not found." };
+    }
+
+    return { status: bill.status };
+  } catch (error) {
+    console.error("Error fetching bill status:", error);
+    return { status: null, error: "Database error." };
+  }
 }
