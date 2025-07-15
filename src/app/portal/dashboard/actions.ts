@@ -28,7 +28,6 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
 
 export interface TenantPortalData {
   agreement: PortalAgreementWithRelations | null;
-  aiGeneratedAgreementText: string | null;
   error?: string;
 }
 
@@ -91,7 +90,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return { agreement: null, aiGeneratedAgreementText: null, error: "Your session is invalid or has expired. Please re-enter from the Mini App." };
+      return { agreement: null, error: "Your session is invalid or has expired. Please log in again." };
     }
 
     // Find the tenant record associated with the logged-in user's email or phone number
@@ -99,7 +98,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     
     if (!associatedTenant) {
         console.error(`Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`);
-        return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant profile. Please contact property management." };
+        return { agreement: null, error: "Your user account is not associated with any tenant profile. Please contact property management." };
     }
     console.log(`Portal Data: Found tenant '${associatedTenant.name}' for user '${currentUser.email}'.`);
     
@@ -168,53 +167,19 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     }
     
     if (!targetAgreement) {
-      return { agreement: null, aiGeneratedAgreementText: null, error: "You do not have an active rental agreement on file." };
+      return { agreement: null, error: "You do not have an active rental agreement on file." };
     }
-    
-    const agreementText = targetAgreement.agreementText;
     
     return {
       agreement: targetAgreement,
-      aiGeneratedAgreementText: agreementText,
       error: undefined,
     };
 
   } catch (error: any) {
     console.error("Error fetching tenant portal data:", error);
     return { 
-        agreement: null, 
-        aiGeneratedAgreementText: null, 
+        agreement: null,
         error: `Failed to fetch portal data: ${(error as Error).message}` 
     };
-  }
-}
-
-export interface SubmitPaymentProofInput {
-  billId: string;
-  paymentProofUrl: string; // Simulate URL, actual upload not handled
-  tenantPaymentNotes?: string;
-  paymentMethod: string;
-}
-
-export async function submitPaymentProofAction(input: SubmitPaymentProofInput) {
-  try {
-    const bill = await databaseService.getBillById(input.billId);
-    if (!bill) {
-      return { success: false, error: "Bill not found." };
-    }
-    if (bill.status === 'Paid') {
-      return { success: false, error: "This bill is already marked as paid." };
-    }
-
-    const updatedBill = await databaseService.updateBill(input.billId, {
-      status: 'PendingVerification',
-      paymentProofUrl: input.paymentProofUrl,
-      tenantPaymentNotes: input.tenantPaymentNotes,
-      paymentMethod: input.paymentMethod,
-    });
-    return { success: true, bill: updatedBill };
-  } catch (error: any) {
-    console.error("Error submitting payment proof:", error);
-    return { success: false, error: error.message || "Failed to submit payment proof." };
   }
 }

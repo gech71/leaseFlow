@@ -22,22 +22,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { submitPaymentProofAction } from './actions';
-import type { ClientAgreement, ClientBill, SerializedTenantPortalData, ClientPenaltyTier } from './page'; 
+import type { ClientAgreement, ClientBill, SerializedTenantPortalData, ClientPenaltyTier } from '../(app)/dashboard/page'; 
 import type { BillStatus } from '@prisma/client';
 import { jsPDF } from 'jspdf';
 
@@ -53,50 +38,19 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
 
-  const [displayBills, setDisplayBills] = useState<ClientBill[]>([]);
-  
-  const [payBillDialogOpen, setPayBillDialogOpen] = useState(false);
-  const [proofDialogOpen, setProofDialogOpen] = useState(false);
-  const [selectedBillForDialog, setSelectedBillForDialog] = useState<ClientBill | null>(null);
-  
-  const [paymentMethod, setPaymentMethod] = useState("Card");
-  const [paymentNotes, setPaymentNotes] = useState("");
-  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
-  const paymentProofFileInputRef = useRef<HTMLInputElement>(null);
-
-  const [isLoadingAction, setIsLoadingAction] = useState(false);
-
   useEffect(() => {
     setIsMounted(true);
     setToday(startOfDay(new Date()));
-    if (initialData) {
-      if (initialData.error) {
-        toast({
-          title: "Authentication Failed",
-          description: initialData.error,
-          variant: "destructive",
-        });
-      } else if (initialData.agreement) {
-        toast({
-          title: "Authentication Successful",
-          description: "Welcome to your tenant portal.",
-        });
-        setDisplayBills(initialData.agreement.bills.map(bill => ({
-          ...bill,
-          currentStatus: bill.status, 
-        })));
-      }
-    } else {
+    if (initialData?.error) {
         toast({
           title: "Error",
-          description: "Could not load portal data. Please try again.",
+          description: initialData.error,
           variant: "destructive",
         });
     }
   }, [initialData, toast]);
 
   const agreement = initialData?.agreement;
-  const aiGeneratedAgreementText = initialData?.aiGeneratedAgreementText;
 
   const handleDownloadAgreement = () => {
     if (!agreement || !agreement.agreementText) {
@@ -168,8 +122,8 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
 
   const processedBills = useMemo(() => {
     if (!agreement) return [];
-    return displayBills.map(bill => {
-      let currentStatus = bill.currentStatus || bill.status; 
+    return (agreement.bills || []).map(bill => {
+      let currentStatus = bill.status; 
       if (currentStatus === 'Pending' && isBefore(parseISO(bill.dueDate), today)) {
         currentStatus = 'Overdue';
       }
@@ -188,79 +142,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
         calculatedTotal: totalAmount,
       };
     }).sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime());
-  }, [displayBills, agreement, calculatePenaltyForTenant, today]);
-
-
-  const handleOpenPayDialog = (bill: ClientBill) => { setSelectedBillForDialog(bill); setPayBillDialogOpen(true); };
-  const handleOpenProofDialog = (bill: ClientBill) => { setSelectedBillForDialog(bill); setProofDialogOpen(true); };
-
-  const handleSimulatedPayment = async () => {
-    if (!selectedBillForDialog) return;
-    setIsLoadingAction(true);
-
-    const simulatedProofUrl = `card_payment_ref_${Date.now()}`;
-    const notes = `Simulated card payment.`;
-
-    const result = await submitPaymentProofAction({
-      billId: selectedBillForDialog.id,
-      paymentProofUrl: simulatedProofUrl,
-      tenantPaymentNotes: notes,
-      paymentMethod: "Card",
-    });
-    
-    setIsLoadingAction(false);
-
-    if (result.success && result.bill) {
-      setDisplayBills(prevBills => prevBills.map(b => 
-        b.id === selectedBillForDialog.id ? { ...b, currentStatus: 'PendingVerification', paymentProofUrl: simulatedProofUrl, tenantPaymentNotes: notes, paymentMethod: 'Card' } : b
-      ));
-      toast({ title: "Payment Submitted", description: `Payment for bill ${selectedBillForDialog.id} submitted for verification.` });
-      setPayBillDialogOpen(false);
-      setSelectedBillForDialog(null);
-      setPaymentMethod("Card"); 
-    } else {
-      toast({ title: "Payment Submission Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
-    }
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setPaymentProofFile(event.target.files[0]);
-    } else {
-      setPaymentProofFile(null);
-    }
-  };
-
-  const handleSubmitProof = async () => {
-    if (!selectedBillForDialog || !paymentProofFile) {
-      toast({ title: "Error", description: "Please select a bill and a proof file.", variant: "destructive" });
-      return;
-    }
-    setIsLoadingAction(true);
-    const simulatedProofUrl = `simulated_proofs/${selectedBillForDialog.id}/${paymentProofFile.name}`;
-    
-    const result = await submitPaymentProofAction({
-      billId: selectedBillForDialog.id,
-      paymentProofUrl: simulatedProofUrl,
-      tenantPaymentNotes: paymentNotes,
-      paymentMethod: paymentMethod,
-    });
-    setIsLoadingAction(false);
-
-    if (result.success && result.bill) {
-      setDisplayBills(prevBills => prevBills.map(b => 
-        b.id === selectedBillForDialog.id ? { ...b, currentStatus: 'PendingVerification', paymentProofUrl: simulatedProofUrl, tenantPaymentNotes: paymentNotes, paymentMethod: paymentMethod } : b
-      ));
-      toast({ title: "Proof Submitted", description: `Payment proof for bill ${selectedBillForDialog.id} submitted for verification.` });
-      setProofDialogOpen(false);
-      setSelectedBillForDialog(null);
-      setPaymentNotes("");
-      setPaymentProofFile(null);
-      if (paymentProofFileInputRef.current) paymentProofFileInputRef.current.value = "";
-    } else {
-      toast({ title: "Proof Submission Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
-    }
-  };
+  }, [agreement, calculatePenaltyForTenant, today]);
 
   const getStatusBadgeVariant = (status: BillStatus): "default" | "destructive" | "secondary" | "outline" => {
     switch (status) {
@@ -343,23 +225,6 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                 </Button>
             </CardFooter>
           </Card>
-
-          {aiGeneratedAgreementText && (
-            <Card className="shadow-lg">
-              <CardHeader><CardTitle className="font-headline text-xl flex items-center"><FileText className="mr-2 text-primary"/>Agreement Summary</CardTitle></CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[200px] w-full rounded-md border p-3 bg-secondary/30">
-                  <pre className="whitespace-pre-wrap text-xs font-mono leading-relaxed">{aiGeneratedAgreementText}</pre>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          )}
-          {initialData?.error && !aiGeneratedAgreementText && (
-             <Card className="shadow-sm bg-destructive/10">
-                <CardHeader><CardTitle className="text-sm text-destructive-foreground">Agreement Summary Error</CardTitle></CardHeader>
-                <CardContent><p className="text-xs text-destructive-foreground">{initialData.error}</p></CardContent>
-            </Card>
-          )}
         </div>
 
         <div className="lg:col-span-1 space-y-6">
@@ -369,50 +234,9 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
               {processedBills.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No bills found for this agreement yet.</p>
               ) : (
-                <>
-                {/* Mobile View */}
-                <div className="md:hidden space-y-4">
-                  {processedBills.map(bill => (
-                    <Card key={`mobile-${bill.id}`} className={`p-4 shadow-md ${bill.currentStatus === 'Overdue' ? 'border-destructive' : bill.currentStatus === 'PendingVerification' ? 'border-blue-500' : 'border-border'}`}>
-                      <div className="flex justify-between items-baseline">
-                        <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>
-                          {getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification', ' Ver.')}</span>
-                        </Badge>
-                        <span className="font-semibold text-xl text-primary">{bill.calculatedTotal?.toFixed(2)} Birr</span>
-                      </div>
-                      <div className="mt-2">
-                        <p className={`text-sm ${bill.currentStatus === 'Overdue' ? 'text-destructive font-semibold' : ''}`}>
-                          Due: {format(parseISO(bill.dueDate), 'PP')}
-                        </p>
-                        {bill.calculatedPenalty && bill.calculatedPenalty > 0 && (
-                          <p className="text-xs text-destructive">Penalty Applied: {bill.calculatedPenalty.toFixed(2)} Birr</p>
-                        )}
-                      </div>
-                      <div className="mt-3 pt-3 border-t">
-                        {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && (
-                          <Button size="sm" variant="default" onClick={() => handleOpenPayDialog(bill)} className="w-full text-xs h-9 px-3 bg-green-600 hover:bg-green-700" disabled={isLoadingAction}>Pay Now</Button>
-                        )}
-                        {bill.currentStatus === 'Paid' && (
-                          <div className="text-sm text-green-600 flex items-center justify-center w-full">
-                            <CheckCircle className="mr-2 h-4 w-4"/>
-                             Paid on {bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}
-                          </div>
-                        )}
-                        {bill.currentStatus === 'PendingVerification' && (
-                          <Button size="sm" variant="outline" className="text-xs h-9 px-3 w-full" disabled>
-                            <Clock className="mr-2 h-4 w-4"/>
-                            Verification in Progress
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-
-                {/* Desktop View */}
-                <div className="hidden md:block">
+                <div className="md:block">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Due Date</TableHead><TableHead>Total</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Due Date</TableHead><TableHead>Total</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {processedBills.map(bill => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
@@ -424,106 +248,16 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification',' Ver.')}</span></Badge>
                             {bill.calculatedPenalty && bill.calculatedPenalty > 0 && (<Popover><PopoverTrigger asChild><AlertTriangle className="h-3.5 w-3.5 text-destructive inline-block ml-1 cursor-help"/></PopoverTrigger><PopoverContent className="text-xs w-auto p-2" side="top">Penalty: {bill.calculatedPenalty.toFixed(2)} Birr</PopoverContent></Popover>)}
                           </TableCell>
-                          <TableCell className="p-2 text-right">
-                            {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && (
-                              <Button size="sm" variant="default" onClick={() => handleOpenPayDialog(bill)} className="text-xs h-7 px-2 bg-green-600 hover:bg-green-700" disabled={isLoadingAction}>Pay</Button>
-                            )}
-                            {bill.currentStatus === 'Paid' && (
-                              <span className="text-xs text-muted-foreground">Paid</span>
-                            )}
-                             {bill.currentStatus === 'PendingVerification' && (
-                              <Button size="sm" variant="outline" className="text-xs h-7 px-2" disabled>Verifying</Button>
-                            )}
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-                </>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
-      
-      <Dialog open={payBillDialogOpen} onOpenChange={(isOpen) => { setPayBillDialogOpen(isOpen); if(!isOpen) setSelectedBillForDialog(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-headline">Pay Bill (Simulated)</DialogTitle>
-            <DialogDescription>
-              Bill ID: {selectedBillForDialog?.id} <br/>
-              Amount Due: {processedBills.find(b=>b.id === selectedBillForDialog?.id)?.calculatedTotal?.toFixed(2)} Birr
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label htmlFor="paymentMethodDialog">Payment Method</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger id="paymentMethodDialog"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Card">Credit/Debit Card</SelectItem>
-                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="Wallet">Digital Wallet</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
-              <div className="text-sm p-3 bg-secondary/50 rounded-md border border-border">
-                <p className="font-semibold">Instructions for {paymentMethod}:</p>
-                {paymentMethod === "Bank Transfer" && (
-                  <>
-                    <p>Bank: LeaseFlow Central Bank</p>
-                    <p>Account: 123-456-7890</p>
-                    <p>Reference: Bill ID {selectedBillForDialog?.id}</p>
-                  </>
-                )}
-                {paymentMethod === "Wallet" && (
-                  <>
-                    <p>Wallet Provider: LFPay</p>
-                    <p>Recipient ID: tenant_payments@leaseflow.com</p>
-                    <p>Reference: Bill ID {selectedBillForDialog?.id}</p>
-                  </>
-                )}
-                <p className="mt-2">After payment, please click <strong>"Submit Proof"</strong> on the dashboard to upload your transaction receipt.</p>
-              </div>
-            )}
-            {paymentMethod === "Card" && (
-                 <p className="text-sm text-muted-foreground">This is a simulated payment. It will be submitted for verification by an administrator.</p>
-            )}
-
-          </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline" disabled={isLoadingAction}>Cancel</Button></DialogClose>
-            {paymentMethod === "Card" && (
-                <Button onClick={handleSimulatedPayment} disabled={isLoadingAction}>
-                    {isLoadingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Submit Card Payment
-                </Button>
-            )}
-             {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
-                <Button onClick={() => { setPayBillDialogOpen(false); if(selectedBillForDialog) handleOpenProofDialog(selectedBillForDialog); }} disabled={isLoadingAction}>
-                   Proceed to Submit Proof
-                </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={proofDialogOpen} onOpenChange={(isOpen) => { setProofDialogOpen(isOpen); if(!isOpen) {setSelectedBillForDialog(null); setPaymentProofFile(null); if(paymentProofFileInputRef.current) paymentProofFileInputRef.current.value = ""; setPaymentNotes(""); }}}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-headline">Submit Payment Proof</DialogTitle>
-            <DialogDescription>
-              For Bill ID: {selectedBillForDialog?.id} - Amount: {processedBills.find(b=>b.id === selectedBillForDialog?.id)?.calculatedTotal?.toFixed(2)} Birr
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div><Label htmlFor="paymentProofFile" className="flex items-center mb-1"><UploadCloud className="mr-2 h-4 w-4 text-primary"/>Upload Proof (e.g., bank slip)</Label><Input id="paymentProofFile" type="file" onChange={handleFileSelect} ref={paymentProofFileInputRef} className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"/>{paymentProofFile && <p className="text-xs text-muted-foreground mt-1">Selected: {paymentProofFile.name}</p>}</div>
-            <div><Label htmlFor="paymentNotes" className="flex items-center mb-1"><MessageSquare className="mr-2 h-4 w-4 text-primary"/>Notes (Optional)</Label><Textarea id="paymentNotes" placeholder="e.g., Paid via XYZ bank, ref #123" value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={2}/></div>
-          </div>
-          <DialogFooter><DialogClose asChild><Button variant="outline" disabled={isLoadingAction}>Cancel</Button></DialogClose><Button onClick={handleSubmitProof} disabled={!paymentProofFile || isLoadingAction}>{isLoadingAction && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Submit for Verification</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 
-
 import React, { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Loader2, User } from 'lucide-react';
@@ -61,7 +60,6 @@ export interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'up
 
 export interface SerializedTenantPortalData {
   agreement: ClientAgreement | null;
-  aiGeneratedAgreementText: string | null;
   error?: string;
 }
 
@@ -116,13 +114,11 @@ async function TenantPortalDataFetcher() {
   if (portalData.agreement) {
     serializedData = {
       agreement: serializeAgreementData(portalData.agreement),
-      aiGeneratedAgreementText: portalData.aiGeneratedAgreementText,
       error: portalData.error,
     };
   } else { // Handle cases where portalData.agreement is null (e.g., error or no active agreement)
     serializedData = {
         agreement: null,
-        aiGeneratedAgreementText: null,
         error: portalData.error || "No active agreement found or failed to load data.", // Provide a default error if none
     };
   }
