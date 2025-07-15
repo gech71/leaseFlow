@@ -49,7 +49,7 @@ export async function getBillingAmountForPhoneNumberAction(phone: string): Promi
     const bill = await prisma.bill.findFirst({
       where: {
         agreementId: activeAgreement.id,
-        status: { in: ['Pending', 'Overdue'] },
+        status: { in: ['Pending', 'Overdue', 'PendingVerification'] },
       },
       orderBy: {
         dueDate: 'desc',
