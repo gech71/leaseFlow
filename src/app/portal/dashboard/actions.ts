@@ -57,7 +57,7 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
 
 // Gets current user from the session cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const accessToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
 
     if (!accessToken) {
