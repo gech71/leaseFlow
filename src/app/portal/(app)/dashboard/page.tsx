@@ -1,11 +1,12 @@
 
+
 import React, { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Loader2, User } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma } from '@prisma/client';
 import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths } from 'date-fns';
-import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from './actions';
-import { CustomerDashboardClientPage } from './client-page'; // Import the new client component
+import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from '../../dashboard/actions';
+import { CustomerDashboardClientPage } from '../../dashboard/client-page'; // Import the new client component
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
