@@ -1,9 +1,7 @@
 
 import React, { Suspense } from 'react';
-import { PageHeader } from '@/components/custom/PageHeader';
-import { Loader2, User } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma } from '@prisma/client';
-import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths } from 'date-fns';
 import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from './actions';
 import { CustomerDashboardClientPage } from './client-page'; // Import the new client component
 
@@ -39,11 +37,9 @@ export interface ClientBill extends Omit<BillPrisma, 'createdAt' | 'updatedAt' |
   billDate: string;
   dueDate: string;
   paymentDate?: string | null;
-  utilityBreakdown: ClientUtilityBreakdownItem[]; // Use the simplified type
-  // For client-side processing:
-  currentStatus?: BillPrisma['status']; // This will be set/updated client-side
-  calculatedPenalty?: number | null; // Calculated client-side
-  calculatedTotal?: number; // Calculated client-side
+  utilityBreakdown: ClientUtilityBreakdownItem[]; 
+  status: BillPrisma['status'];
+  currentStatus?: BillPrisma['status']; 
 }
 
 export interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space' | 'bills'> {
@@ -60,7 +56,6 @@ export interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'up
 
 export interface SerializedTenantPortalData {
   agreement: ClientAgreement | null;
-  aiGeneratedAgreementText: string | null;
   error?: string;
 }
 
@@ -82,7 +77,7 @@ const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWit
       ...tenant,
       createdAt: tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
       updatedAt: tenant.updatedAt?.toISOString() || tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
-    } : ({} as ClientTenant), // Provide a default empty object if tenant is null
+    } : ({} as ClientTenant), 
     space: space ? {
       ...space,
       createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
@@ -92,8 +87,8 @@ const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWit
         createdAt: building.createdAt?.toISOString() || EPOCH_ISO_STRING,
         updatedAt: building.updatedAt?.toISOString() || building.createdAt?.toISOString() || EPOCH_ISO_STRING,
         penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt })) || [],
-      } : ({} as ClientBuilding), // Default empty object
-    } : ({} as ClientSpace), // Default empty object
+      } : ({} as ClientBuilding),
+    } : ({} as ClientSpace), 
     bills: (agreementWithParsedUtilities.bills || []).map(bill => ({
       ...bill,
       createdAt: bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
@@ -115,14 +110,12 @@ async function TenantPortalDataFetcher() {
   if (portalData.agreement) {
     serializedData = {
       agreement: serializeAgreementData(portalData.agreement),
-      aiGeneratedAgreementText: portalData.aiGeneratedAgreementText,
       error: portalData.error,
     };
-  } else { // Handle cases where portalData.agreement is null (e.g., error or no active agreement)
+  } else { 
     serializedData = {
         agreement: null,
-        aiGeneratedAgreementText: null,
-        error: portalData.error || "No active agreement found or failed to load data.", // Provide a default error if none
+        error: portalData.error || "No active agreement found or failed to load data.",
     };
   }
   

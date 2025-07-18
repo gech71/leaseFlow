@@ -3,7 +3,7 @@
 "use server";
 
 import { databaseService } from '@/lib/services/databaseService';
-import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, UtilityBreakdownItem as UtilityBreakdownItemPrisma, User, Role } from '@prisma/client';
+import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, User, Role } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns';
 import { cookies } from 'next/headers';
 
@@ -28,7 +28,6 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
 
 export interface TenantPortalData {
   agreement: PortalAgreementWithRelations | null;
-  aiGeneratedAgreementText: string | null;
   error?: string;
 }
 
@@ -71,15 +70,11 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
         console.error(`Portal Auth Error: Failed to decode session token or 'sub' claim is missing.`);
         return null;
     }
-    
-    console.log(`Portal Auth: Token from cookie decoded successfully for sub: ${tokenPayload.sub}. Fetching user from DB.`);
 
     const user = await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
 
     if (!user) {
         console.error(`Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local database.`);
-    } else {
-        console.log(`Portal Auth: Successfully found local user '${user.name}' for external ID '${tokenPayload.sub}'.`);
     }
 
     return user;
@@ -91,7 +86,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return { agreement: null, aiGeneratedAgreementText: null, error: "Your session is invalid or has expired. Please re-enter from the Mini App." };
+      return { agreement: null, error: "Your session is invalid or has expired. Please re-enter from the Mini App or login page." };
     }
 
     // Find the tenant record associated with the logged-in user's email or phone number
@@ -99,9 +94,8 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     
     if (!associatedTenant) {
         console.error(`Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`);
-        return { agreement: null, aiGeneratedAgreementText: null, error: "Your user account is not associated with any tenant profile. Please contact property management." };
+        return { agreement: null, error: "Your user account is not associated with any tenant profile. Please contact property management." };
     }
-    console.log(`Portal Data: Found tenant '${associatedTenant.name}' for user '${currentUser.email}'.`);
     
     const allAgreementsRaw = await databaseService.getAllAgreements({
       where: { tenantId: associatedTenant.id },
@@ -157,7 +151,6 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       return { ...ag, bills: processedBills };
     });
 
-
     let targetAgreement: PortalAgreementWithRelations | null = null;
     for (const ag of processedAgreements) { 
         const agreementEndDate = addMonths(new Date(ag.startDate), ag.paymentTermMonths);
@@ -168,14 +161,11 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     }
     
     if (!targetAgreement) {
-      return { agreement: null, aiGeneratedAgreementText: null, error: "You do not have an active rental agreement on file." };
+      targetAgreement = processedAgreements[processedAgreements.length - 1] as PortalAgreementWithRelations || null;
     }
-    
-    const agreementText = targetAgreement.agreementText;
     
     return {
       agreement: targetAgreement,
-      aiGeneratedAgreementText: agreementText,
       error: undefined,
     };
 
@@ -183,38 +173,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     console.error("Error fetching tenant portal data:", error);
     return { 
         agreement: null, 
-        aiGeneratedAgreementText: null, 
         error: `Failed to fetch portal data: ${(error as Error).message}` 
     };
-  }
-}
-
-export interface SubmitPaymentProofInput {
-  billId: string;
-  paymentProofUrl: string; // Simulate URL, actual upload not handled
-  tenantPaymentNotes?: string;
-  paymentMethod: string;
-}
-
-export async function submitPaymentProofAction(input: SubmitPaymentProofInput) {
-  try {
-    const bill = await databaseService.getBillById(input.billId);
-    if (!bill) {
-      return { success: false, error: "Bill not found." };
-    }
-    if (bill.status === 'Paid') {
-      return { success: false, error: "This bill is already marked as paid." };
-    }
-
-    const updatedBill = await databaseService.updateBill(input.billId, {
-      status: 'PendingVerification',
-      paymentProofUrl: input.paymentProofUrl,
-      tenantPaymentNotes: input.tenantPaymentNotes,
-      paymentMethod: input.paymentMethod,
-    });
-    return { success: true, bill: updatedBill };
-  } catch (error: any) {
-    console.error("Error submitting payment proof:", error);
-    return { success: false, error: error.message || "Failed to submit payment proof." };
   }
 }
