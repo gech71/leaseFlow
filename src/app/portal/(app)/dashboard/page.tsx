@@ -1,63 +1,12 @@
 
+
 import React, { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma } from '@prisma/client';
-import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from './actions';
-import { CustomerDashboardClientPage } from './client-page'; // Import the new client component
+import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from '../../dashboard/actions';
+import { CustomerDashboardClientPage, type ClientAgreement, type ClientBill, type SerializedTenantPortalData, type ClientPenaltyTier, type ClientBuilding, type ClientSpace, type ClientTenant, type ClientUtilityBreakdownItem } from '../../dashboard/client-page'; // Import from sibling folder
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
-
-// Serialized types for props passed to Client Component (Dates are strings)
-export interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id'> { id?: string; }
-export interface ClientBuilding extends Omit<BuildingPrisma, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers'> {
-  createdAt: string;
-  updatedAt: string;
-  penaltyPolicyTiers: ClientPenaltyTier[];
-}
-export interface ClientSpace extends Omit<SpacePrisma, 'createdAt' | 'updatedAt' | 'building'> {
-  createdAt: string;
-  updatedAt: string;
-  building: ClientBuilding;
-}
-export interface ClientTenant extends Omit<TenantPrisma, 'createdAt' | 'updatedAt'> {
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Simplified utility breakdown item type for client-side
-export interface ClientUtilityBreakdownItem {
-  id?: string;
-  name: string;
-  amount: number;
-}
-
-export interface ClientBill extends Omit<BillPrisma, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'utilityBreakdown'> {
-  createdAt: string;
-  updatedAt: string;
-  billDate: string;
-  dueDate: string;
-  paymentDate?: string | null;
-  utilityBreakdown: ClientUtilityBreakdownItem[]; 
-  status: BillPrisma['status'];
-  currentStatus?: BillPrisma['status']; 
-}
-
-export interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space' | 'bills'> {
-  createdAt: string;
-  updatedAt: string;
-  startDate: string;
-  nextPaymentDueDate: string;
-  initialPaymentDate?: string | null;
-  endDate?: string | null; 
-  tenant: ClientTenant;
-  space: ClientSpace;
-  bills: ClientBill[];
-}
-
-export interface SerializedTenantPortalData {
-  agreement: ClientAgreement | null;
-  error?: string;
-}
 
 // Helper function to serialize a single agreement with deep relations
 const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWithRelations): ClientAgreement => {
