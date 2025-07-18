@@ -6,34 +6,40 @@ const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
 
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
 const ADMIN_LOGIN_PATH = '/auth/login';
+const PORTAL_DASHBOARD_PATH = '/portal/dashboard';
+const PORTAL_LOGIN_PATH = '/portal/login';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Read tokens from cookies
   const adminToken = request.cookies.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+  const portalToken = request.cookies.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
 
   const publicApiPaths = [
     '/api/auth/login', // Admin login
+    '/api/auth/portal/login', // Portal login
     '/api/auth/logout', // Admin logout
     '/api/auth/portal/logout', // Portal logout
-    '/api/portal/validate-token', // Public validation endpoint for the connect page
+    '/api/portal/validate-token',
   ];
 
   if (publicApiPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
-  // Handle portal paths. The entry point is /portal/connect, which expects a header.
-  // Other portal pages rely on the cookie set by the connect page.
-  if (pathname.startsWith('/portal') && pathname !== '/portal/connect') {
-      const portalToken = request.cookies.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
-      if(!portalToken) {
-          // If no session cookie, they must re-enter through the connect flow.
-          // We can show an error or simply let the page handle it.
-          // For now, let the page handle it as it will fail to fetch data.
-      }
+  // Handle portal paths
+  if (pathname.startsWith('/portal')) {
+    // If trying to access login page but already logged in, redirect to dashboard
+    if (pathname === PORTAL_LOGIN_PATH && portalToken) {
+      return NextResponse.redirect(new URL(PORTAL_DASHBOARD_PATH, request.url));
+    }
+    // If accessing a protected portal page without a token, redirect to login
+    if (!portalToken && pathname.startsWith(PORTAL_DASHBOARD_PATH)) {
+      return NextResponse.redirect(new URL(PORTAL_LOGIN_PATH, request.url));
+    }
   }
+
 
   // Handle admin paths
   if (pathname.startsWith('/admin') || pathname === ADMIN_LOGIN_PATH) {
@@ -45,7 +51,6 @@ export function middleware(request: NextRequest) {
     if (!adminToken && pathname !== ADMIN_LOGIN_PATH) {
       return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
     }
-    return NextResponse.next();
   }
 
   // Handle root path
