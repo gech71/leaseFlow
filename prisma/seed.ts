@@ -1,36 +1,27 @@
 
 import { PrismaClient, Prisma } from '@prisma/client';
-import { addMonths, formatISO, subDays, parseISO } from 'date-fns';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Starting seeding process...');
 
-  // 1. Clear existing data
+  // 1. Clear existing data in a safe order
   console.log('Clearing existing data...');
   try {
-    await prisma.user.deleteMany({}); 
-    console.log('Deleted Users');
-    await prisma.role.deleteMany({}); 
-    console.log('Deleted Roles');
-
+    // Clear models with relations first
     await prisma.bill.deleteMany({});
     console.log('Deleted Bills');
-
     await prisma.agreement.deleteMany({});
     console.log('Deleted Agreements');
-    
     await prisma.buildingUtilityItem.deleteMany({});
     console.log('Deleted BuildingUtilityItems');
-
     await prisma.buildingMonthlyUtilities.deleteMany({});
     console.log('Deleted BuildingMonthlyUtilities');
-
     await prisma.penaltyTier.deleteMany({});
     console.log('Deleted PenaltyTiers');
 
-    // Clear tenant link from Spaces and set isOccupied to false
+    // Clear tenant links from Spaces before deleting tenants
     const spacesWithTenants = await prisma.space.findMany({
       where: { tenantId: { not: null } },
       select: { id: true }
@@ -44,24 +35,30 @@ async function main() {
         }
       });
     }
-    console.log('Cleared tenant links from Spaces and set isOccupied to false.');
-
+    console.log('Cleared tenant links from Spaces.');
+    
+    // Now delete models that were referenced
     await prisma.tenant.deleteMany({});
     console.log('Deleted Tenants');
     await prisma.space.deleteMany({});
     console.log('Deleted Spaces');
-
     await prisma.building.deleteMany({}); 
     console.log('Deleted Buildings');
-
+    
+    // Finally, clear user and role data
+    await prisma.user.deleteMany({}); 
+    console.log('Deleted Users');
+    await prisma.role.deleteMany({}); 
+    console.log('Deleted Roles');
+    
     console.log('Finished clearing data.');
   } catch (e: any) {
     console.error('Error during data clearing:', e);
     throw e;
   }
 
-  // 2. Create Roles
-  console.log('Creating Roles...');
+  // 2. Create the essential SUPER_ADMIN Role
+  console.log('Creating SUPER_ADMIN Role...');
   const superAdminRole = await prisma.role.create({
     data: {
       name: 'SUPER_ADMIN',
@@ -82,73 +79,15 @@ async function main() {
       ],
     },
   });
-  const propertyManagerRole = await prisma.role.create({
-    data: {
-      name: 'PROPERTY_MANAGER',
-      description: 'Manages assigned properties, tenants, and related operations.',
-      permissions: [
-        'dashboard:view',
-        'building:view', 'building:edit',
-        'space:view', 'space:create', 'space:edit',
-        'tenant:view', 'tenant:create', 'tenant:edit',
-        'agreement:view', 'agreement:create', 'agreement:edit',
-        'building_utility:view', 'building_utility:save',
-        'billing:view', 'billing:generate',
-        'payment_overview:view',
-        'portal:view'
-      ],
-    },
-  });
-  const accountantRole = await prisma.role.create({
-    data: {
-        name: 'ACCOUNTANT',
-        description: 'Manages financial records, billing, and payments.',
-        permissions: [
-          'dashboard:view',
-          'billing:view', 'billing:manage_payments',
-          'agreement:view', 
-          'tenant:view',
-          'payment_overview:view'
-        ],
-    }
-  });
-  const supportStaffRole = await prisma.role.create({
-    data: {
-      name: 'SUPPORT_STAFF',
-      description: 'Assists users and views data with limited modification rights.',
-      permissions: [
-        'dashboard:view',
-        'building:view', 
-        'space:view', 
-        'tenant:view', 
-        'agreement:view', 
-        'billing:view',
-        'payment_overview:view'
-      ],
-    },
-  });
-  const tenantRole = await prisma.role.create({
-    data: {
-      name: 'TENANT',
-      description: 'Access to the tenant portal to view lease and billing information.',
-      permissions: ['portal:view'],
-    },
-  });
-  console.log(`Created Roles: ${superAdminRole.name}, ${propertyManagerRole.name}, ${accountantRole.name}, ${supportStaffRole.name}, ${tenantRole.name}`);
+  console.log(`Created Role: ${superAdminRole.name}`);
 
-
-  // 3. Create Users and assign roles
-  console.log('Creating Users...');
-  const user1 = await prisma.user.create({
+  // 3. Create the default Super Admin User
+  console.log('Creating Super Admin User...');
+  const superAdminUser = await prisma.user.create({
     data: {
       // IMPORTANT: This 'userId' MUST match the 'sub' (subject) claim from the JWT issued by your external authentication provider.
       //
-      // WHY YOU MIGHT SEE A "USER NOT FOUND" ERROR:
-      // When you log in, the auth service gives you a token. This application reads the user ID from that token.
-      // If the ID in the token does not exactly match a 'userId' in this database table, you will get a "User not found" error.
-      // This is the most common setup issue.
-      //
-      // HOW TO FIX IT:
+      // HOW TO FIX A "USER NOT FOUND" ERROR:
       // 1. Log in to your application.
       // 2. Your auth provider will give your app a JWT access token.
       // 3. Decode this JWT (you can use online tools like jwt.io).
@@ -164,387 +103,9 @@ async function main() {
       roles: { connect: { id: superAdminRole.id } },
     },
   });
-  const user2 = await prisma.user.create({
-    data: {
-      userId: 'default-property-manager-user-id',
-      email: 'manager.user@leaseflow.com',
-      name: 'Property Manager User',
-      firstName: 'Manager',
-      lastName: 'User',
-      phoneNumber: '0911111111',
-      roles: { connect: { id: propertyManagerRole.id } },
-    },
-  });
-   const user3 = await prisma.user.create({
-    data: {
-      userId: 'default-support-staff-user-id',
-      email: 'support.staff@leaseflow.com',
-      name: 'Support Staff User',
-      firstName: 'Support',
-      lastName: 'Staff',
-      phoneNumber: '0922222222',
-      roles: { connect: { id: supportStaffRole.id } },
-    },
-  });
-   const user4 = await prisma.user.create({
-    data: {
-      userId: 'default-accountant-user-id',
-      email: 'accountant.user@leaseflow.com',
-      name: 'Accountant User',
-      firstName: 'Accy',
-      lastName: 'User',
-      phoneNumber: '0933333333',
-      roles: { connect: { id: accountantRole.id } },
-    },
-  });
-  
-  // Note: For a tenant to log into the portal, a corresponding User must be created
-  // with an email and/or phone number that matches the Tenant record.
-  // The password for this user would be managed by your external identity provider.
-  // The example below links a User record to the 'Alice Wonderland' Tenant record.
-  // To log in as this tenant, you would need to register a user with the email 
-  // 'alice@example.com' and a chosen password in your identity system.
-  const tenantUser1 = await prisma.user.create({
-    data: {
-      userId: 'default-tenant-user-id', // Example external ID. Update this with the real one from your auth provider.
-      email: 'alice@example.com', // This MUST MATCH the tenant's email to link them
-      name: 'Alice Wonderland',
-      firstName: 'Alice',
-      lastName: 'Wonderland',
-      phoneNumber: '0901010101', // This can also be used for matching
-      roles: { connect: { id: tenantRole.id } },
-    },
-  });
-  
-  console.log(`Created Users: ${user1.email}, ${user2.email}, ${user3.email}, ${user4.email}, ${tenantUser1.email} (Tenant)`);
+  console.log(`Created Super Admin User: ${superAdminUser.email}`);
 
-
-  // 4. Create Buildings with Penalty Tiers and assign managers
-  console.log('Creating Buildings...');
-  const building1 = await prisma.building.create({
-    data: {
-      name: 'Sunrise Tower',
-      address: '123 Sunrise Ave, Metro City',
-      managedByUserId: user1.userId, 
-      penaltyPolicyTiers: {
-        create: [
-          { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 50, scope: 'Building' },
-          { fromDay: 6, toDay: 10, feeType: 'Fixed', feeValue: 100, scope: 'Building' },
-          { fromDay: 11, toDay: null, feeType: 'Percentage', feeValue: 2.5, scope: 'Building' },
-        ],
-      },
-    },
-  });
-
-  const building2 = await prisma.building.create({
-    data: {
-      name: 'Ocean View Plaza',
-      address: '456 Ocean Dr, Pacifica',
-      managedByUserId: user2.userId, 
-      penaltyPolicyTiers: {
-        create: [
-          { fromDay: 1, toDay: 3, feeType: 'Percentage', feeValue: 1, scope: 'Building' },
-          { fromDay: 4, toDay: 7, feeType: 'Percentage', feeValue: 3, scope: 'Building' },
-          { fromDay: 1, toDay: 5, feeType: 'Fixed', feeValue: 20, scope: 'Floor', applicableFloor: 'Penthouse' },
-          { fromDay: 6, toDay: null, feeType: 'Fixed', feeValue: 40, scope: 'Floor', applicableFloor: 'Penthouse' },
-        ],
-      },
-    },
-  });
-  
-  const building3 = await prisma.building.create({ 
-    data: {
-        name: 'Tech Park One',
-        address: '789 Innovation Rd, Silicon Valley',
-        managedByUserId: user1.userId,
-    }
-  });
-  console.log(`Created Buildings: ${building1.name}, ${building2.name}, ${building3.name}`);
-
-  // 5. Create Tenants
-  console.log('Creating Tenants...');
-  const tenant1 = await prisma.tenant.create({
-    data: {
-      name: 'Alice Wonderland',
-      email: 'alice@example.com',
-      phone: '0901010101',
-      nationalId: 'AW12345X',
-      representativeName: 'Cheshire Cat',
-      representativePhone: '0901999999',
-    },
-  });
-
-  const tenant2 = await prisma.tenant.create({
-    data: {
-      name: 'Bob The Builder',
-      email: 'bob@example.com',
-      phone: '0902020202',
-    },
-  });
-
-  const tenant3 = await prisma.tenant.create({
-    data: {
-      name: 'Carol Danvers',
-      email: 'carol@example.com',
-      phone: '0903030303',
-      nationalId: 'CD98765Z',
-    },
-  });
-  console.log(`Created Tenants: ${tenant1.name}, ${tenant2.name}, ${tenant3.name}`);
-
-  // 6. Create Spaces (linking to Buildings and some to Tenants)
-  console.log('Creating Spaces...');
-  const space1_B1 = await prisma.space.create({ 
-    data: {
-      buildingId: building1.id,
-      buildingName: building1.name,
-      spaceIdName: 'Unit 101',
-      area: 1200,
-      floor: '10th',
-      utilityProrationShare: 0.15,
-      monthlyRentalPrice: 2500,
-      isOccupied: true,
-      tenantId: tenant1.id, 
-    },
-  });
-
-  const space2_B1 = await prisma.space.create({ 
-    data: {
-      buildingId: building1.id,
-      buildingName: building1.name,
-      spaceIdName: 'Unit 102',
-      area: 900,
-      floor: '10th',
-      utilityProrationShare: 0.10,
-      monthlyRentalPrice: 1800,
-      isOccupied: false,
-    },
-  });
-
-  const space1_B2 = await prisma.space.create({ 
-    data: {
-      buildingId: building2.id,
-      buildingName: building2.name,
-      spaceIdName: 'Suite 20A',
-      area: 800,
-      floor: '2nd',
-      utilityProrationShare: 0.20,
-      monthlyRentalPrice: 1950,
-      isOccupied: true,
-      tenantId: tenant2.id, 
-    },
-  });
-
-  const space2_B2 = await prisma.space.create({ 
-    data: {
-        buildingId: building2.id,
-        buildingName: building2.name,
-        spaceIdName: 'Penthouse Suite',
-        area: 2500,
-        floor: 'Penthouse',
-        utilityProrationShare: 0.40,
-        monthlyRentalPrice: 5500,
-        isOccupied: true,
-        tenantId: tenant3.id, 
-    }
-  });
-  
-  const space1_B3 = await prisma.space.create({ 
-    data: {
-        buildingId: building3.id,
-        buildingName: building3.name,
-        spaceIdName: 'Lab A1',
-        area: 1500,
-        floor: '1st',
-        utilityProrationShare: 0.30,
-        monthlyRentalPrice: 3200,
-        isOccupied: false,
-    }
-  });
-  console.log('Created Spaces and linked occupied ones to tenants via tenantId on Space.');
-
-
-  // 7. Create Agreements
-  console.log('Creating Agreements...');
-  const agreement1_startDate_obj = subDays(new Date(), 60);
-  const agreement1 = await prisma.agreement.create({ 
-    data: {
-      tenantId: tenant1.id,
-      spaceId: space1_B1.id,
-      agreementText: 'Standard Rental Agreement for Alice Wonderland...',
-      startDate: agreement1_startDate_obj, 
-      monthlyRentalPrice: space1_B1.monthlyRentalPrice,
-      paymentTermMonths: 12,
-      initialPaymentMonths: 1,
-      nextPaymentDueDate: addMonths(agreement1_startDate_obj, 1), 
-      initialPaymentAmount: space1_B1.monthlyRentalPrice * 1,
-      initialPaymentMethod: 'Bank Transfer',
-      initialPaymentBankOrWalletName: 'Metro Bank',
-      initialPaymentReference: 'INITPAY001',
-      initialPaymentDate: agreement1_startDate_obj,
-    },
-  });
-
-  const agreement2_startDate_obj = subDays(new Date(), 30);
-  const agreement2 = await prisma.agreement.create({ 
-    data: {
-      tenantId: tenant2.id,
-      spaceId: space1_B2.id,
-      agreementText: 'Standard Rental Agreement for Bob The Builder...',
-      startDate: agreement2_startDate_obj, 
-      monthlyRentalPrice: space1_B2.monthlyRentalPrice,
-      paymentTermMonths: 6,
-      initialPaymentMonths: 2,
-      nextPaymentDueDate: addMonths(agreement2_startDate_obj, 2), 
-      initialPaymentAmount: space1_B2.monthlyRentalPrice * 2,
-      initialPaymentMethod: 'Credit Card',
-      initialPaymentReference: 'INITPAY002',
-      initialPaymentDate: agreement2_startDate_obj,
-    },
-  });
-  
-  const agreement3_startDate_obj = new Date();
-  const agreement3 = await prisma.agreement.create({ 
-    data: {
-        tenantId: tenant3.id,
-        spaceId: space2_B2.id,
-        agreementText: 'Premium Rental Agreement for Carol Danvers...',
-        startDate: agreement3_startDate_obj, 
-        monthlyRentalPrice: space2_B2.monthlyRentalPrice,
-        paymentTermMonths: 24,
-        initialPaymentMonths: 3,
-        nextPaymentDueDate: addMonths(agreement3_startDate_obj, 3), 
-        additionalTerms: "Access to rooftop pool and gym included. Bi-weekly cleaning service.",
-        initialPaymentAmount: space2_B2.monthlyRentalPrice * 3,
-        initialPaymentMethod: 'Wallet',
-        initialPaymentBankOrWalletName: 'StarPay',
-        initialPaymentReference: 'INITPAY003',
-        initialPaymentDate: agreement3_startDate_obj,
-    }
-  });
-  console.log(`Created Agreements: ${agreement1.id}, ${agreement2.id}, ${agreement3.id}`);
-
-  // 8. Create Bills (with nested UtilityBreakdownItems)
-  console.log('Creating Bills...');
-  const bill1_billDate = addMonths(agreement1.startDate, 1); 
-  await prisma.bill.create({
-    data: {
-      agreementId: agreement1.id,
-      tenantId: tenant1.id,
-      billDate: bill1_billDate,
-      dueDate: addMonths(bill1_billDate, 0, {days: 14}), 
-      rentAmount: agreement1.monthlyRentalPrice,
-      utilityBreakdown: [ 
-          { name: 'Electricity', amount: 50 },
-          { name: 'Water', amount: 20 },
-      ],
-      totalAmount: agreement1.monthlyRentalPrice + 50 + 20, 
-      status: 'Paid',
-      paymentDate: addMonths(bill1_billDate, 0, {days: 10}),
-      paymentMethod: 'Bank Transfer',
-      paymentReference: 'BILLPAY001',
-      bankOrWalletName: 'Metro Bank',
-    },
-  });
-
-  const bill2_billDate = addMonths(agreement1.startDate, 2);
-  await prisma.bill.create({
-    data: {
-      agreementId: agreement1.id,
-      tenantId: tenant1.id,
-      billDate: bill2_billDate,
-      dueDate: addMonths(bill2_billDate, 0, {days: 14}),
-      rentAmount: agreement1.monthlyRentalPrice,
-      utilityBreakdown: [
-          { name: 'Electricity', amount: 55 },
-          { name: 'Water', amount: 22 },
-      ],
-      totalAmount: agreement1.monthlyRentalPrice + 55 + 22, 
-      status: 'Pending',
-    },
-  });
-  
-  const bill3_billDate = addMonths(agreement2.startDate, 2); 
-  const bobBillDueDate = addMonths(bill3_billDate, 0, {days: 5}); 
-  await prisma.bill.create({
-    data: {
-      agreementId: agreement2.id,
-      tenantId: tenant2.id,
-      billDate: bill3_billDate, 
-      dueDate: bobBillDueDate,
-      rentAmount: agreement2.monthlyRentalPrice,
-      utilityBreakdown: [ 
-          { name: 'Common Area Maintenance', amount: 100 },
-      ],
-      totalAmount: agreement2.monthlyRentalPrice + 100, 
-      status: 'Overdue', 
-    },
-  });
-  
-  const bill4_billDate = addMonths(agreement3.startDate, 3); 
-  await prisma.bill.create({
-    data: {
-      agreementId: agreement3.id,
-      tenantId: tenant3.id,
-      billDate: bill4_billDate, 
-      dueDate: addMonths(bill4_billDate, 0, {days: 14}),
-      rentAmount: agreement3.monthlyRentalPrice,
-      utilityBreakdown: [ 
-          { name: 'Premium Internet', amount: 150 },
-          { name: 'Valet Parking', amount: 75 },
-      ],
-      totalAmount: agreement3.monthlyRentalPrice + 150 + 75, 
-      status: 'Pending',
-    },
-  });
-  console.log('Created Bills.');
-
-  // 9. Create BuildingMonthlyUtilities (with nested BuildingUtilityItems)
-  console.log('Creating BuildingMonthlyUtilities...');
-  const todayDate = new Date();
-  const lastMonthDate = subDays(todayDate, todayDate.getDate()); 
-  const lastMonth = lastMonthDate.getMonth(); 
-  const lastMonthYear = lastMonthDate.getFullYear();
-
-  await prisma.buildingMonthlyUtilities.create({
-    data: {
-      buildingId: building1.id,
-      buildingName: building1.name, 
-      year: lastMonthYear,
-      month: lastMonth, 
-      utilities: {
-        create: [
-          { name: 'Building Electricity', totalCost: 1200, appliesToScope: 'Building' },
-          { name: 'Building Water', totalCost: 800, appliesToScope: 'Building' },
-          { name: '10th Floor Cleaning', totalCost: 300, appliesToScope: 'Floor', applicableFloor: '10th' },
-        ],
-      },
-    },
-  });
-
-  await prisma.buildingMonthlyUtilities.create({
-    data: {
-      buildingId: building2.id,
-      buildingName: building2.name, 
-      year: lastMonthYear,
-      month: lastMonth,
-      utilities: {
-        create: [
-          { name: 'General Building Maintenance', totalCost: 1500, appliesToScope: 'Building' },
-          // Changed to create one item per specific space
-          { 
-            name: 'Penthouse Landscaping', 
-            totalCost: 250, 
-            appliesToScope: 'SpecificSpaces', 
-            applicableSpaceIdNames: ['Penthouse Suite'] 
-          },
-        ],
-      },
-    },
-  });
-  console.log('Created BuildingMonthlyUtilities.');
-
-  console.log('Seeding finished successfully!');
+  console.log('Seeding finished successfully! Only the SUPER_ADMIN role and user were created.');
 }
 
 main()
