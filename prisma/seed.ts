@@ -57,7 +57,7 @@ async function main() {
     throw e;
   }
 
-  // 2. Create the essential SUPER_ADMIN Role
+  // 2. Create the essential Roles
   console.log('Creating SUPER_ADMIN Role...');
   const superAdminRole = await prisma.role.create({
     data: {
@@ -81,31 +81,49 @@ async function main() {
   });
   console.log(`Created Role: ${superAdminRole.name}`);
 
+  console.log('Creating TENANT Role...');
+  const tenantRole = await prisma.role.create({
+    data: {
+      name: 'TENANT',
+      description: 'Access to the tenant portal.',
+      permissions: ['portal:view'],
+    },
+  });
+  console.log(`Created Role: ${tenantRole.name}`);
+
+
   // 3. Create the default Super Admin User
   console.log('Creating Super Admin User...');
   const superAdminUser = await prisma.user.create({
     data: {
-      // IMPORTANT: This 'userId' MUST match the 'sub' (subject) claim from the JWT issued by your external authentication provider.
+      // ----------------- IMPORTANT! HOW TO FIX "USER NOT FOUND" ERROR -----------------
+      // This 'userId' MUST exactly match the 'sub' (subject) claim from the JWT 
+      // issued by your external authentication provider for your Super Admin account.
       //
-      // HOW TO FIX A "USER NOT FOUND" ERROR:
+      // To get the correct ID:
       // 1. Log in to your application.
-      // 2. Your auth provider will give your app a JWT access token.
-      // 3. Decode this JWT (you can use online tools like jwt.io).
-      // 4. Find the 'sub' claim in the decoded payload. That is your user ID.
-      // 5. Replace the value below with the actual user ID from your token.
-      // 6. Rerun the database seed command (`npm run prisma:seed`).
-      userId: 'fda67c29-7753-4a81-bb1c-b25a63b29bc7',
+      // 2. The login will fail, but your auth provider has issued a JWT access token.
+      // 3. Open your browser's Developer Tools (F12 or Ctrl+Shift+I).
+      // 4. Go to the "Application" or "Storage" tab.
+      // 5. Look for "Cookies" and find the cookie for your application's URL.
+      // 6. Find the 'leaseflow_admin_access_token' cookie and copy its value.
+      // 7. Go to an online JWT decoder like https://jwt.io.
+      // 8. Paste the token value into the decoder.
+      // 9. In the "Decoded" payload section, find the 'sub' claim. Its value is your User ID.
+      // 10. Copy that 'sub' value and paste it here, replacing the placeholder below.
+      // 11. Save this file and rerun the database seed command (`npm run prisma:seed`).
+      userId: 'fda67c29-7753-4a81-bb1c-b25a63b29bc7', // <-- REPLACE THIS VALUE
       email: 'superadmin@leaseflow.com',
       name: 'Default Super Admin',
       firstName: 'Default',
       lastName: 'SuperAdmin',
-      phoneNumber: '0912345678', // The login credential used with the auth service.
+      phoneNumber: '0912345678',
       roles: { connect: { id: superAdminRole.id } },
     },
   });
   console.log(`Created Super Admin User: ${superAdminUser.email}`);
 
-  console.log('Seeding finished successfully! Only the SUPER_ADMIN role and user were created.');
+  console.log('Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user.');
 }
 
 main()

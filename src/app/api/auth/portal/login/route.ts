@@ -72,9 +72,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isSuccess: false, errors: ["User not found in system."] }, { status: 403 });
     }
     
+    // Ensure the user has the TENANT role to log into the portal.
     const isTenant = localUser.roles.some(role => role.name === 'TENANT');
     if (!isTenant) {
-      return NextResponse.json({ isSuccess: false, errors: ["This login is for tenants only."] }, { status: 403 });
+      return NextResponse.json({ isSuccess: false, errors: ["This login is for tenants only. Please use the admin login for other roles."] }, { status: 403 });
     }
 
     const cookieStore = cookies();

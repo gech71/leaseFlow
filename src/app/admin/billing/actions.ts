@@ -374,10 +374,14 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     // Determine if rent should be charged based on upfront payment
     const agreementStartDate = agreement.startDate;
     const firstChargeableRentDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
-
-
+    
+    // FIX: The very first bill (whose due date matches the agreement start date) should include rent,
+    // as it represents the first payment (often handled at signing). Subsequent bills within the
+    // initial payment period will have zero rent.
     let rentAmount = agreement.monthlyRentalPrice;
-    if (agreement.initialPaymentMonths > 0 && !isAfter(targetBillDate, firstChargeableRentDueDate) && !isSameDay(targetBillDate, firstChargeableRentDueDate)) {
+    const isFirstBill = isSameDay(targetBillDate, agreementStartDate);
+
+    if (!isFirstBill && agreement.initialPaymentMonths > 0 && !isAfter(targetBillDate, firstChargeableRentDueDate) && !isSameDay(targetBillDate, firstChargeableRentDueDate)) {
         rentAmount = 0;
     }
     
