@@ -129,12 +129,11 @@ export async function POST(request: NextRequest) {
           });
       });
       
-      if (effectivePermissions.size === 1 && effectivePermissions.has('portal:view')) {
-          return NextResponse.json({ isSuccess: false, errors: ["This account is for the tenant portal. Please use the tenant login page."] }, { status: 403 });
-      }
-      
-      if (effectivePermissions.size === 0) {
-          return NextResponse.json({ isSuccess: false, errors: ["Your account does not have any permissions assigned. Please contact an administrator."] }, { status: 403 });
+      const isTenantOnly = effectivePermissions.size === 1 && effectivePermissions.has('portal:view');
+      const hasAdminPermissions = effectivePermissions.size > 0 && !isTenantOnly;
+
+      if (!hasAdminPermissions) {
+           return NextResponse.json({ isSuccess: false, errors: ["This account does not have sufficient permissions for the admin panel. Please use the tenant login if you are a tenant."] }, { status: 403 });
       }
       
       const cookieStore = await cookies();
