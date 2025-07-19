@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     const localUser = await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
 
     if (!localUser) {
-      return NextResponse.json({ isSuccess: false, errors: ["User not found in system."] }, { status: 403 });
+      return NextResponse.json({ isSuccess: false, errors: ["Your account is not recognized by this system. Please contact support."] }, { status: 403 });
     }
     
     // Ensure the user has the TENANT role to log into the portal.
