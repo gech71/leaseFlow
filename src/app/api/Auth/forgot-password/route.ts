@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Assuming the external API returns { isSuccess: true, token: "..." }
+    // This endpoint now directly returns the token to the client.
     return NextResponse.json(responseData);
 
   } catch (error: any) {
@@ -46,5 +47,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["An unexpected error occurred during the forgot password process."] }, { status: 500 });
   }
 }
-
-    

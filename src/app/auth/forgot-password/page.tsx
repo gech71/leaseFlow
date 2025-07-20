@@ -31,13 +31,13 @@ export default function ForgotPasswordPage() {
 
       const data = await response.json();
 
-      if (response.ok && data.isSuccess) {
+      if (response.ok && data.isSuccess && data.token) {
         toast({
-          title: "Reset Code Sent",
-          description: "A password reset code has been sent to your phone. Please use it to reset your password.",
+          title: "Token Received",
+          description: "Redirecting you to the password reset page.",
         });
-        // Redirect to the reset password page, passing the phone number along
-        router.push(`/auth/reset-password?phone=${encodeURIComponent(phoneNumber)}`);
+        // Redirect to the reset password page, passing the phone and token
+        router.push(`/auth/reset-password?phone=${encodeURIComponent(phoneNumber)}&token=${encodeURIComponent(data.token)}`);
       } else {
         const errorMessages = data.errors?.join(', ') || "Failed to initiate password reset. Please check the phone number.";
         toast({
@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
             <KeyRound className="mx-auto h-12 w-12 text-primary" />
             <div className="space-y-1 px-2">
                 <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Forgot Password?</CardTitle>
-                <CardDescription>Enter your phone number to receive a reset code.</CardDescription>
+                <CardDescription>Enter your phone number to receive a reset token.</CardDescription>
             </div>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">
@@ -85,13 +85,13 @@ export default function ForgotPasswordPage() {
                 disabled={isLoading}
               />
             </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base" disabled={isLoading}>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base" disabled={isLoading || !phoneNumber}>
               {isLoading ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : (
                 <Send className="mr-2 h-5 w-5" />
               )}
-              Send Reset Code
+              Get Reset Token
             </Button>
             <div className="text-center">
                 <Link href="/auth/login" className="text-sm text-primary hover:underline">
