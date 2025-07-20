@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  const { firstName, lastName, phoneNumber, email, password, isTenant } = newUserRegistrationData;
+  const { firstName, lastName, phoneNumber, email, password, tempPassword } = newUserRegistrationData;
 
   if (!firstName || !lastName || !phoneNumber || !email || !password) {
     return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email, password)."] }, { status: 400 });
@@ -145,20 +145,12 @@ export async function POST(request: NextRequest) {
   const newUserLastName = newUserPayload.lastName || lastName;
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
-  // 5. Store new user in local Prisma database, assigning TENANT role if flagged
+  // 5. Store new user in local Prisma database, assigning TENANT role and tempPassword if flagged
   try {
-    let tenantRoleConnect = {};
-    if (isTenant) {
-        const tenantRole = await databaseService.getRoleByName('TENANT');
-        if (tenantRole) {
-            tenantRoleConnect = {
-                roles: {
-                    connect: { id: tenantRole.id }
-                }
-            };
-        } else {
-            console.warn("TENANT role not found in database. User will be created without a role.");
-        }
+    const tenantRole = await databaseService.getRoleByName('TENANT');
+    if (!tenantRole) {
+        // This is a critical failure if the seed isn't run correctly.
+        return NextResponse.json({ isSuccess: false, errors: ["User registered on identity server, but the required TENANT role was not found in the local database. Please seed the database."] }, { status: 500 });
     }
 
     const userCreateInput: Prisma.UserCreateInput = {
@@ -168,12 +160,13 @@ export async function POST(request: NextRequest) {
       firstName: newUserFirstName,
       lastName: newUserLastName,
       phoneNumber: newUserPhoneNumber,
-      ...tenantRoleConnect,
+      roles: { connect: { id: tenantRole.id } },
+      tempPassword: tempPassword,
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
     
-    return NextResponse.json({ isSuccess: true, message: `User registered successfully. ${isTenant ? 'TENANT role assigned.' : ''}`, userId: localUser.userId });
+    return NextResponse.json({ isSuccess: true, message: "Tenant user registered successfully.", userId: localUser.userId });
 
   } catch (dbError: any) {
     console.error("Error creating user in local database:", dbError);

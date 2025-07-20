@@ -78,6 +78,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isSuccess: false, errors: ["This login is for tenants only. Please use the admin login for other roles."] }, { status: 403 });
     }
 
+    // Check for temporary password
+    if (localUser.tempPassword && localUser.tempPassword === password) {
+      // User is logging in with the temporary password.
+      // Set the access token so they can call the change-password API.
+      const cookieStore = cookies();
+      cookieStore.set(ACCESS_TOKEN_KEY, accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        sameSite: 'lax',
+        maxAge: ACCESS_TOKEN_MAX_AGE,
+      });
+      // Don't set refresh token yet.
+      return NextResponse.json({ isSuccess: true, requiresPasswordChange: true, message: "Please change your temporary password.", accessToken });
+    }
+
     const cookieStore = cookies();
     cookieStore.set(ACCESS_TOKEN_KEY, accessToken, {
       httpOnly: true,

@@ -4,26 +4,23 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma } from '@prisma/client';
-import { addMonths, isAfter } from 'date-fns';
+import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
+import crypto from 'crypto';
 
 // This function now expects password and will trigger user registration
 export async function createTenantAction(data: {
   name: string;
   email: string;
   phone: string;
-  password?: string; // Password is required for tenant user creation
   alternativePhone?: string;
   nationalId?: string;
   representativeName?: string;
   representativePhone?: string;
 }) {
-  const { password, ...tenantData } = data;
-
-  if (!password) {
-    return { success: false, error: "Password is required to create a user account for the tenant." };
-  }
-
   try {
+    // Generate a secure temporary password
+    const tempPassword = crypto.randomBytes(8).toString('hex');
+
     // We can't directly call the API route from a server action.
     // However, we can simulate the fetch call to our own API endpoint.
     // This requires the full URL.
@@ -31,9 +28,6 @@ export async function createTenantAction(data: {
     
     // The registration API needs a logged-in admin's token, which is in cookies.
     // This server action runs in the context of that user, so we can forward the call.
-    // NOTE: This approach is complex. A better long-term solution would be to
-    // refactor user creation logic into a shared service that both the API and this action can call.
-    // For now, this makes the feature work without major refactoring.
     const { headers } = await import('next/headers');
     
     const registrationResponse = await fetch(`${baseUrl}/api/admin/register-user`, {
@@ -44,12 +38,12 @@ export async function createTenantAction(data: {
             'Cookie': headers().get('Cookie') || "",
         },
         body: JSON.stringify({
-            firstName: tenantData.name.split(' ')[0] || tenantData.name,
-            lastName: tenantData.name.split(' ').slice(1).join(' ') || 'Tenant',
-            phoneNumber: tenantData.phone,
-            email: tenantData.email,
-            password: password,
-            isTenant: true // Flag to auto-assign TENANT role
+            firstName: data.name.split(' ')[0] || data.name,
+            lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
+            phoneNumber: data.phone,
+            email: data.email,
+            password: tempPassword, // Use the generated temporary password
+            tempPassword: tempPassword, // Pass it along to be saved in the User model
         }),
     });
 
@@ -61,14 +55,22 @@ export async function createTenantAction(data: {
     }
 
     // Now that the user is created, create the tenant profile
-    const newTenant = await databaseService.createTenant(tenantData);
+    const newTenant = await databaseService.createTenant({
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      alternativePhone: data.alternativePhone,
+      nationalId: data.nationalId,
+      representativeName: data.representativeName,
+      representativePhone: data.representativePhone,
+    });
 
     revalidatePath('/admin/tenants');
-    return { success: true, tenant: newTenant };
+    // Return the temp password so the admin can see it
+    return { success: true, tenant: newTenant, tempPassword: tempPassword };
 
   } catch (error: any) {
     console.error("Error creating tenant or user:", error);
-    // Attempt to clean up if tenant was created but user failed, or vice-versa (though less likely with this flow)
     return { success: false, error: error.message || "Failed to create tenant and user account." };
   }
 }

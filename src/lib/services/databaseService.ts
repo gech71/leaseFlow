@@ -292,6 +292,13 @@ export class DatabaseService {
         include // This 'include' comes directly from the method parameter
     });
   }
+  
+  async findUserByPhoneNumber(phoneNumber: string): Promise<User | null> {
+    if (!phoneNumber) return null;
+    return prisma.user.findFirst({
+        where: { phoneNumber: phoneNumber }
+    });
+  }
 
 
   async getAllUsers(params?: {

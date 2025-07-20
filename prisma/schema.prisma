@@ -1,21 +1,183 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
 }
 
-enum FeeType {
-  Fixed
-  Percentage
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-enum ScopeType {
-  Building
-  Floor
-  SpecificSpaces
+model Building {
+  id                      String                    @id @default(cuid())
+  name                    String
+  address                 String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime?                 @updatedAt
+  spaces                  Space[]
+  buildingMonthlyUtilities BuildingMonthlyUtilities[]
+  penaltyPolicyTiers      PenaltyTier[]
+  manager                 User?                     @relation(fields: [managedByUserId], references: [userId])
+  managedByUserId         String?
+}
+
+model Space {
+  id                   String      @id @default(cuid())
+  buildingId           String
+  buildingName         String // Denormalized for easier access
+  spaceIdName          String // e.g., "Unit 10A", "Office 201"
+  area                 Float // in square meters
+  floor                String
+  utilityProrationShare Float // e.g., 0.05 for 5%
+  monthlyRentalPrice   Float
+  isOccupied           Boolean     @default(false)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime?   @updatedAt
+  
+  building             Building    @relation(fields: [buildingId], references: [id])
+  tenantId             String?     @unique
+  tenant               Tenant?     @relation(fields: [tenantId], references: [id])
+  
+  agreements           Agreement[]
+}
+
+model Tenant {
+  id                  String      @id @default(cuid())
+  name                String
+  email               String      @unique
+  phone               String?
+  alternativePhone    String?
+  nationalId          String?
+  representativeName  String?
+  representativePhone String?
+  
+  rentedSpaceId       String?     @unique
+  rentedSpace         Space?      
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime?   @updatedAt
+
+  agreements          Agreement[]
+  bills               Bill[]
+}
+
+model Agreement {
+  id                          String    @id @default(cuid())
+  tenantId                    String
+  spaceId                     String
+  agreementText               String
+  startDate                   DateTime
+  monthlyRentalPrice          Float
+  additionalTerms             String?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime? @updatedAt
+  paymentTermMonths           Int       @default(12) // e.g., 12 months
+  initialPaymentMonths        Int       @default(1)  // e.g., 1 month upfront
+  nextPaymentDueDate          DateTime  // Calculated as startDate + initialPaymentMonths
+  
+  // New fields for initial payment record
+  initialPaymentAmount        Float?
+  initialPaymentMethod        String?
+  initialPaymentReference     String?
+  initialPaymentBankOrWalletName String?
+  initialPaymentDate          DateTime?
+
+  tenant                      Tenant    @relation(fields: [tenantId], references: [id])
+  space                       Space     @relation(fields: [spaceId], references: [id])
+  bills                       Bill[]
+}
+
+model Bill {
+  id                  String        @id @default(cuid())
+  agreementId         String
+  tenantId            String
+  billDate            DateTime
+  dueDate             DateTime
+  rentAmount          Float
+  utilityBreakdown    Json? // e.g., [{"name": "Water", "amount": 50}, {"name": "Electricity", "amount": 100}]
+  penaltyAmount       Float?
+  totalAmount         Float
+  status              BillStatus    @default(Pending)
+  paymentDate         DateTime?
+  paymentMethod       String?
+  paymentReference    String?
+  bankOrWalletName    String?
+  paymentProofUrl     String?
+  adminVerifiedPayment Boolean?
+  tenantPaymentNotes  String?
+  adminVerificationNotes String?
+
+  agreement           Agreement     @relation(fields: [agreementId], references: [id])
+  tenant              Tenant        @relation(fields: [tenantId], references: [id])
+}
+
+model BuildingMonthlyUtilities {
+  id            String    @id @default(cuid())
+  buildingId    String
+  buildingName  String
+  year          Int
+  month         Int // 0-11 for Jan-Dec
+  utilities     BuildingUtilityItem[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
+
+  building      Building  @relation(fields: [buildingId], references: [id])
+
+  @@unique([buildingId, year, month])
+}
+
+model BuildingUtilityItem {
+  id                      String   @id @default(cuid())
+  name                    String
+  totalCost               Float
+  appliesToScope          UtilityScope
+  applicableFloor         String?
+  applicableSpaceIdNames  String[]
+  monthlyUtilitiesId      String
+  
+  monthlyUtilities        BuildingMonthlyUtilities @relation(fields: [monthlyUtilitiesId], references: [id])
+}
+
+model PenaltyTier {
+  id                      String    @id @default(cuid())
+  fromDay                 Int
+  toDay                   Int?
+  feeType                 FeeType
+  feeValue                Float
+  scope                   PenaltyScope
+  applicableFloor         String?
+  applicableSpaceIdNames  String[]
+  buildingId              String
+
+  building                Building  @relation(fields: [buildingId], references: [id])
+}
+
+model User {
+  id                String      @id @default(cuid())
+  userId            String      @unique // This is the external ID from the auth provider (e.g., JWT 'sub' claim)
+  email             String      @unique
+  name              String?
+  firstName         String?
+  lastName          String?
+  phoneNumber       String?     @unique
+  tempPassword      String?
+  
+  roles             Role[]      @relation("UserRoles")
+  managedBuildings  Building[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime?   @updatedAt
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  permissions String[]
+  
+  users       User[]    @relation("UserRoles")
 }
 
 enum BillStatus {
@@ -25,169 +187,19 @@ enum BillStatus {
   PendingVerification
 }
 
-model User {
-  id               String      @id @default(cuid())
-  userId           String      @unique
-  email            String      @unique
-  name             String
-  firstName        String?
-  lastName         String?
-  phoneNumber      String?
-  roles            Role[]      @relation("UserRoles")
-  managedBuildings Building[]  @relation("ManagedBuildings")
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime?   @updatedAt
+enum UtilityScope {
+  Building
+  Floor
+  SpecificSpaces
 }
 
-model Role {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  permissions String[]
-  users       User[]   @relation("UserRoles")
+enum FeeType {
+  Fixed
+  Percentage
 }
 
-model Building {
-  id                       String                     @id @default(cuid())
-  name                     String
-  address                  String?
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime?                  @updatedAt
-  spaces                   Space[]
-  buildingMonthlyUtilities BuildingMonthlyUtilities[]
-  penaltyPolicyTiers       PenaltyTier[]
-
-  managedByUserId String?
-  manager         User?   @relation("ManagedBuildings", fields: [managedByUserId], references: [userId])
-}
-
-model Space {
-  id                    String      @id @default(cuid())
-  buildingId            String
-  buildingName          String
-  spaceIdName           String
-  area                  Float
-  floor                 String
-  utilityProrationShare Float       @default(0)
-  monthlyRentalPrice    Float
-  isOccupied            Boolean     @default(false)
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime?   @updatedAt
-
-  building   Building    @relation(fields: [buildingId], references: [id])
-  tenantId   String?     @unique
-  tenant     Tenant?     @relation(name: "TenantRentedSpace", fields: [tenantId], references: [id])
-  agreements Agreement[]
-}
-
-model Tenant {
-  id                  String      @id @default(cuid())
-  name                String
-  email               String
-  phone               String?
-  alternativePhone    String?
-  nationalId          String?
-  representativeName  String?
-  representativePhone String?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime?   @updatedAt
-
-  rentedSpaceId String?     @unique
-  rentedSpace   Space?      @relation(name: "TenantRentedSpace")
-  agreements    Agreement[]
-  bills         Bill[]
-}
-
-model Agreement {
-  id                           String    @id @default(cuid())
-  agreementText                String    @db.Text
-  startDate                    DateTime
-  monthlyRentalPrice           Float
-  paymentTermMonths            Int
-  initialPaymentMonths         Int
-  nextPaymentDueDate           DateTime
-  additionalTerms              String?   @db.Text
-  endDate                      DateTime?
-  initialPaymentAmount         Float?
-  initialPaymentMethod         String?
-  initialPaymentReference      String?
-  initialPaymentBankOrWalletName String?
-  initialPaymentDate           DateTime?
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime? @updatedAt
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  spaceId String
-  space   Space  @relation(fields: [spaceId], references: [id])
-
-  bills Bill[]
-}
-
-model Bill {
-  id                     String     @id @default(cuid())
-  billDate               DateTime
-  dueDate                DateTime
-  rentAmount             Float
-  utilityBreakdown       Json?
-  penaltyAmount          Float?
-  totalAmount            Float
-  status                 BillStatus
-  paymentDate            DateTime?
-  paymentMethod          String?
-  paymentReference       String?
-  bankOrWalletName       String?
-  paymentProofUrl        String?
-  adminVerifiedPayment   Boolean?   @default(false)
-  tenantPaymentNotes     String?
-  adminVerificationNotes String?
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime?  @updatedAt
-
-  agreementId String
-  agreement   Agreement @relation(fields: [agreementId], references: [id])
-
-  tenantId String
-  tenant   Tenant    @relation(fields: [tenantId], references: [id])
-}
-
-model BuildingMonthlyUtilities {
-  id           String                @id @default(cuid())
-  buildingId   String
-  buildingName String
-  year         Int
-  month        Int
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime?             @updatedAt
-  building     Building              @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  utilities    BuildingUtilityItem[]
-
-  @@unique([buildingId, year, month])
-}
-
-model BuildingUtilityItem {
-  id                     String                   @id @default(cuid())
-  name                   String
-  totalCost              Float
-  appliesToScope         ScopeType
-  applicableFloor        String?
-  applicableSpaceIdNames String[]
-  monthlyUtilitiesId     String
-  monthlyUtilities       BuildingMonthlyUtilities @relation(fields: [monthlyUtilitiesId], references: [id], onDelete: Cascade)
-}
-
-model PenaltyTier {
-  id                     String    @id @default(cuid())
-  fromDay                Int
-  toDay                  Int?
-  feeType                FeeType
-  feeValue               Float
-  scope                  ScopeType
-  applicableFloor        String?
-  applicableSpaceIdNames String[]
-
-  buildingId String
-  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+enum PenaltyScope {
+  Building
+  Floor
+  SpecificSpaces
 }
