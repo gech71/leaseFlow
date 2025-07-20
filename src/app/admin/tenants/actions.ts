@@ -5,11 +5,35 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns'; 
-import crypto from 'crypto';
 import { cookies } from 'next/headers';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+
+function generateTempPassword(length = 12) {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+  // Ensure at least one of each character type
+  let password = '';
+  password += upper[Math.floor(Math.random() * upper.length)];
+  password += lower[Math.floor(Math.random() * lower.length)];
+  password += numbers[Math.floor(Math.random() * numbers.length)];
+  password += symbols[Math.floor(Math.random() * symbols.length)];
+
+  const allChars = upper + lower + numbers + symbols;
+
+  // Fill the rest of the password
+  for (let i = 4; i < length; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+
+  // Shuffle the password to make it more random
+  return password.split('').sort(() => 0.5 - Math.random()).join('');
+}
+
 
 // This function now expects password and will trigger user registration
 export async function createTenantAction(data: {
@@ -23,7 +47,7 @@ export async function createTenantAction(data: {
 }) {
   try {
     // Generate a secure temporary password
-    const tempPassword = crypto.randomBytes(8).toString('hex');
+    const tempPassword = generateTempPassword();
 
     // We can't directly call the API route from a server action.
     // However, we can simulate the fetch call to our own API endpoint.
