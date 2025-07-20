@@ -180,6 +180,7 @@ async function deleteIdentityServerUser(phoneNumber: string) {
         });
         
         if (response.ok) {
+            // Success can have an empty body.
             return { success: true };
         }
 
@@ -232,39 +233,43 @@ export async function deleteTenantAction(tenantId: string) {
     
     // Then, delete local records in a transaction
     await prisma.$transaction(async (tx) => {
-      // Find any space that this tenant occupies
-      const spacesOccupiedByTenant = await tx.space.findMany({
-          where: { tenantId: tenant.id }
-      });
+        // Find any space that this tenant occupies
+        const spacesOccupiedByTenant = await tx.space.findMany({
+            where: { tenantId: tenant.id }
+        });
 
-      // Vacate all spaces linked to this tenant
-      for (const space of spacesOccupiedByTenant) {
-          await tx.space.update({
-              where: { id: space.id },
-              data: {
-                  isOccupied: false,
-                  tenantId: null
-              }
-          });
-      }
+        // Vacate all spaces linked to this tenant
+        for (const space of spacesOccupiedByTenant) {
+            await tx.space.update({
+                where: { id: space.id },
+                data: {
+                    isOccupied: false,
+                    tenantId: null
+                }
+            });
+        }
 
-      // Explicitly delete the Tenant record first.
-      await tx.tenant.delete({
-          where: { id: tenant.id }
-      });
-      
-      // Explicitly delete the associated User profile.
-      if (tenant.userId) {
-          await tx.user.delete({
-              where: { id: tenant.userId }
-          }).catch(e => {
-              if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-                  console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. Continuing transaction.`);
-              } else {
-                  throw e;
-              }
-          });
-      }
+        // Explicitly delete the Tenant record.
+        await tx.tenant.delete({
+            where: { id: tenant.id }
+        });
+        
+        // Explicitly delete the associated User profile.
+        // This is now safe because the tenant has been deleted.
+        if (tenant.userId) {
+            await tx.user.delete({
+                where: { id: tenant.userId }
+            }).catch(e => {
+                // This catch is a safeguard in case of weird race conditions,
+                // but the P2025 error should ideally not happen with this logic.
+                if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+                    console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. Continuing transaction.`);
+                } else {
+                    // Rethrow other errors to fail the transaction
+                    throw e;
+                }
+            });
+        }
     });
 
     revalidatePath('/admin/tenants');
@@ -278,7 +283,7 @@ export async function deleteTenantAction(tenantId: string) {
         return { success: false, error: "Failed to delete tenant. The record or a related record was not found." };
       }
       if (error.code === 'P2003') {
-        return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills or other non-active agreements not caught by the check). Please ensure all dependencies are cleared or consider archiving." };
+        return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills or other non-active agreements). Please ensure all dependencies are cleared or consider archiving." };
       }
     }
     return { success: false, error: error.message || "Failed to delete tenant." };
