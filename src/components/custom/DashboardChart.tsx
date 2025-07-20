@@ -15,6 +15,14 @@ interface DashboardChartProps {
 }
 
 export function DashboardChart({ data }: DashboardChartProps) {
+  const formatYAxisTick = (value: number): string => {
+    if (value === 0) return "0";
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(value % 1000 !== 0 ? 1 : 0)}k`;
+    }
+    return value.toString();
+  };
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 5, right: 0, left: -20, bottom: 5 }}>
@@ -31,7 +39,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
           fontSize={12} 
           tickLine={false} 
           axisLine={false} 
-          tickFormatter={(value) => `${value / 1000}k`} 
+          tickFormatter={formatYAxisTick} 
         />
         <Tooltip
           cursor={{ fill: "hsl(var(--accent)/0.3)" }}
