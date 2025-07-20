@@ -72,9 +72,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isSuccess: false, errors: ["Your account is not recognized by this system. Please contact support."] }, { status: 403 });
     }
     
-    // Ensure the user has the TENANT role to log into the portal.
+    // Check for TENANT role (or SUPER_ADMIN for testing purposes)
     const isTenant = localUser.roles.some(role => role.name === 'TENANT');
-    if (!isTenant) {
+    const isSuperAdmin = localUser.roles.some(role => role.name === 'SUPER_ADMIN');
+
+    if (!isTenant && !isSuperAdmin) {
       return NextResponse.json({ isSuccess: false, errors: ["This login is for tenants only. Please use the admin login for other roles."] }, { status: 403 });
     }
 
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest) {
     if (localUser.tempPassword && localUser.tempPassword === password) {
       // User is logging in with the temporary password.
       // Set the access token so they can call the change-password API.
-      const cookieStore = cookies();
+      const cookieStore = await cookies();
       cookieStore.set(ACCESS_TOKEN_KEY, accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isSuccess: true, requiresPasswordChange: true, message: "Please change your temporary password.", accessToken });
     }
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.set(ACCESS_TOKEN_KEY, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
