@@ -35,6 +35,8 @@ export default function TenantLoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [changePasswordToken, setChangePasswordToken] = useState<string | null>(null);
@@ -231,9 +233,11 @@ export default function TenantLoginPage() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Temporary Password</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" {...field} disabled />
-                                    </FormControl>
+                                     <div className="relative">
+                                        <FormControl>
+                                            <Input type={showPassword ? "text" : "password"} {...field} disabled />
+                                        </FormControl>
+                                    </div>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -244,9 +248,20 @@ export default function TenantLoginPage() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>New Password</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" {...field} placeholder="Enter your new password" />
-                                    </FormControl>
+                                    <div className="relative">
+                                        <FormControl>
+                                            <Input type={showNewPassword ? "text" : "password"} {...field} placeholder="Enter your new password" />
+                                        </FormControl>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
+                                          onClick={() => setShowNewPassword(!showNewPassword)}
+                                        >
+                                          {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </Button>
+                                    </div>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -257,9 +272,20 @@ export default function TenantLoginPage() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Confirm New Password</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" {...field} placeholder="Confirm your new password" />
-                                    </FormControl>
+                                     <div className="relative">
+                                        <FormControl>
+                                            <Input type={showConfirmPassword ? "text" : "password"} {...field} placeholder="Confirm your new password" />
+                                        </FormControl>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
+                                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        >
+                                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </Button>
+                                    </div>
                                     <FormMessage />
                                 </FormItem>
                             )}
