@@ -142,7 +142,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(9);
+  const [itemsPerPage, setItemsPerPage] = useState(3);
 
   const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
   const canEditBuildings = isSuperAdmin || hasPermission('building:edit');

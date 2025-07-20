@@ -101,8 +101,8 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
 
   const [upcomingCurrentPage, setUpcomingCurrentPage] = useState(1);
   const [paidCurrentPage, setPaidCurrentPage] = useState(1);
-  const [upcomingItemsPerPage, setUpcomingItemsPerPage] = useState(10);
-  const [paidItemsPerPage, setPaidItemsPerPage] = useState(10);
+  const [upcomingItemsPerPage, setUpcomingItemsPerPage] = useState(3);
+  const [paidItemsPerPage, setPaidItemsPerPage] = useState(3);
 
   const handleUpcomingItemsPerPageChange = (newSize: number) => {
     setUpcomingItemsPerPage(newSize);

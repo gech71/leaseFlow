@@ -61,7 +61,7 @@ export function UserManagementClientPage({
   const [buildingSearchTerm, setBuildingSearchTerm] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(3);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canManageUserAssignments = isSuperAdmin || hasPermission('settings:user_management:assign');

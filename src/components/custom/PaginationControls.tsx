@@ -75,7 +75,7 @@ export function PaginationControls({
   };
 
   return (
-    <div className={cn("flex flex-col-reverse sm:flex-row items-center justify-between gap-4", className)}>
+    <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-4", className)}>
       <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-muted-foreground">
         {onItemsPerPageChange && (
           <>

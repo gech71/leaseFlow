@@ -108,11 +108,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [individualBillFilter, setIndividualBillFilter] = useState('');
   const [generationFilterStatus, setGenerationFilterStatus] = useState<'all' | 'ready' | 'upcoming'>('all');
   const [generationCurrentPage, setGenerationCurrentPage] = useState(1);
-  const [generationItemsPerPage, setGenerationItemsPerPage] = useState(5);
+  const [generationItemsPerPage, setGenerationItemsPerPage] = useState(3);
 
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(3);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canGenerateBills = isSuperAdmin || hasPermission('billing:generate');
