@@ -1,9 +1,10 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma } from '@prisma/client';
+import { Prisma, type User as PrismaUser, type Role as PrismaRole } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns'; 
 import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
@@ -177,7 +178,7 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             },
             body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
         });
-
+        
         if (response.ok) {
             return { success: true };
         }
@@ -208,55 +209,69 @@ export async function deleteTenantAction(tenantId: string) {
   try {
     const tenant = await databaseService.getTenantById(tenantId, {
       agreements: true,
-      user: true, // Also include the associated user
+      user: true, 
     });
 
     if (!tenant) {
       return { success: false, error: "Tenant not found." };
     }
+    if (!tenant.user) {
+      return { success: false, error: "Cannot delete tenant profile because it is not linked to a user account." };
+    }
 
-    // Check for active agreements in application code
-    if (tenant.agreements && tenant.agreements.length > 0) {
-      const activeAgreements = tenant.agreements.filter(agreement => {
-        const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
-        return isAfter(agreementEndDate, new Date());
-      });
-      if (activeAgreements.length > 0) {
-        return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve or terminate these agreements first." };
-      }
+    // Check for active agreements
+    const hasActiveAgreements = tenant.agreements.some(agreement =>
+      isAfter(addMonths(agreement.startDate, agreement.paymentTermMonths), new Date())
+    );
+    if (hasActiveAgreements) {
+      return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
     }
     
-    // Find any space that this tenant occupies
-    const spacesOccupiedByTenant = await databaseService.getAllSpaces({
-        where: { tenantId: tenantId }
-    });
-
-    // Vacate all spaces linked to this tenant
-    for (const space of spacesOccupiedByTenant) {
-        await databaseService.updateSpace(space.id, {
-            isOccupied: false,
-            tenant: { disconnect: true }
-        });
-    }
-
+    // First, delete from the identity server
     const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
     if (!identityDeletionResult.success) {
-      return { success: false, error: `Failed to delete the user account from the identity server: ${identityDeletionResult.error}. Local data was not deleted.` };
+      return { success: false, error: `Failed to delete from identity server: ${identityDeletionResult.error}. Local data not deleted.` };
     }
     
-    await databaseService.deleteTenant(tenantId);
-    
-    if (tenant.userId) {
-       await prisma.user.delete({ where: { id: tenant.userId } }).catch(e => {
-            console.error(`Failed to delete local user record ${tenant.userId}, but identity record was deleted. Manual cleanup may be required.`, e);
-        });
-    }
+    // Then, delete local records in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Find any space that this tenant occupies
+      const spacesOccupiedByTenant = await tx.space.findMany({
+          where: { tenantId: tenant.id }
+      });
 
+      // Vacate all spaces linked to this tenant
+      for (const space of spacesOccupiedByTenant) {
+          await tx.space.update({
+              where: { id: space.id },
+              data: {
+                  isOccupied: false,
+                  tenantId: null
+              }
+          });
+      }
+
+      // Delete the Tenant profile
+      await tx.tenant.delete({
+          where: { id: tenant.id }
+      });
+
+      // Delete the associated User profile
+      if (tenant.userId) {
+          await tx.user.delete({
+              where: { id: tenant.userId }
+          }).catch(e => {
+              console.error(`Transaction failed to delete local user record ${tenant.userId}. Rolling back.`, e);
+              throw e; // This will cause the transaction to roll back
+          });
+      }
+    });
 
     revalidatePath('/admin/tenants');
     revalidatePath('/admin/spaces'); 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: any)
+   {
     console.error("Error deleting tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') { 
