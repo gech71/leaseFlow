@@ -45,33 +45,30 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
 }
 
-// This is the main Server Component for the page
-export default async function BuildingUpsertPage({ searchParams }: { searchParams: { id?: string } }) {
+// Data fetching component
+async function BuildingDataFetcher({ searchParams }: { searchParams: { id?: string } }) {
   let initialBuildingDataSerializable: BuildingUpsertFormInternalProps['initialBuildingData'] = null;
   let formMode: 'add' | 'edit' = 'add';
-  let pageTitle = "Add New Building";
-  const buildingIdParam = searchParams.id;
+  const buildingIdParam = searchParams?.id;
 
   if (buildingIdParam) {
     let buildingToEdit = await databaseService.getBuildingById(buildingIdParam, {
       penaltyPolicyTiers: true
     });
 
-    // Security Check: Ensure non-super-admin can only edit their own buildings
     if (buildingToEdit) {
         const currentUser = await getCurrentUser();
         const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
 
         if (!isSuperAdmin && currentUser) {
             if (buildingToEdit.managedByUserId !== currentUser.userId) {
-                buildingToEdit = null; // User doesn't manage this building, treat as not found.
+                buildingToEdit = null;
             }
         }
     }
 
     if (buildingToEdit) {
       formMode = 'edit';
-      pageTitle = "Edit Building";
       initialBuildingDataSerializable = {
         id: buildingToEdit.id,
         name: buildingToEdit.name,
@@ -84,6 +81,19 @@ export default async function BuildingUpsertPage({ searchParams }: { searchParam
     }
   }
 
+  return (
+    <BuildingUpsertFormInternal
+      initialBuildingData={initialBuildingDataSerializable}
+      formMode={formMode}
+    />
+  );
+}
+
+
+// This is the main Server Component for the page
+export default function BuildingUpsertPage({ searchParams }: { searchParams: { id?: string } }) {
+  const pageTitle = searchParams?.id ? "Edit Building" : "Add New Building";
+  
   return (
     <div className="animate-fadeIn">
       <PageHeader
@@ -99,10 +109,7 @@ export default async function BuildingUpsertPage({ searchParams }: { searchParam
         }
       />
       <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-        <BuildingUpsertFormInternal
-            initialBuildingData={initialBuildingDataSerializable}
-            formMode={formMode}
-        />
+        <BuildingDataFetcher searchParams={searchParams} />
       </Suspense>
     </div>
   );
