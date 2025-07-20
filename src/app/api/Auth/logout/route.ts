@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   if (AUTH_API_BASE_URL && accessToken && refreshToken) {
     try {
-      await fetch(`${AUTH_API_BASE_URL}/api/auth/logout`, { 
+      await fetch(`${AUTH_API_BASE_URL}/api/Auth/logout`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,3 +57,5 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ isSuccess: true, message: "Logout successful" });
 }
+
+    

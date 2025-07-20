@@ -52,3 +52,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["An unexpected error occurred during the reset password process."] }, { status: 500 });
   }
 }
+
+    
