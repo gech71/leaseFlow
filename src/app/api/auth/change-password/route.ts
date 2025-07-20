@@ -6,17 +6,50 @@ import { databaseService } from '@/lib/services/databaseService';
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
 
+// Insecure JWT payload decoder for prototype purposes ONLY.
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!AUTH_API_BASE_URL) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication service is not configured."] }, { status: 500 });
   }
 
-  // 1. Verify user is authenticated to make this change
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required."] }, { status: 401 });
   }
   const accessToken = authHeader.substring(7);
+
+  // Decode the token to get the user's phone number securely
+  const tokenPayload = decodeJwtPayload(accessToken);
+  if (!tokenPayload) {
+    return NextResponse.json({ isSuccess: false, errors: ["Invalid authentication token."] }, { status: 401 });
+  }
+  
+  // The phone number is typically in a specific claim
+  const phoneNumber = tokenPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"];
+  if (!phoneNumber) {
+    return NextResponse.json({ isSuccess: false, errors: ["Could not identify user from token. Phone number missing."] }, { status: 401 });
+  }
+
 
   let requestBody;
   try {
@@ -25,10 +58,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format."] }, { status: 400 });
   }
 
-  const { phoneNumber, currentPassword, newPassword } = requestBody;
+  const { currentPassword, newPassword } = requestBody;
 
-  if (!phoneNumber || !currentPassword || !newPassword) {
-    return NextResponse.json({ isSuccess: false, errors: ["Phone number, current password, and new password are required."] }, { status: 400 });
+  if (!currentPassword || !newPassword) {
+    return NextResponse.json({ isSuccess: false, errors: ["Current password and new password are required."] }, { status: 400 });
   }
 
   try {
@@ -36,7 +69,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`, // Pass user's token for authorization
+        'Authorization': `Bearer ${accessToken}`, 
       },
       body: JSON.stringify({ phoneNumber, currentPassword, newPassword }),
     });
@@ -48,8 +81,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status || 400 });
     }
 
-    // If the password change was successful on the identity server,
-    // clear the tempPassword field in the local database.
     const user = await databaseService.findUserByPhoneNumber(phoneNumber);
     if (user) {
       await databaseService.updateUser(user.id, { tempPassword: null });
