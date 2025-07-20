@@ -16,6 +16,11 @@ export function middleware(request: NextRequest) {
   const adminToken = request.cookies.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
   const portalToken = request.cookies.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
 
+  // --- Redirect from /login to /auth/login ---
+  if (pathname === '/login') {
+    return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+  }
+
   // --- Public Unprotected Routes ---
   const publicPaths = [
     ADMIN_LOGIN_PATH, 
