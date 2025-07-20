@@ -1,4 +1,5 @@
 
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -75,7 +76,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  const { firstName, lastName, phoneNumber, email, password } = newUserRegistrationData;
+  // Destructure all required fields, including tempPassword
+  const { firstName, lastName, phoneNumber, email, password, tempPassword } = newUserRegistrationData;
 
   if (!firstName || !lastName || !phoneNumber || !email || !password) {
     return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email, password)."] }, { status: 400 });
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest) {
   // Extract phone number from the specific claim
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
-  // 5. Store new user in local Prisma database without assigning any default role
+  // 5. Store new user in local Prisma database with tempPassword
   try {
     const userCreateInput: Prisma.UserCreateInput = {
       userId: newUserId,
@@ -155,12 +157,12 @@ export async function POST(request: NextRequest) {
       firstName: newUserFirstName,
       lastName: newUserLastName,
       phoneNumber: newUserPhoneNumber,
-      // roles field is omitted, so the user will have no roles by default
+      tempPassword: tempPassword, // Correctly include tempPassword here
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
     
-    return NextResponse.json({ isSuccess: true, message: "User registered successfully and created locally without a default role.", userId: localUser.userId });
+    return NextResponse.json({ isSuccess: true, message: "User registered successfully.", userId: localUser.userId });
 
   } catch (dbError: any) {
     console.error("Error creating user in local database:", dbError);
@@ -170,6 +172,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["User registered on identity server, but failed to create local record.", dbError.message] }, { status: 500 });
   }
 }
-    
-
-    

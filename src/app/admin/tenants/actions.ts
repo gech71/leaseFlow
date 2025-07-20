@@ -179,11 +179,12 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
         });
         
+        // Handle successful deletion (200 OK or 204 No Content) which may have an empty body
         if (response.ok) {
-            // Success can have an empty body.
             return { success: true };
         }
 
+        // Handle error responses that might have a body
         const errorText = await response.text();
         let errorMessage = `Failed with status ${response.status}`;
         
@@ -249,23 +250,19 @@ export async function deleteTenantAction(tenantId: string) {
             });
         }
 
-        // Explicitly delete the Tenant record.
+        // First, delete the Tenant record. This breaks the link from User.
         await tx.tenant.delete({
             where: { id: tenant.id }
         });
         
-        // Explicitly delete the associated User profile.
-        // This is now safe because the tenant has been deleted.
+        // Then, it is safe to delete the associated User profile.
         if (tenant.userId) {
             await tx.user.delete({
                 where: { id: tenant.userId }
             }).catch(e => {
-                // This catch is a safeguard in case of weird race conditions,
-                // but the P2025 error should ideally not happen with this logic.
                 if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
                     console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. Continuing transaction.`);
                 } else {
-                    // Rethrow other errors to fail the transaction
                     throw e;
                 }
             });
