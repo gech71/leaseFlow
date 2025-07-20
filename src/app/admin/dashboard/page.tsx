@@ -15,13 +15,13 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { OccupancyCard } from '@/components/custom/OccupancyCard';
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
-  <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+  <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px]">
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       <Icon className="h-5 w-5 text-primary" />
     </CardHeader>
-    <CardContent>
-      <div className="text-2xl sm:text-3xl font-bold font-headline text-foreground">{value}</div>
+    <CardContent className="flex flex-col flex-grow justify-center">
+      <div className="text-3xl lg:text-4xl font-bold font-headline text-foreground">{value}</div>
       {description && <p className="text-xs text-muted-foreground pt-1">{description}</p>}
       {trend && <p className={`text-xs pt-1 ${trendColor || 'text-green-500'}`}>{trend}</p>}
     </CardContent>
@@ -60,8 +60,8 @@ function decodeJwtPayload(token: string): any | null {
 
 // Gets current user from cookie
 async function getCurrentUser(): Promise<(UserPrisma & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
     const cookieStore = await cookies();
+    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
     const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
     if (!accessToken) return null;
     
@@ -280,7 +280,7 @@ export default async function AdminDashboardPage() {
     <div className="animate-fadeIn">
       <PageHeader title="Admin Dashboard" icon={LayoutGrid} description="Overview of your rental properties and finances." />
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 mb-8">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-8">
         <StatCard title="Total Buildings" value={String(stats.totalBuildings)} icon={Building} description="Number of managed buildings." />
         <OccupancyCard 
           spaces={spaces.map(s => ({id: s.id, buildingId: s.buildingId, isOccupied: s.isOccupied, area: s.area}))} 
@@ -318,8 +318,7 @@ export default async function AdminDashboardPage() {
             className="w-full"
           >
             <CarouselContent className="-ml-1 py-4">
-              {financials.map((summary) => (
-                <CarouselItem key={summary.buildingId} className="pl-1 md:basis-1/2 lg:basis-1/3">
+              <CarouselItem key={summary.buildingId} className="pl-4 md:basis-1/2 lg:basis-1/3">
                   <BuildingFinancialCard
                     buildingName={summary.buildingName}
                     currentMonthExpenses={summary.currentMonthExpenses}
