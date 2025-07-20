@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
 
     try {
       // Call the Next.js API route for login
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/Auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

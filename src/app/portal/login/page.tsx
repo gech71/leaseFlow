@@ -52,7 +52,7 @@ export default function TenantLoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/portal/login', {
+      const response = await fetch('/api/Auth/portal/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber, password }),
@@ -102,7 +102,7 @@ export default function TenantLoginPage() {
         // Here we only need to pass the current and new passwords.
         const { currentPassword, newPassword } = values;
 
-        const response = await fetch('/api/auth/change-password', {
+        const response = await fetch('/api/Auth/change-password', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ export default function TenantLoginPage() {
 
   const handleLoginWithNewPassword = async (newPassword: string) => {
       setIsLoading(true);
-      const response = await fetch('/api/auth/portal/login', {
+      const response = await fetch('/api/Auth/portal/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phoneNumber, password: newPassword }),

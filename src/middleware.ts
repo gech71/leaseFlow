@@ -24,15 +24,20 @@ export function middleware(request: NextRequest) {
   // --- Public Unprotected Routes ---
   const publicPaths = [
     ADMIN_LOGIN_PATH, 
+    '/auth/forgot-password',
+    '/auth/reset-password',
     PORTAL_LOGIN_PATH, 
     '/portal/connect',
     '/portal/billing'
   ];
   const publicApiPaths = [
-    '/api/auth/login', 
-    '/api/auth/portal/login', 
-    '/api/auth/logout', 
-    '/api/auth/portal/logout', 
+    '/api/Auth/login', 
+    '/api/Auth/portal/login', 
+    '/api/Auth/logout', 
+    '/api/Auth/portal/logout', 
+    '/api/Auth/forgot-password',
+    '/api/Auth/reset-password',
+    '/api/Auth/change-password',
     '/api/portal/validate-token',
     '/api/portal/payment-callback',
   ];

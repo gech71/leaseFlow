@@ -44,7 +44,7 @@ export function AdminProfileClientPage() {
     try {
         // The API only needs the current and new passwords.
         const { currentPassword, newPassword } = values;
-        const response = await fetch('/api/auth/change-password', {
+        const response = await fetch('/api/Auth/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ currentPassword, newPassword }),
@@ -56,7 +56,7 @@ export function AdminProfileClientPage() {
             toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
             form.reset();
             // Optional: force logout after password change for better security
-            await fetch('/api/auth/logout', { method: 'POST' });
+            await fetch('/api/Auth/logout', { method: 'POST' });
             window.location.href = '/auth/login';
         } else {
             toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
