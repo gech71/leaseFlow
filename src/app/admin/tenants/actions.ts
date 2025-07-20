@@ -94,12 +94,19 @@ export async function createTenantAction(data: {
     });
 
     revalidatePath('/admin/tenants');
-    // Return the temp password so the admin can see it
-    return { success: true, tenant: newTenant, tempPassword: tempPassword };
-
+    return { success: true, tenant: newTenant };
   } catch (error: any) {
-    console.error("Error creating tenant or user:", error);
-    return { success: false, error: error.message || "Failed to create tenant and user account." };
+    console.error("Error creating tenant:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      let fieldName = "email or another unique field";
+      if (error.meta && typeof error.meta.target === 'string') {
+        fieldName = error.meta.target;
+      } else if (Array.isArray(error.meta?.target)) {
+        fieldName = error.meta.target.join(', ');
+      }
+      return { success: false, error: `Failed to create tenant. A tenant with the same ${fieldName} might already exist.` };
+    }
+    return { success: false, error: error.message || "Failed to create tenant." };
   }
 }
 
@@ -114,6 +121,15 @@ export async function updateTenantAction(
   } catch (error: any) {
     console.error("Error updating tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        let fieldName = "email or another unique field";
+        if (error.meta && typeof error.meta.target === 'string') {
+            fieldName = error.meta.target;
+        } else if (Array.isArray(error.meta?.target)) {
+            fieldName = error.meta.target.join(', ');
+        }
+        return { success: false, error: `Failed to update tenant. A tenant with the same ${fieldName} might already exist.` };
+      }
       if (error.code === 'P2025') { 
         return { success: false, error: "Failed to update tenant. Record not found." };
       }
@@ -124,7 +140,6 @@ export async function updateTenantAction(
 
 export async function deleteTenantAction(tenantId: string) {
   try {
-    // 1. Fetch the tenant to get their phone number and check for active agreements
     const tenant = await databaseService.getTenantById(tenantId, {
       agreements: true,
     });
@@ -133,52 +148,23 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Tenant not found." };
     }
 
-    // 2. Check for active agreements locally
+    // Check for active agreements in application code
     if (tenant.agreements && tenant.agreements.length > 0) {
       const activeAgreements = tenant.agreements.filter(agreement => {
         const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
         return isAfter(agreementEndDate, new Date());
       });
       if (activeAgreements.length > 0) {
-        return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
+        return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve or terminate these agreements first." };
       }
-    }
-
-    // 3. Delete the user from the external identity server
-    if (AUTH_API_BASE_URL && tenant.phone) {
-      const cookieStore = await cookies();
-      const adminAccessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-
-      if (!adminAccessToken) {
-        return { success: false, error: "Admin authentication token not found. Cannot perform deletion on identity server." };
-      }
-
-      const deleteUserResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/delete-users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminAccessToken}`,
-        },
-        body: JSON.stringify({ phoneNumbers: [tenant.phone] }),
-      });
-
-      if (!deleteUserResponse.ok) {
-        const errorData = await deleteUserResponse.json();
-        const errorMessage = errorData.errors?.join(', ') || `Identity server returned status ${deleteUserResponse.status}.`;
-        console.error("Failed to delete user from identity server:", errorMessage);
-        return { success: false, error: `Could not delete user from identity server: ${errorMessage}` };
-      }
-    } else {
-        if (!tenant.phone) {
-             console.warn(`Skipping identity server deletion for tenant ${tenant.id} because they have no phone number.`);
-        }
     }
     
-    // 4. If external deletion is successful (or skipped), proceed with local deletion
+    // Find any space that this tenant occupies
     const spacesOccupiedByTenant = await databaseService.getAllSpaces({
         where: { tenantId: tenantId }
     });
 
+    // Vacate all spaces linked to this tenant
     for (const space of spacesOccupiedByTenant) {
         await databaseService.updateSpace(space.id, {
             isOccupied: false,
@@ -198,7 +184,7 @@ export async function deleteTenantAction(tenantId: string) {
         return { success: false, error: "Failed to delete tenant. Record not found." };
       }
       if (error.code === 'P2003') {
-        return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills). Please ensure all dependencies are cleared." };
+        return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills or other non-active agreements not caught by the check). Please ensure all dependencies are cleared or consider archiving." };
       }
     }
     return { success: false, error: error.message || "Failed to delete tenant." };
