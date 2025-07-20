@@ -251,11 +251,28 @@ export async function deleteTenantAction(tenantId: string) {
           });
       }
 
-      // Delete the Tenant profile. This should cascade to the User record due to the schema.
+      // Explicitly delete the Tenant record first.
       await tx.tenant.delete({
           where: { id: tenant.id }
       });
-
+      
+      // Explicitly delete the associated User profile.
+      // This is necessary because the cascade is from User->Tenant, not the other way.
+      if (tenant.userId) {
+          await tx.user.delete({
+              where: { id: tenant.userId }
+          }).catch(e => {
+              // This catch is a safeguard. If the user was already deleted by another process
+              // or a schema-level cascade (which shouldn't happen with the current setup),
+              // we don't want the transaction to fail. P2025 is "Record to delete does not exist".
+              if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+                  console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. Continuing transaction.`);
+              } else {
+                  // If it's another error, re-throw to fail the transaction.
+                  throw e;
+              }
+          });
+      }
     });
 
     revalidatePath('/admin/tenants');
@@ -266,7 +283,7 @@ export async function deleteTenantAction(tenantId: string) {
     console.error("Error deleting tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') { 
-        return { success: false, error: "Failed to delete tenant. Record not found." };
+        return { success: false, error: "Failed to delete tenant. The record or a related record was not found." };
       }
       if (error.code === 'P2003') {
         return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills or other non-active agreements not caught by the check). Please ensure all dependencies are cleared or consider archiving." };
@@ -275,4 +292,3 @@ export async function deleteTenantAction(tenantId: string) {
     return { success: false, error: error.message || "Failed to delete tenant." };
   }
 }
-
