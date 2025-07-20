@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileSignature, DollarSign, AlertTriangle, CheckCircle, Info, UploadCloud, Download, User, Clock, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -196,7 +197,19 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
 
   return (
     <div className="animate-fadeIn">
-      <PageHeader title={`Welcome, ${agreement.tenant.name}!`} icon={User} description="View your lease details and billing history." />
+      <PageHeader
+        title={`Welcome, ${agreement.tenant.name}!`}
+        icon={User}
+        description="View your lease details and billing history."
+        actions={
+          <Link href={`/portal/billing?phone=${agreement.tenant.phone}`} passHref>
+            <Button>
+              <DollarSign className="mr-2 h-4 w-4" />
+              Pay Bill
+            </Button>
+          </Link>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-3 space-y-6">
