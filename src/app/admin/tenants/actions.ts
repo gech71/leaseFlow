@@ -9,6 +9,7 @@ import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
 function generateTempPassword(length = 12) {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -161,33 +162,35 @@ async function deleteIdentityServerUser(phoneNumber: string) {
     }
 
     try {
-        const requestHeaders = await headers();
+        const cookieStore = await cookies();
+        const adminAccessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+
+        if (!adminAccessToken) {
+            return { success: false, error: "Admin authentication token not found." };
+        }
         
         const response = await fetch(`${AUTH_API_BASE_URL}/api/Auth/delete-users`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': requestHeaders.get('Authorization') || "",
+                'Authorization': `Bearer ${adminAccessToken}`,
             },
             body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
         });
 
         if (response.ok) {
-            // Success case, includes 204 No Content which has no body
             return { success: true };
         }
 
-        // Handle error cases where there might not be a JSON body
         const errorText = await response.text();
         let errorMessage = `Failed with status ${response.status}`;
         
         if (errorText) {
             try {
                 const errorData = JSON.parse(errorText);
-                errorMessage = errorData?.errors?.join(', ') || errorMessage;
+                errorMessage = errorData?.errors?.join(', ') || errorData?.message || errorMessage;
             } catch (e) {
-                // Not a JSON response, use the text content if it's not too long
-                errorMessage = errorText.substring(0, 100);
+                errorMessage = errorText.substring(0, 150);
             }
         }
         
