@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  const { firstName, lastName, phoneNumber, email, password } = newUserRegistrationData;
+  const { firstName, lastName, phoneNumber, email, password, isTenant } = newUserRegistrationData;
 
   if (!firstName || !lastName || !phoneNumber || !email || !password) {
     return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email, password)."] }, { status: 400 });
@@ -143,11 +143,24 @@ export async function POST(request: NextRequest) {
   const newUserEmail = newUserPayload.email || email; 
   const newUserFirstName = newUserPayload.firstName || firstName;
   const newUserLastName = newUserPayload.lastName || lastName;
-  // Extract phone number from the specific claim
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
-  // 5. Store new user in local Prisma database without assigning any default role
+  // 5. Store new user in local Prisma database, assigning TENANT role if flagged
   try {
+    let tenantRoleConnect = {};
+    if (isTenant) {
+        const tenantRole = await databaseService.getRoleByName('TENANT');
+        if (tenantRole) {
+            tenantRoleConnect = {
+                roles: {
+                    connect: { id: tenantRole.id }
+                }
+            };
+        } else {
+            console.warn("TENANT role not found in database. User will be created without a role.");
+        }
+    }
+
     const userCreateInput: Prisma.UserCreateInput = {
       userId: newUserId,
       email: newUserEmail,
@@ -155,12 +168,12 @@ export async function POST(request: NextRequest) {
       firstName: newUserFirstName,
       lastName: newUserLastName,
       phoneNumber: newUserPhoneNumber,
-      // roles field is omitted, so the user will have no roles by default
+      ...tenantRoleConnect,
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
     
-    return NextResponse.json({ isSuccess: true, message: "User registered successfully and created locally without a default role.", userId: localUser.userId });
+    return NextResponse.json({ isSuccess: true, message: `User registered successfully. ${isTenant ? 'TENANT role assigned.' : ''}`, userId: localUser.userId });
 
   } catch (dbError: any) {
     console.error("Error creating user in local database:", dbError);

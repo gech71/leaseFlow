@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search } from 'lucide-react';
+import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock } from 'lucide-react';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -85,8 +85,24 @@ const tenantFormSchema = z.object({
   representativePhone: z.string().optional().or(z.literal('')).refine(val => !val || phoneRegex.test(val), {
     message: phoneErrorMessage
   }),
+  password: z.string().optional(),
+}).superRefine((data, ctx) => {
+    // This logic runs after initial validation
+    // The password is required only if the form is in "add" mode.
+    // We can't directly access formMode here, so we check if a tenant ID exists.
+    // If there's no ID, we assume it's a new tenant and password is required.
+    // This check is a bit of a proxy for `formMode === 'add'`
+    if (!data.id && (!data.password || data.password.length < 6)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['password'],
+        message: 'Password must be at least 6 characters for new tenants.',
+      });
+    }
 });
-type TenantFormValues = z.infer<typeof tenantFormSchema>;
+  
+type TenantFormValues = z.infer<typeof tenantFormSchema> & { id?: string };
+
 
 export function TenantsClientPage({ 
   initialTenants, 
@@ -110,6 +126,7 @@ export function TenantsClientPage({
   const [currentTenantForForm, setCurrentTenantForForm] = useState<TenantWithRelations | null>(null);
   const [tenantToDelete, setTenantToDelete] = useState<TenantWithRelations | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,7 +142,7 @@ export function TenantsClientPage({
     resolver: zodResolver(tenantFormSchema),
     defaultValues: {
       name: "", email: "", phone: "", alternativePhone: "", nationalId: "", 
-      representativeName: "", representativePhone: "",
+      representativeName: "", representativePhone: "", password: "",
     },
   });
 
@@ -179,7 +196,7 @@ export function TenantsClientPage({
     setCurrentTenantForForm(null); 
     form.reset({ 
         name: "", email: "", phone: "", alternativePhone: "", nationalId: "", 
-        representativeName: "", representativePhone: "",
+        representativeName: "", representativePhone: "", password: ""
     });
     setIsFormOpen(true);
   };
@@ -199,6 +216,7 @@ export function TenantsClientPage({
       nationalId: tenant.nationalId || "",
       representativeName: tenant.representativeName || "",
       representativePhone: tenant.representativePhone || "",
+      password: "", // Password is not edited
     });
     setIsFormOpen(true);
   };
@@ -210,23 +228,32 @@ export function TenantsClientPage({
     }
     setIsSaving(true);
     
-    const tenantInputData = {
-      name: values.name,
-      email: values.email,
-      phone: values.phone || undefined,
-      alternativePhone: values.alternativePhone || undefined,
-      nationalId: values.nationalId || undefined,
-      representativeName: values.representativeName || undefined,
-      representativePhone: values.representativePhone || undefined,
-    };
-
     let result;
     if (formMode === 'add') {
-      result = await createTenantAction(tenantInputData as Prisma.TenantCreateInput);
+      const createData = {
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        alternativePhone: values.alternativePhone || undefined,
+        nationalId: values.nationalId || undefined,
+        representativeName: values.representativeName || undefined,
+        representativePhone: values.representativePhone || undefined,
+        password: values.password!, // Password is required for creation
+      };
+      result = await createTenantAction(createData);
     } else if (currentTenantForForm?.id) {
+      const updateData = {
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        alternativePhone: values.alternativePhone || undefined,
+        nationalId: values.nationalId || undefined,
+        representativeName: values.representativeName || undefined,
+        representativePhone: values.representativePhone || undefined,
+      };
       result = await updateTenantAction(
         currentTenantForForm.id, 
-        tenantInputData as Prisma.TenantUpdateInput
+        updateData as Prisma.TenantUpdateInput
       );
     } else {
       toast({ title: "Error", description: "Tenant ID missing for update.", variant: "destructive"});
@@ -239,7 +266,7 @@ export function TenantsClientPage({
       toast({ title: `Tenant ${formMode === 'add' ? 'Added' : 'Updated'}`, description: `${result.tenant?.name} has been saved.` });
       setIsFormOpen(false);
       setCurrentTenantForForm(null);
-      form.reset({ name: "", email: "", phone: "" });
+      form.reset({ name: "", email: "", phone: "", password: "" });
       router.refresh(); 
     } else {
       toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Tenant`, description: result.error, variant: "destructive" });
@@ -308,7 +335,7 @@ export function TenantsClientPage({
           if (!isOpen) {
             form.reset({ 
                 name: "", email: "", phone: "", alternativePhone: "", nationalId: "",
-                representativeName: "", representativePhone: "",
+                representativeName: "", representativePhone: "", password: "",
             });
             setCurrentTenantForForm(null);
           }
@@ -317,7 +344,7 @@ export function TenantsClientPage({
           <DialogHeader>
             <DialogTitle className="font-headline">{formMode === 'add' ? 'Add New Tenant' : (canEditTenants ? 'Edit Tenant' : 'View Tenant')}</DialogTitle>
             <DialogDescription>
-              {formMode === 'add' ? "Enter the details for the new tenant." : (canEditTenants ? "Update the tenant's details." : "Viewing tenant details.")}
+              {formMode === 'add' ? "Enter details to create a tenant profile and a user account for the portal." : (canEditTenants ? "Update the tenant's details." : "Viewing tenant details.")}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -325,6 +352,43 @@ export function TenantsClientPage({
               <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><UserSquare className="mr-2 h-4 w-4 text-primary" />Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="e.g., John Doe" {...field} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" />Email<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="e.g., john.doe@example.com" {...field} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="e.g., 0912345678" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
+              
+              {formMode === 'add' && (
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Password<span className="text-destructive ml-1">*</span></FormLabel>
+                      <div className="relative">
+                        <FormControl>
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Set a temporary password"
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={isSaving || !canCreateTenants}
+                          />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isSaving || !canCreateTenants}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                      <FormMessage />
+                      <FormDescription>This will be the tenant's password for the portal. They should change it after their first login.</FormDescription>
+                    </FormItem>
+                  )}
+                />
+              )}
+
               <FormField control={form.control} name="alternativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><PhoneIncoming className="mr-2 h-4 w-4 text-primary" />Alternative Phone</FormLabel> <FormControl><Input type="tel" placeholder="e.g., 0987654321" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="nationalId" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number</FormLabel> <FormControl><Input placeholder="e.g., AB1234567" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="representativeName" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" />Representative Name</FormLabel> <FormControl><Input placeholder="e.g., Jane Smith (Spouse, Agent)" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
