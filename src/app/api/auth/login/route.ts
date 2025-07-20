@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   let externalApiResponse: Response;
   try {
-    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/login`, {
+    externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
