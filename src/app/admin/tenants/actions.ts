@@ -179,17 +179,17 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
         });
         
+        const errorText = await response.text();
+
         if (response.ok) {
             return { success: true };
         }
-
-        const errorText = await response.text();
-        let errorMessage = `Failed with status ${response.status}`;
         
+        let errorMessage = `Failed with status ${response.status}`;
         if (errorText) {
             try {
                 const errorData = JSON.parse(errorText);
-                errorMessage = errorData?.errors?.join(', ') || errorData?.message || errorMessage;
+                errorMessage = errorData?.errors?.join(', ') || errorData?.message || errorText;
             } catch (e) {
                 errorMessage = errorText.substring(0, 150);
             }

@@ -1,4 +1,5 @@
 
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
+  // Destructure all required fields, including tempPassword
   const { firstName, lastName, phoneNumber, email, password, tempPassword } = newUserRegistrationData;
 
   if (!firstName || !lastName || !phoneNumber || !email || !password) {
@@ -143,6 +145,7 @@ export async function POST(request: NextRequest) {
   const newUserEmail = newUserPayload.email || email; 
   const newUserFirstName = newUserPayload.firstName || firstName;
   const newUserLastName = newUserPayload.lastName || lastName;
+  // Extract phone number from the specific claim
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
   // 5. Store new user in local Prisma database with tempPassword
@@ -154,7 +157,7 @@ export async function POST(request: NextRequest) {
       firstName: newUserFirstName,
       lastName: newUserLastName,
       phoneNumber: newUserPhoneNumber,
-      tempPassword: tempPassword,
+      tempPassword: tempPassword, // Correctly include tempPassword here
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
