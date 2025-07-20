@@ -318,7 +318,8 @@ export default async function AdminDashboardPage() {
             className="w-full"
           >
             <CarouselContent className="-ml-1 py-4">
-              <CarouselItem key={summary.buildingId} className="pl-4 md:basis-1/2 lg:basis-1/3">
+              {financials.map(summary => (
+                <CarouselItem key={summary.buildingId} className="pl-4 md:basis-1/2 lg:basis-1/3">
                   <BuildingFinancialCard
                     buildingName={summary.buildingName}
                     currentMonthExpenses={summary.currentMonthExpenses}
