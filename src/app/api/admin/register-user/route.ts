@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
   // 3. Call external identity server to register the user
   let externalRegisterResponse: Response;
   try {
-    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/auth/register`, {
+    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
