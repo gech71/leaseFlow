@@ -162,8 +162,7 @@ async function deleteIdentityServerUser(phoneNumber: string) {
 
     try {
         const requestHeaders = await headers();
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 9002}`;
-
+        
         const response = await fetch(`${AUTH_API_BASE_URL}/api/Auth/delete-users`, {
             method: 'POST',
             headers: {
@@ -173,14 +172,28 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            const errorMessage = errorData?.errors?.join(', ') || `Failed with status ${response.status}`;
-            console.error("Failed to delete user from identity server:", errorMessage);
-            return { success: false, error: errorMessage };
+        if (response.ok) {
+            // Success case, includes 204 No Content which has no body
+            return { success: true };
         }
 
-        return { success: true };
+        // Handle error cases where there might not be a JSON body
+        const errorText = await response.text();
+        let errorMessage = `Failed with status ${response.status}`;
+        
+        if (errorText) {
+            try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData?.errors?.join(', ') || errorMessage;
+            } catch (e) {
+                // Not a JSON response, use the text content if it's not too long
+                errorMessage = errorText.substring(0, 100);
+            }
+        }
+        
+        console.error("Failed to delete user from identity server:", errorMessage);
+        return { success: false, error: errorMessage };
+
     } catch (error: any) {
         console.error("Error calling delete user endpoint on identity server:", error);
         return { success: false, error: "Could not connect to the identity service to delete user." };
