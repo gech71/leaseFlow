@@ -215,10 +215,7 @@ export async function deleteTenantAction(tenantId: string) {
     if (!tenant) {
       return { success: false, error: "Tenant not found." };
     }
-    if (!tenant.user) {
-      return { success: false, error: "Cannot delete tenant profile because it is not linked to a user account." };
-    }
-
+    
     // Check for active agreements
     const hasActiveAgreements = tenant.agreements.some(agreement =>
       isAfter(addMonths(agreement.startDate, agreement.paymentTermMonths), new Date())
@@ -257,18 +254,13 @@ export async function deleteTenantAction(tenantId: string) {
       });
       
       // Explicitly delete the associated User profile.
-      // This is necessary because the cascade is from User->Tenant, not the other way.
       if (tenant.userId) {
           await tx.user.delete({
               where: { id: tenant.userId }
           }).catch(e => {
-              // This catch is a safeguard. If the user was already deleted by another process
-              // or a schema-level cascade (which shouldn't happen with the current setup),
-              // we don't want the transaction to fail. P2025 is "Record to delete does not exist".
               if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
                   console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. Continuing transaction.`);
               } else {
-                  // If it's another error, re-throw to fail the transaction.
                   throw e;
               }
           });
