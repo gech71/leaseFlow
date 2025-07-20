@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
@@ -32,11 +33,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication service is not configured."] }, { status: 500 });
   }
 
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const cookieStore = await cookies();
+  const adminToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+  const portalToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
+
+  const accessToken = adminToken || portalToken;
+
+  if (!accessToken) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required."] }, { status: 401 });
   }
-  const accessToken = authHeader.substring(7);
 
   // Decode the token to get the user's phone number securely
   const tokenPayload = decodeJwtPayload(accessToken);
@@ -88,7 +93,17 @@ export async function POST(request: NextRequest) {
         console.warn(`Password changed for ${phoneNumber}, but user not found locally to clear temp password.`);
     }
 
-    return NextResponse.json({ isSuccess: true, message: "Password changed successfully." });
+    // After a successful password change, we should log the user out to force a re-login with the new password.
+    // This is a good security practice. Let's clear the cookies.
+    if (adminToken) {
+        cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, '', { maxAge: -1, path: '/' });
+    }
+    if (portalToken) {
+        cookieStore.set(PORTAL_ACCESS_TOKEN_KEY, '', { maxAge: -1, path: '/' });
+    }
+
+
+    return NextResponse.json({ isSuccess: true, message: "Password changed successfully. Please log in again." });
 
   } catch (error: any) {
     console.error("Change password error:", error);

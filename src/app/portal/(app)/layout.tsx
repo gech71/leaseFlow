@@ -73,7 +73,7 @@ export default function PortalLayout({
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-4">
-            <Link href="#" className="text-sm font-medium hover:underline flex items-center gap-1">
+            <Link href="/portal/profile" className="text-sm font-medium hover:underline flex items-center gap-1">
               <UserCircle size={18} /> My Account
             </Link>
             <Button variant="ghost" size="sm" onClick={handleLogout} disabled={isLoggingOut} className="text-sm font-medium hover:underline flex items-center gap-1 p-2 h-auto text-primary-foreground">
@@ -94,7 +94,7 @@ export default function PortalLayout({
               <SheetContent side="right" className="w-[240px] bg-primary text-primary-foreground p-4">
                 <nav className="flex flex-col space-y-4 mt-8">
                   <SheetClose asChild>
-                    <Link href="#" className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80">
+                    <Link href="/portal/profile" className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80">
                       <UserCircle size={20} /> My Account
                     </Link>
                   </SheetClose>
