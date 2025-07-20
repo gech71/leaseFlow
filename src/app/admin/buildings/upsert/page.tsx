@@ -46,18 +46,11 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
 }
 
 // This is the main Server Component for the page
-export default function BuildingUpsertPage({ searchParams }: { searchParams: { id?: string } }) {
-  return (
-    <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-      <BuildingUpsertDataFetcher buildingIdParam={searchParams.id} />
-    </Suspense>
-  );
-}
-
-async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?: string}) {
+export default async function BuildingUpsertPage({ searchParams }: { searchParams: { id?: string } }) {
   let initialBuildingDataSerializable: BuildingUpsertFormInternalProps['initialBuildingData'] = null;
   let formMode: 'add' | 'edit' = 'add';
   let pageTitle = "Add New Building";
+  const buildingIdParam = searchParams.id;
 
   if (buildingIdParam) {
     let buildingToEdit = await databaseService.getBuildingById(buildingIdParam, {
@@ -105,10 +98,12 @@ async function BuildingUpsertDataFetcher({ buildingIdParam }: { buildingIdParam?
             </Link>
         }
       />
-      <BuildingUpsertFormInternal
-        initialBuildingData={initialBuildingDataSerializable}
-        formMode={formMode}
-      />
+      <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
+        <BuildingUpsertFormInternal
+            initialBuildingData={initialBuildingDataSerializable}
+            formMode={formMode}
+        />
+      </Suspense>
     </div>
   );
 }
