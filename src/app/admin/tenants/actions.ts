@@ -4,8 +4,12 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma } from '@prisma/client';
-import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
+import { addMonths, isAfter } from 'date-fns'; 
 import crypto from 'crypto';
+import { cookies } from 'next/headers';
+
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
 // This function now expects password and will trigger user registration
 export async function createTenantAction(data: {
@@ -96,8 +100,7 @@ export async function updateTenantAction(
 
 export async function deleteTenantAction(tenantId: string) {
   try {
-    // Note: This does not delete the associated User account, only the Tenant profile.
-    // Deleting the user should be a separate, deliberate action in User Management.
+    // 1. Fetch the tenant to get their phone number and check for active agreements
     const tenant = await databaseService.getTenantById(tenantId, {
       agreements: true,
     });
@@ -106,16 +109,48 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Tenant not found." };
     }
 
+    // 2. Check for active agreements locally
     if (tenant.agreements && tenant.agreements.length > 0) {
       const activeAgreements = tenant.agreements.filter(agreement => {
         const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
         return isAfter(agreementEndDate, new Date());
       });
       if (activeAgreements.length > 0) {
-        return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve or terminate these agreements first." };
+        return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
       }
     }
+
+    // 3. Delete the user from the external identity server
+    if (AUTH_API_BASE_URL && tenant.phone) {
+      const cookieStore = await cookies();
+      const adminAccessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+
+      if (!adminAccessToken) {
+        return { success: false, error: "Admin authentication token not found. Cannot perform deletion on identity server." };
+      }
+
+      const deleteUserResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/delete-users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminAccessToken}`,
+        },
+        body: JSON.stringify({ phoneNumbers: [tenant.phone] }),
+      });
+
+      if (!deleteUserResponse.ok) {
+        const errorData = await deleteUserResponse.json();
+        const errorMessage = errorData.errors?.join(', ') || `Identity server returned status ${deleteUserResponse.status}.`;
+        console.error("Failed to delete user from identity server:", errorMessage);
+        return { success: false, error: `Could not delete user from identity server: ${errorMessage}` };
+      }
+    } else {
+        if (!tenant.phone) {
+             console.warn(`Skipping identity server deletion for tenant ${tenant.id} because they have no phone number.`);
+        }
+    }
     
+    // 4. If external deletion is successful (or skipped), proceed with local deletion
     const spacesOccupiedByTenant = await databaseService.getAllSpaces({
         where: { tenantId: tenantId }
     });
@@ -139,7 +174,7 @@ export async function deleteTenantAction(tenantId: string) {
         return { success: false, error: "Failed to delete tenant. Record not found." };
       }
       if (error.code === 'P2003') {
-        return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills or other non-active agreements not caught by the check). Please ensure all dependencies are cleared or consider archiving." };
+        return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills). Please ensure all dependencies are cleared." };
       }
     }
     return { success: false, error: error.message || "Failed to delete tenant." };
