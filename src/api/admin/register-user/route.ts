@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
   const newUserLastName = newUserPayload.lastName || lastName;
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
-  // 5. Store new user in local Prisma database without a default role, but with tempPassword
+  // 5. Store new user in local Prisma database with tempPassword
   try {
     const userCreateInput: Prisma.UserCreateInput = {
       userId: newUserId,

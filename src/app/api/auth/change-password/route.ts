@@ -12,11 +12,11 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. Verify user is authenticated to make this change
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
-  if (!accessToken) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required."] }, { status: 401 });
   }
+  const accessToken = authHeader.substring(7);
 
   let requestBody;
   try {
