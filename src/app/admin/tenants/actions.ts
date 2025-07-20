@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns'; 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
@@ -56,14 +56,14 @@ export async function createTenantAction(data: {
     
     // The registration API needs a logged-in admin's token, which is in cookies.
     // This server action runs in the context of that user, so we can forward the call.
-    const { headers } = await import('next/headers');
+    const requestHeaders = await headers();
     
     const registrationResponse = await fetch(`${baseUrl}/api/admin/register-user`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             // Forward the cookie header from the original request to the API route
-            'Cookie': headers().get('Cookie') || "",
+            'Cookie': requestHeaders.get('Cookie') || "",
         },
         body: JSON.stringify({
             firstName: data.name.split(' ')[0] || data.name,
@@ -81,6 +81,11 @@ export async function createTenantAction(data: {
         console.error("Failed to register tenant user:", registrationResult.errors);
         return { success: false, error: `Failed to create user account: ${registrationResult.errors?.join(', ') || 'Unknown error'}` };
     }
+    
+    const userIdFromRegistration = registrationResult.userId;
+    if (!userIdFromRegistration) {
+        return { success: false, error: "User was created, but the user ID was not returned. Cannot create tenant profile." };
+    }
 
     // Now that the user is created, create the tenant profile
     const newTenant = await databaseService.createTenant({
@@ -91,6 +96,11 @@ export async function createTenantAction(data: {
       nationalId: data.nationalId,
       representativeName: data.representativeName,
       representativePhone: data.representativePhone,
+      user: {
+        connect: {
+            userId: userIdFromRegistration
+        }
+      }
     });
 
     revalidatePath('/admin/tenants');
@@ -127,6 +137,7 @@ export async function deleteTenantAction(tenantId: string) {
     // 1. Fetch the tenant to get their phone number and check for active agreements
     const tenant = await databaseService.getTenantById(tenantId, {
       agreements: true,
+      user: true,
     });
 
     if (!tenant) {
@@ -145,7 +156,8 @@ export async function deleteTenantAction(tenantId: string) {
     }
 
     // 3. Delete the user from the external identity server
-    if (AUTH_API_BASE_URL && tenant.phone) {
+    const userPhoneNumber = tenant.user?.phoneNumber;
+    if (AUTH_API_BASE_URL && userPhoneNumber) {
       const cookieStore = await cookies();
       const adminAccessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
 
@@ -159,18 +171,24 @@ export async function deleteTenantAction(tenantId: string) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${adminAccessToken}`,
         },
-        body: JSON.stringify({ phoneNumbers: [tenant.phone] }),
+        body: JSON.stringify({ phoneNumbers: [userPhoneNumber] }),
       });
 
       if (!deleteUserResponse.ok) {
-        const errorData = await deleteUserResponse.json();
-        const errorMessage = errorData.errors?.join(', ') || `Identity server returned status ${deleteUserResponse.status}.`;
-        console.error("Failed to delete user from identity server:", errorMessage);
-        return { success: false, error: `Could not delete user from identity server: ${errorMessage}` };
+        try {
+            const errorData = await deleteUserResponse.json();
+            const errorMessage = errorData.errors?.join(', ') || `Identity server returned status ${deleteUserResponse.status}.`;
+            console.error("Failed to delete user from identity server:", errorMessage);
+            // Decide if we should stop here or continue. For now, we will stop.
+            return { success: false, error: `Could not delete user from identity server: ${errorMessage}` };
+        } catch(e) {
+            console.error("Failed to parse error from identity server on delete:", await deleteUserResponse.text());
+             return { success: false, error: `Could not delete user from identity server, received status ${deleteUserResponse.status}.` };
+        }
       }
     } else {
-        if (!tenant.phone) {
-             console.warn(`Skipping identity server deletion for tenant ${tenant.id} because they have no phone number.`);
+        if (!userPhoneNumber) {
+             console.warn(`Skipping identity server deletion for tenant ${tenant.id} because the associated user has no phone number.`);
         }
     }
     
@@ -186,7 +204,14 @@ export async function deleteTenantAction(tenantId: string) {
         });
     }
     
+    // 5. Delete the tenant record (which will also cascade delete the user if the schema is set up that way,
+    // or we might need to delete the user separately).
     await databaseService.deleteTenant(tenantId);
+    if(tenant.userId) {
+        // Also delete the User record if it's linked
+        await databaseService.deleteUser(tenant.userId);
+    }
+
 
     revalidatePath('/admin/tenants');
     revalidatePath('/admin/spaces'); 

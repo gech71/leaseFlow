@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -401,7 +402,7 @@ export function TenantsClientPage({
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the tenant "{tenantToDelete?.name}"
               {tenantToDelete?.rentedSpace ? ` and mark their space (${getSpaceDetails(tenantToDelete.rentedSpace)}) as vacant.` : '.'}
-              This will not delete the associated user account.
+              This will also delete the associated user account from the identity provider.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
