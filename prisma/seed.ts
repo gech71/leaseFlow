@@ -123,26 +123,7 @@ async function main() {
   });
   console.log(`Created Super Admin User: ${superAdminUser.email}`);
 
-  // 4. Create a default Tenant User for testing
-  console.log('Creating a default Tenant User for testing...');
-  const defaultTenantUser = await prisma.user.create({
-      data: {
-          // This userId is a placeholder. For a real tenant, you would register them
-          // through the User Registration in the app settings, which gets a real ID
-          // from the authentication provider. This one is for easy testing of the portal.
-          userId: '00000000-0000-0000-0000-000000000001',
-          email: 'tenant@leaseflow.com',
-          name: 'Default Tenant',
-          firstName: 'Default',
-          lastName: 'Tenant',
-          phoneNumber: '0900000000', // Use this phone number to log into the portal
-          roles: { connect: { id: tenantRole.id } },
-      },
-  });
-   console.log(`Created Tenant User: ${defaultTenantUser.email}. Use phone ${defaultTenantUser.phoneNumber} and password 'password123' to log into the portal.`);
-
-
-  console.log('Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user and one test Tenant user.');
+  console.log('Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user.');
 }
 
 main()
