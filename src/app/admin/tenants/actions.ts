@@ -216,7 +216,6 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Tenant not found." };
     }
     
-    // Check for active agreements
     const hasActiveAgreements = tenant.agreements.some(agreement =>
       isAfter(addMonths(agreement.startDate, agreement.paymentTermMonths), new Date())
     );
@@ -224,50 +223,29 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
     }
     
-    // First, delete from the identity server
     const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
     if (!identityDeletionResult.success) {
       return { success: false, error: `Failed to delete from identity server: ${identityDeletionResult.error}. Local data not deleted.` };
     }
     
-    // Then, delete local records in a transaction
     await prisma.$transaction(async (tx) => {
-        // Find any space that this tenant occupies
-        const spacesOccupiedByTenant = await tx.space.findMany({
-            where: { tenantId: tenant.id }
-        });
-
-        // Vacate all spaces linked to this tenant
-        for (const space of spacesOccupiedByTenant) {
-            await tx.space.update({
-                where: { id: space.id },
-                data: {
-                    isOccupied: false,
-                    tenantId: null
-                }
-            });
-        }
-        
-        // Delete the associated User profile.
-        // Because the schema for Tenant has `onDelete: Cascade` for the `user` relation,
-        // deleting the user will automatically delete the associated tenant record.
         if (tenant.userId) {
+            const userWithBuildings = await tx.user.findUnique({
+              where: { id: tenant.userId },
+              include: { managedBuildings: { select: { id: true } } },
+            });
+
+            if (userWithBuildings && userWithBuildings.managedBuildings.length > 0) {
+              await tx.building.updateMany({
+                where: { managedByUserId: userWithBuildings.userId }, 
+                data: { managedByUserId: null },
+              });
+            }
             await tx.user.delete({
                 where: { id: tenant.userId }
-            }).catch(e => {
-                // If the user is already gone for some reason, we can ignore the P2025 error and proceed.
-                if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-                    console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. This might be due to a race condition or manual deletion. The associated tenant should also be gone.`);
-                } else {
-                    // Re-throw other errors to fail the transaction.
-                    throw e;
-                }
             });
         } else {
-            // If there's no associated user, just delete the tenant record.
-            await tx.tenant.delete({
-                where: { id: tenant.id }
-            });
+             await tx.tenant.delete({ where: { id: tenantId }});
         }
     });
 
