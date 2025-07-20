@@ -63,7 +63,7 @@ export async function createTenantAction(data: {
         headers: {
             'Content-Type': 'application/json',
             // Forward the cookie header from the original request to the API route
-            'Cookie': headers().get('Cookie') || "",
+            'Cookie': (await headers()).get('Cookie') || "",
         },
         body: JSON.stringify({
             firstName: data.name.split(' ')[0] || data.name,
