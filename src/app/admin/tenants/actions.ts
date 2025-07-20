@@ -179,12 +179,10 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
         });
         
-        // Handle successful deletion (200 OK or 204 No Content) which may have an empty body
         if (response.ok) {
             return { success: true };
         }
 
-        // Handle error responses that might have a body
         const errorText = await response.text();
         let errorMessage = `Failed with status ${response.status}`;
         
@@ -249,22 +247,26 @@ export async function deleteTenantAction(tenantId: string) {
                 }
             });
         }
-
-        // First, delete the Tenant record. This breaks the link from User.
-        await tx.tenant.delete({
-            where: { id: tenant.id }
-        });
         
-        // Then, it is safe to delete the associated User profile.
+        // Delete the associated User profile.
+        // Because the schema for Tenant has `onDelete: Cascade` for the `user` relation,
+        // deleting the user will automatically delete the associated tenant record.
         if (tenant.userId) {
             await tx.user.delete({
                 where: { id: tenant.userId }
             }).catch(e => {
+                // If the user is already gone for some reason, we can ignore the P2025 error and proceed.
                 if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
-                    console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. Continuing transaction.`);
+                    console.warn(`Attempted to delete user ${tenant.userId}, but they were already gone. This might be due to a race condition or manual deletion. The associated tenant should also be gone.`);
                 } else {
+                    // Re-throw other errors to fail the transaction.
                     throw e;
                 }
+            });
+        } else {
+            // If there's no associated user, just delete the tenant record.
+            await tx.tenant.delete({
+                where: { id: tenant.id }
             });
         }
     });
