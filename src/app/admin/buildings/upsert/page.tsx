@@ -46,13 +46,12 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
 }
 
 // Data fetching component
-async function BuildingDataFetcher({ searchParams }: { searchParams: { id?: string } }) {
+async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
   let initialBuildingDataSerializable: BuildingUpsertFormInternalProps['initialBuildingData'] = null;
   let formMode: 'add' | 'edit' = 'add';
-  const buildingIdParam = searchParams?.id;
 
-  if (buildingIdParam) {
-    let buildingToEdit = await databaseService.getBuildingById(buildingIdParam, {
+  if (buildingId) {
+    let buildingToEdit = await databaseService.getBuildingById(buildingId, {
       penaltyPolicyTiers: true
     });
 
@@ -91,7 +90,7 @@ async function BuildingDataFetcher({ searchParams }: { searchParams: { id?: stri
 
 
 // This is the main Server Component for the page
-export default function BuildingUpsertPage({ searchParams }: { searchParams: { id?: string } }) {
+export default async function BuildingUpsertPage({ searchParams }: { searchParams?: { id?: string } }) {
   const pageTitle = searchParams?.id ? "Edit Building" : "Add New Building";
   
   return (
@@ -109,7 +108,7 @@ export default function BuildingUpsertPage({ searchParams }: { searchParams: { i
         }
       />
       <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-        <BuildingDataFetcher searchParams={searchParams} />
+        <BuildingDataFetcher buildingId={searchParams?.id} />
       </Suspense>
     </div>
   );
