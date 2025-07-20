@@ -79,13 +79,35 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ phoneNumber, currentPassword, newPassword }),
     });
 
-    const responseData = await externalApiResponse.json();
+    // Handle empty response body gracefully
+    const responseText = await externalApiResponse.text();
+    let responseData;
+    if (responseText) {
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (jsonError) {
+        // If parsing fails but the status was not OK, it's an error.
+        if (!externalApiResponse.ok) {
+           return NextResponse.json({ isSuccess: false, errors: [`Authentication service responded with an unreadable body (Status: ${externalApiResponse.status}).`] }, { status: externalApiResponse.status });
+        }
+        // If status was OK but JSON is invalid, that's also an issue.
+         return NextResponse.json({ isSuccess: false, errors: ["Received an invalid JSON response from the authentication service."] }, { status: 500 });
+      }
+    }
 
-    if (!externalApiResponse.ok || !responseData.isSuccess) {
+    if (!externalApiResponse.ok) {
       const errorMessages = responseData?.errors || ["Failed to change password."];
       return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status || 400 });
     }
-
+    
+    // If we get here, the external API call was successful (2xx status).
+    // Now handle the response data, which might be undefined if the body was empty.
+    if (responseData && !responseData.isSuccess) {
+      const errorMessages = responseData?.errors || ["Failed to change password."];
+      return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: 400 });
+    }
+    
+    // Success case
     const user = await databaseService.findUserByPhoneNumber(phoneNumber);
     if (user) {
       await databaseService.updateUser(user.id, { tempPassword: null });
@@ -93,8 +115,7 @@ export async function POST(request: NextRequest) {
         console.warn(`Password changed for ${phoneNumber}, but user not found locally to clear temp password.`);
     }
 
-    // After a successful password change, we should log the user out to force a re-login with the new password.
-    // This is a good security practice. Let's clear the cookies.
+    // After a successful password change, log the user out to force a re-login with the new password.
     if (adminToken) {
         cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, '', { maxAge: -1, path: '/' });
     }
