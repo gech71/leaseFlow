@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { LogIn, Phone, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -88,9 +89,14 @@ export default function AdminLoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center">
-                <Lock className="mr-2 h-4 w-4 text-primary" /> Password
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="flex items-center">
+                  <Lock className="mr-2 h-4 w-4 text-primary" /> Password
+                </Label>
+                <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
+                  Forgot Password?
+                </Link>
+              </div>
               <div className="relative">
                 <Input 
                   id="password" 

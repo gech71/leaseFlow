@@ -13,7 +13,6 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
-import { cookies } from 'next/headers';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -25,11 +24,6 @@ const changePasswordSchema = z.object({
 });
 
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
-
-async function getAdminAccessToken(): Promise<string | null> {
-    const cookieStore = cookies();
-    return cookieStore.get('leaseflow_admin_access_token')?.value || null;
-}
 
 export function AdminProfileClientPage() {
   const { currentUser, isLoading: isUserLoading } = usePermissions();
@@ -48,17 +42,22 @@ export function AdminProfileClientPage() {
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
     try {
+        // The API only needs the current and new passwords.
+        const { currentPassword, newPassword } = values;
         const response = await fetch('/api/auth/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(values),
+            body: JSON.stringify({ currentPassword, newPassword }),
         });
 
         const data = await response.json();
 
         if (response.ok && data.isSuccess) {
-            toast({ title: "Success", description: "Your password has been changed successfully." });
+            toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
             form.reset();
+            // Optional: force logout after password change for better security
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/auth/login';
         } else {
             toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
         }

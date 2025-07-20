@@ -48,17 +48,22 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
     try {
+        // The API only needs the current and new passwords.
+        const { currentPassword, newPassword } = values;
         const response = await fetch('/api/auth/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(values),
+            body: JSON.stringify({ currentPassword, newPassword }),
         });
 
         const data = await response.json();
 
         if (response.ok && data.isSuccess) {
-            toast({ title: "Success", description: "Your password has been changed successfully." });
+            toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
             form.reset();
+            // Optional: force logout after password change for better security
+            await fetch('/api/auth/portal/logout', { method: 'POST' });
+            window.location.href = '/portal/login';
         } else {
             toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
         }

@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Link from 'next/link';
 
 const changePasswordSchema = z.object({
     currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -98,16 +99,18 @@ export default function TenantLoginPage() {
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsLoading(true);
     try {
+        // Here we only need to pass the current and new passwords.
+        const { currentPassword, newPassword } = values;
+
         const response = await fetch('/api/auth/change-password', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${changePasswordToken}`
              },
-            body: JSON.stringify({ 
-                phoneNumber,
-                currentPassword: values.currentPassword,
-                newPassword: values.newPassword,
+            body: JSON.stringify({
+                currentPassword,
+                newPassword,
             }),
         });
 
@@ -177,9 +180,14 @@ export default function TenantLoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="flex items-center">
-                  <Lock className="mr-2 h-4 w-4 text-primary" /> Password
-                </Label>
+                 <div className="flex items-center justify-between">
+                    <Label htmlFor="password" className="flex items-center">
+                      <Lock className="mr-2 h-4 w-4 text-primary" /> Password
+                    </Label>
+                    <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
+                      Forgot Password?
+                    </Link>
+                  </div>
                 <div className="relative">
                   <Input
                     id="password"
