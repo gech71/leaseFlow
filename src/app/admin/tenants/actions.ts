@@ -251,20 +251,11 @@ export async function deleteTenantAction(tenantId: string) {
           });
       }
 
-      // Delete the Tenant profile
+      // Delete the Tenant profile. This should cascade to the User record due to the schema.
       await tx.tenant.delete({
           where: { id: tenant.id }
       });
 
-      // Delete the associated User profile
-      if (tenant.userId) {
-          await tx.user.delete({
-              where: { id: tenant.userId }
-          }).catch(e => {
-              console.error(`Transaction failed to delete local user record ${tenant.userId}. Rolling back.`, e);
-              throw e; // This will cause the transaction to roll back
-          });
-      }
     });
 
     revalidatePath('/admin/tenants');
@@ -284,3 +275,4 @@ export async function deleteTenantAction(tenantId: string) {
     return { success: false, error: error.message || "Failed to delete tenant." };
   }
 }
+
