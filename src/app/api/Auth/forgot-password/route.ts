@@ -43,8 +43,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
 
+        // Handle empty but successful response
         if (!responseText) {
-             return NextResponse.json({ isSuccess: false, errors: ["Forgot password request was successful, but the server returned an empty response."] }, { status: 500 });
+             console.warn("Forgot password request was successful, but the server returned an empty response.");
+             return NextResponse.json({ isSuccess: false, errors: ["Server did not provide a reset token."] }, { status: 500 });
         }
 
         const responseData = JSON.parse(responseText);
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
              return NextResponse.json({ isSuccess: true, token: responseData.token });
         }
 
-        return NextResponse.json({ isSuccess: false, errors: ["Forgot password request failed or token was not provided."] }, { status: 500 });
+        return NextResponse.json({ isSuccess: false, errors: responseData.errors || ["Forgot password request failed or token was not provided."] }, { status: 500 });
 
     } catch (error) {
         console.error("Forgot password API call error:", error);

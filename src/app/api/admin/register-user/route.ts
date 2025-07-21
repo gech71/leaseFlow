@@ -1,5 +1,4 @@
 
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -76,7 +75,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  // The 'tempPassword' field is sent from the client but is not used directly.
   // The 'password' field is what's sent to the external service.
   const { firstName, lastName, phoneNumber, email, password } = newUserRegistrationData;
 
