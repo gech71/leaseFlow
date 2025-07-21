@@ -42,14 +42,21 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ Phone: phoneNumber, Password: password }),
     });
 
-    const responseData = await externalResponse.json();
+    const responseText = await externalResponse.text();
+    let responseData;
+    try {
+        responseData = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+        console.error("Login Error: Failed to parse JSON response from identity server.", responseText);
+        return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
+    }
 
-    if (!externalResponse.ok || !responseData.isSuccess) {
+    if (!externalResponse.ok) {
       const errorMessages = responseData?.errors || ["Invalid credentials or authentication failed."];
       return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
     }
-
-    const { accessToken } = responseData;
+    
+    const accessToken = responseData.accessToken;
     if (!accessToken) {
       return NextResponse.json({ isSuccess: false, errors: ["Authentication successful, but no access token was provided."] }, { status: 500 });
     }

@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
 
         if (!bill) {
             console.warn(`Callback Success: Received valid callback for transaction ${transactionId}, but no matching bill was found.`);
+            // Acknowledge to NIB that we received it, even if we can't find the bill, to prevent retries.
             return NextResponse.json({ message: "Callback acknowledged, no action taken." }, { status: 200 });
         }
 

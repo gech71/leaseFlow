@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 
 const VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
@@ -35,23 +36,36 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Handle cases where the response might not have a body
-    if (externalResponse.status === 204 || !externalResponse.headers.get('content-length') || externalResponse.headers.get('content-length') === '0') {
-      console.error(`External token validation returned status ${externalResponse.status} with an empty body.`);
-      return NextResponse.json({ isSuccess: false, errors: ['Token validation failed with an empty response from the server.'] }, { status: externalResponse.status });
-    }
-
-    const responseData = await externalResponse.json();
+    const responseText = await externalResponse.text();
 
     if (!externalResponse.ok) {
-        // If the external service returned an error, forward it
-        console.error(`External token validation failed with status ${externalResponse.status}:`, responseData);
+        let errorData;
+        try {
+            errorData = responseText ? JSON.parse(responseText) : {};
+        } catch (e) {
+             console.error(`External token validation failed with status ${externalResponse.status} and non-JSON body:`, responseText);
+             return NextResponse.json({ isSuccess: false, errors: ['Token validation failed with an unreadable response.'] }, { status: externalResponse.status });
+        }
+        console.error(`External token validation failed with status ${externalResponse.status}:`, errorData);
         return NextResponse.json(
-            { isSuccess: false, errors: responseData?.errors || ['Token validation failed.'], details: responseData },
+            { isSuccess: false, errors: errorData?.errors || ['Token validation failed.'], details: errorData },
             { status: externalResponse.status }
         );
     }
     
+    if (!responseText) {
+        console.error(`External token validation returned status ${externalResponse.status} with an empty body.`);
+        return NextResponse.json({ isSuccess: false, errors: ['Token validation failed with an empty response from the server.'] }, { status: 500 });
+    }
+
+    let responseData;
+    try {
+        responseData = JSON.parse(responseText);
+    } catch (e) {
+        console.error("External validation success, but failed to parse JSON response:", responseText);
+        return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the validation server."] }, { status: 500 });
+    }
+
     const phoneNumber = responseData.phone;
     if (!phoneNumber) {
         console.error("External validation success, but 'phone' field is missing in the response:", responseData);

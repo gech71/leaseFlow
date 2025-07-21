@@ -51,36 +51,26 @@ export async function POST(request: NextRequest) {
 
         const responseText = await externalApiResponse.text();
         
-        // The external service might return an empty body on success (200 OK)
-        if (externalApiResponse.ok) {
-          if (!responseText) {
+        // The external service might return an empty body on success
+        if (externalApiResponse.ok && !responseText) {
             return NextResponse.json({ isSuccess: true, message: "Password changed successfully." });
-          }
-          // If body is not empty, try to parse it
-          try {
-            const responseData = JSON.parse(responseText);
-            return NextResponse.json({ isSuccess: true, ...responseData });
-          } catch (e) {
-             // If parsing fails but status is OK, treat as success
-             return NextResponse.json({ isSuccess: true, message: "Password changed successfully (unreadable response)." });
-          }
+        }
+        
+        let responseData;
+        try {
+            responseData = responseText ? JSON.parse(responseText) : {};
+        } catch(e) {
+             console.error("Change Password Error: Failed to parse JSON response from identity server.", responseText);
+             return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
         }
 
-        // Handle error responses
-        let errorMessages = ["Failed to change password."];
-        if (responseText) {
-            try {
-                const errorData = JSON.parse(responseText);
-                errorMessages = errorData?.errors || (errorData.message ? [errorData.message] : errorMessages);
-            } catch (e) {
-                // The error response wasn't valid JSON, use the raw text if short
-                if (responseText.length < 200) {
-                    errorMessages = [responseText];
-                }
-            }
+
+        if (!externalApiResponse.ok) {
+            const errorMessages = responseData?.errors || (responseData.message ? [responseData.message] : ["Failed to change password."]);
+            return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status });
         }
 
-        return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status });
+        return NextResponse.json({ isSuccess: true, ...responseData });
 
     } catch (error) {
         console.error("Change password API call error:", error);

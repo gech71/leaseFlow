@@ -1,5 +1,4 @@
 
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -100,33 +99,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Failed to connect to user registration service."] }, { status: 503 });
   }
 
-  let externalResponseText;
-  try {
-    externalResponseText = await externalRegisterResponse.text();
-  } catch (textError: any) {
-    return NextResponse.json({ isSuccess: false, errors: [`Registration service responded with an unreadable body (Status: ${externalRegisterResponse.status}).`] }, { status: externalRegisterResponse.status || 500 });
-  }
-  
+  const externalResponseText = await externalRegisterResponse.text();
   let externalResponseData;
-  if (externalResponseText) {
-    try {
-      externalResponseData = JSON.parse(externalResponseText);
-    } catch (jsonError: any) {
-      if (!externalRegisterResponse.ok) {
-        return NextResponse.json({ isSuccess: false, errors: [`Registration service responded with status: ${externalRegisterResponse.status} and an invalid JSON: ${externalResponseText.substring(0,100)}...`] }, { status: externalRegisterResponse.status });
-      }
-      return NextResponse.json({ isSuccess: false, errors: ["Received an invalid JSON response from registration service despite OK status."] }, { status: 500 });
-    }
-  } else if (!externalRegisterResponse.ok) {
-      return NextResponse.json({ isSuccess: false, errors: [`Registration service responded with status: ${externalRegisterResponse.status} and an empty response.`] }, { status: externalRegisterResponse.status });
+  try {
+      externalResponseData = externalResponseText ? JSON.parse(externalResponseText) : {};
+  } catch (e) {
+      console.error("Registration Error: Failed to parse JSON response from identity server.", externalResponseText);
+      return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the registration service."] }, { status: 500 });
   }
 
-  if (!externalRegisterResponse.ok || !externalResponseData?.isSuccess) {
+  if (!externalRegisterResponse.ok) {
     const errorMessages = externalResponseData?.errors && Array.isArray(externalResponseData.errors) && externalResponseData.errors.length > 0
       ? externalResponseData.errors
       : externalResponseData?.message ? [externalResponseData.message]
       : externalResponseData?.detail ? [externalResponseData.detail] 
-      : externalResponseText ? [externalResponseText.substring(0, 200)] // Fallback to raw text if parsing fails but text exists
+      : externalResponseText ? [externalResponseText.substring(0, 200)]
       : [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status || 400 });
   }
