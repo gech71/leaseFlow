@@ -36,10 +36,9 @@ export async function POST(request: NextRequest) {
 
   try {
     // 1. Authenticate against the external identity provider
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Corrected payload to use 'Phone' and 'Password' as expected by the external service
       body: JSON.stringify({ Phone: phoneNumber, Password: password }),
     });
 

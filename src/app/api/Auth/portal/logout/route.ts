@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     if (token && AUTH_API_BASE_URL) {
         try {
-            fetch(`${AUTH_API_BASE_URL}/api/Auth/logout`, {
+            fetch(`${AUTH_API_BASE_URL}/logout`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             }).catch(e => console.error("Error calling external portal logout:", e.message));
