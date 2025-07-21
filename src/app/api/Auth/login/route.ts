@@ -1,0 +1,104 @@
+
+import { NextResponse, type NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
+import { databaseService } from '@/lib/services/databaseService';
+
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ADMIN_ACCESS_TOKEN_MAX_AGE = 60 * 60 * 8; // 8 hours
+
+// Insecure JWT payload decoder for prototype purposes. Not for production.
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const jsonPayload = decodeURIComponent(atob(base64Url.replace(/-/g, '+').replace(/_/g, '/')).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  if (!AUTH_API_BASE_URL) {
+    console.error("Auth API base URL is not configured.");
+    return NextResponse.json({ isSuccess: false, errors: ["Authentication service is not configured."] }, { status: 500 });
+  }
+
+  let credentials;
+  try {
+    credentials = await request.json();
+  } catch (e) {
+    return NextResponse.json({ isSuccess: false, errors: ["Invalid request format."] }, { status: 400 });
+  }
+
+  const { phoneNumber, password } = credentials;
+
+  try {
+    // 1. Authenticate against the external identity provider
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber, password }),
+    });
+
+    const responseData = await externalResponse.json();
+
+    if (!externalResponse.ok || !responseData.isSuccess) {
+      const errorMessages = responseData?.errors || ["Invalid credentials or authentication failed."];
+      return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
+    }
+
+    const { accessToken } = responseData;
+    if (!accessToken) {
+      return NextResponse.json({ isSuccess: false, errors: ["Authentication successful, but no access token was provided."] }, { status: 500 });
+    }
+
+    // 2. Decode token to check for password change requirement and get user ID
+    const tokenPayload = decodeJwtPayload(accessToken);
+    if (!tokenPayload) {
+      return NextResponse.json({ isSuccess: false, errors: ["Invalid token format received."] }, { status: 500 });
+    }
+
+    const requiresPasswordChange = tokenPayload.requiresPasswordChange === 'True' || tokenPayload.requiresPasswordChange === true;
+    
+    // For admin login, we still proceed to check local user existence even if password change is needed
+    // The front end can be designed to handle this state.
+    const userIdFromToken = tokenPayload.sub;
+    if (!userIdFromToken) {
+       return NextResponse.json({ isSuccess: false, errors: ["Token is missing user identifier (sub)."] }, { status: 500 });
+    }
+    
+    // 3. Verify user exists in the local database
+    const localUser = await databaseService.getUserByExternalId(userIdFromToken, { roles: true });
+    if (!localUser) {
+        console.warn(`Admin Login Warning: User ${userIdFromToken} authenticated successfully but is not found or provisioned in the local system.`);
+        return NextResponse.json({ isSuccess: false, errors: ["Login successful, but this user is not configured for access to this system. Please contact an administrator."] }, { status: 403 });
+    }
+    
+    // 4. Set the session cookie
+    cookies().set(ADMIN_ACCESS_TOKEN_KEY, accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
+      maxAge: ADMIN_ACCESS_TOKEN_MAX_AGE,
+    });
+    
+    // 5. Determine redirect path
+    let redirectPath = '/admin/dashboard'; // Default admin path
+    if (localUser.roles.length === 1 && localUser.roles[0].name === 'TENANT') {
+      redirectPath = '/portal/dashboard'; // A tenant role user trying to log in via admin page
+    }
+
+    return NextResponse.json({ 
+      isSuccess: true, 
+      redirectPath,
+      requiresPasswordChange
+    });
+
+  } catch (error) {
+    console.error("Login API call error:", error);
+    return NextResponse.json({ isSuccess: false, errors: ["Could not connect to the authentication service."] }, { status: 503 });
+  }
+}
