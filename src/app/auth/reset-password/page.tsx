@@ -39,7 +39,7 @@ export default function ResetPasswordPage() {
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
       phoneNumber: searchParams.get('phone') || "",
-      token: "",
+      token: searchParams.get('token') || "",
       newPassword: "",
       confirmPassword: ""
     }
@@ -47,6 +47,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     form.setValue("phoneNumber", searchParams.get('phone') || "");
+    form.setValue("token", searchParams.get('token') || "");
   }, [searchParams, form]);
 
   const handleResetPassword = async (values: ResetPasswordValues) => {
@@ -93,7 +94,7 @@ export default function ResetPasswordPage() {
           <KeyRound className="mx-auto h-12 w-12 text-primary" />
           <div className="space-y-1 px-2">
             <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Reset Your Password</CardTitle>
-            <CardDescription>Enter the code from your SMS and your new password.</CardDescription>
+            <CardDescription>Enter the reset code and your new password.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">
@@ -109,7 +110,7 @@ export default function ResetPasswordPage() {
               <FormField control={form.control} name="token" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center"><MessageSquareText className="mr-2 h-4 w-4" /> Reset Code</FormLabel>
-                  <FormControl><Input placeholder="Enter code from SMS" {...field} /></FormControl>
+                  <FormControl><Input placeholder="Enter reset code" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
