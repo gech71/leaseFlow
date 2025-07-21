@@ -76,8 +76,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  // Destructure all required fields, including tempPassword
-  const { firstName, lastName, phoneNumber, email, password, tempPassword } = newUserRegistrationData;
+  // The 'tempPassword' field is sent from the client but is not used directly.
+  // The 'password' field is what's sent to the external service.
+  const { firstName, lastName, phoneNumber, email, password } = newUserRegistrationData;
 
   if (!firstName || !lastName || !phoneNumber || !email || !password) {
     return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email, password)."] }, { status: 400 });
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
   // Extract phone number from the specific claim
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
-  // 5. Store new user in local Prisma database with tempPassword
+  // 5. Store new user in local Prisma database. No password-related fields are stored.
   try {
     const userCreateInput: Prisma.UserCreateInput = {
       userId: newUserId,
@@ -157,7 +158,8 @@ export async function POST(request: NextRequest) {
       firstName: newUserFirstName,
       lastName: newUserLastName,
       phoneNumber: newUserPhoneNumber,
-      tempPassword: tempPassword, // Correctly include tempPassword here
+      // The tempPassword field is intentionally removed from here.
+      // The local DB should not store any passwords.
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
