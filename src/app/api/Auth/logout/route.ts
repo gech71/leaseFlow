@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
         try {
             // Call the external identity server's logout endpoint.
             // This is "fire and forget" - we don't block the user's logout if it fails.
-            fetch(`${AUTH_API_BASE_URL}/logout`, {
+            fetch(`${AUTH_API_BASE_URL}/api/Auth/logout`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`

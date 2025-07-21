@@ -169,7 +169,7 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             return { success: false, error: "Admin authentication token not found." };
         }
         
-        const response = await fetch(`${AUTH_API_BASE_URL}/delete-users`, {
+        const response = await fetch(`${AUTH_API_BASE_URL}/api/Auth/delete-users`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

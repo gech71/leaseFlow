@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/change-password`, {
+        const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
