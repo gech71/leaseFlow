@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   const { phoneNumber, password } = await request.json();
 
   try {
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phoneNumber, password }),
