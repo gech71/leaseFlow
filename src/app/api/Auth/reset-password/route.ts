@@ -22,20 +22,36 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/reset-password`, {
+        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/reset-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phoneNumber, token, newPassword }),
         });
 
-        const responseData = await externalResponse.json();
+        const responseText = await externalResponse.text();
 
         if (!externalResponse.ok) {
-            const errorMessages = responseData?.errors || ["Failed to reset password."];
+            let errorMessages = ["Failed to reset password."];
+            if (responseText) {
+                try {
+                    const errorData = JSON.parse(responseText);
+                    errorMessages = errorData?.errors || (errorData.message ? [errorData.message] : errorMessages);
+                } catch (e) {
+                     errorMessages = [responseText.substring(0, 150)];
+                }
+            }
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
         
-        return NextResponse.json({ isSuccess: true, message: "Password has been reset successfully." });
+        // Even on success, some APIs might return an empty body.
+        // If there's no text, we can assume success based on the OK status.
+        if (!responseText) {
+            return NextResponse.json({ isSuccess: true, message: "Password has been reset successfully." });
+        }
+
+        // If there is a response body, parse it and return.
+        const responseData = JSON.parse(responseText);
+        return NextResponse.json({ isSuccess: true, ...responseData });
 
     } catch (error) {
         console.error("Reset password API call error:", error);

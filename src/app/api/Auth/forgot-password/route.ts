@@ -22,20 +22,33 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/forgot-password`, {
+        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/forgot-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phoneNumber }),
         });
 
-        const responseData = await externalResponse.json();
+        const responseText = await externalResponse.text();
 
         if (!externalResponse.ok) {
-            const errorMessages = responseData?.errors || ["Failed to initiate password reset."];
+            let errorMessages = ["Failed to initiate password reset."];
+            if (responseText) {
+                try {
+                    const errorData = JSON.parse(responseText);
+                    errorMessages = errorData?.errors || (errorData.message ? [errorData.message] : errorMessages);
+                } catch (e) {
+                    errorMessages = [responseText.substring(0, 150)];
+                }
+            }
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
+
+        if (!responseText) {
+             return NextResponse.json({ isSuccess: false, errors: ["Forgot password request was successful, but the server returned an empty response."] }, { status: 500 });
+        }
+
+        const responseData = JSON.parse(responseText);
         
-        // The external service is expected to return a token on success
         if (responseData.isSuccess && responseData.token) {
              return NextResponse.json({ isSuccess: true, token: responseData.token });
         }
