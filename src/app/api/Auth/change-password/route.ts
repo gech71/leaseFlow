@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         if (responseText) {
             try {
                 const errorData = JSON.parse(responseText);
-                errorMessages = errorData?.errors || errorData?.message ? [errorData.message] : errorMessages;
+                errorMessages = errorData?.errors || (errorData.message ? [errorData.message] : errorMessages);
             } catch (e) {
                 // The error response wasn't valid JSON, use the raw text if short
                 if (responseText.length < 200) {

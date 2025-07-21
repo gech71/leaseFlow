@@ -156,8 +156,6 @@ export async function POST(request: NextRequest) {
       firstName: newUserFirstName,
       lastName: newUserLastName,
       phoneNumber: newUserPhoneNumber,
-      // The tempPassword field is intentionally removed from here.
-      // The local DB should not store any passwords.
     };
 
     const localUser = await databaseService.createUser(userCreateInput);

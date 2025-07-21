@@ -43,10 +43,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
 
-        // Handle empty but successful response
         if (!responseText) {
-             console.warn("Forgot password request was successful, but the server returned an empty response.");
-             return NextResponse.json({ isSuccess: false, errors: ["Server did not provide a reset token."] }, { status: 500 });
+            console.error("Forgot password API call successful, but received an empty response from identity server.");
+            return NextResponse.json({ isSuccess: false, errors: ["Server did not provide a reset token."] }, { status: 500 });
         }
 
         const responseData = JSON.parse(responseText);

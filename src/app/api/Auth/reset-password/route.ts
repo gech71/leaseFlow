@@ -43,13 +43,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
         
-        // Even on success, some APIs might return an empty body.
-        // If there's no text, we can assume success based on the OK status.
         if (!responseText) {
             return NextResponse.json({ isSuccess: true, message: "Password has been reset successfully." });
         }
 
-        // If there is a response body, parse it and return.
         const responseData = JSON.parse(responseText);
         return NextResponse.json({ isSuccess: true, ...responseData });
 

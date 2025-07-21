@@ -45,11 +45,10 @@ export async function createTenantAction(data: {
 }) {
   try {
     const tempPassword = generateTempPassword();
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 9002}`;
     
     const requestHeaders = await headers();
     
-    const registrationResponse = await fetch(`${baseUrl}/api/admin/register-user`, {
+    const registrationResponse = await fetch(`${requestHeaders.get('origin')}/api/admin/register-user`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -177,12 +176,11 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
         });
         
-        const errorText = await response.text();
-
         if (response.ok) {
             return { success: true };
         }
         
+        const errorText = await response.text();
         let errorMessage = `Failed with status ${response.status}`;
         if (errorText) {
             try {
@@ -222,9 +220,11 @@ export async function deleteTenantAction(tenantId: string) {
     }
     
     // Delete from identity server first. If this fails, we don't touch the local DB.
-    const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
-    if (!identityDeletionResult.success) {
-      return { success: false, error: `Failed to delete from identity server: ${identityDeletionResult.error}. Local data not deleted.` };
+    if (tenant.phone) {
+      const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
+      if (!identityDeletionResult.success) {
+        return { success: false, error: `Failed to delete from identity server: ${identityDeletionResult.error}. Local data not deleted.` };
+      }
     }
     
     await prisma.$transaction(async (tx) => {
