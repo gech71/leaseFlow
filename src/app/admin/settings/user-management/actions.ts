@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -58,9 +59,19 @@ export async function getUserManagementPageData() {
     // so we typically fetch all data and let the UI layer handle visibility.
     // However, a good practice could be to scope this down for non-super-admins if needed in the future.
     const users = await databaseService.getAllUsers({
-      include: { 
+      select: {
+        id: true,
+        userId: true,
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        phoneNumber: true,
+        tempPassword: true, // Explicitly select tempPassword
+        createdAt: true,
+        updatedAt: true,
         roles: true, 
-        managedBuildings: true
+        managedBuildings: true,
       },
       orderBy: { createdAt: 'desc' }
     });

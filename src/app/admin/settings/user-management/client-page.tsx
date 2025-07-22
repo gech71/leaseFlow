@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,12 +12,14 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff } from 'lucide-react';
+import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff, InfoIcon } from 'lucide-react';
 import { updateUserAssignments } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
   createdAt: string;
@@ -165,6 +168,7 @@ export function UserManagementClientPage({
   }
 
   return (
+    <TooltipProvider>
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline text-xl">All Users</CardTitle>
@@ -192,7 +196,21 @@ export function UserManagementClientPage({
                 <TableBody>
                   {paginatedUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.name || `${user.firstName} ${user.lastName}`.trim() || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                            <span>{user.name || `${user.firstName} ${user.lastName}`.trim() || 'N/A'}</span>
+                            {user.tempPassword && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <InfoIcon className="h-4 w-4 text-primary cursor-help"/>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Temp Password: <span className="font-semibold">{user.tempPassword}</span></p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+                        </div>
+                      </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell className="text-xs">
                         {user.roles.length > 0 ? user.roles[0].name.replace(/_/g, ' ') : <span className="italic text-muted-foreground">No role</span>}
@@ -298,5 +316,6 @@ export function UserManagementClientPage({
         </Dialog>
       )}
     </Card>
+    </TooltipProvider>
   );
 }
