@@ -82,29 +82,34 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ isSuccess: false, errors: ["Token is missing user identifier (sub)."] }, { status: 500 });
     }
     
-    // 3. Verify user exists in the local database
+    // 3. Verify user exists in the local database and check for temp password
     const localUser = await databaseService.getUserByExternalId(userIdFromToken, { roles: true });
     if (!localUser) {
         console.warn(`Admin Login Warning: User ${userIdFromToken} authenticated successfully but is not found or provisioned in the local system.`);
         return NextResponse.json({ isSuccess: false, errors: ["Login successful, but this user is not configured for access to this system. Please contact an administrator."] }, { status: 403 });
     }
+
+    // NEW: Check if the user has a temporary password set
+    const requiresPasswordChange = !!localUser.tempPassword;
+
+    // 4. Set cookies if password change is NOT required
+    if (!requiresPasswordChange) {
+      const cookieStore = await cookies();
+      cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        sameSite: 'lax',
+      });
+      cookieStore.set(ADMIN_REFRESH_TOKEN_KEY, refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        sameSite: 'lax',
+      });
+    }
     
-    // 4. Set the session cookies for both access and refresh tokens
-    const cookieStore = await cookies();
-    cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
-    });
-    cookieStore.set(ADMIN_REFRESH_TOKEN_KEY, refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
-    });
-    
-    // 5. Determine redirect path
+    // 5. Determine redirect path and return appropriate response
     let redirectPath = '/admin/dashboard'; // Default admin path
     if (localUser.roles.length === 1 && localUser.roles[0].name === 'TENANT') {
       redirectPath = '/portal/dashboard'; // A tenant role user trying to log in via admin page
@@ -112,7 +117,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       isSuccess: true, 
-      redirectPath
+      redirectPath,
+      requiresPasswordChange,
+      accessToken: requiresPasswordChange ? accessToken : undefined, // Send token back if change is needed
     });
 
   } catch (error) {

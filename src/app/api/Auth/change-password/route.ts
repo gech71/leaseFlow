@@ -25,7 +25,7 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-async function getAccessTokenAndPhoneFromCookie(): Promise<{accessToken: string; phoneNumber: string} | null> {
+async function getAuthDetailsFromCookie(): Promise<{accessToken: string; phoneNumber: string; userId: string} | null> {
     const cookieStore = await cookies();
     const token = cookieStore.get('leaseflow_admin_access_token')?.value || cookieStore.get('leaseflow_portal_access_token')?.value;
 
@@ -33,13 +33,14 @@ async function getAccessTokenAndPhoneFromCookie(): Promise<{accessToken: string;
 
     const payload = decodeJwtPayload(token);
     const phoneNumber = payload?.phone_number;
+    const userId = payload?.sub;
 
-    if (!phoneNumber) {
-        console.error("Change Password Error: 'phone_number' claim missing from JWT payload for logged-in user.");
+    if (!phoneNumber || !userId) {
+        console.error("Change Password Error: 'phone_number' or 'sub' claim missing from JWT payload for logged-in user.");
         return null;
     }
     
-    return { accessToken: token, phoneNumber };
+    return { accessToken: token, phoneNumber, userId };
 }
 
 
@@ -74,14 +75,16 @@ export async function POST(request: NextRequest) {
         if (payload?.phone_number) {
             effectivePhoneNumber = payload.phone_number;
         }
+        if (!effectivePhoneNumber && phoneNumberFromRequest) {
+            effectivePhoneNumber = phoneNumberFromRequest;
+        }
         userIdForDbUpdate = payload?.sub;
     } else {
-        const cookieAuth = await getAccessTokenAndPhoneFromCookie();
+        const cookieAuth = await getAuthDetailsFromCookie();
         if (cookieAuth) {
             accessToken = cookieAuth.accessToken;
             effectivePhoneNumber = cookieAuth.phoneNumber;
-            const payload = decodeJwtPayload(cookieAuth.accessToken);
-            userIdForDbUpdate = payload?.sub;
+            userIdForDbUpdate = cookieAuth.userId;
         }
     }
 
