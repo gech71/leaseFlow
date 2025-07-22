@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        // Corrected the endpoint path to match other auth-related API calls.
         const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/forgot-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -44,17 +43,32 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
         
+        // Handle cases where success is indicated by status code but body might be empty
         if (!responseText) {
-            console.error("Forgot password API call successful, but received an empty response from identity server.");
-            return NextResponse.json({ isSuccess: false, errors: ["Server did not provide a reset token."] }, { status: 500 });
+            // It's possible the token is sent via SMS and the API just confirms success.
+            return NextResponse.json({ isSuccess: true, message: "Request received. If your number is valid, you will receive a reset code." });
         }
 
-        const responseData = JSON.parse(responseText);
+        let responseData;
+        try {
+            responseData = JSON.parse(responseText);
+        } catch (e) {
+            console.error("Forgot password API call successful, but failed to parse JSON response from identity server.", responseText);
+            // Even if we can't parse, we can tell the user to check their phone.
+            return NextResponse.json({ isSuccess: true, message: "Request received. If your number is valid, you will receive a reset code." });
+        }
         
+        // If we successfully parsed, check for token and success status.
         if (responseData.isSuccess && responseData.token) {
              return NextResponse.json({ isSuccess: true, token: responseData.token });
         }
-
+        
+        // The identity server might just return `isSuccess: true` if the token is sent via another channel
+        if (responseData.isSuccess) {
+            return NextResponse.json({ isSuccess: true, message: responseData.message || "Request received." });
+        }
+        
+        // Fallback for any other scenario
         return NextResponse.json({ isSuccess: false, errors: responseData.errors || ["Forgot password request failed or token was not provided."] }, { status: 500 });
 
     } catch (error) {
