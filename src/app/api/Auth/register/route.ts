@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   // 3. Call external identity server to register the user
   let externalRegisterResponse: Response;
   try {
-    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/register`, {
+    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -97,25 +97,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Failed to connect to user registration service."] }, { status: 503 });
   }
 
+  const externalResponseText = await externalRegisterResponse.text();
+
   if (!externalRegisterResponse.ok) {
-    const externalResponseText = await externalRegisterResponse.text();
     let errorMessages = [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     if (externalResponseText) {
         try {
             const errorData = JSON.parse(externalResponseText);
             errorMessages = errorData?.errors || [errorData.message] || errorMessages;
         } catch (e) {
-            // Can't parse, use raw text if it's not too long
             errorMessages = [externalResponseText.substring(0, 200)];
         }
     }
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status });
   }
-
-  // After successful external registration, we need to log the user in to get their token and thus their user ID (sub claim)
+  
+  // Registration was successful, now get the user's ID
   let loginResponse: Response;
   try {
-      loginResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+      loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phoneNumber, password }),
