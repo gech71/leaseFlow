@@ -25,22 +25,32 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-async function getAuthDetailsFromCookie(): Promise<{accessToken: string; phoneNumber: string; userId: string} | null> {
+// Updated helper to get user details from the database using the token's user ID
+async function getAuthDetailsFromSession(): Promise<{accessToken: string; phoneNumber: string; userId: string} | null> {
     const cookieStore = await cookies();
     const token = cookieStore.get('leaseflow_admin_access_token')?.value || cookieStore.get('leaseflow_portal_access_token')?.value;
 
-    if (!token) return null;
+    if (!token) {
+        console.error("Change Password Error: No session token found.");
+        return null;
+    }
 
     const payload = decodeJwtPayload(token);
-    const phoneNumber = payload?.phone_number;
     const userId = payload?.sub;
 
-    if (!phoneNumber || !userId) {
-        console.error("Change Password Error: 'phone_number' or 'sub' claim missing from JWT payload for logged-in user.");
+    if (!userId) {
+        console.error("Change Password Error: 'sub' claim missing from JWT payload for logged-in user.");
+        return null;
+    }
+
+    // Fetch user from local DB to get their phone number
+    const localUser = await databaseService.getUserByExternalId(userId);
+    if (!localUser || !localUser.phoneNumber) {
+        console.error(`Change Password Error: User with ID ${userId} not found in local DB or has no phone number.`);
         return null;
     }
     
-    return { accessToken: token, phoneNumber, userId };
+    return { accessToken: token, phoneNumber: localUser.phoneNumber, userId: userId };
 }
 
 
@@ -69,24 +79,22 @@ export async function POST(request: NextRequest) {
     let effectivePhoneNumber: string | undefined;
     let userIdForDbUpdate: string | undefined;
 
+    // This handles the post-login "force change password" flow where the token is sent as a header
     if (authHeader && authHeader.startsWith('Bearer ')) {
         accessToken = authHeader.substring(7);
+        // In this specific flow, the phone number must be provided in the body
+        effectivePhoneNumber = phoneNumberFromRequest;
         const payload = decodeJwtPayload(accessToken);
-        effectivePhoneNumber = payload?.phone_number;
         userIdForDbUpdate = payload?.sub;
     } else {
-        const cookieAuth = await getAuthDetailsFromCookie();
-        if (cookieAuth) {
-            accessToken = cookieAuth.accessToken;
-            effectivePhoneNumber = cookieAuth.phoneNumber;
-            userIdForDbUpdate = cookieAuth.userId;
+        // This handles a logged-in user changing their password from their profile page
+        const sessionAuth = await getAuthDetailsFromSession();
+        if (sessionAuth) {
+            accessToken = sessionAuth.accessToken;
+            effectivePhoneNumber = sessionAuth.phoneNumber;
+            userIdForDbUpdate = sessionAuth.userId;
         }
     }
-    
-    if (!effectivePhoneNumber && phoneNumberFromRequest) {
-        effectivePhoneNumber = phoneNumberFromRequest;
-    }
-
 
     if (!accessToken) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
@@ -94,7 +102,6 @@ export async function POST(request: NextRequest) {
     if (!effectivePhoneNumber) {
         return NextResponse.json({ isSuccess: false, errors: ["User phone number could not be determined."] }, { status: 400 });
     }
-
 
     try {
         const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-password`, {
