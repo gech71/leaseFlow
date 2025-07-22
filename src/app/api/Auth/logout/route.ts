@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const token = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
     const refreshToken = cookieStore.get(ADMIN_REFRESH_TOKEN_KEY)?.value;
 
-    // Always clear the local cookies
+    // Always clear the local cookies immediately
     cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, '', { httpOnly: true, path: '/', maxAge: -1 });
     cookieStore.set(ADMIN_REFRESH_TOKEN_KEY, '', { httpOnly: true, path: '/', maxAge: -1 });
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         try {
             // Call the external identity server's logout endpoint.
             // This is "fire and forget" - we don't block the user's logout if it fails.
-            fetch(`${AUTH_API_BASE_URL}/api/Auth/logout`, {
+            fetch(`${AUTH_API_BASE_URL}/logout`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

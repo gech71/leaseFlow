@@ -4,16 +4,45 @@ import { cookies } from 'next/headers';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 
-async function getAccessToken(request: NextRequest): Promise<string | null> {
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
+  }
+}
+
+async function getAccessTokenAndPhone(request: NextRequest): Promise<{accessToken: string; phoneNumber: string} | null> {
     const authHeader = request.headers.get('Authorization');
+    let token: string | undefined;
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
-        return authHeader.substring(7);
+        token = authHeader.substring(7);
+    } else {
+        const cookieStore = await cookies();
+        token = cookieStore.get('leaseflow_admin_access_token')?.value || cookieStore.get('leaseflow_portal_access_token')?.value;
     }
-    const cookieStore = await cookies();
-    const adminToken = cookieStore.get('leaseflow_admin_access_token')?.value;
-    if (adminToken) return adminToken;
-    const portalToken = cookieStore.get('leaseflow_portal_access_token')?.value;
-    return portalToken || null;
+
+    if (!token) return null;
+
+    const payload = decodeJwtPayload(token);
+    const phoneNumber = payload?.phone_number;
+
+    if (!phoneNumber) return null;
+    
+    return { accessToken: token, phoneNumber };
 }
 
 export async function POST(request: NextRequest) {
@@ -22,9 +51,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication service is not configured."] }, { status: 500 });
     }
 
-    const accessToken = await getAccessToken(request);
-    if (!accessToken) {
-        return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
+    const authDetails = await getAccessTokenAndPhone(request);
+    if (!authDetails) {
+        return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing or invalid."] }, { status: 401 });
     }
     
     let requestBody;
@@ -44,14 +73,17 @@ export async function POST(request: NextRequest) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${authDetails.accessToken}`,
             },
-            body: JSON.stringify({ currentPassword, newPassword }),
+            body: JSON.stringify({ 
+                phoneNumber: authDetails.phoneNumber,
+                currentPassword, 
+                newPassword 
+            }),
         });
 
         const responseText = await externalApiResponse.text();
         
-        // The external service might return an empty body on success
         if (externalApiResponse.ok && !responseText) {
             return NextResponse.json({ isSuccess: true, message: "Password changed successfully." });
         }
@@ -63,7 +95,6 @@ export async function POST(request: NextRequest) {
              console.error("Change Password Error: Failed to parse JSON response from identity server.", responseText);
              return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
         }
-
 
         if (!externalApiResponse.ok) {
             const errorMessages = responseData?.errors || (responseData.message ? [responseData.message] : ["Failed to change password."]);
