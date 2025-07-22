@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   // 3. Call external identity server to register the user
   let externalRegisterResponse: Response;
   try {
-    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
+    externalRegisterResponse = await fetch(`${AUTH_API_BASE_URL}/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -154,3 +154,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["User registered on identity server, but failed to create local record.", dbError.message] }, { status: 500 });
   }
 }
+

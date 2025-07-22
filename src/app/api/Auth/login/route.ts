@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // 1. Authenticate against the external identity provider
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phoneNumber: phoneNumber, Password: password }),
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 4. Set the session cookies for both access and refresh tokens
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -123,3 +123,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Could not connect to the authentication service."] }, { status: 503 });
   }
 }
+
