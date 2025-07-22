@@ -42,7 +42,6 @@ export default function ForgotPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [resetToken, setResetToken] = useState('');
   
   const getResetTokenForm = useForm<GetResetTokenValues>({
     resolver: zodResolver(getResetTokenSchema),
@@ -65,8 +64,7 @@ export default function ForgotPasswordPage() {
       });
       const data = await response.json();
       if (response.ok && data.isSuccess && data.token) {
-        toast({ title: "Verification Code Sent", description: "A reset code has been sent. Please enter it below.", });
-        setResetToken(data.token);
+        toast({ title: "Verification Code Sent", description: "A reset code has been sent to you. Please enter it below.", });
         resetPasswordForm.setValue("token", data.token);
         setStep('enter-password');
       } else {

@@ -51,18 +51,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
         }
         
-        // If we successfully parsed, check for token and success status.
-        if (responseData.isSuccess && responseData.token) {
-             return NextResponse.json({ isSuccess: true, token: responseData.token });
+        // --- Corrected Logic ---
+        // The token is embedded in the 'message' field.
+        const message = responseData.message;
+        if (typeof message === 'string' && message.includes(': ')) {
+            const token = message.split(': ').pop()?.trim();
+            if (token) {
+                return NextResponse.json({ isSuccess: true, token: token });
+            }
         }
         
-        // This case handles when the identity server reports success but doesn't include a token.
-        if (responseData.isSuccess && !responseData.token) {
-            return NextResponse.json({ isSuccess: false, errors: ["Forgot password request was successful, but a token was not provided by the service."] }, { status: 500 });
-        }
-        
-        // Fallback for any other scenario, including isSuccess: false from the identity server
-        return NextResponse.json({ isSuccess: false, errors: responseData.errors || ["Forgot password request failed or token was not provided."] }, { status: 500 });
+        // This will now be the error case if the token isn't found in the message.
+        return NextResponse.json({ isSuccess: false, errors: ["Forgot password request was successful, but a token was not provided in the expected format."] }, { status: 500 });
 
     } catch (error) {
         console.error("Forgot password API call error:", error);
