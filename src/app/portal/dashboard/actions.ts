@@ -195,7 +195,7 @@ export async function submitPaymentProofAction(
     }
 
     const bill = await databaseService.getBillById(billId, {
-      include: { agreement: { include: { tenant: true } } }
+      agreement: { include: { tenant: true } }
     });
 
     if (!bill) {
