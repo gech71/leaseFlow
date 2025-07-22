@@ -75,7 +75,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  // The 'password' field is what's sent to the external service.
   const { firstName, lastName, phoneNumber, email, password } = newUserRegistrationData;
 
   if (!firstName || !lastName || !phoneNumber || !email || !password) {
@@ -100,19 +99,22 @@ export async function POST(request: NextRequest) {
 
   const externalResponseText = await externalRegisterResponse.text();
   let externalResponseData;
+  if (!externalResponseText) {
+      console.error("Registration Error: Received an empty response from the identity server.");
+      return NextResponse.json({ isSuccess: false, errors: ["Registration service returned an empty response."] }, { status: 500 });
+  }
+  
   try {
-      externalResponseData = externalResponseText ? JSON.parse(externalResponseText) : {};
+      externalResponseData = JSON.parse(externalResponseText);
   } catch (e) {
       console.error("Registration Error: Failed to parse JSON response from identity server.", externalResponseText);
       return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the registration service."] }, { status: 500 });
   }
 
-  if (!externalRegisterResponse.ok) {
+  if (!externalRegisterResponse.ok || !externalResponseData.isSuccess) {
     const errorMessages = externalResponseData?.errors && Array.isArray(externalResponseData.errors) && externalResponseData.errors.length > 0
       ? externalResponseData.errors
       : externalResponseData?.message ? [externalResponseData.message]
-      : externalResponseData?.detail ? [externalResponseData.detail] 
-      : externalResponseText ? [externalResponseText.substring(0, 200)]
       : [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status || 400 });
   }
@@ -128,20 +130,16 @@ export async function POST(request: NextRequest) {
   }
 
   const newUserId = newUserPayload.sub;
-  const newUserEmail = newUserPayload.email || email; 
-  const newUserFirstName = newUserPayload.firstName || firstName;
-  const newUserLastName = newUserPayload.lastName || lastName;
-  const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
-  // 5. Store new user in local Prisma database. No password-related fields are stored.
+  // 5. Store new user in local Prisma database.
   try {
     const userCreateInput: Prisma.UserCreateInput = {
       userId: newUserId,
-      email: newUserEmail,
-      name: `${newUserFirstName} ${newUserLastName}`.trim(),
-      firstName: newUserFirstName,
-      lastName: newUserLastName,
-      phoneNumber: newUserPhoneNumber,
+      email: email,
+      name: `${firstName} ${lastName}`.trim(),
+      firstName: firstName,
+      lastName: lastName,
+      phoneNumber: phoneNumber,
     };
 
     const localUser = await databaseService.createUser(userCreateInput);

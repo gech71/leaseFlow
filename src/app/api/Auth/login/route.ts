@@ -5,6 +5,7 @@ import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ADMIN_REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
 const ADMIN_ACCESS_TOKEN_MAX_AGE = 60 * 60 * 8; // 8 hours
 
 // Insecure JWT payload decoder for prototype purposes. Not for production.
@@ -39,35 +40,40 @@ export async function POST(request: NextRequest) {
     const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Phone: phoneNumber, Password: password }),
+      // Use the correct payload keys as specified by the user
+      body: JSON.stringify({ phoneNumber, password }),
     });
 
     const responseText = await externalResponse.text();
     let responseData;
+    
+    if (!responseText) {
+        console.error("Login Error: Received an empty response from the identity server.");
+        return NextResponse.json({ isSuccess: false, errors: ["Authentication service returned an empty response."] }, { status: 500 });
+    }
+
     try {
-        responseData = responseText ? JSON.parse(responseText) : {};
+        responseData = JSON.parse(responseText);
     } catch (e) {
         console.error("Login Error: Failed to parse JSON response from identity server.", responseText);
         return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
     }
 
-    if (!externalResponse.ok) {
+    if (!externalResponse.ok || !responseData.isSuccess) {
       const errorMessages = responseData?.errors || ["Invalid credentials or authentication failed."];
       return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
     }
     
-    const accessToken = responseData.accessToken;
-    if (!accessToken) {
-      return NextResponse.json({ isSuccess: false, errors: ["Authentication successful, but no access token was provided."] }, { status: 500 });
+    const { accessToken, refreshToken } = responseData;
+    if (!accessToken || !refreshToken) {
+      return NextResponse.json({ isSuccess: false, errors: ["Authentication successful, but tokens were not provided."] }, { status: 500 });
     }
 
-    // 2. Decode token to check for password change requirement and get user ID
+    // 2. Decode token to get user ID
     const tokenPayload = decodeJwtPayload(accessToken);
     if (!tokenPayload) {
       return NextResponse.json({ isSuccess: false, errors: ["Invalid token format received."] }, { status: 500 });
     }
-
-    const requiresPasswordChange = tokenPayload.requiresPasswordChange === 'True' || tokenPayload.requiresPasswordChange === true;
     
     const userIdFromToken = tokenPayload.sub;
     if (!userIdFromToken) {
@@ -81,13 +87,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["Login successful, but this user is not configured for access to this system. Please contact an administrator."] }, { status: 403 });
     }
     
-    // 4. Set the session cookie
-    cookies().set(ADMIN_ACCESS_TOKEN_KEY, accessToken, {
+    // 4. Set the session cookies for both access and refresh tokens
+    const cookieStore = cookies();
+    cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       sameSite: 'lax',
       maxAge: ADMIN_ACCESS_TOKEN_MAX_AGE,
+    });
+    cookieStore.set(ADMIN_REFRESH_TOKEN_KEY, refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
+      maxAge: ADMIN_ACCESS_TOKEN_MAX_AGE, // Match the access token's age for simplicity
     });
     
     // 5. Determine redirect path
@@ -98,8 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       isSuccess: true, 
-      redirectPath,
-      requiresPasswordChange
+      redirectPath
     });
 
   } catch (error) {
