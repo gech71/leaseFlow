@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/forgot-password`, {
+        // Corrected the endpoint path to match other auth-related API calls.
+        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/forgot-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phoneNumber }),
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
             }
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
-
+        
         if (!responseText) {
             console.error("Forgot password API call successful, but received an empty response from identity server.");
             return NextResponse.json({ isSuccess: false, errors: ["Server did not provide a reset token."] }, { status: 500 });
