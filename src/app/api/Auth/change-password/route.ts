@@ -25,34 +25,18 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-// Updated helper to get user details from the database using the token's user ID
-async function getAuthDetailsFromSession(): Promise<{accessToken: string; phoneNumber: string; userId: string} | null> {
+// Simplified helper to get the access token from cookies or header.
+async function getAccessToken(request: NextRequest): Promise<string | null> {
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        return authHeader.substring(7);
+    }
     const cookieStore = await cookies();
-    const token = cookieStore.get('leaseflow_admin_access_token')?.value || cookieStore.get('leaseflow_portal_access_token')?.value;
-
-    if (!token) {
-        console.error("Change Password Error: No session token found.");
-        return null;
-    }
-
-    const payload = decodeJwtPayload(token);
-    const userId = payload?.sub;
-
-    if (!userId) {
-        console.error("Change Password Error: 'sub' claim missing from JWT payload for logged-in user.");
-        return null;
-    }
-
-    // Fetch user from local DB to get their phone number
-    const localUser = await databaseService.getUserByExternalId(userId);
-    if (!localUser || !localUser.phoneNumber) {
-        console.error(`Change Password Error: User with ID ${userId} not found in local DB or has no phone number.`);
-        return null;
-    }
-    
-    return { accessToken: token, phoneNumber: localUser.phoneNumber, userId: userId };
+    const adminToken = cookieStore.get('leaseflow_admin_access_token')?.value;
+    if (adminToken) return adminToken;
+    const portalToken = cookieStore.get('leaseflow_portal_access_token')?.value;
+    return portalToken || null;
 }
-
 
 export async function POST(request: NextRequest) {
     if (!AUTH_API_BASE_URL) {
@@ -66,42 +50,38 @@ export async function POST(request: NextRequest) {
     } catch (e) {
         return NextResponse.json({ isSuccess: false, errors: ["Invalid request format."] }, { status: 400 });
     }
-    
+
     const { currentPassword, newPassword, phoneNumber: phoneNumberFromRequest } = requestBody;
 
     if (!currentPassword || !newPassword) {
         return NextResponse.json({ isSuccess: false, errors: ["Current and new passwords are required."] }, { status: 400 });
     }
 
-    // Determine the source of authentication details
-    const authHeader = request.headers.get('Authorization');
-    let accessToken: string | undefined;
-    let effectivePhoneNumber: string | undefined;
-    let userIdForDbUpdate: string | undefined;
-
-    // This handles the post-login "force change password" flow where the token is sent as a header
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        accessToken = authHeader.substring(7);
-        // In this specific flow, the phone number must be provided in the body
-        effectivePhoneNumber = phoneNumberFromRequest;
-        const payload = decodeJwtPayload(accessToken);
-        userIdForDbUpdate = payload?.sub;
-    } else {
-        // This handles a logged-in user changing their password from their profile page
-        const sessionAuth = await getAuthDetailsFromSession();
-        if (sessionAuth) {
-            accessToken = sessionAuth.accessToken;
-            effectivePhoneNumber = sessionAuth.phoneNumber;
-            userIdForDbUpdate = sessionAuth.userId;
-        }
-    }
-
+    const accessToken = await getAccessToken(request);
     if (!accessToken) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
     }
+    
+    const tokenPayload = decodeJwtPayload(accessToken);
+    if (!tokenPayload || !tokenPayload.sub) {
+        return NextResponse.json({ isSuccess: false, errors: ["Invalid token or user ID not found."] }, { status: 401 });
+    }
+
+    const userIdForDbUpdate = tokenPayload.sub;
+    let effectivePhoneNumber: string | undefined = phoneNumberFromRequest;
+
+    // If phone number is not in the request (e.g., changing from profile), fetch it from local DB
+    if (!effectivePhoneNumber) {
+        const localUser = await databaseService.getUserByExternalId(userIdForDbUpdate);
+        if (localUser && localUser.phoneNumber) {
+            effectivePhoneNumber = localUser.phoneNumber;
+        }
+    }
+    
     if (!effectivePhoneNumber) {
         return NextResponse.json({ isSuccess: false, errors: ["User phone number could not be determined."] }, { status: 400 });
     }
+
 
     try {
         const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-password`, {
