@@ -43,19 +43,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
         
-        // Handle cases where success is indicated by status code but body might be empty
-        if (!responseText) {
-            // It's possible the token is sent via SMS and the API just confirms success.
-            return NextResponse.json({ isSuccess: true, message: "Request received. If your number is valid, you will receive a reset code." });
-        }
-
         let responseData;
         try {
             responseData = JSON.parse(responseText);
         } catch (e) {
             console.error("Forgot password API call successful, but failed to parse JSON response from identity server.", responseText);
-            // Even if we can't parse, we can tell the user to check their phone.
-            return NextResponse.json({ isSuccess: true, message: "Request received. If your number is valid, you will receive a reset code." });
+            return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
         }
         
         // If we successfully parsed, check for token and success status.
@@ -64,11 +57,11 @@ export async function POST(request: NextRequest) {
         }
         
         // The identity server might just return `isSuccess: true` if the token is sent via another channel
-        if (responseData.isSuccess) {
-            return NextResponse.json({ isSuccess: true, message: responseData.message || "Request received." });
+        if (responseData.isSuccess && !responseData.token) {
+            return NextResponse.json({ isSuccess: false, errors: ["Forgot password request was successful, but a token was not provided by the service."] }, { status: 500 });
         }
         
-        // Fallback for any other scenario
+        // Fallback for any other scenario, including isSuccess: false from the identity server
         return NextResponse.json({ isSuccess: false, errors: responseData.errors || ["Forgot password request failed or token was not provided."] }, { status: 500 });
 
     } catch (error) {
