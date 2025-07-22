@@ -6,7 +6,6 @@ import { databaseService } from '@/lib/services/databaseService';
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 const ADMIN_REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
-const ADMIN_ACCESS_TOKEN_MAX_AGE = 60 * 60 * 8; // 8 hours
 
 // Insecure JWT payload decoder for prototype purposes. Not for production.
 function decodeJwtPayload(token: string): any | null {
@@ -97,14 +96,12 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       sameSite: 'lax',
-      maxAge: ADMIN_ACCESS_TOKEN_MAX_AGE,
     });
     cookieStore.set(ADMIN_REFRESH_TOKEN_KEY, refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       sameSite: 'lax',
-      maxAge: ADMIN_ACCESS_TOKEN_MAX_AGE, // Match the access token's age for simplicity
     });
     
     // 5. Determine redirect path
