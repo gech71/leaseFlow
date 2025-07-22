@@ -164,112 +164,53 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         setIsLoadingData(true);
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
-        if (existingEntry && existingEntry.utilities) {
+        if (existingEntry && existingEntry.utilities && selectedBuilding) {
             const uiItems: UIUtilityItem[] = [];
-            
-            // --- FIX: Grouping logic is updated to handle same-named items with different scopes ---
-            const getGroupKey = (item: BuildingUtilityItemPrismaType): string => {
-                if (item.appliesToScope === 'Building') {
-                    // Unique key for building-scoped items
-                    return `${item.name}::scope=Building`;
-                }
-                if (item.appliesToScope === 'SpecificSpaces') {
-                    // Group floor-scoped items by their common floor
-                    const space = selectedBuilding?.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
-                    if (space?.floor) {
-                        return `${item.name}::scope=Floor::floor=${space.floor}`;
-                    }
-                }
-                // Fallback for specific spaces not part of a floor group, or any other case
-                return `${item.name}::scope=SpecificSpaces::id=${item.id}`;
-            };
-            
-            const itemGroups = new Map<string, BuildingUtilityItemPrismaType[]>();
+            const processedItemIds = new Set<string>();
+
             for (const item of existingEntry.utilities) {
-                 if (item.appliesToScope === 'Building') {
-                    // Building-scoped items are always individual groups
-                    itemGroups.set(getGroupKey(item), [item]);
-                    continue;
-                }
-                
-                // For 'SpecificSpaces', try to group them by floor
-                let grouped = false;
-                if(selectedBuilding) {
-                    const space = selectedBuilding.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
-                    if (space?.floor) {
-                        const floorKey = `${item.name}::scope=Floor::floor=${space.floor}`;
-                        if (!itemGroups.has(floorKey)) itemGroups.set(floorKey, []);
-                        itemGroups.get(floorKey)!.push(item);
-                        grouped = true;
-                    }
-                }
+                if (processedItemIds.has(item.id)) continue;
 
-                if (!grouped) {
-                    // If it couldn't be grouped by floor (e.g., specific spaces across floors), treat it as a unique group
-                    itemGroups.set(getGroupKey(item), [item]);
-                }
-            }
-            
-            // Post-process floor groups to ensure they are complete
-            for (const [key, group] of itemGroups.entries()) {
-                if (!key.includes('::scope=Floor')) continue;
-                
-                const floorName = key.split('::floor=')[1];
-                const spacesOnFloor = selectedBuilding?.spaces.filter(s => s.floor === floorName).length || 0;
-                
-                // If the number of items in the group doesn't match the number of spaces on the floor,
-                // it wasn't a true "Floor" scope save. Split them into individual "SpecificSpaces" groups.
-                if (group.length !== spacesOnFloor) {
-                    itemGroups.delete(key);
-                    for (const item of group) {
-                        itemGroups.set(getGroupKey(item), [item]);
-                    }
-                }
-            }
-
-
-            for (const itemsInGroup of itemGroups.values()) {
-                if (itemsInGroup.length === 0) continue;
-                
-                const firstItem = itemsInGroup[0];
-
-                if (itemsInGroup.length === 1 && firstItem.appliesToScope === 'Building') {
+                if (item.appliesToScope === 'Building') {
                     uiItems.push({
-                        uiId: firstItem.id || `dbItem-building-${Date.now()}`,
-                        name: firstItem.name,
-                        totalCost: firstItem.totalCost,
+                        uiId: item.id,
+                        name: item.name,
+                        totalCost: item.totalCost,
                         appliesToScope: 'Building',
                         perSpaceCosts: {}, perSpacePercentages: {},
                     });
-                } else {
+                    processedItemIds.add(item.id);
+                } else if (item.appliesToScope === 'SpecificSpaces') {
+                    const spaceForItem = selectedBuilding.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
+                    const floorName = spaceForItem?.floor;
+
+                    // Group all other items with the same name and on the same floor
+                    const itemsInGroup = existingEntry.utilities.filter(otherItem => {
+                        const otherSpace = selectedBuilding.spaces.find(s => s.spaceIdName === otherItem.applicableSpaceIdNames?.[0]);
+                        return otherItem.name === item.name && otherSpace?.floor === floorName;
+                    });
+                    
+                    const spacesOnFloor = selectedBuilding.spaces.filter(s => s.floor === floorName);
+                    const isFullFloorGroup = floorName && itemsInGroup.length === spacesOnFloor.length && itemsInGroup.every(i => spacesOnFloor.some(s => s.spaceIdName === i.applicableSpaceIdNames?.[0]));
+
                     const groupTotalCost = itemsInGroup.reduce((sum, i) => sum + i.totalCost, 0);
                     const perSpacePercentages: { [spaceId: string]: number } = {};
 
-                    if (selectedBuilding) {
-                      itemsInGroup.forEach(item => {
-                          const spaceName = item.applicableSpaceIdNames?.[0];
-                          const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
-                          if (space && groupTotalCost > 0) {
-                              const percentage = (item.totalCost / groupTotalCost) * 100;
-                              perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
-                          }
-                      });
-                    }
-                    
-                    const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
-                    const firstSpaceInGroup = selectedBuilding?.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
-
-                    const isFloorScope = firstSpaceInGroup?.floor && itemsInGroup.every(item => {
-                        const space = selectedBuilding?.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
-                        return space?.floor === firstSpaceInGroup.floor;
+                    itemsInGroup.forEach(groupItem => {
+                        const space = selectedBuilding.spaces.find(s => s.spaceIdName === groupItem.applicableSpaceIdNames?.[0]);
+                        if (space && groupTotalCost > 0) {
+                            const percentage = (groupItem.totalCost / groupTotalCost) * 100;
+                            perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
+                        }
+                        processedItemIds.add(groupItem.id);
                     });
                     
                     uiItems.push({
-                        uiId: `logical-${firstItem.name}-${Date.now()}`,
-                        name: firstItem.name,
-                        appliesToScope: isFloorScope ? 'Floor' : 'SpecificSpaces',
+                        uiId: `logical-${item.name}-${floorName || item.id}`,
+                        name: item.name,
+                        appliesToScope: isFullFloorGroup ? 'Floor' : 'SpecificSpaces',
                         totalCost: groupTotalCost,
-                        applicableFloor: isFloorScope ? firstSpaceInGroup?.floor : undefined,
+                        applicableFloor: isFullFloorGroup ? floorName : undefined,
                         perSpacePercentages: perSpacePercentages,
                         perSpaceCosts: {} 
                     });
@@ -292,8 +233,10 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const refreshUtilityRecordsList = async () => {
     setIsLoadingData(true); 
     const records = await getAllBuildingUtilitiesForListAction();
+    const totalCost = records.reduce((sum, util) => sum + (util as any).totalCost, 0);
     setAllUtilityRecords(records.map(r => ({
       ...r,
+      totalCost: totalCost,
       createdAt: r.createdAt.toISOString(), 
       updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(),
       utilities: r.utilities.map(u => ({...u}))
@@ -370,7 +313,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       if (validationFailed) break;
 
       if (!item.name.trim()) {
-        if (currentUtilityItems.length > 1) {
+        if (currentUtilityItems.length > 1 || (currentUtilityItems.length === 1 && (item.totalCost && item.totalCost > 0))) {
           toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
           validationFailed = true;
         }
@@ -780,13 +723,13 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                   </TableHeader>
                   <TableBody>
                     {paginatedUtilityRecords.map(entry => {
-                      const totalCost = entry.utilities.reduce((sum, util) => sum + util.totalCost, 0);
+                      const totalCost = (entry.utilities || []).reduce((sum, util) => sum + util.totalCost, 0);
                       return (
                         <TableRow key={entry.id}>
                           <TableCell className="font-medium">{entry.buildingName}</TableCell>
                           <TableCell>{format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</TableCell>
                           <TableCell className="text-right whitespace-nowrap">{totalCost.toFixed(2)} Birr</TableCell>
-                          <TableCell className="text-center hidden sm:table-cell">{entry.utilities.length}</TableCell>
+                          <TableCell className="text-center hidden sm:table-cell">{(entry.utilities || []).length}</TableCell>
                           <TableCell className="hidden md:table-cell text-xs">{format(parseISO(entry.createdAt), 'PP')}</TableCell>
                           <TableCell className="text-right">
                               <Button variant="ghost" size="icon" onClick={() => { setSelectedBuildingId(entry.buildingId); setSelectedYear(entry.year); setSelectedMonth(entry.month);}} className="h-8 w-8 text-blue-600 hover:text-blue-700">
@@ -821,3 +764,4 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     </div>
   );
 }
+
