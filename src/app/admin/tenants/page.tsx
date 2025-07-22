@@ -56,14 +56,8 @@ export default async function TenantsPage() {
   const tenantWhere: Prisma.TenantWhereInput = managedBuildingIds
     ? {
         OR: [
-          { rentedSpace: null },
-          {
-            rentedSpace: {
-              buildingId: {
-                in: managedBuildingIds,
-              },
-            },
-          },
+          { rentedSpaceId: null },
+          { rentedSpace: { buildingId: { in: managedBuildingIds } } },
         ],
       }
     : {};

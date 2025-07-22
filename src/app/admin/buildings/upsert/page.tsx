@@ -97,7 +97,6 @@ export default async function BuildingUpsertPage({ searchParams }: { searchParam
     <div className="animate-fadeIn">
       <PageHeader
         title={pageTitle}
-        icon={BuildingIconLucide}
         description="Define building details and late fee policies."
         actions={
             <Link href="/admin/buildings" passHref>

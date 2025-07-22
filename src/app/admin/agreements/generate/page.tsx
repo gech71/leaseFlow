@@ -54,7 +54,6 @@ export default function GenerateAgreementPage() {
     <div className="animate-fadeIn">
        <PageHeader
         title="Generate Rental Agreement"
-        icon={FileText}
         description="Select tenant and space, generate agreement text, then save the complete record."
         actions={
             <Link href="/admin/agreements" passHref>
@@ -82,9 +81,15 @@ async function GenerateAgreementDataFetcher() {
       managedBuildingIds = managedBuildings.map(b => b.id);
   }
 
-  // A tenant can have multiple agreements, so list all tenants.
-  // The user's ability to create the agreement is limited by the available spaces they manage.
-  const tenantWhereClause: Prisma.TenantWhereInput = {};
+  // A user can see unassigned tenants, and tenants assigned to buildings they manage.
+  const tenantWhereClause: Prisma.TenantWhereInput = managedBuildingIds
+    ? {
+        OR: [
+          { rentedSpaceId: null },
+          { rentedSpace: { buildingId: { in: managedBuildingIds } } }
+        ]
+      }
+    : {};
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {
     isOccupied: false,
