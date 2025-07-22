@@ -34,6 +34,10 @@ export async function POST(request: NextRequest) {
   }
 
   const { phoneNumber, password } = credentials;
+  if (!phoneNumber || !password) {
+      return NextResponse.json({ isSuccess: false, errors: ["Phone number and password are required."] }, { status: 400 });
+  }
+
 
   try {
     // 1. Authenticate against the external identity provider

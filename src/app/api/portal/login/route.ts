@@ -26,11 +26,15 @@ export async function POST(request: NextRequest) {
 
   const { phoneNumber, password } = await request.json();
 
+  if (!phoneNumber || !password) {
+      return NextResponse.json({ isSuccess: false, errors: ["Phone number and password are required."] }, { status: 400 });
+  }
+
   try {
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Phone: phoneNumber, Password: password }),
+      body: JSON.stringify({ phoneNumber: phoneNumber, Password: password }),
     });
 
     const responseData = await externalResponse.json();
