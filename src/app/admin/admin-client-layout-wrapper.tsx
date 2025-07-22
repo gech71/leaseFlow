@@ -126,7 +126,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      const response = await fetch('/api/auth/logout', {
+      const response = await fetch('/api/Auth/logout', {
         method: 'POST',
       });
       const data = await response.json();

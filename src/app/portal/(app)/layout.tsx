@@ -31,7 +31,7 @@ export default function PortalLayout({
       setIsLoggingOut(true);
       try {
           // Call the dedicated portal logout endpoint
-          const response = await fetch('/api/auth/portal/logout', {
+          const response = await fetch('/api/Auth/portal/logout', {
               method: 'POST',
           });
           const data = await response.json();
