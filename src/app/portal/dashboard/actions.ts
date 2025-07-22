@@ -75,7 +75,7 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const user = await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
 
     if (!user) {
-        console.error(`Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local database.`);
+        console.error(`Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local system.`);
     }
 
     return user;
@@ -202,7 +202,7 @@ export async function submitPaymentProofAction(
       return { success: false, error: "Bill not found." };
     }
 
-    if (bill.agreement?.tenant?.user?.id !== currentUser.id) {
+    if (bill.agreement?.tenant?.userId !== currentUser.id) {
        return { success: false, error: "Unauthorized. You can only submit payment for your own bills." };
     }
     

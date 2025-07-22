@@ -253,8 +253,8 @@ Landlord/Authorized Representative
       toast({ title: "Agreement Saved Successfully!", description: "The agreement is now active." });
       setGeneratedAgreementText(null);
     } else {
-      setError(result.error || "Failed to save agreement to database.");
-      toast({ title: "Database Save Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
+      setError(result.error || "Failed to save agreement.");
+      toast({ title: "Save Failed", description: result.error || "An unknown error occurred.", variant: "destructive" });
     }
   };
 
@@ -398,7 +398,7 @@ Landlord/Authorized Representative
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Generated Agreement & Finalize</CardTitle>
-          <CardDescription>Review the generated text. If satisfied, save the agreement to the database.</CardDescription>
+          <CardDescription>Review the generated text. If satisfied, save the agreement.</CardDescription>
         </CardHeader>
         <CardContent>
           {isPreviewing && ( <div className="flex flex-col items-center justify-center h-64 text-muted-foreground"> <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" /> <p>Generating text...</p> </div> )}
@@ -421,7 +421,7 @@ Landlord/Authorized Representative
 
           {finalizedAgreement && !error && (
               <div className="space-y-4">
-                  <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md border border-green-200"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">Agreement successfully saved to database!</p></div>
+                  <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md border border-green-200"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">Agreement successfully saved!</p></div>
                   <h3 className="text-lg font-semibold font-headline">Agreement ID: {finalizedAgreement.id}</h3>
                   <p className="text-sm font-medium">Tenant: <span className="font-normal">{tenants.find(t => t.id === finalizedAgreement.tenantId)?.name || 'N/A'}</span></p>
                   <p className="text-sm font-medium">Space: <span className="font-normal">{finalizedSpace ? `${finalizedSpace.spaceIdName} (${finalizedSpace.buildingName})` : 'N/A'}</span></p>

@@ -104,7 +104,7 @@ export async function createTenantAction(data: {
     // Now that the user is created, find the TENANT role and assign it.
     const tenantRole = await databaseService.getRoleByName('TENANT');
     if (!tenantRole) {
-      return { success: false, error: "The default 'TENANT' role was not found in the database. Please seed the database."};
+      return { success: false, error: "The default 'TENANT' role was not found. Please seed the application."};
     }
 
     // Create the local User record first

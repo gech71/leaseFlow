@@ -104,7 +104,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     revalidatePath('/admin/billing'); // Invalidate billing page data
     return { success: true, agreement: newAgreement };
   } catch (error: any) {
-    console.error("Error creating agreement in DB:", error);
+    console.error("Error creating agreement:", error);
     let errorMessage = "Failed to create agreement.";
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') { 

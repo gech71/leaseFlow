@@ -191,7 +191,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
       <PageHeader
         title="Rental Agreements"
         icon={FileText}
-        description="Browse and manage all rental agreements from the database."
+        description="Browse and manage all rental agreements."
         actions={ 
           canCreateAgreements && (
             <Link href="/admin/agreements/generate" passHref> 

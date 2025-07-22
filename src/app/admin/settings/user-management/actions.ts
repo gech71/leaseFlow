@@ -138,7 +138,7 @@ export async function updateUserAssignments(
     console.error("Error updating user assignments:", error);
     let errorMessage = "Failed to update user assignments.";
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      errorMessage = `Database error: ${error.message}`;
+      errorMessage = `A database error occurred: ${error.message}`;
     } else if (error.message) {
       errorMessage = error.message;
     }
