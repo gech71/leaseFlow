@@ -7,22 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building, Building2, FileText, Banknote, LayoutGrid, AlertCircle, User, Loader2 } from 'lucide-react';
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart';
-import { databaseService } from '@/lib/services/databaseService';
 import { getMonth, getYear, format, isAfter, addMonths, subMonths, isValid, parseISO } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { OccupancyCard } from '@/components/custom/OccupancyCard';
-import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { getDashboardDataAction, type DashboardData, type ClientAgreement, type ClientBill, type ClientUtility, type ClientBuilding, type ClientSpace } from './actions';
 
-// Re-defining client-side types here since this is now a client component
-// These should ideally be in a shared types file if not already.
-interface ClientBuilding { id: string; name: string; }
-interface ClientSpace { id: string; buildingId: string; isOccupied: boolean; area: number; }
-interface ClientAgreement { id: string; tenantId: string; spaceId: string | null; startDate: string; paymentTermMonths: number; }
-interface ClientBill { agreementId: string; status: string; totalAmount: number; paymentDate: string | null; billDate: string; }
-interface ClientUtility { buildingId: string; year: number; month: number; totalCost: number; }
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px]">
@@ -47,33 +39,6 @@ interface BuildingFinancialSummary {
   currentMonthIncomeToBeCollected: number;
 }
 
-// In a real app, you'd fetch this data based on the filters.
-// For this prototype, we'll assume we get all data initially and filter client-side.
-async function getDashboardData() {
-  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
-  
-  if (!isSuperAdmin && managedBuildingIds?.length === 0) {
-    return { buildings: [], spaces: [], agreements: [], allBills: [], allUtilities: [], error: "No buildings assigned." };
-  }
-  
-  const buildingWhere = managedBuildingIds ? { id: { in: managedBuildingIds } } : {};
-  const spaceWhere = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
-  const agreementWhere = managedBuildingIds ? { space: { buildingId: { in: managedBuildingIds } } } : {};
-  const billWhere = managedBuildingIds ? { agreement: { space: { buildingId: { in: managedBuildingIds } } } } : {};
-
-  const [buildings, spaces, agreements, allBills, allUtilitiesRaw] = await Promise.all([
-    databaseService.getAllBuildings({ where: buildingWhere }),
-    databaseService.getAllSpaces({ where: spaceWhere }),
-    databaseService.getAllAgreements({ where: agreementWhere, include: { space: true, tenant: true } }),
-    databaseService.getAllBills({ where: billWhere, include: { agreement: { include: { tenant: true, space: true } } } }),
-    databaseService.getAllBuildingMonthlyUtilities({ where: managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {}, include: { utilities: true } })
-  ]);
-  
-  const allUtilities = allUtilitiesRaw.map(u => ({...u, totalCost: u.utilities.reduce((sum, item) => sum + item.totalCost, 0)}));
-
-  return { buildings, spaces, agreements, allBills, allUtilities, error: null };
-}
-
 
 export default function AdminDashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
@@ -81,13 +46,13 @@ export default function AdminDashboardPage() {
     const [today, setToday] = useState(new Date());
 
     // State for all fetched data
-    const [allData, setAllData] = useState<{
-        buildings: ClientBuilding[];
-        spaces: ClientSpace[];
-        agreements: ClientAgreement[];
-        allBills: ClientBill[];
-        allUtilities: ClientUtility[];
-    }>({ buildings: [], spaces: [], agreements: [], allBills: [], allUtilities: [] });
+    const [allData, setAllData] = useState<Omit<DashboardData, 'error'>>({
+        buildings: [],
+        spaces: [],
+        agreements: [],
+        allBills: [],
+        allUtilities: [],
+    });
 
     // State for filters
     const [selectedYear, setSelectedYear] = useState(getYear(today));
@@ -97,17 +62,16 @@ export default function AdminDashboardPage() {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const data = await getDashboardData();
+                const data = await getDashboardDataAction();
                 if (data.error) {
                     setError(data.error);
                 } else {
-                    // Serialize dates right after fetching
                     setAllData({
-                        buildings: data.buildings.map(b => ({ id: b.id, name: b.name })),
-                        spaces: data.spaces.map(s => ({ id: s.id, buildingId: s.buildingId, isOccupied: s.isOccupied, area: s.area })),
-                        agreements: data.agreements.map(a => ({ ...a, startDate: a.startDate.toISOString() })),
-                        allBills: data.allBills.map(b => ({ ...b, billDate: b.billDate.toISOString(), paymentDate: b.paymentDate?.toISOString() || null })),
-                        allUtilities: data.allUtilities.map(u => ({ buildingId: u.buildingId, year: u.year, month: u.month, totalCost: u.totalCost })),
+                        buildings: data.buildings,
+                        spaces: data.spaces,
+                        agreements: data.agreements,
+                        allBills: data.allBills,
+                        allUtilities: data.allUtilities,
                     });
                 }
             } catch (e) {
@@ -217,7 +181,7 @@ export default function AdminDashboardPage() {
                     case "Pending": actionText = `Bill generated for ${tenantName} for ${spaceName}, due ${billDueDateFormatted}.`; break;
                     case "Overdue": actionText = `Bill for ${tenantName} (${spaceName}) is overdue since ${billDueDateFormatted}.`; break;
                     case "PendingVerification": actionText = `${tenantName} submitted payment proof for ${spaceName}.`; break;
-                    default: actionText = `Activity related to bill ID ${bill.id} for ${tenantName}.`;
+                    default: actionText = `Activity related to bill ID ${bill.agreementId} for ${tenantName}.`;
                 }
 
                 return {
