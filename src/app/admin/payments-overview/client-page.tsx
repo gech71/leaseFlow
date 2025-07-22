@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2, EyeOff } from 'lucide-react';
+import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2, EyeOff, Paperclip } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Space as SpacePrismaOriginal, Bill as BillPrismaOriginal, Agreement as AgreementPrismaOriginal, Tenant as TenantPrismaOriginal, Building as BuildingPrismaTypeOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
@@ -468,6 +468,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                         <TableHead className="hidden md:table-cell">Space</TableHead>
                         <TableHead>Payment Date</TableHead>
                         <TableHead className="hidden lg:table-cell">Method</TableHead>
+                        <TableHead className="hidden xl:table-cell">Proof</TableHead>
                         <TableHead className="text-right">Amount Paid</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -481,6 +482,18 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                             {bill.paymentMethod || 'N/A'}
                             {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
                             {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
+                          </TableCell>
+                          <TableCell className="hidden xl:table-cell text-xs">
+                            {bill.paymentProofUrl ? (
+                                <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                                    <a href={bill.paymentProofUrl} target="_blank" rel="noopener noreferrer">
+                                        <Paperclip className="mr-1 h-3 w-3"/>
+                                        View
+                                    </a>
+                                </Button>
+                            ) : (
+                                <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-semibold text-green-600 whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
                         </TableRow>
@@ -504,5 +517,3 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
     </div>
   );
 }
-
-    
