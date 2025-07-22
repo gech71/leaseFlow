@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
              return NextResponse.json({ isSuccess: true, token: responseData.token });
         }
         
-        // The identity server might just return `isSuccess: true` if the token is sent via another channel
+        // This case handles when the identity server reports success but doesn't include a token.
         if (responseData.isSuccess && !responseData.token) {
             return NextResponse.json({ isSuccess: false, errors: ["Forgot password request was successful, but a token was not provided by the service."] }, { status: 500 });
         }
