@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileSignature, DollarSign, AlertTriangle, CheckCircle, Info, UploadCloud, Download, User, Clock, Home } from 'lucide-react';
+import { FileSignature, DollarSign, AlertTriangle, CheckCircle, Info, UploadCloud, Download, User, Clock, Home, CreditCard, Landmark, Wallet, HelpCircle, FileText, Paperclip, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -19,20 +19,49 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ClientAgreement, ClientBill, SerializedTenantPortalData, ClientPenaltyTier } from './page'; 
 import type { BillStatus } from '@prisma/client';
 import { jsPDF } from 'jspdf';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { submitPaymentProofAction } from './actions';
+import { Loader2 } from 'lucide-react';
+
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
 };
 
+const paymentProofSchema = z.object({
+  paymentMethod: z.string().min(1, { message: "Please select a payment method." }),
+  paymentReference: z.string().min(2, { message: "A payment reference is required (e.g., transaction ID)." }),
+  notes: z.string().optional(),
+  paymentSlip: z.instanceof(File).optional(),
+});
+type PaymentProofFormValues = z.infer<typeof paymentProofSchema>;
+
 export function CustomerDashboardClientPage({ initialData }: { initialData: SerializedTenantPortalData | null }) {
   const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeBillForPayment, setActiveBillForPayment] = useState<ClientBill | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -47,6 +76,48 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
   }, [initialData, toast]);
 
   const agreement = initialData?.agreement;
+
+  const paymentProofForm = useForm<PaymentProofFormValues>({
+    resolver: zodResolver(paymentProofSchema),
+    defaultValues: { paymentMethod: "", paymentReference: "", notes: "", paymentSlip: undefined },
+  });
+
+  const handleOpenPaymentDialog = (bill: ClientBill) => {
+    paymentProofForm.reset();
+    setActiveBillForPayment(bill);
+  };
+
+  const handleClosePaymentDialog = () => {
+    setActiveBillForPayment(null);
+    paymentProofForm.reset();
+  };
+
+  const handlePaymentProofSubmit = async (values: PaymentProofFormValues) => {
+    if (!activeBillForPayment) return;
+    setIsSubmitting(true);
+    
+    // Simulate file upload by just using its name.
+    const paymentProofUrl = values.paymentSlip ? `simulated_slip_${values.paymentSlip.name}` : "";
+
+    const result = await submitPaymentProofAction(activeBillForPayment.id, {
+        paymentMethod: values.paymentMethod,
+        paymentReference: values.paymentReference,
+        paymentProofUrl: paymentProofUrl,
+        notes: values.notes,
+    });
+
+    setIsSubmitting(false);
+    if (result.success) {
+      toast({ title: "Payment Proof Submitted", description: "Your payment is now pending verification by administration." });
+      handleClosePaymentDialog();
+      // We need a way to refresh the data from the server action here.
+      // For now, a page refresh is the simplest way.
+      window.location.reload();
+    } else {
+      toast({ title: "Submission Failed", description: result.error, variant: "destructive" });
+    }
+  };
+
 
   const handleDownloadAgreement = () => {
     if (!agreement || !agreement.agreementText) {
@@ -196,19 +267,12 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
   const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
 
   return (
+    <>
     <div className="animate-fadeIn">
       <PageHeader
         title={`Welcome, ${agreement.tenant.name}!`}
         icon={User}
         description="View your lease details and billing history."
-        actions={
-          <Link href={`/portal/billing?phone=${agreement.tenant.phone}`} passHref>
-            <Button>
-              <DollarSign className="mr-2 h-4 w-4" />
-              Pay Bill
-            </Button>
-          </Link>
-        }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -246,7 +310,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
               ) : (
                 <div className="w-full overflow-x-auto">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Due Date</TableHead><TableHead>Rent</TableHead><TableHead>Utilities</TableHead><TableHead>Penalty</TableHead><TableHead>Total Due</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Due Date</TableHead><TableHead>Rent</TableHead><TableHead>Utilities</TableHead><TableHead>Penalty</TableHead><TableHead>Total Due</TableHead><TableHead className="text-center">Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {processedBills.map(bill => (
                         <TableRow key={bill.id} className={`${bill.currentStatus === 'Overdue' ? 'bg-destructive/5 hover:bg-destructive/10' : bill.currentStatus === 'PendingVerification' ? 'bg-blue-500/5 hover:bg-blue-500/10' : ''}`}>
@@ -278,6 +342,11 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                           <TableCell className="p-2 text-center">
                             <Badge variant={getStatusBadgeVariant(bill.currentStatus || bill.status)} className={`capitalize text-xs ${bill.currentStatus === 'PendingVerification' ? 'border-blue-400 text-blue-700 bg-blue-100' : ''}`}>{getStatusIcon(bill.currentStatus || bill.status)}<span className="ml-1">{(bill.currentStatus || bill.status).replace('Verification',' Ver.')}</span></Badge>
                           </TableCell>
+                          <TableCell className="p-2 text-right">
+                              {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && (
+                                <Button size="sm" onClick={() => handleOpenPaymentDialog(bill)}>Pay</Button>
+                              )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -289,5 +358,86 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
         </div>
       </div>
     </div>
+
+     <Dialog open={!!activeBillForPayment} onOpenChange={handleClosePaymentDialog}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle className="font-headline text-xl">Submit Payment Proof</DialogTitle>
+                <DialogDescription>
+                  For bill due on {activeBillForPayment ? format(parseISO(activeBillForPayment.dueDate), 'PP') : ''}, totaling {activeBillForPayment?.calculatedTotal.toFixed(2)} Birr.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...paymentProofForm}>
+                <form onSubmit={paymentProofForm.handleSubmit(handlePaymentProofSubmit)} className="space-y-4 py-2">
+                    <FormField
+                      control={paymentProofForm.control}
+                      name="paymentMethod"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary"/>Payment Method<span className="text-destructive ml-1">*</span></FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select a payment method" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="Bank Transfer"><Landmark className="mr-2 h-4 w-4 inline-block"/>Bank Transfer</SelectItem>
+                              <SelectItem value="Wallet"><Wallet className="mr-2 h-4 w-4 inline-block"/>Digital Wallet</SelectItem>
+                              <SelectItem value="Cash"><HelpCircle className="mr-2 h-4 w-4 inline-block"/>Cash</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                        control={paymentProofForm.control}
+                        name="paymentReference"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center"><FileText className="mr-2 h-4 w-4 text-primary"/>Payment Reference<span className="text-destructive ml-1">*</span></FormLabel>
+                                <FormControl><Input placeholder="e.g., Transaction ID, Receipt No." {...field} disabled={isSubmitting}/></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={paymentProofForm.control}
+                        name="paymentSlip"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center"><Paperclip className="mr-2 h-4 w-4 text-primary"/>Attach Payment Slip (Optional)</FormLabel>
+                                <FormControl>
+                                    <Input 
+                                      type="file" 
+                                      onChange={(e) => field.onChange(e.target.files ? e.target.files[0] : null)}
+                                      disabled={isSubmitting}
+                                      className="file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={paymentProofForm.control}
+                        name="notes"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center"><MessageSquare className="mr-2 h-4 w-4 text-primary"/>Notes (Optional)</FormLabel>
+                                <FormControl><Textarea placeholder="Add any relevant notes for the admin..." {...field} disabled={isSubmitting}/></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <DialogFooter className="pt-4">
+                        <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button></DialogClose>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            Submit for Verification
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

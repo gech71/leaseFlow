@@ -6,6 +6,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, User, Role } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns';
 import { cookies } from 'next/headers';
+import { prisma } from '@/lib/prisma';
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -175,5 +176,48 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         agreement: null, 
         error: `Failed to fetch portal data: ${(error as Error).message}` 
     };
+  }
+}
+
+export async function submitPaymentProofAction(
+  billId: string,
+  data: {
+    paymentMethod: string;
+    paymentReference: string;
+    paymentProofUrl: string; // Placeholder for now
+    notes?: string;
+  }
+) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const bill = await databaseService.getBillById(billId, {
+      include: { agreement: { include: { tenant: true } } }
+    });
+
+    if (!bill) {
+      return { success: false, error: "Bill not found." };
+    }
+    
+    if (bill.agreement.tenant.userFk !== currentUser.id) {
+       return { success: false, error: "Unauthorized. You can only submit payment for your own bills." };
+    }
+    
+    await databaseService.updateBill(billId, {
+      status: 'PendingVerification',
+      paymentMethod: data.paymentMethod,
+      paymentReference: data.paymentReference,
+      paymentProofUrl: data.paymentProofUrl,
+      tenantPaymentNotes: data.notes,
+    });
+    
+    return { success: true };
+    
+  } catch (error: any) {
+    console.error("Error submitting payment proof:", error);
+    return { success: false, error: `Failed to submit proof: ${(error as Error).message}` };
   }
 }
