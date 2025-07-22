@@ -116,14 +116,7 @@ export class DatabaseService {
     return prisma.tenant.findUnique({ where: { id }, include });
   }
 
-  async getAllTenants(params?: {
-    skip?: number;
-    take?: number;
-    cursor?: Prisma.TenantWhereUniqueInput;
-    where?: Prisma.TenantWhereInput;
-    orderBy?: Prisma.TenantOrderByWithRelationInput | Prisma.TenantOrderByWithRelationInput[];
-    include?: Prisma.TenantInclude;
-  }): Promise<Tenant[]> {
+  async getAllTenants(params?: Prisma.TenantFindManyArgs): Promise<Tenant[]> {
     return prisma.tenant.findMany(params);
   }
 
