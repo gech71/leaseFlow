@@ -113,7 +113,7 @@ export default function ForgotPasswordPage() {
               <KeyRound className="mx-auto h-12 w-12 text-primary" />
               <div className="space-y-1 px-2">
                 <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Forgot Password?</CardTitle>
-                <CardDescription>Enter your phone number to receive a reset code.</CardDescription>
+                <CardDescription>Enter your phone number to start the password reset process.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-6">
@@ -156,7 +156,7 @@ export default function ForgotPasswordPage() {
                 <KeyRound className="mx-auto h-12 w-12 text-primary" />
                 <div className="space-y-1 px-2">
                     <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Reset Your Password</CardTitle>
-                    <CardDescription>Enter the reset code sent to you and choose a new password.</CardDescription>
+                    <CardDescription>Enter a new password for your account.</CardDescription>
                 </div>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-6">
@@ -166,7 +166,7 @@ export default function ForgotPasswordPage() {
                     <Label htmlFor="phoneNumberDisplay" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-muted-foreground" /> Phone Number</Label>
                     <Input id="phoneNumberDisplay" value={phoneNumber} readOnly disabled className="bg-muted/50" />
                   </div>
-                  <FormField control={resetPasswordForm.control} name="token" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><MessageSquareText className="mr-2 h-4 w-4" /> Reset Code</FormLabel> <FormControl><Input placeholder="Enter reset code from SMS/message" {...field} /></FormControl> <FormMessage /> </FormItem> )} />
+                  
                   <FormField control={resetPasswordForm.control} name="newPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> New Password</FormLabel> <div className="relative"> <FormControl><Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowNewPassword(!showNewPassword)}> {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
                   <FormField control={resetPasswordForm.control} name="confirmPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> Confirm New Password</FormLabel> <div className="relative"> <FormControl><Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowConfirmPassword(!showConfirmPassword)}> {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
                   <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base" disabled={isLoading}>
