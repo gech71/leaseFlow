@@ -97,38 +97,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Failed to connect to user registration service."] }, { status: 503 });
   }
 
-  const externalResponseText = await externalRegisterResponse.text();
-  let externalResponseData;
-  if (!externalResponseText) {
-      console.error("Registration Error: Received an empty response from the identity server.");
-      return NextResponse.json({ isSuccess: false, errors: ["Registration service returned an empty response."] }, { status: 500 });
+  if (!externalRegisterResponse.ok) {
+    const externalResponseText = await externalRegisterResponse.text();
+    let errorMessages = [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
+    if (externalResponseText) {
+        try {
+            const errorData = JSON.parse(externalResponseText);
+            errorMessages = errorData?.errors || [errorData.message] || errorMessages;
+        } catch (e) {
+            // Can't parse, use raw text if it's not too long
+            errorMessages = [externalResponseText.substring(0, 200)];
+        }
+    }
+    return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status });
+  }
+
+  // After successful external registration, we need to log the user in to get their token and thus their user ID (sub claim)
+  let loginResponse: Response;
+  try {
+      loginResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber, password }),
+      });
+  } catch (networkError: any) {
+      console.error("Network error during post-registration login:", networkError.message);
+      return NextResponse.json({ isSuccess: false, errors: ["Registered user, but failed to fetch their details from the identity service."] }, { status: 503 });
+  }
+
+  if (!loginResponse.ok) {
+      return NextResponse.json({ isSuccess: false, errors: ["Registered user, but failed to log in to retrieve their details."] }, { status: 500 });
   }
   
-  try {
-      externalResponseData = JSON.parse(externalResponseText);
-  } catch (e) {
-      console.error("Registration Error: Failed to parse JSON response from identity server.", externalResponseText);
-      return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the registration service."] }, { status: 500 });
-  }
+  const loginData = await loginResponse.json();
+  const newUserAccessToken = loginData.accessToken;
 
-  if (!externalRegisterResponse.ok || !externalResponseData.isSuccess) {
-    const errorMessages = externalResponseData?.errors && Array.isArray(externalResponseData.errors) && externalResponseData.errors.length > 0
-      ? externalResponseData.errors
-      : externalResponseData?.message ? [externalResponseData.message]
-      : [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
-    return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status || 400 });
-  }
-
-  const newUserAccessToken = externalResponseData.accessToken;
   if (!newUserAccessToken) {
-    return NextResponse.json({ isSuccess: false, errors: ["Identity server did not return an access token for the new user."] }, { status: 500 });
+    return NextResponse.json({ isSuccess: false, errors: ["Identity server did not return an access token for the new user after registration."] }, { status: 500 });
   }
 
   const newUserPayload = decodeJwtPayload(newUserAccessToken);
   if (!newUserPayload || !newUserPayload.sub) {
     return NextResponse.json({ isSuccess: false, errors: ["Failed to decode new user's token or extract user ID (sub)."] }, { status: 500 });
   }
-
   const newUserId = newUserPayload.sub;
   
   // 5. Store new user in local Prisma database.
@@ -154,4 +165,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["User registered on identity server, but failed to create local record.", dbError.message] }, { status: 500 });
   }
 }
-
