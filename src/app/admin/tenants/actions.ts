@@ -48,7 +48,7 @@ export async function createTenantAction(data: {
     
     const requestHeaders = await headers();
     
-    const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/register`, {
+    const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -63,19 +63,27 @@ export async function createTenantAction(data: {
         }),
     });
 
-    // Check for empty but successful response first
-    if (registrationResponse.ok && registrationResponse.status === 200 && registrationResponse.headers.get('content-length') === '0') {
-      // Empty response is a success, proceed to create user locally
-    } else {
-        const registrationResult = await registrationResponse.json();
-        if (!registrationResponse.ok || !registrationResult.isSuccess) {
-            console.error("Failed to register tenant user:", registrationResult.errors);
-            return { success: false, error: `Failed to create user account: ${registrationResult.errors?.join(', ') || 'Unknown error'}` };
+    const responseText = await registrationResponse.text();
+
+    if (!registrationResponse.ok) {
+        let errorMessages = ["Failed to register user account."];
+        try {
+            if (responseText) {
+                const errorJson = JSON.parse(responseText);
+                errorMessages = errorJson.errors || [errorJson.message] || errorMessages;
+            }
+        } catch (e) {
+            // Ignore if parsing fails, use the raw text if it's not too long
+            if(responseText && responseText.length < 500) {
+              errorMessages = [responseText];
+            }
         }
+        console.error("Failed to register tenant user:", errorMessages);
+        return { success: false, error: `Failed to create user account: ${errorMessages.join(', ')}` };
     }
     
     // To get the new user's ID, we have to log them in to get a token
-    const loginResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+    const loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber: data.phone, password: tempPassword }),
