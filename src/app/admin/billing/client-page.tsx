@@ -104,6 +104,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [billFilterTerm, setBillFilterTerm] = useState('');
   const [filterYear, setFilterYear] = useState<number | 'all'>('all');
   const [filterMonth, setFilterMonth] = useState<number | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   
   const [individualBillFilter, setIndividualBillFilter] = useState('');
   const [generationFilterStatus, setGenerationFilterStatus] = useState<'all' | 'ready' | 'upcoming'>('all');
@@ -153,7 +154,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   
   useEffect(() => {
     setCurrentPage(1);
-  }, [billFilterTerm, filterYear, filterMonth]);
+  }, [billFilterTerm, filterYear, filterMonth, filterStatus]);
   
   useEffect(() => {
     setGenerationCurrentPage(1);
@@ -258,10 +259,15 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                 }
             }
         }
+        
+        // Status filter
+        if (filterStatus !== 'all' && bill.currentStatus !== filterStatus) {
+            return false;
+        }
 
         return true;
     }).sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
-  }, [bills, calculatePenalty, today, billFilterTerm, filterYear, filterMonth]);
+  }, [bills, calculatePenalty, today, billFilterTerm, filterYear, filterMonth, filterStatus]);
   
   const filteredAgreementsForGeneration = useMemo(() => {
     const todayUtcDateString = new Date().toISOString().substring(0, 10);
@@ -776,6 +782,18 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
               />
             </div>
             <div className="flex gap-2">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full sm:w-[180px] h-9">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="Paid">Paid</SelectItem>
+                  <SelectItem value="PendingVerification">Pending Verification</SelectItem>
+                  <SelectItem value="Overdue">Overdue</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={String(filterYear)} onValueChange={(val) => { setFilterYear(val === 'all' ? 'all' : Number(val)); if(val === 'all') setFilterMonth('all'); }}>
                   <SelectTrigger className="w-full sm:w-[120px] h-9">
                       <SelectValue placeholder="Year" />
@@ -808,8 +826,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
             <Card className="text-center py-12 shadow-sm">
                 <CardContent>
                     <Banknote className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-semibold mb-2 font-headline">{billFilterTerm || filterYear !== 'all' ? 'No Bills Match Filter' : 'No Bills Yet'}</h3>
-                    <p className="text-muted-foreground">{billFilterTerm || filterYear !== 'all' ? 'Try different filter options.' : 'Generate bills to see them here.'}</p>
+                    <h3 className="text-xl font-semibold mb-2 font-headline">{billFilterTerm || filterYear !== 'all' || filterStatus !== 'all' ? 'No Bills Match Filter' : 'No Bills Yet'}</h3>
+                    <p className="text-muted-foreground">{billFilterTerm || filterYear !== 'all' || filterStatus !== 'all' ? 'Try different filter options.' : 'Generate bills to see them here.'}</p>
                 </CardContent>
             </Card>
         ) : (

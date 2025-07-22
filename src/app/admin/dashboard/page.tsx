@@ -135,7 +135,7 @@ export default async function AdminDashboardPage() {
     return getYear(billDate) === currentYear && getMonth(billDate) === currentMonth;
   });
   
-  const paidBillsInCurrentMonth = billsInCurrentMonthPeriod.filter(bill => 
+  const paidBillsInCurrentMonth = allBills.filter(bill => 
     bill.status === 'Paid' && bill.paymentDate &&
     getYear(bill.paymentDate) === currentYear &&
     getMonth(bill.paymentDate) === currentMonth
@@ -157,11 +157,13 @@ export default async function AdminDashboardPage() {
     const spacesInThisBuildingIds = spaces.filter(s => s.buildingId === building.id).map(s => s.id);
     
     const agreementIdsInBuilding = allAgreements
-      .filter(ag => spacesInThisBuildingIds.includes(ag.spaceId))
+      .filter(ag => ag.spaceId && spacesInThisBuildingIds.includes(ag.spaceId))
       .map(ag => ag.id);
     
-    const billsForBuildingCurrentMonth = billsInCurrentMonthPeriod.filter(bill => 
-      agreementIdsInBuilding.includes(bill.agreementId)
+    const billsForBuildingCurrentMonth = allBills.filter(bill => 
+      agreementIdsInBuilding.includes(bill.agreementId) &&
+      getYear(bill.billDate) === currentYear &&
+      getMonth(bill.billDate) === currentMonth
     );
     
     const incomeCollected = billsForBuildingCurrentMonth
