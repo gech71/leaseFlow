@@ -25,30 +25,23 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-async function getAccessTokenAndPhone(request: NextRequest): Promise<{accessToken: string; phoneNumber: string} | null> {
-    const authHeader = request.headers.get('Authorization');
-    let token: string | undefined;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
-    } else {
-        const cookieStore = await cookies();
-        token = cookieStore.get('leaseflow_admin_access_token')?.value || cookieStore.get('leaseflow_portal_access_token')?.value;
-    }
+async function getAccessTokenAndPhoneFromCookie(): Promise<{accessToken: string; phoneNumber: string} | null> {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('leaseflow_admin_access_token')?.value || cookieStore.get('leaseflow_portal_access_token')?.value;
 
     if (!token) return null;
 
     const payload = decodeJwtPayload(token);
-    // The phone number claim in the JWT from your identity provider is "phone_number"
     const phoneNumber = payload?.phone_number;
 
     if (!phoneNumber) {
-        console.error("Change Password Error: 'phone_number' claim missing from JWT payload.");
+        console.error("Change Password Error: 'phone_number' claim missing from JWT payload for logged-in user.");
         return null;
     }
     
     return { accessToken: token, phoneNumber };
 }
+
 
 export async function POST(request: NextRequest) {
     if (!AUTH_API_BASE_URL) {
@@ -56,32 +49,59 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication service is not configured."] }, { status: 500 });
     }
 
-    const authDetails = await getAccessTokenAndPhone(request);
-    if (!authDetails) {
-        return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing or invalid."] }, { status: 401 });
-    }
-    
     let requestBody;
     try {
         requestBody = await request.json();
     } catch (e) {
         return NextResponse.json({ isSuccess: false, errors: ["Invalid request format."] }, { status: 400 });
     }
+    
+    const { currentPassword, newPassword, phoneNumber: phoneNumberFromRequest } = requestBody;
 
-    const { currentPassword, newPassword } = requestBody;
     if (!currentPassword || !newPassword) {
         return NextResponse.json({ isSuccess: false, errors: ["Current and new passwords are required."] }, { status: 400 });
     }
+
+    // Determine the source of authentication details
+    const authHeader = request.headers.get('Authorization');
+    let accessToken: string | undefined;
+    let effectivePhoneNumber: string | undefined = phoneNumberFromRequest;
+    let userIdForDbUpdate: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        accessToken = authHeader.substring(7);
+        const payload = decodeJwtPayload(accessToken);
+        if (payload?.phone_number) {
+            effectivePhoneNumber = payload.phone_number;
+        }
+        userIdForDbUpdate = payload?.sub;
+    } else {
+        const cookieAuth = await getAccessTokenAndPhoneFromCookie();
+        if (cookieAuth) {
+            accessToken = cookieAuth.accessToken;
+            effectivePhoneNumber = cookieAuth.phoneNumber;
+            const payload = decodeJwtPayload(cookieAuth.accessToken);
+            userIdForDbUpdate = payload?.sub;
+        }
+    }
+
+    if (!accessToken) {
+        return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
+    }
+    if (!effectivePhoneNumber) {
+        return NextResponse.json({ isSuccess: false, errors: ["User phone number could not be determined."] }, { status: 400 });
+    }
+
 
     try {
         const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authDetails.accessToken}`,
+                'Authorization': `Bearer ${accessToken}`,
             },
             body: JSON.stringify({ 
-                phoneNumber: authDetails.phoneNumber,
+                phoneNumber: effectivePhoneNumber,
                 currentPassword: currentPassword, 
                 newPassword: newPassword 
             }),
@@ -93,10 +113,10 @@ export async function POST(request: NextRequest) {
         try {
             responseData = responseText ? JSON.parse(responseText) : {};
         } catch(e) {
-             console.error("Change Password Error: Failed to parse JSON response from identity server.", responseText);
-             // If the status is OK but the body is empty, treat as success.
              if (externalApiResponse.ok && !responseText) {
-                 await databaseService.updateUserByExternalId(authDetails.accessToken, { tempPassword: null });
+                 if (userIdForDbUpdate) {
+                    await databaseService.updateUserByExternalId(userIdForDbUpdate, { tempPassword: null });
+                 }
                  return NextResponse.json({ isSuccess: true, message: "Password changed successfully." });
              }
              return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
@@ -107,12 +127,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status });
         }
         
-        // --- On successful password change, clear tempPassword ---
-        const payload = decodeJwtPayload(authDetails.accessToken);
-        if (payload?.sub) {
-            await databaseService.updateUserByExternalId(payload.sub, { tempPassword: null });
+        if (userIdForDbUpdate) {
+            await databaseService.updateUserByExternalId(userIdForDbUpdate, { tempPassword: null });
         }
-        // --------------------------------------------------------
 
         return NextResponse.json({ isSuccess: true, ...responseData });
 
