@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileSignature, DollarSign, AlertTriangle, CheckCircle, Info, UploadCloud, Download, User, Clock, Home, CreditCard, Landmark, Wallet, HelpCircle, FileText, Paperclip, MessageSquare } from 'lucide-react';
+import { FileSignature, Banknote, AlertTriangle, CheckCircle, Info, UploadCloud, Download, User, Clock, Home, CreditCard, Landmark, Wallet, HelpCircle, FileText, Paperclip, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -303,7 +303,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
           </Card>
 
            <Card className="shadow-lg">
-            <CardHeader><CardTitle className="font-headline text-xl flex items-center"><DollarSign className="mr-2 text-primary"/>Billing History</CardTitle><CardDescription>Your payment obligations and history.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="font-headline text-xl flex items-center"><Banknote className="mr-2 text-primary"/>Billing History</CardTitle><CardDescription>Your payment obligations and history.</CardDescription></CardHeader>
             <CardContent>
               {processedBills.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No bills found for this agreement yet.</p>

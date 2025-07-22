@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, DollarSign as DollarSignLucide, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search } from 'lucide-react';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search } from 'lucide-react';
 import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -80,7 +80,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
                             return (
                                 <div key={`${tier.id}-${index}`} className="text-xs pl-2 py-0.5">
                                     <p><Clock className="inline mr-1 h-3 w-3"/>{tierDurationDesc}</p>
-                                    <p><DollarSignLucide className="inline mr-1 h-3 w-3"/>Fee: {tier.feeType === 'Fixed' ? `${tier.feeValue.toFixed(2)} Birr` : `${tier.feeValue}% of rent`}</p>
+                                    <p><BanknoteIcon className="inline mr-1 h-3 w-3"/>Fee: {tier.feeType === 'Fixed' ? `${tier.feeValue.toFixed(2)} Birr` : `${tier.feeValue}% of rent`}</p>
                                 </div>
                             )
                         })}

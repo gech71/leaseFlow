@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, DollarSign as DollarSignIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle, Edit, Search } from 'lucide-react';
+import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle, Edit, Search } from 'lucide-react';
 import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth, parseISO, subMonths } from 'date-fns';
@@ -598,7 +598,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                     
                     {item.appliesToScope === 'Building' && (
                         <div className="space-y-1.5">
-                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
+                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
                             <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
                             <p className="text-xs text-muted-foreground">This cost will be prorated among all spaces based on their individual Proration Share %.</p>
                         </div>
@@ -608,7 +608,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                       <div className="space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                             <div className="space-y-1.5">
-                                <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost for Floor</Label>
+                                <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Floor</Label>
                                 <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 200.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
                             </div>
                             <div className="space-y-1.5">
@@ -660,7 +660,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                     {item.appliesToScope === 'SpecificSpaces' && (
                         <div className="space-y-3">
                           <div className="space-y-1.5">
-                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><DollarSignIcon className="mr-1 h-3 w-3"/>Total Cost to Allocate</Label>
+                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost to Allocate</Label>
                             <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 300.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
                           </div>
 

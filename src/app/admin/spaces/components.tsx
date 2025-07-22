@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, MapPin, Maximize, Percent, DollarSign, Trash2, Edit3, Loader2, EyeOff, Eye, Clock, Search } from 'lucide-react';
+import { Building2, PlusCircle, MapPin, Maximize, Percent, Banknote, Trash2, Edit3, Loader2, EyeOff, Eye, Clock, Search } from 'lucide-react';
 import type { Building as BuildingTypePrisma, Space as SpaceTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -436,7 +436,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                   <div className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> Floor: {space.floor}</div>
                   <div className="flex items-center"><Maximize className="mr-2 h-4 w-4 text-primary" /> Area: {space.area} m²</div>
                   <div className="flex items-center"><Percent className="mr-2 h-4 w-4 text-primary" /> Proration Share: {(Number(space.utilityProrationShare) * 100).toFixed(0)}%</div>
-                  <div className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Rent: {Number(space.monthlyRentalPrice).toLocaleString()} Birr/month</div>
+                  <div className="flex items-center"><Banknote className="mr-2 h-4 w-4 text-primary" /> Rent: {Number(space.monthlyRentalPrice).toLocaleString()} Birr/month</div>
                   {space.isOccupied && space.availabilityDate && (
                     <div className="flex items-center text-blue-600 font-medium pt-3 border-t mt-3">
                       <Clock className="mr-2 h-4 w-4" /> 

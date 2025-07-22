@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Building2, FileText, DollarSign, LayoutGrid, AlertCircle, User } from 'lucide-react';
+import { Building, Building2, FileText, Banknote, LayoutGrid, AlertCircle, User } from 'lucide-react';
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart';
 import { databaseService } from '@/lib/services/databaseService';
@@ -288,7 +288,7 @@ export default async function AdminDashboardPage() {
         />
         <StatCard title="Active Tenants" value={String(stats.totalTenants)} icon={User} description="Currently active tenants." />
         <StatCard title="Active Agreements" value={String(stats.activeAgreements)} icon={FileText} description="Currently active leases." />
-        <StatCard title="Revenue (This Month)" value={stats.totalRevenueMTD} icon={DollarSign} description={`Collected in ${periodDescription}.`} />
+        <StatCard title="Revenue (This Month)" value={stats.totalRevenueMTD} icon={Banknote} description={`Collected in ${periodDescription}.`} />
       </div>
       
       <div className="mb-10">

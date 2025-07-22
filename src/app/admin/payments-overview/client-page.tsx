@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, DollarSign, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2, EyeOff, Paperclip } from 'lucide-react';
+import { ClipboardList, Banknote, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2, EyeOff, Paperclip } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Space as SpacePrismaOriginal, Bill as BillPrismaOriginal, Agreement as AgreementPrismaOriginal, Tenant as TenantPrismaOriginal, Building as BuildingPrismaTypeOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
@@ -312,7 +312,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
         <Card className="shadow-sm bg-secondary/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Upcoming/Awaiting</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">{totalUpcomingAmount.toFixed(2)} Birr</div>
@@ -322,7 +322,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
         <Card className="shadow-sm bg-secondary/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Paid ({format(new Date(selectedYear, selectedMonth), 'MMMM yyyy')})</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{totalPaidSelectedPeriod.toFixed(2)} Birr</div>
@@ -451,7 +451,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
         {paidBillsInSelectedPeriod.length === 0 ? (
           <Card className="text-center py-10 shadow-sm">
             <CardContent>
-              <DollarSign className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+              <Banknote className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
               <h3 className="text-lg font-semibold font-headline">No Payments Found</h3>
               <p className="text-muted-foreground">No payments recorded for {format(new Date(selectedYear, selectedMonth), 'MMMM yyyy')}.</p>
             </CardContent>

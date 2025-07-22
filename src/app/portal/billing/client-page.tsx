@@ -12,7 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { CheckCircle, Phone, Loader2, DollarSign, AlertCircle, Info, RefreshCw, AlertOctagon } from 'lucide-react';
+import { CheckCircle, Phone, Loader2, Banknote, AlertCircle, Info, RefreshCw, AlertOctagon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getBillingAmountForPhoneNumberAction, initiatePaymentAction, getBillStatusAction } from './actions';
 
@@ -187,7 +187,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                   <div>
                     <p className="text-sm text-muted-foreground">Outstanding Amount Due</p>
                     <p className="text-4xl font-bold font-headline text-primary flex items-baseline gap-2">
-                      <DollarSign className="h-8 w-8" />
+                      <Banknote className="h-8 w-8" />
                       {billingInfo.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       <span className="text-2xl text-muted-foreground font-medium">Birr</span>
                     </p>

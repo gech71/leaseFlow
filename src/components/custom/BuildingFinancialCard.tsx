@@ -2,7 +2,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Building, DollarSign, TrendingUp, AlertCircle, Clock, CheckCircle } from "lucide-react";
+import { Building, Banknote, TrendingUp, AlertCircle, Clock, CheckCircle } from "lucide-react";
 
 interface BuildingFinancialCardProps {
   buildingName: string;
@@ -40,7 +40,7 @@ export function BuildingFinancialCard({
         {/* Expenses */}
         <div className="flex items-center justify-between px-3 py-2 bg-red-100/60 dark:bg-red-900/30 rounded-md">
             <div className="flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
-                <DollarSign className="h-4 w-4" />
+                <Banknote className="h-4 w-4" />
                 <span>Expenses:</span>
             </div>
             <span className="font-semibold text-red-800 dark:text-red-200">

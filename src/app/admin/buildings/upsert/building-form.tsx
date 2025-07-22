@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, MapPin, DollarSign as DollarSignLucide, Layers, HomeIcon, Loader2, EyeOff, Clock } from 'lucide-react';
+import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -380,14 +380,14 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
                               <p className="text-xs text-muted-foreground mt-0.5">For last rule in scope, leave blank/0 for indefinite.</p>
                           </div>
                           <div>
-                              <Label htmlFor={`ruleFeeType-${uiRule.id}`} className="text-xs flex items-center"><DollarSignLucide className="mr-1 h-3 w-3"/>Fee Type<span className="text-destructive ml-1">*</span></Label>
+                              <Label htmlFor={`ruleFeeType-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Fee Type<span className="text-destructive ml-1">*</span></Label>
                               <Select value={uiRule.feeType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as UIPenaltyRule['feeType'])} disabled={isSaving || !canManageThisForm}>
                                   <SelectTrigger id={`ruleFeeType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue /></SelectTrigger>
                                   <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
                               </Select>
                           </div>
                           <div>
-                              <Label htmlFor={`ruleFeeValue-${uiRule.id}`} className="text-xs flex items-center"><DollarSignLucide className="mr-1 h-3 w-3"/>Fee Value<span className="text-destructive ml-1">*</span></Label>
+                              <Label htmlFor={`ruleFeeValue-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Fee Value<span className="text-destructive ml-1">*</span></Label>
                               <Input id={`ruleFeeValue-${uiRule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5"
                                       value={uiRule.feeValue ?? ''} 
                                       onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'feeValue', e.target.value)}
