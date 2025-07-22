@@ -166,88 +166,114 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         
         if (existingEntry && existingEntry.utilities) {
             const uiItems: UIUtilityItem[] = [];
-            // Group utilities from DB by name to reconstruct logical UI items
-            const groupedByName = existingEntry.utilities.reduce((acc, item) => {
-                if (!acc[item.name]) acc[item.name] = [];
-                acc[item.name].push(item);
-                return acc;
-            }, {} as Record<string, BuildingUtilityItemPrismaType[]>);
+            
+            // --- FIX: Grouping logic is updated to handle same-named items with different scopes ---
+            const getGroupKey = (item: BuildingUtilityItemPrismaType): string => {
+                if (item.appliesToScope === 'Building') {
+                    // Unique key for building-scoped items
+                    return `${item.name}::scope=Building`;
+                }
+                if (item.appliesToScope === 'SpecificSpaces') {
+                    // Group floor-scoped items by their common floor
+                    const space = selectedBuilding?.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
+                    if (space?.floor) {
+                        return `${item.name}::scope=Floor::floor=${space.floor}`;
+                    }
+                }
+                // Fallback for specific spaces not part of a floor group, or any other case
+                return `${item.name}::scope=SpecificSpaces::id=${item.id}`;
+            };
+            
+            const itemGroups = new Map<string, BuildingUtilityItemPrismaType[]>();
+            for (const item of existingEntry.utilities) {
+                 if (item.appliesToScope === 'Building') {
+                    // Building-scoped items are always individual groups
+                    itemGroups.set(getGroupKey(item), [item]);
+                    continue;
+                }
+                
+                // For 'SpecificSpaces', try to group them by floor
+                let grouped = false;
+                if(selectedBuilding) {
+                    const space = selectedBuilding.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
+                    if (space?.floor) {
+                        const floorKey = `${item.name}::scope=Floor::floor=${space.floor}`;
+                        if (!itemGroups.has(floorKey)) itemGroups.set(floorKey, []);
+                        itemGroups.get(floorKey)!.push(item);
+                        grouped = true;
+                    }
+                }
 
-            for (const name in groupedByName) {
-                const itemsInGroup = groupedByName[name];
+                if (!grouped) {
+                    // If it couldn't be grouped by floor (e.g., specific spaces across floors), treat it as a unique group
+                    itemGroups.set(getGroupKey(item), [item]);
+                }
+            }
+            
+            // Post-process floor groups to ensure they are complete
+            for (const [key, group] of itemGroups.entries()) {
+                if (!key.includes('::scope=Floor')) continue;
+                
+                const floorName = key.split('::floor=')[1];
+                const spacesOnFloor = selectedBuilding?.spaces.filter(s => s.floor === floorName).length || 0;
+                
+                // If the number of items in the group doesn't match the number of spaces on the floor,
+                // it wasn't a true "Floor" scope save. Split them into individual "SpecificSpaces" groups.
+                if (group.length !== spacesOnFloor) {
+                    itemGroups.delete(key);
+                    for (const item of group) {
+                        itemGroups.set(getGroupKey(item), [item]);
+                    }
+                }
+            }
+
+
+            for (const itemsInGroup of itemGroups.values()) {
+                if (itemsInGroup.length === 0) continue;
+                
                 const firstItem = itemsInGroup[0];
 
-                // Handle 'Building' scope items (they are not grouped, always single)
                 if (itemsInGroup.length === 1 && firstItem.appliesToScope === 'Building') {
                     uiItems.push({
                         uiId: firstItem.id || `dbItem-building-${Date.now()}`,
                         name: firstItem.name,
                         totalCost: firstItem.totalCost,
                         appliesToScope: 'Building',
-                        perSpaceCosts: {},
-                        perSpacePercentages: {},
+                        perSpaceCosts: {}, perSpacePercentages: {},
                     });
-                    continue; // Go to next group
-                }
+                } else {
+                    const groupTotalCost = itemsInGroup.reduce((sum, i) => sum + i.totalCost, 0);
+                    const perSpacePercentages: { [spaceId: string]: number } = {};
 
-                // All other groups are either 'Floor' or 'SpecificSpaces' which were saved as multiple 'SpecificSpaces' records.
-                const groupTotalCost = itemsInGroup.reduce((sum, i) => sum + i.totalCost, 0);
-                const perSpacePercentages: { [spaceId: string]: number } = {};
-
-                if (selectedBuilding) {
-                  itemsInGroup.forEach(item => {
-                      const spaceName = item.applicableSpaceIdNames?.[0];
-                      const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
-                      if (space && groupTotalCost > 0) {
-                          const percentage = (item.totalCost / groupTotalCost) * 100;
-                          perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
-                      }
-                  });
-                }
-                
-                let inferredScope: 'Floor' | 'SpecificSpaces' = 'SpecificSpaces';
-                let inferredFloor: string | undefined = undefined;
-
-                if (selectedBuilding) {
-                    const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
-                    const firstSpaceInGroup = selectedBuilding.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
-
-                    if (firstSpaceInGroup?.floor) {
-                        const commonFloor = firstSpaceInGroup.floor;
-                        // Check if ALL items in this group are on the same floor
-                        const allOnSameFloor = itemsInGroup.every(item => {
-                            const spaceName = item.applicableSpaceIdNames?.[0];
-                            const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
-                            return space?.floor === commonFloor;
-                        });
-
-                        // If they are on the same floor, check if they represent ALL spaces on that floor
-                        if (allOnSameFloor) {
-                            const spacesOnThisFloor = selectedBuilding.spaces.filter(s => s.floor === commonFloor);
-                            const spaceNamesInGroup = new Set(itemsInGroup.flatMap(i => i.applicableSpaceIdNames || []));
-                            
-                            // Check if the number of unique spaces in the group matches the total number of spaces on that floor
-                            if (spacesOnThisFloor.length === spaceNamesInGroup.size) {
-                                 const allSpacesOnFloorAreInGroup = spacesOnThisFloor.every(s => spaceNamesInGroup.has(s.spaceIdName));
-                                 if (allSpacesOnFloorAreInGroup) {
-                                    // This is a much safer heuristic. It's very likely a Floor-scoped item.
-                                    inferredScope = 'Floor';
-                                    inferredFloor = commonFloor;
-                                 }
-                            }
-                        }
+                    if (selectedBuilding) {
+                      itemsInGroup.forEach(item => {
+                          const spaceName = item.applicableSpaceIdNames?.[0];
+                          const space = selectedBuilding.spaces.find(s => s.spaceIdName === spaceName);
+                          if (space && groupTotalCost > 0) {
+                              const percentage = (item.totalCost / groupTotalCost) * 100;
+                              perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
+                          }
+                      });
                     }
+                    
+                    const firstSpaceNameInGroup = itemsInGroup[0]?.applicableSpaceIdNames?.[0];
+                    const firstSpaceInGroup = selectedBuilding?.spaces.find(s => s.spaceIdName === firstSpaceNameInGroup);
+
+                    const isFloorScope = firstSpaceInGroup?.floor && itemsInGroup.every(item => {
+                        const space = selectedBuilding?.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
+                        return space?.floor === firstSpaceInGroup.floor;
+                    });
+                    
+                    uiItems.push({
+                        uiId: `logical-${firstItem.name}-${Date.now()}`,
+                        name: firstItem.name,
+                        appliesToScope: isFloorScope ? 'Floor' : 'SpecificSpaces',
+                        totalCost: groupTotalCost,
+                        applicableFloor: isFloorScope ? firstSpaceInGroup?.floor : undefined,
+                        perSpacePercentages: perSpacePercentages,
+                        perSpaceCosts: {} 
+                    });
                 }
-                
-                uiItems.push({
-                    uiId: `logical-${name}-${Date.now()}`,
-                    name: name,
-                    appliesToScope: inferredScope,
-                    totalCost: groupTotalCost,
-                    applicableFloor: inferredFloor,
-                    perSpacePercentages: perSpacePercentages,
-                    perSpaceCosts: {} // Not used for reading
-                });
             }
 
             setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
