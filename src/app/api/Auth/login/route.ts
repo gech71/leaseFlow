@@ -40,18 +40,17 @@ export async function POST(request: NextRequest) {
     const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Use the correct payload keys as specified by the user
-      body: JSON.stringify({ phoneNumber, password }),
+      body: JSON.stringify({ phoneNumber: phoneNumber, Password: password }),
     });
 
     const responseText = await externalResponse.text();
-    let responseData;
     
     if (!responseText) {
         console.error("Login Error: Received an empty response from the identity server.");
         return NextResponse.json({ isSuccess: false, errors: ["Authentication service returned an empty response."] }, { status: 500 });
     }
 
+    let responseData;
     try {
         responseData = JSON.parse(responseText);
     } catch (e) {
