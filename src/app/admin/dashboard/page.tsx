@@ -130,11 +130,6 @@ export default async function AdminDashboardPage() {
   });
   const uniqueActiveTenantIds = new Set(activeAgreements.map(ag => ag.tenantId));
 
-  const billsInCurrentMonthPeriod = allBills.filter(bill => {
-    const billDate = bill.billDate;
-    return getYear(billDate) === currentYear && getMonth(billDate) === currentMonth;
-  });
-  
   const paidBillsInCurrentMonth = allBills.filter(bill => 
     bill.status === 'Paid' && bill.paymentDate &&
     getYear(bill.paymentDate) === currentYear &&
@@ -160,6 +155,7 @@ export default async function AdminDashboardPage() {
       .filter(ag => ag.spaceId && spacesInThisBuildingIds.includes(ag.spaceId))
       .map(ag => ag.id);
     
+    // Correctly filter for bills generated in the current month for this building
     const billsForBuildingCurrentMonth = allBills.filter(bill => 
       agreementIdsInBuilding.includes(bill.agreementId) &&
       getYear(bill.billDate) === currentYear &&
