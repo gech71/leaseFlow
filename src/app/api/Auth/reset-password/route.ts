@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/reset-password`, {
+        const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/reset-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phoneNumber, token, newPassword }),
@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
         }
         
+        // Handle success with potentially empty body
         if (!responseText) {
             return NextResponse.json({ isSuccess: true, message: "Password has been reset successfully." });
         }

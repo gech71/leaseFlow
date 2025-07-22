@@ -1,3 +1,4 @@
+
 // This page is no longer needed as the functionality has been merged
 // into the forgot-password page for a better user experience.
 // It can be deleted. Redirecting to the new flow.
