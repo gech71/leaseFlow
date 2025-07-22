@@ -282,7 +282,7 @@ export class DatabaseService {
   async getUserByExternalId(userId: string, include?: Prisma.UserInclude): Promise<User | null> { 
     return prisma.user.findUnique({ 
         where: { userId }, 
-        include // This 'include' comes directly from the method parameter
+        include
     });
   }
   
@@ -321,9 +321,13 @@ export class DatabaseService {
     });
 
     if (userWithBuildings && userWithBuildings.managedBuildings.length > 0) {
-      await prisma.building.updateMany({
-        where: { managedByUserId: userWithBuildings.userId }, 
-        data: { managedByUserId: null },
+      await prisma.user.update({
+          where: { id },
+          data: {
+              managedBuildings: {
+                  set: []
+              }
+          }
       });
     }
     return prisma.user.delete({ where: { id } });

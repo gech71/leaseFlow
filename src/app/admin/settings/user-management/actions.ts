@@ -1,6 +1,5 @@
 
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -12,9 +11,6 @@ import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
 export async function getUserManagementPageData() {
   try {
-    // This data is intended for super admins or users with specific user management rights,
-    // so we typically fetch all data and let the UI layer handle visibility.
-    // However, a good practice could be to scope this down for non-super-admins if needed in the future.
     const users = await databaseService.getAllUsers({
       select: {
         id: true,
@@ -24,7 +20,7 @@ export async function getUserManagementPageData() {
         firstName: true,
         lastName: true,
         phoneNumber: true,
-        tempPassword: true, // Explicitly select tempPassword
+        tempPassword: true,
         createdAt: true,
         updatedAt: true,
         roles: true, 
@@ -44,7 +40,7 @@ export async function getUserManagementPageData() {
 
 export async function updateUserAssignments(
   targetUserId: string,
-  selectedRoleId: string | null, // Changed from string[] to string | null
+  selectedRoleId: string | null,
   selectedManagedBuildingIds: string[]
 ) {
   try {
@@ -52,43 +48,27 @@ export async function updateUserAssignments(
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
         return { success: false, error: "Permission denied." };
     }
-
-    // 1. Update role for the user
-    await databaseService.updateUser(targetUserId, {
-      roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] }, // Handle single role or no role
-    });
-
-    // 2. Update managed buildings
-    const userToUpdate = await databaseService.getUserById(targetUserId);
+    
+    const userToUpdate = await databaseService.getUserById(targetUserId, { managedBuildings: true });
     if (!userToUpdate) {
-        throw new Error("User not found with internal ID.");
+      throw new Error("User not found for assignment update.");
     }
-    const identityUserId = userToUpdate.userId;
+    
+    const buildingsToConnect = selectedManagedBuildingIds.map(id => ({ id }));
+    const buildingsToDisconnect = userToUpdate.managedBuildings
+        .filter(b => !selectedManagedBuildingIds.includes(b.id))
+        .map(b => ({ id: b.id }));
 
-    const currentlyManagedBuildings = await databaseService.getAllBuildings({
-      where: { managedByUserId: identityUserId }
-    });
-
-    const buildingsToUnassign = currentlyManagedBuildings.filter(
-      b => !selectedManagedBuildingIds.includes(b.id)
-    );
-    for (const building of buildingsToUnassign) {
-      await databaseService.updateBuilding(building.id, {
-        manager: { disconnect: true }
-      });
-    }
-
-    for (const buildingId of selectedManagedBuildingIds) {
-      const isAlreadyManaged = currentlyManagedBuildings.some(b => b.id === buildingId && b.managedByUserId === identityUserId);
-      if (!isAlreadyManaged) {
-        await databaseService.updateBuilding(buildingId, {
-          manager: { connect: { userId: identityUserId } }
-        });
+    await databaseService.updateUser(targetUserId, {
+      roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] },
+      managedBuildings: {
+        connect: buildingsToConnect,
+        disconnect: buildingsToDisconnect,
       }
-    }
+    });
 
     revalidatePath('/admin/settings/user-management');
-    revalidatePath('/admin/buildings'); // Revalidate in case manager assignments changed
+    revalidatePath('/admin/buildings');
     return { success: true, message: "User assignments updated successfully." };
 
   } catch (error: any) {

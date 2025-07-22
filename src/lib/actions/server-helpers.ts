@@ -29,7 +29,7 @@ function decodeJwtPayload(token: string): any | null {
 }
 
 // Gets current user from cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+async function getCurrentUser(): Promise<(User & { roles: Role[]; managedBuildings: { id: string }[] }) | null> {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
     if (!accessToken) return null;
@@ -37,7 +37,10 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const tokenPayload = decodeJwtPayload(accessToken);
     if (!tokenPayload || !tokenPayload.sub) return null;
 
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+    return await databaseService.getUserByExternalId(tokenPayload.sub, { 
+      roles: true,
+      managedBuildings: { select: { id: true } }
+    });
 }
 
 // Helper to get user and check permissions
@@ -57,11 +60,9 @@ export async function getUserAndManagedIds() {
     if (!currentUser) throw new Error("Authentication required.");
 
     const isSuperAdmin = currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
-    let managedBuildingIds: string[] | null = null; // null means all access for super admin
-
-    if (!isSuperAdmin) {
-        const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-        managedBuildingIds = managedBuildings.map(b => b.id);
-    }
+    
+    // For non-super admins, their managedBuildingIds are directly on the user object.
+    const managedBuildingIds = isSuperAdmin ? null : currentUser.managedBuildings.map(b => b.id);
+    
     return { currentUser, isSuperAdmin, managedBuildingIds };
 }
