@@ -85,7 +85,7 @@ async function GenerateAgreementDataFetcher() {
   const tenantWhereClause: Prisma.TenantWhereInput = managedBuildingIds
     ? {
         OR: [
-          { rentedSpaceId: null },
+          { rentedSpace: null },
           { rentedSpace: { buildingId: { in: managedBuildingIds } } }
         ]
       }
