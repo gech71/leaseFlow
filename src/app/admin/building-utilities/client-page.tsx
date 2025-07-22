@@ -165,57 +165,69 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
         if (existingEntry && existingEntry.utilities && selectedBuilding) {
-            const uiItems: UIUtilityItem[] = [];
-            const processedItemIds = new Set<string>();
+            const logicalGroups: { [key: string]: BuildingUtilityItemPrismaType[] } = {};
 
+            // Group DB items into logical UI items
             for (const item of existingEntry.utilities) {
-                if (processedItemIds.has(item.id)) continue;
-
+                let groupKey: string;
                 if (item.appliesToScope === 'Building') {
-                    uiItems.push({
-                        uiId: item.id,
-                        name: item.name,
-                        totalCost: item.totalCost,
-                        appliesToScope: 'Building',
-                        perSpaceCosts: {}, perSpacePercentages: {},
-                    });
-                    processedItemIds.add(item.id);
-                } else if (item.appliesToScope === 'SpecificSpaces') {
+                    groupKey = `Building_${item.name}`;
+                } else {
                     const spaceForItem = selectedBuilding.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
-                    const floorName = spaceForItem?.floor;
+                    const floorName = spaceForItem?.floor || 'unknown_floor';
+                    groupKey = `Floor_${floorName}_${item.name}`;
+                }
+                
+                if (!logicalGroups[groupKey]) {
+                    logicalGroups[groupKey] = [];
+                }
+                logicalGroups[groupKey].push(item);
+            }
 
-                    // Group all other items with the same name and on the same floor
-                    const itemsInGroup = existingEntry.utilities.filter(otherItem => {
-                        const otherSpace = selectedBuilding.spaces.find(s => s.spaceIdName === otherItem.applicableSpaceIdNames?.[0]);
-                        return otherItem.name === item.name && otherSpace?.floor === floorName;
-                    });
-                    
-                    const spacesOnFloor = selectedBuilding.spaces.filter(s => s.floor === floorName);
-                    const isFullFloorGroup = floorName && itemsInGroup.length === spacesOnFloor.length && itemsInGroup.every(i => spacesOnFloor.some(s => s.spaceIdName === i.applicableSpaceIdNames?.[0]));
-
-                    const groupTotalCost = itemsInGroup.reduce((sum, i) => sum + i.totalCost, 0);
-                    const perSpacePercentages: { [spaceId: string]: number } = {};
-
-                    itemsInGroup.forEach(groupItem => {
-                        const space = selectedBuilding.spaces.find(s => s.spaceIdName === groupItem.applicableSpaceIdNames?.[0]);
-                        if (space && groupTotalCost > 0) {
-                            const percentage = (groupItem.totalCost / groupTotalCost) * 100;
-                            perSpacePercentages[space.id] = Math.round((percentage + Number.EPSILON) * 100) / 100;
+            const uiItems: UIUtilityItem[] = Object.values(logicalGroups).map(group => {
+                const firstItem = group[0];
+                const spaceForFirstItem = selectedBuilding.spaces.find(s => s.spaceIdName === firstItem.applicableSpaceIdNames?.[0]);
+                
+                const groupTotalCost = group.reduce((sum, i) => sum + i.totalCost, 0);
+                
+                const perSpacePercentages: { [spaceId: string]: number } = {};
+                if (groupTotalCost > 0) {
+                    group.forEach(item => {
+                        const space = selectedBuilding.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
+                        if (space) {
+                            perSpacePercentages[space.id] = (item.totalCost / groupTotalCost) * 100;
                         }
-                        processedItemIds.add(groupItem.id);
-                    });
-                    
-                    uiItems.push({
-                        uiId: `logical-${item.name}-${floorName || item.id}`,
-                        name: item.name,
-                        appliesToScope: isFullFloorGroup ? 'Floor' : 'SpecificSpaces',
-                        totalCost: groupTotalCost,
-                        applicableFloor: isFullFloorGroup ? floorName : undefined,
-                        perSpacePercentages: perSpacePercentages,
-                        perSpaceCosts: {} 
                     });
                 }
-            }
+                
+                // Determine the scope for the UI
+                let scope: UIUtilityItem['appliesToScope'] = 'SpecificSpaces';
+                let applicableFloor: string | undefined = undefined;
+
+                if (firstItem.appliesToScope === 'Building') {
+                    scope = 'Building';
+                } else if (spaceForFirstItem?.floor) {
+                    const floorName = spaceForFirstItem.floor;
+                    const spacesOnFloor = selectedBuilding.spaces.filter(s => s.floor === floorName);
+                    const groupCoversAllSpacesOnFloor = spacesOnFloor.every(s => 
+                        group.some(item => item.applicableSpaceIdNames?.includes(s.spaceIdName))
+                    );
+                    if (groupCoversAllSpacesOnFloor && group.length === spacesOnFloor.length) {
+                        scope = 'Floor';
+                        applicableFloor = floorName;
+                    }
+                }
+                
+                return {
+                    uiId: `logical-${firstItem.name}-${spaceForFirstItem?.floor || firstItem.id}`,
+                    name: firstItem.name,
+                    appliesToScope: scope,
+                    totalCost: groupTotalCost,
+                    applicableFloor: applicableFloor,
+                    perSpacePercentages: perSpacePercentages,
+                    perSpaceCosts: {},
+                };
+            });
 
             setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
         } else {
@@ -233,14 +245,18 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const refreshUtilityRecordsList = async () => {
     setIsLoadingData(true); 
     const records = await getAllBuildingUtilitiesForListAction();
-    const totalCost = records.reduce((sum, util) => sum + (util as any).totalCost, 0);
-    setAllUtilityRecords(records.map(r => ({
-      ...r,
-      totalCost: totalCost,
-      createdAt: r.createdAt.toISOString(), 
-      updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(),
-      utilities: r.utilities.map(u => ({...u}))
-    })) as ClientBuildingMonthlyUtilitiesPrismaType[]);
+    
+    setAllUtilityRecords(records.map(r => {
+      const totalCost = (r.utilities || []).reduce((sum, util) => sum + util.totalCost, 0);
+      return {
+        ...r,
+        totalCost: totalCost, // This is the new computed total cost
+        createdAt: r.createdAt.toISOString(), 
+        updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(),
+        utilities: r.utilities.map(u => ({...u}))
+      }
+    }) as ClientBuildingMonthlyUtilitiesPrismaType[]);
+
     setIsLoadingData(false);
   };
 
@@ -764,4 +780,3 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     </div>
   );
 }
-
