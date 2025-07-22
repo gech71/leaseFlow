@@ -5,46 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type User, type Role } from '@prisma/client';
 import { cookies } from 'next/headers';
-
-// Helper function to decode JWT
-function decodeJwtPayload(token: string): any | null {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
-
-// Helper function to get current user from cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    if (!accessToken) return null;
-    
-    const tokenPayload = decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
-
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
-}
-
+import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
 export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
   try {
     // Get the current user who is creating the building
-    const currentUser = await getCurrentUser();
+    const { currentUser } = await getUserAndPermissions();
     if (!currentUser) {
         return { success: false, error: "Authentication required to create a building." };
     }

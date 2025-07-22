@@ -7,56 +7,13 @@ import { FileText, Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Tenant, Space, User, Role, Prisma } from '@prisma/client';
 import { AgreementsListClientPage, type AgreementWithRelations } from './components'; // Import from new components file
-import { cookies } from 'next/headers';
-
-// Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
-
-// Gets current user from cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    if (!accessToken) return null;
-    
-    const tokenPayload = decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
-
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
-}
+import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 // This is now a Server Component
 export default async function AgreementsListPage() {
-  const currentUser = await getCurrentUser();
-  const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
-  let managedBuildingIds: string[] | undefined = undefined;
+  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
-  if (!isSuperAdmin && currentUser) {
-      const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-      managedBuildingIds = managedBuildings.map(b => b.id);
-  }
-
-  const whereClause: Prisma.AgreementWhereInput = managedBuildingIds
-    ? { space: { buildingId: { in: managedBuildingIds } } }
-    : {};
+  const whereClause: Prisma.AgreementWhereInput = !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {};
 
   const agreementsData = await databaseService.getAllAgreements({
     where: whereClause,

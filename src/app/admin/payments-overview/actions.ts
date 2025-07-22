@@ -5,6 +5,8 @@
 import { databaseService } from '@/lib/services/databaseService';
 import type { Bill as BillPrisma, Space as SpacePrisma, Prisma, User, Role } from '@prisma/client';
 import { cookies } from 'next/headers';
+import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItem {
@@ -36,55 +38,15 @@ export interface PaymentsOverviewData {
   spaces: SpacePrisma[]; // For "Total Potential Monthly Revenue"
 }
 
-// Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
-
-// Gets current user from cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    if (!accessToken) return null;
-    
-    const tokenPayload = decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
-
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
-}
-
 export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewData> {
-  const currentUser = await getCurrentUser();
-  const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
-  let managedBuildingIds: string[] | undefined = undefined;
+  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
-  if (!isSuperAdmin && currentUser) {
-      const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-      managedBuildingIds = managedBuildings.map(b => b.id);
-      if (managedBuildingIds.length === 0) {
-          return { bills: [], spaces: [] };
-      }
+  if (!isSuperAdmin && managedBuildingIds?.length === 0) {
+      return { bills: [], spaces: [] };
   }
 
-  const billWhere: Prisma.BillWhereInput = managedBuildingIds ? { agreement: { space: { buildingId: { in: managedBuildingIds } } } } : {};
-  const spaceWhere: Prisma.SpaceWhereInput = managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {};
+  const billWhere: Prisma.BillWhereInput = !isSuperAdmin ? { agreement: { space: { buildingId: { in: managedBuildingIds! } } } } : {};
+  const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
 
   const rawBills = await databaseService.getAllBills({
     where: billWhere,

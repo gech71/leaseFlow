@@ -5,46 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type User, type Role } from '@prisma/client';
 import { cookies } from 'next/headers';
-
-// Insecure JWT payload decoder
-async function decodeJwtPayload(token: string): Promise<any | null> {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
-
-// Gets current user from cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    if (!accessToken) return null;
-    
-    const tokenPayload = await decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
-
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
-}
+import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
 // Helper to get user and check for super admin status
 async function getIsSuperAdmin() {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error("Authentication required.");
-    return currentUser.roles.some(r => r.name === 'SUPER_ADMIN');
+    const { isSuperAdmin } = await getUserAndPermissions();
+    return isSuperAdmin;
 }
 
 export async function getAllRolesAction(): Promise<{ success: boolean, roles?: Role[], error?: string }> {

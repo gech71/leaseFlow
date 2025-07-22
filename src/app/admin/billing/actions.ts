@@ -7,58 +7,9 @@ import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPri
 import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths, isSameDay, isAfter } from 'date-fns';
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 import { cookies } from 'next/headers';
+import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
-
-// Insecure JWT payload decoder
-async function decodeJwtPayload(token: string): Promise<any | null> {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
-
-// Gets current user from cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    if (!accessToken) return null;
-    
-    const tokenPayload = await decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
-
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
-}
-
-// Helper to get user and their managed building IDs
-async function getUserAndManagedIds() {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error("Authentication required.");
-
-    const isSuperAdmin = currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
-    let managedBuildingIds: string[] | null = null; // null means all access for super admin
-
-    if (!isSuperAdmin) {
-        const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-        managedBuildingIds = managedBuildings.map(b => b.id);
-    }
-    return { currentUser, isSuperAdmin, managedBuildingIds };
-}
-
 
 export async function getBillingPageDataAction(): Promise<SerializedBillingPageData> {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();

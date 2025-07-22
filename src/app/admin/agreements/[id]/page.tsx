@@ -10,47 +10,10 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Tenant, Space, User, Role } from '@prisma/client';
 import { ViewAgreementClientPage, type AgreementWithRelations } from './client-page'; // Adjusted import
 import { cookies } from 'next/headers';
-
-interface PageParams {
-  params: { id: string };
-}
-
-// Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
-
-// Gets current user from cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    if (!accessToken) return null;
-    
-    const tokenPayload = decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
-
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
-}
+import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 // Server Component to fetch initial data
-export default async function ViewAgreementPage({ params }: PageParams) {
+export default async function ViewAgreementPage({ params }: { params: { id: string } }) {
   const { id } = params; // Destructure ID from params first
   let agreementData = await databaseService.getAgreementById(id, {
     tenant: true, 
@@ -58,13 +21,10 @@ export default async function ViewAgreementPage({ params }: PageParams) {
   });
 
   if (agreementData) {
-    const currentUser = await getCurrentUser();
-    const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
-    if (!isSuperAdmin && currentUser) {
-        const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-        const managedBuildingIds = managedBuildings.map(b => b.id);
-        if (!agreementData.space || !managedBuildingIds.includes(agreementData.space.buildingId)) {
+    if (!isSuperAdmin) {
+        if (!agreementData.space || !managedBuildingIds?.includes(agreementData.space.buildingId)) {
             agreementData = null; // User doesn't manage this building, so they can't see the agreement.
         }
     }
