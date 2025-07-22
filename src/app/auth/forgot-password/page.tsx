@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
       });
       const data = await response.json();
       if (response.ok && data.isSuccess && data.token) {
-        toast({ title: "Verification Code Sent", description: "A reset code has been sent to you. Please enter it below.", });
+        // No toast needed here, the UI change is enough feedback.
         resetPasswordForm.setValue("token", data.token);
         setStep('enter-password');
       } else {
@@ -162,7 +162,11 @@ export default function ForgotPasswordPage() {
             <CardContent className="px-4 sm:px-6 pb-6">
               <FormProvider {...resetPasswordForm}>
                 <form onSubmit={resetPasswordForm.handleSubmit(handleResetPasswordSubmit)} className="space-y-4">
-                  <FormField control={resetPasswordForm.control} name="token" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><MessageSquareText className="mr-2 h-4 w-4" /> Reset Code</FormLabel> <FormControl><Input placeholder="Enter reset code" {...field} /></FormControl> <FormMessage /> </FormItem> )} />
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumberDisplay" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-muted-foreground" /> Phone Number</Label>
+                    <Input id="phoneNumberDisplay" value={phoneNumber} readOnly disabled className="bg-muted/50" />
+                  </div>
+                  <FormField control={resetPasswordForm.control} name="token" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><MessageSquareText className="mr-2 h-4 w-4" /> Reset Code</FormLabel> <FormControl><Input placeholder="Enter reset code from SMS/message" {...field} /></FormControl> <FormMessage /> </FormItem> )} />
                   <FormField control={resetPasswordForm.control} name="newPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> New Password</FormLabel> <div className="relative"> <FormControl><Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowNewPassword(!showNewPassword)}> {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
                   <FormField control={resetPasswordForm.control} name="confirmPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> Confirm New Password</FormLabel> <div className="relative"> <FormControl><Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowConfirmPassword(!showConfirmPassword)}> {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
                   <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base" disabled={isLoading}>
