@@ -31,10 +31,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: phoneNumber, Password: password }),
+      body: JSON.stringify({ phoneNumber: phoneNumber, password: password }),
     });
 
     const responseData = await externalResponse.json();
@@ -89,4 +89,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Could not connect to the authentication service."] }, { status: 503 });
   }
 }
-

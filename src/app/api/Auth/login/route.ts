@@ -41,10 +41,10 @@ export async function POST(request: NextRequest) {
 
   try {
     // 1. Authenticate against the external identity provider
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: phoneNumber, Password: password }),
+      body: JSON.stringify({ phoneNumber: phoneNumber, password: password }),
     });
 
     const responseText = await externalResponse.text();
@@ -123,4 +123,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Could not connect to the authentication service."] }, { status: 503 });
   }
 }
-
