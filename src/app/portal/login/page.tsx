@@ -245,7 +245,7 @@ export default function TenantLoginPage() {
                                     <FormLabel>Temporary Password</FormLabel>
                                      <div className="relative">
                                         <FormControl>
-                                            <Input type={showPassword ? "text" : "password"} {...field} disabled />
+                                            <Input type="password" {...field} disabled />
                                         </FormControl>
                                     </div>
                                     <FormMessage />

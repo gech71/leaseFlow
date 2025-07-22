@@ -53,9 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isSuccess: false, errors: ["Invalid token format received."] }, { status: 500 });
     }
 
-    const requiresPasswordChange = tokenPayload.requiresPasswordChange === 'True' || tokenPayload.requiresPasswordChange === true;
     const userIdFromToken = tokenPayload.sub;
-    
     if (!userIdFromToken) {
        return NextResponse.json({ isSuccess: false, errors: ["Token is missing user identifier."] }, { status: 500 });
     }
@@ -65,6 +63,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["User not found in this system."] }, { status: 403 });
     }
     
+    // Check if the user has a temporary password set in the local database
+    const requiresPasswordChange = !!localUser.tempPassword;
+
     // If password change is not required, set the session cookie
     if (!requiresPasswordChange) {
         const cookieStore = await cookies();
