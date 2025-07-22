@@ -195,14 +195,14 @@ export async function submitPaymentProofAction(
     }
 
     const bill = await databaseService.getBillById(billId, {
-      agreement: { include: { tenant: true } }
+      agreement: { include: { tenant: { include: { user: true } } } }
     });
 
     if (!bill) {
       return { success: false, error: "Bill not found." };
     }
-    
-    if (bill.agreement.tenant.userFk !== currentUser.id) {
+
+    if (bill.agreement?.tenant?.user?.id !== currentUser.id) {
        return { success: false, error: "Unauthorized. You can only submit payment for your own bills." };
     }
     
