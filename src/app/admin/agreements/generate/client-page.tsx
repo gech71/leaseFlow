@@ -46,7 +46,7 @@ const agreementFormSchema = z.object({
   selectedSpaceId: z.string().min(1, { message: "Please select a space." }),
   startDate: z.date({ required_error: "Agreement start date is required."}),
   paymentTermMonths: z.coerce.number().int().positive({ message: "Payment term must be a positive number of months." }).min(1, {message: "Term must be at least 1 month."}),
-  initialPaymentMonths: z.coerce.number().int().positive({ message: "Initial payment must be a positive number of months." }).min(1, {message: "Initial payment must be at least 1 month."}),
+  initialPaymentMonths: z.coerce.number().int().nonnegative({ message: "Initial payment must be 0 or a positive number." }),
   additionalTerms: z.string().optional(),
   paymentMethod: z.string().min(1, { message: "Please select a payment method."}),
   paymentReference: z.string().optional(),
@@ -110,7 +110,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
   }, [selectedSpaceId, availableSpaces]);
 
   const calculatedInitialPaymentAmount = useMemo(() => {
-    if (selectedSpaceDetails && initialPaymentMonths > 0) {
+    if (selectedSpaceDetails && initialPaymentMonths >= 0) {
       return selectedSpaceDetails.monthlyRentalPrice * initialPaymentMonths;
     }
     return 0;
