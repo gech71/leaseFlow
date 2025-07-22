@@ -48,7 +48,7 @@ export async function createTenantAction(data: {
     
     const requestHeaders = await headers();
     
-    const registrationResponse = await fetch(`${requestHeaders.get('origin')}/api/Auth/register`, {
+    const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -63,14 +63,32 @@ export async function createTenantAction(data: {
         }),
     });
 
-    const registrationResult = await registrationResponse.json();
-
-    if (!registrationResponse.ok || !registrationResult.isSuccess) {
-        console.error("Failed to register tenant user:", registrationResult.errors);
-        return { success: false, error: `Failed to create user account: ${registrationResult.errors?.join(', ') || 'Unknown error'}` };
+    // Check for empty but successful response first
+    if (registrationResponse.ok && registrationResponse.status === 200 && registrationResponse.headers.get('content-length') === '0') {
+      // Empty response is a success, proceed to create user locally
+    } else {
+        const registrationResult = await registrationResponse.json();
+        if (!registrationResponse.ok || !registrationResult.isSuccess) {
+            console.error("Failed to register tenant user:", registrationResult.errors);
+            return { success: false, error: `Failed to create user account: ${registrationResult.errors?.join(', ') || 'Unknown error'}` };
+        }
     }
     
-    const newUserId = registrationResult.userId;
+    // To get the new user's ID, we have to log them in to get a token
+    const loginResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: data.phone, password: tempPassword }),
+    });
+
+    if (!loginResponse.ok) {
+        return { success: false, error: "User registered, but failed to retrieve user ID for local setup." };
+    }
+
+    const loginData = await loginResponse.json();
+    const tokenPayload = decodeJwtPayload(loginData.accessToken);
+    const newUserId = tokenPayload?.sub;
+    
     if (!newUserId) {
       return { success: false, error: "User was created, but the new User ID was not returned." };
     }
@@ -81,20 +99,18 @@ export async function createTenantAction(data: {
       return { success: false, error: "The default 'TENANT' role was not found in the database. Please seed the database."};
     }
 
-    // Find the newly created user by their external ID
-    const newUser = await databaseService.getUserByExternalId(newUserId);
-    if (!newUser) {
-      return { success: false, error: "Could not find the newly created user in the local database to assign a role." };
-    }
-
-    // Assign the TENANT role
-    await databaseService.updateUser(newUser.id, {
-      roles: {
-        connect: { id: tenantRole.id }
-      }
+    // Create the local User record first
+     const newUser = await databaseService.createUser({
+        userId: newUserId,
+        email: data.email,
+        name: data.name,
+        firstName: data.name.split(' ')[0] || data.name,
+        lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
+        phoneNumber: data.phone,
+        roles: { connect: { id: tenantRole.id } }
     });
-
-    // Now create the tenant profile
+    
+    // Now create the tenant profile linked to the new user
     const newTenant = await databaseService.createTenant({
       name: data.name,
       email: data.email,
@@ -103,8 +119,7 @@ export async function createTenantAction(data: {
       nationalId: data.nationalId,
       representativeName: data.representativeName,
       representativePhone: data.representativePhone,
-      // Link the Tenant profile to the User profile
-      user: { connect: { userId: newUserId } }
+      user: { connect: { id: newUser.id } }
     });
 
     revalidatePath('/admin/tenants');
@@ -121,6 +136,27 @@ export async function createTenantAction(data: {
       return { success: false, error: `Failed to create tenant. A tenant with the same ${fieldName} might already exist.` };
     }
     return { success: false, error: error.message || "Failed to create tenant." };
+  }
+}
+
+// Insecure JWT payload decoder
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Failed to decode JWT payload:', e);
+    return null;
   }
 }
 
@@ -206,6 +242,7 @@ export async function deleteTenantAction(tenantId: string) {
     const tenant = await databaseService.getTenantById(tenantId, {
       agreements: true,
       user: true, 
+      rentedSpace: true,
     });
 
     if (!tenant) {
@@ -219,7 +256,6 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
     }
     
-    // Delete from identity server first. If this fails, we don't touch the local DB.
     if (tenant.phone) {
       const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
       if (!identityDeletionResult.success) {
@@ -228,13 +264,23 @@ export async function deleteTenantAction(tenantId: string) {
     }
     
     await prisma.$transaction(async (tx) => {
-      // Step 1: Delete the Tenant record.
-      // We must do this first because the User relation on Tenant might prevent User deletion if Tenant still exists.
+      // Unlink the tenant from their space to make it vacant
+      if (tenant.rentedSpace) {
+        await tx.space.update({
+          where: { id: tenant.rentedSpace.id },
+          data: {
+            isOccupied: false,
+            tenant: {
+              disconnect: true
+            }
+          }
+        });
+      }
+
       await tx.tenant.delete({
         where: { id: tenantId }
       });
       
-      // Step 2: Delete the associated User record if it exists.
       if (tenant.user?.userId) {
         await tx.user.delete({
           where: { userId: tenant.user.userId }
@@ -250,8 +296,6 @@ export async function deleteTenantAction(tenantId: string) {
     console.error("Error deleting tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') { 
-        // This might happen if the user was already deleted by a cascade we didn't expect,
-        // which can be considered a success for the end-user.
         console.warn(`Prisma P2025 error during tenant deletion, likely a race condition or unexpected cascade. Considering it a success. Error: ${error.message}`);
         revalidatePath('/admin/tenants');
         return { success: true };
