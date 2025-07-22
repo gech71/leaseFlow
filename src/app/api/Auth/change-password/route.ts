@@ -66,18 +66,13 @@ export async function POST(request: NextRequest) {
     // Determine the source of authentication details
     const authHeader = request.headers.get('Authorization');
     let accessToken: string | undefined;
-    let effectivePhoneNumber: string | undefined = phoneNumberFromRequest;
+    let effectivePhoneNumber: string | undefined;
     let userIdForDbUpdate: string | undefined;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
         accessToken = authHeader.substring(7);
         const payload = decodeJwtPayload(accessToken);
-        if (payload?.phone_number) {
-            effectivePhoneNumber = payload.phone_number;
-        }
-        if (!effectivePhoneNumber && phoneNumberFromRequest) {
-            effectivePhoneNumber = phoneNumberFromRequest;
-        }
+        effectivePhoneNumber = payload?.phone_number;
         userIdForDbUpdate = payload?.sub;
     } else {
         const cookieAuth = await getAuthDetailsFromCookie();
@@ -87,6 +82,11 @@ export async function POST(request: NextRequest) {
             userIdForDbUpdate = cookieAuth.userId;
         }
     }
+    
+    if (!effectivePhoneNumber && phoneNumberFromRequest) {
+        effectivePhoneNumber = phoneNumberFromRequest;
+    }
+
 
     if (!accessToken) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
