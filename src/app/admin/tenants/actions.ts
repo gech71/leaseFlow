@@ -115,6 +115,7 @@ export async function createTenantAction(data: {
         firstName: data.name.split(' ')[0] || data.name,
         lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
         phoneNumber: data.phone,
+        tempPassword: tempPassword, // Save the temporary password
         roles: { connect: { id: tenantRole.id } }
     });
     

@@ -1,6 +1,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
+import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/change-password`, {
+        const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-password`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -88,15 +89,16 @@ export async function POST(request: NextRequest) {
 
         const responseText = await externalApiResponse.text();
         
-        if (externalApiResponse.ok && !responseText) {
-            return NextResponse.json({ isSuccess: true, message: "Password changed successfully." });
-        }
-        
         let responseData;
         try {
             responseData = responseText ? JSON.parse(responseText) : {};
         } catch(e) {
              console.error("Change Password Error: Failed to parse JSON response from identity server.", responseText);
+             // If the status is OK but the body is empty, treat as success.
+             if (externalApiResponse.ok && !responseText) {
+                 await databaseService.updateUserByExternalId(authDetails.accessToken, { tempPassword: null });
+                 return NextResponse.json({ isSuccess: true, message: "Password changed successfully." });
+             }
              return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
         }
 
@@ -104,6 +106,13 @@ export async function POST(request: NextRequest) {
             const errorMessages = responseData?.errors || (responseData.message ? [responseData.message] : ["Failed to change password."]);
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status });
         }
+        
+        // --- On successful password change, clear tempPassword ---
+        const payload = decodeJwtPayload(authDetails.accessToken);
+        if (payload?.sub) {
+            await databaseService.updateUserByExternalId(payload.sub, { tempPassword: null });
+        }
+        // --------------------------------------------------------
 
         return NextResponse.json({ isSuccess: true, ...responseData });
 
