@@ -438,7 +438,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       return;
     }
     setIsLoading(true);
-    const adminProofUrl = adminSelectedProofFile ? `admin_simulated_slip_${adminSelectedProofFile.name}` : billForPayment.paymentProofUrl;
+    const adminProofUrl = adminSelectedProofFile ? `${adminSelectedProofFile.name}` : billForPayment.paymentProofUrl;
 
     const result = await recordPaymentOrVerificationAction(billForPayment.id, {
       ...values,
@@ -464,7 +464,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       return;
     }
     setIsLoading(true);
-    const adminProofUrl = adminSelectedProofFile ? `admin_sim_replaced_slip_${adminSelectedProofFile.name}` : billForVerification.paymentProofUrl;
+    const adminProofUrl = adminSelectedProofFile ? `${adminSelectedProofFile.name}` : billForVerification.paymentProofUrl;
 
     const result = await recordPaymentOrVerificationAction(billForVerification.id, {
       ...values,
@@ -490,7 +490,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       return;
     }
     setIsLoading(true);
-    const adminProofUrl = adminSelectedProofFile ? `admin_simulated_slip_${adminSelectedProofFile.name}` : billForEdit.paymentProofUrl;
+    const adminProofUrl = adminSelectedProofFile ? `${adminSelectedProofFile.name}` : billForEdit.paymentProofUrl;
 
     const result = await updateBillAdminDetailsAction(billForEdit.id, {
       paymentReference: values.paymentReference,

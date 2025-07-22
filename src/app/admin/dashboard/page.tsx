@@ -1,18 +1,28 @@
 
-export const dynamic = 'force-dynamic';
+"use client";
 
+import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building, Building2, FileText, Banknote, LayoutGrid, AlertCircle, User } from 'lucide-react';
+import { Building, Building2, FileText, Banknote, LayoutGrid, AlertCircle, User, Loader2 } from 'lucide-react';
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart';
 import { databaseService } from '@/lib/services/databaseService';
-import { getMonth, getYear, format, isAfter, addMonths, subMonths, isValid } from 'date-fns';
+import { getMonth, getYear, format, isAfter, addMonths, subMonths, isValid, parseISO } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { cookies } from 'next/headers';
-import type { User as UserPrisma, Role, Prisma } from '@prisma/client';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { OccupancyCard } from '@/components/custom/OccupancyCard';
+import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+
+// Re-defining client-side types here since this is now a client component
+// These should ideally be in a shared types file if not already.
+interface ClientBuilding { id: string; name: string; }
+interface ClientSpace { id: string; buildingId: string; isOccupied: boolean; area: number; }
+interface ClientAgreement { id: string; tenantId: string; spaceId: string | null; startDate: string; paymentTermMonths: number; }
+interface ClientBill { agreementId: string; status: string; totalAmount: number; paymentDate: string | null; billDate: string; }
+interface ClientUtility { buildingId: string; year: number; month: number; totalCost: number; }
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px]">
@@ -37,51 +47,13 @@ interface BuildingFinancialSummary {
   currentMonthIncomeToBeCollected: number;
 }
 
-// Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
-
-// Gets current user from cookie
-async function getCurrentUser(): Promise<(UserPrisma & { roles: Role[] }) | null> {
-    const cookieStore = await cookies();
-    const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    if (!accessToken) return null;
-    
-    const tokenPayload = decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) return null;
-
-    return await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
-}
-
-export default async function AdminDashboardPage() {
-  const currentUser = await getCurrentUser();
-  const isSuperAdmin = currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') ?? false;
-  let managedBuildingIds: string[] | undefined = undefined;
-
-  if (!isSuperAdmin && currentUser) {
-      const managedBuildings = await databaseService.getAllBuildings({ where: { managedByUserId: currentUser.userId } });
-      managedBuildingIds = managedBuildings.map(b => b.id);
-      if (managedBuildingIds.length === 0) {
-          managedBuildingIds = ['-1']; // Use a non-existent ID to ensure no results are returned
-      }
+// In a real app, you'd fetch this data based on the filters.
+// For this prototype, we'll assume we get all data initially and filter client-side.
+async function getDashboardData() {
+  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+  
+  if (!isSuperAdmin && managedBuildingIds?.length === 0) {
+    return { buildings: [], spaces: [], agreements: [], allBills: [], allUtilities: [], error: "No buildings assigned." };
   }
   
   const buildingWhere = managedBuildingIds ? { id: { in: managedBuildingIds } } : {};
@@ -89,234 +61,267 @@ export default async function AdminDashboardPage() {
   const agreementWhere = managedBuildingIds ? { space: { buildingId: { in: managedBuildingIds } } } : {};
   const billWhere = managedBuildingIds ? { agreement: { space: { buildingId: { in: managedBuildingIds } } } } : {};
 
-  const today = new Date();
-  const currentMonth = getMonth(today);
-  const currentYear = getYear(today);
-  const periodDescription = format(today, "MMMM yyyy");
-
-  const buildingUtilitiesWhere: Prisma.BuildingMonthlyUtilitiesWhereInput = { month: currentMonth, year: currentYear };
-  if(managedBuildingIds) {
-      buildingUtilitiesWhere.buildingId = { in: managedBuildingIds };
-  }
-
-  const buildingsPromise = databaseService.getAllBuildings({ where: buildingWhere });
-  const spacesPromise = databaseService.getAllSpaces({ where: spaceWhere });
-  const agreementsPromise = databaseService.getAllAgreements({ where: agreementWhere, include: { space: true, tenant: true } });
-  const allBillsPromise = databaseService.getAllBills({ where: billWhere, include: { agreement: { include: { tenant: true, space: true } } } }); // Renamed to reflect all bills
-  const currentMonthBuildingUtilitiesPromise = databaseService.getAllBuildingMonthlyUtilities({
-    where: buildingUtilitiesWhere,
-    include: { utilities: true },
-  });
-
-  const [
-    buildings,
-    spaces,
-    allAgreements,
-    allBills,
-    currentMonthBuildingUtilities,
-  ] = await Promise.all([
-    buildingsPromise,
-    spacesPromise,
-    agreementsPromise,
-    allBillsPromise,
-    currentMonthBuildingUtilitiesPromise,
+  const [buildings, spaces, agreements, allBills, allUtilitiesRaw] = await Promise.all([
+    databaseService.getAllBuildings({ where: buildingWhere }),
+    databaseService.getAllSpaces({ where: spaceWhere }),
+    databaseService.getAllAgreements({ where: agreementWhere, include: { space: true, tenant: true } }),
+    databaseService.getAllBills({ where: billWhere, include: { agreement: { include: { tenant: true, space: true } } } }),
+    databaseService.getAllBuildingMonthlyUtilities({ where: managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {}, include: { utilities: true } })
   ]);
-
-  const totalBuildingsCount = buildings.length;
   
-  const activeAgreements = allAgreements.filter(ag => {
-      const agreementEndDate = addMonths(ag.startDate, ag.paymentTermMonths);
-      return isAfter(agreementEndDate, today);
-  });
-  const uniqueActiveTenantIds = new Set(activeAgreements.map(ag => ag.tenantId));
+  const allUtilities = allUtilitiesRaw.map(u => ({...u, totalCost: u.utilities.reduce((sum, item) => sum + item.totalCost, 0)}));
 
-  const paidBillsInCurrentMonth = allBills.filter(bill => 
-    bill.status === 'Paid' && bill.paymentDate &&
-    getYear(bill.paymentDate) === currentYear &&
-    getMonth(bill.paymentDate) === currentMonth
-  );
-  const totalRevenueMTDValue = paidBillsInCurrentMonth.reduce((sum, bill) => sum + bill.totalAmount, 0);
+  return { buildings, spaces, agreements, allBills, allUtilities, error: null };
+}
 
-  const stats = {
-    totalBuildings: totalBuildingsCount,
-    totalSpaces: spaces.length,
-    totalTenants: uniqueActiveTenantIds.size,
-    totalRevenueMTD: `${totalRevenueMTDValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Birr`,
-    activeAgreements: activeAgreements.length,
-  };
 
-  const financials: BuildingFinancialSummary[] = buildings.map(building => {
-    const buildingUtil = currentMonthBuildingUtilities.find(bu => bu.buildingId === building.id);
-    const expenses = buildingUtil ? buildingUtil.utilities.reduce((sum, util) => sum + util.totalCost, 0) : 0;
+export default function AdminDashboardPage() {
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [today, setToday] = useState(new Date());
 
-    const spacesInThisBuildingIds = spaces.filter(s => s.buildingId === building.id).map(s => s.id);
+    // State for all fetched data
+    const [allData, setAllData] = useState<{
+        buildings: ClientBuilding[];
+        spaces: ClientSpace[];
+        agreements: ClientAgreement[];
+        allBills: ClientBill[];
+        allUtilities: ClientUtility[];
+    }>({ buildings: [], spaces: [], agreements: [], allBills: [], allUtilities: [] });
+
+    // State for filters
+    const [selectedYear, setSelectedYear] = useState(getYear(today));
+    const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const data = await getDashboardData();
+                if (data.error) {
+                    setError(data.error);
+                } else {
+                    // Serialize dates right after fetching
+                    setAllData({
+                        buildings: data.buildings.map(b => ({ id: b.id, name: b.name })),
+                        spaces: data.spaces.map(s => ({ id: s.id, buildingId: s.buildingId, isOccupied: s.isOccupied, area: s.area })),
+                        agreements: data.agreements.map(a => ({ ...a, startDate: a.startDate.toISOString() })),
+                        allBills: data.allBills.map(b => ({ ...b, billDate: b.billDate.toISOString(), paymentDate: b.paymentDate?.toISOString() || null })),
+                        allUtilities: data.allUtilities.map(u => ({ buildingId: u.buildingId, year: u.year, month: u.month, totalCost: u.totalCost })),
+                    });
+                }
+            } catch (e) {
+                setError((e as Error).message);
+            }
+            setIsLoading(false);
+        };
+        fetchData();
+    }, []);
+
+    const periodDescription = format(new Date(selectedYear, selectedMonth), "MMMM yyyy");
+
+    const filteredData = useMemo(() => {
+        const activeAgreements = allData.agreements.filter(ag => {
+            const agreementEndDate = addMonths(parseISO(ag.startDate), ag.paymentTermMonths);
+            return isAfter(agreementEndDate, today);
+        });
+        const uniqueActiveTenantIds = new Set(activeAgreements.map(ag => ag.tenantId));
+
+        const paidBillsThisPeriod = allData.allBills.filter(bill =>
+            bill.status === 'Paid' && bill.paymentDate &&
+            getYear(parseISO(bill.paymentDate)) === selectedYear &&
+            getMonth(parseISO(bill.paymentDate)) === selectedMonth
+        );
+        const totalRevenueThisPeriod = paidBillsThisPeriod.reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+        const stats = {
+            totalBuildings: allData.buildings.length,
+            totalSpaces: allData.spaces.length,
+            totalTenants: uniqueActiveTenantIds.size,
+            totalRevenueThisPeriod: `${totalRevenueThisPeriod.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Birr`,
+            activeAgreements: activeAgreements.length,
+        };
+
+        const financials: BuildingFinancialSummary[] = allData.buildings.map(building => {
+            const buildingUtil = allData.allUtilities.find(u => u.buildingId === building.id && u.year === selectedYear && u.month === selectedMonth);
+            const expenses = buildingUtil ? buildingUtil.totalCost : 0;
+            
+            const spacesInThisBuildingIds = allData.spaces.filter(s => s.buildingId === building.id).map(s => s.id);
+            const agreementIdsInBuilding = allData.agreements.filter(ag => ag.spaceId && spacesInThisBuildingIds.includes(ag.spaceId)).map(ag => ag.id);
+
+            const billsForBuildingThisPeriod = allData.allBills.filter(bill =>
+                agreementIdsInBuilding.includes(bill.agreementId) &&
+                getYear(parseISO(bill.billDate)) === selectedYear &&
+                getMonth(parseISO(bill.billDate)) === selectedMonth
+            );
+
+            const incomeCollected = billsForBuildingThisPeriod.filter(b => b.status === 'Paid').reduce((sum, b) => sum + b.totalAmount, 0);
+            const incomePendingConfirmation = billsForBuildingThisPeriod.filter(b => b.status === 'PendingVerification').reduce((sum, b) => sum + b.totalAmount, 0);
+            const incomeToBeCollected = billsForBuildingThisPeriod.filter(b => b.status === 'Pending' || b.status === 'Overdue').reduce((sum, b) => sum + b.totalAmount, 0);
+
+            return {
+                buildingId: building.id,
+                buildingName: building.name,
+                currentMonthExpenses: expenses,
+                currentMonthIncomeCollected: incomeCollected,
+                currentMonthIncomePendingConfirmation: incomePendingConfirmation,
+                currentMonthIncomeToBeCollected: incomeToBeCollected,
+            };
+        });
+
+        return { stats, financials };
+
+    }, [allData, selectedYear, selectedMonth, today]);
+
+    const chartData = useMemo(() => {
+        const data = [];
+        const allPaidBills = allData.allBills.filter(bill => bill.status === 'Paid');
+
+        for (let i = 5; i >= 0; i--) {
+            const date = subMonths(new Date(selectedYear, selectedMonth), i);
+            const monthName = format(date, 'MMM');
+            const year = getYear(date);
+            const month = getMonth(date);
+
+            const monthlyRevenue = allPaidBills.filter(bill => {
+                if (!bill.paymentDate) return false;
+                const paymentDate = parseISO(bill.paymentDate);
+                return getYear(paymentDate) === year && getMonth(paymentDate) === month;
+            }).reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+            const monthlyExpenses = allData.allUtilities.filter(util => util.year === year && util.month === month)
+                                   .reduce((sum, util) => sum + util.totalCost, 0);
+
+            data.push({
+                name: monthName,
+                revenue: parseFloat(monthlyRevenue.toFixed(2)),
+                expenses: parseFloat(monthlyExpenses.toFixed(2)),
+            });
+        }
+        return data;
+    }, [allData, selectedYear, selectedMonth]);
+
+    const recentActivities = useMemo(() => {
+        return [...allData.allBills] // Create a mutable copy
+            .sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime())
+            .slice(0, 5)
+            .map(bill => {
+                const agreement = allData.agreements.find(ag => ag.id === bill.agreementId);
+                const tenantName = agreement?.tenant?.name || "A tenant";
+                const spaceName = agreement?.space?.spaceIdName || "a space";
+                let actionText = "";
+                let billDueDateFormatted = format(parseISO(bill.billDate), 'PP');
+
+                switch(bill.status) {
+                    case "Paid": actionText = `paid bill for ${spaceName}.`; break;
+                    case "Pending": actionText = `Bill generated for ${tenantName} for ${spaceName}, due ${billDueDateFormatted}.`; break;
+                    case "Overdue": actionText = `Bill for ${tenantName} (${spaceName}) is overdue since ${billDueDateFormatted}.`; break;
+                    case "PendingVerification": actionText = `${tenantName} submitted payment proof for ${spaceName}.`; break;
+                    default: actionText = `Activity related to bill ID ${bill.id} for ${tenantName}.`;
+                }
+
+                return {
+                    user: bill.status === "PendingVerification" ? tenantName : "System",
+                    action: actionText,
+                    time: format(parseISO(bill.billDate), 'PPp'),
+                    avatar: tenantName.substring(0,2).toUpperCase()
+                }
+            });
+    }, [allData]);
     
-    const agreementIdsInBuilding = allAgreements
-      .filter(ag => ag.spaceId && spacesInThisBuildingIds.includes(ag.spaceId))
-      .map(ag => ag.id);
+    const availableYears = useMemo(() => {
+        const years = new Set(allData.allBills.map(b => getYear(parseISO(b.billDate))));
+        if (years.size === 0) return [getYear(new Date())];
+        return Array.from(years).sort((a,b) => b - a);
+    }, [allData.allBills]);
+
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center h-screen">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      );
+    }
     
-    // Correctly filter for bills generated in the current month for this building
-    const billsForBuildingCurrentMonth = allBills.filter(bill => 
-      agreementIdsInBuilding.includes(bill.agreementId) &&
-      getYear(bill.billDate) === currentYear &&
-      getMonth(bill.billDate) === currentMonth
-    );
-    
-    const incomeCollected = billsForBuildingCurrentMonth
-      .filter(b => b.status === 'Paid')
-      .reduce((sum, b) => sum + b.totalAmount, 0);
-    const incomePendingConfirmation = billsForBuildingCurrentMonth
-      .filter(b => b.status === 'PendingVerification')
-      .reduce((sum, b) => sum + b.totalAmount, 0);
-    const incomeToBeCollected = billsForBuildingCurrentMonth
-      .filter(b => b.status === 'Pending' || b.status === 'Overdue')
-      .reduce((sum, b) => sum + b.totalAmount, 0);
-
-    return {
-      buildingId: building.id,
-      buildingName: building.name,
-      currentMonthExpenses: expenses,
-      currentMonthIncomeCollected: incomeCollected,
-      currentMonthIncomePendingConfirmation: incomePendingConfirmation,
-      currentMonthIncomeToBeCollected: incomeToBeCollected,
-    };
-  });
-
-  // --- Chart Data Calculation (Last 6 Months) ---
-  const chartData = [];
-  const allPaidBills = allBills.filter(bill => bill.status === 'Paid');
-  const allUtilities = await databaseService.getAllBuildingMonthlyUtilities({
-    where: managedBuildingIds ? { buildingId: { in: managedBuildingIds } } : {},
-    include: { utilities: true }
-  });
-
-  for (let i = 5; i >= 0; i--) {
-    const date = subMonths(today, i);
-    const monthName = format(date, 'MMM'); // 'Jan', 'Feb', etc.
-    const year = getYear(date);
-    const month = getMonth(date);
-
-    const monthlyRevenue = allPaidBills
-      .filter(bill => {
-        if (!bill.paymentDate) return false;
-        const paymentDate = bill.paymentDate;
-        return getYear(paymentDate) === year && getMonth(paymentDate) === month;
-      })
-      .reduce((sum, bill) => sum + bill.totalAmount, 0);
-
-    const monthlyExpenses = allUtilities
-      .filter(util => util.year === year && util.month === month)
-      .reduce((sum, util) => sum + util.utilities.reduce((utilSum, item) => utilSum + item.totalCost, 0), 0);
-
-    chartData.push({
-      name: monthName,
-      revenue: parseFloat(monthlyRevenue.toFixed(2)),
-      expenses: parseFloat(monthlyExpenses.toFixed(2)),
-    });
-  }
-  
-  const recentActivities = allBills
-    .sort((a, b) => {
-        const dateA = a.createdAt;
-        const dateB = b.createdAt;
-        const timeA = dateA && isValid(dateA) ? dateA.getTime() : 0;
-        const timeB = dateB && isValid(dateB) ? dateB.getTime() : 0;
-
-        if (isNaN(timeA) && isNaN(timeB)) return 0;
-        if (isNaN(timeA)) return 1;
-        if (isNaN(timeB)) return -1;
-        
-        return timeB - timeA;
-    })
-    .slice(0, 5)
-    .map(bill => {
-        let actionText = "";
-        const tenantName = bill.agreement?.tenant?.name || "A tenant";
-        const spaceName = bill.agreement?.space?.spaceIdName || "a space";
-        
-        let billDueDateFormatted = 'N/A';
-        if (bill.dueDate && isValid(bill.dueDate)) {
-            billDueDateFormatted = format(bill.dueDate, 'PP');
-        } else {
-            console.warn(`Dashboard: Invalid dueDate for bill ID ${bill.id}:`, bill.dueDate);
-        }
-
-        switch(bill.status) {
-            case "Paid":
-                actionText = `paid bill for ${spaceName}.`;
-                break;
-            case "Pending":
-                actionText = `Bill generated for ${tenantName} for ${spaceName}, due ${billDueDateFormatted}.`;
-                break;
-            case "Overdue":
-                 actionText = `Bill for ${tenantName} (${spaceName}) is overdue since ${billDueDateFormatted}.`;
-                break;
-            case "PendingVerification":
-                actionText = `${tenantName} submitted payment proof for ${spaceName}.`;
-                break;
-            default:
-                actionText = `Activity related to bill ID ${bill.id} for ${tenantName}.`;
-        }
-        
-        let formattedTime = 'Date N/A';
-        if (bill.createdAt && isValid(bill.createdAt)) {
-            formattedTime = format(bill.createdAt, 'PPp');
-        } else {
-            console.warn(`Dashboard: Invalid createdAt for bill ID ${bill.id}:`, bill.createdAt);
-        }
-
-        return {
-            user: bill.status === "PendingVerification" ? tenantName : "System",
-            action: actionText,
-            time: formattedTime, 
-            avatar: tenantName.substring(0,2).toUpperCase()
-        }
-    });
-
+    if (error) {
+      return (
+        <div className="animate-fadeIn">
+          <PageHeader title="Admin Dashboard" icon={LayoutGrid} description="Overview of your rental properties and finances." />
+          <Card>
+            <CardHeader><CardTitle className="text-destructive flex items-center gap-2"><AlertCircle /> Error Loading Dashboard</CardTitle></CardHeader>
+            <CardContent>
+                <p>{error}</p>
+                <p className="mt-2 text-sm text-muted-foreground">Please try refreshing the page or contact support if the issue persists.</p>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
 
   return (
     <div className="animate-fadeIn">
       <PageHeader title="Admin Dashboard" icon={LayoutGrid} description="Overview of your rental properties and finances." />
 
       <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-8">
-        <StatCard title="Total Buildings" value={String(stats.totalBuildings)} icon={Building} description="Number of managed buildings." />
+        <StatCard title="Total Buildings" value={String(filteredData.stats.totalBuildings)} icon={Building} description="Number of managed buildings." />
         <OccupancyCard 
-          spaces={spaces.map(s => ({id: s.id, buildingId: s.buildingId, isOccupied: s.isOccupied, area: s.area}))} 
-          buildings={buildings.map(b => ({id: b.id, name: b.name}))}
+          spaces={allData.spaces} 
+          buildings={allData.buildings}
         />
-        <StatCard title="Active Tenants" value={String(stats.totalTenants)} icon={User} description="Currently active tenants." />
-        <StatCard title="Active Agreements" value={String(stats.activeAgreements)} icon={FileText} description="Currently active leases." />
-        <StatCard title="Revenue (This Month)" value={stats.totalRevenueMTD} icon={Banknote} description={`Collected in ${periodDescription}.`} />
+        <StatCard title="Active Tenants" value={String(filteredData.stats.totalTenants)} icon={User} description="Currently active tenants." />
+        <StatCard title="Active Agreements" value={String(filteredData.stats.activeAgreements)} icon={FileText} description="Currently active leases." />
+        <StatCard title="Revenue" value={filteredData.stats.totalRevenueThisPeriod} icon={Banknote} description={`Collected in ${periodDescription}.`} />
       </div>
       
+       <Card className="mb-10 shadow-sm">
+        <CardHeader>
+            <CardTitle className="font-headline text-xl">Financial Snapshot</CardTitle>
+            <CardDescription>Select a period to view financial summaries and charts for that month.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+                <Label htmlFor="month-select">Month</Label>
+                <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
+                    <SelectTrigger id="month-select" className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Select Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {Array.from({length: 12}, (_, i) => (
+                            <SelectItem key={i} value={String(i)}>{format(new Date(0, i), 'MMMM')}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex-1">
+                <Label htmlFor="year-select">Year</Label>
+                <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
+                    <SelectTrigger id="year-select" className="w-full sm:w-[120px]">
+                        <SelectValue placeholder="Select Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {availableYears.map(year => (
+                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        </CardContent>
+       </Card>
+
       <div className="mb-10">
         <h2 className="text-2xl font-headline font-semibold mb-4 text-foreground">Building Financials ({periodDescription})</h2>
-        {financials.length === 0 && buildings.length > 0 && (
+        {filteredData.financials.length === 0 ? (
             <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                     <AlertCircle className="mx-auto h-10 w-10 mb-2" />
-                    No building financial data to display for {periodDescription}. 
+                    No financial data to display for {periodDescription}. 
                     Ensure utilities for this period are entered and bills are generated.
                 </CardContent>
             </Card>
-        )}
-         {buildings.length === 0 && (
-            <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">
-                    <AlertCircle className="mx-auto h-10 w-10 mb-2" />
-                   No buildings found. Please add buildings to see financial summaries.
-                </CardContent>
-            </Card>
-        )}
-        {financials.length > 0 && (
-          <Carousel
-            opts={{
-              align: "start",
-            }}
-            className="w-full"
-          >
+        ) : (
+          <Carousel opts={{ align: "start" }} className="w-full">
             <CarouselContent className="-ml-1 py-4">
-              {financials.map(summary => (
+              {filteredData.financials.map(summary => (
                 <CarouselItem key={summary.buildingId} className="pl-4 md:basis-1/2 lg:basis-1/3">
                   <BuildingFinancialCard
                     buildingName={summary.buildingName}
@@ -338,7 +343,7 @@ export default async function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="font-headline text-xl">Monthly Overview</CardTitle>
+            <CardTitle className="font-headline text-xl">Monthly Overview (Last 6 Months)</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px] p-2 sm:p-6">
             <DashboardChart data={chartData} />
