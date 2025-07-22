@@ -126,7 +126,10 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   
   const paginatedUtilityRecords = useMemo(() => {
     const sortedRecords = [...filteredRecords].sort((a, b) => {
-      return parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime();
+      if (a.year !== b.year) {
+        return b.year - a.year;
+      }
+      return b.month - a.month;
     });
     return sortedRecords.slice(
       (recordsCurrentPage - 1) * recordsItemsPerPage,
@@ -167,7 +170,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         if (existingEntry && existingEntry.utilities && selectedBuilding) {
             const logicalGroups: { [key: string]: BuildingUtilityItemPrismaType[] } = {};
 
-            // Group DB items into logical UI items
+            // Group DB items by a logical key (e.g., "Building_Water", "Floor_5th Floor_Electricity")
             for (const item of existingEntry.utilities) {
                 let groupKey: string;
                 if (item.appliesToScope === 'Building') {
@@ -178,9 +181,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                     groupKey = `Floor_${floorName}_${item.name}`;
                 }
                 
-                if (!logicalGroups[groupKey]) {
-                    logicalGroups[groupKey] = [];
-                }
+                if (!logicalGroups[groupKey]) logicalGroups[groupKey] = [];
                 logicalGroups[groupKey].push(item);
             }
 
@@ -200,7 +201,6 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                     });
                 }
                 
-                // Determine the scope for the UI
                 let scope: UIUtilityItem['appliesToScope'] = 'SpecificSpaces';
                 let applicableFloor: string | undefined = undefined;
 
@@ -222,7 +222,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                     uiId: `logical-${firstItem.name}-${spaceForFirstItem?.floor || firstItem.id}`,
                     name: firstItem.name,
                     appliesToScope: scope,
-                    totalCost: groupTotalCost,
+                    totalCost: groupTotalCost > 0 ? parseFloat(groupTotalCost.toFixed(2)) : undefined,
                     applicableFloor: applicableFloor,
                     perSpacePercentages: perSpacePercentages,
                     perSpaceCosts: {},
@@ -250,7 +250,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       const totalCost = (r.utilities || []).reduce((sum, util) => sum + util.totalCost, 0);
       return {
         ...r,
-        totalCost: totalCost, // This is the new computed total cost
+        totalCost: totalCost,
         createdAt: r.createdAt.toISOString(), 
         updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(),
         utilities: r.utilities.map(u => ({...u}))
