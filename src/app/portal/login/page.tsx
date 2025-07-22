@@ -36,6 +36,8 @@ export default function TenantLoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  const [isChangePasswordLoading, setIsChangePasswordLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
@@ -99,7 +101,7 @@ export default function TenantLoginPage() {
   };
   
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
-    setIsLoading(true);
+    setIsChangePasswordLoading(true);
     try {
         const { currentPassword, newPassword } = values;
 
@@ -128,7 +130,7 @@ export default function TenantLoginPage() {
     } catch (error) {
         toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
     } finally {
-        setIsLoading(false);
+        setIsChangePasswordLoading(false);
     }
   }
 
@@ -299,8 +301,8 @@ export default function TenantLoginPage() {
                             )}
                         />
                         <DialogFooter className="pt-4">
-                            <Button type="submit" disabled={isLoading}>
-                                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            <Button type="submit" disabled={isChangePasswordLoading}>
+                                {isChangePasswordLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                 Save and Continue
                             </Button>
                         </DialogFooter>
