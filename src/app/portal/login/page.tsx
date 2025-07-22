@@ -39,7 +39,7 @@ export default function TenantLoginPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
   const [changePasswordToken, setChangePasswordToken] = useState<string | null>(null);
 
   const changePasswordForm = useForm<ChangePasswordValues>({
@@ -65,10 +65,12 @@ export default function TenantLoginPage() {
             toast({
                 title: "Password Change Required",
                 description: "For your security, you must change your temporary password.",
+                variant: "default",
+                duration: 5000,
             });
             setChangePasswordToken(data.accessToken);
             changePasswordForm.setValue("currentPassword", password);
-            setShowChangePassword(true);
+            setShowChangePasswordDialog(true);
         } else {
             toast({
               title: "Login Successful",
@@ -99,7 +101,6 @@ export default function TenantLoginPage() {
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsLoading(true);
     try {
-        // Here we only need to pass the current and new passwords.
         const { currentPassword, newPassword } = values;
 
         const response = await fetch('/api/Auth/change-password', {
@@ -118,8 +119,7 @@ export default function TenantLoginPage() {
 
         if (response.ok && data.isSuccess) {
             toast({ title: "Password Changed", description: "Your password has been updated successfully. Logging you in..." });
-            setShowChangePassword(false);
-            // Now, automatically log in with the new password
+            setShowChangePasswordDialog(false);
             await handleLoginWithNewPassword(values.newPassword);
         } else {
             toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
@@ -143,7 +143,6 @@ export default function TenantLoginPage() {
           router.push(data.redirectPath || '/portal/dashboard');
       } else {
           toast({ title: "Auto Login Failed", description: "Please log in manually with your new password.", variant: "destructive"});
-          // Reset form fields
           setPassword('');
           setChangePasswordToken(null);
           changePasswordForm.reset();
@@ -225,7 +224,7 @@ export default function TenantLoginPage() {
         </Card>
       </div>
 
-       <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
+       <Dialog open={showChangePasswordDialog} onOpenChange={setShowChangePasswordDialog}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="font-headline text-xl">Change Your Password</DialogTitle>

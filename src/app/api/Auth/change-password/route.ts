@@ -38,9 +38,13 @@ async function getAccessTokenAndPhone(request: NextRequest): Promise<{accessToke
     if (!token) return null;
 
     const payload = decodeJwtPayload(token);
+    // The phone number claim in the JWT from your identity provider is "phone_number"
     const phoneNumber = payload?.phone_number;
 
-    if (!phoneNumber) return null;
+    if (!phoneNumber) {
+        console.error("Change Password Error: 'phone_number' claim missing from JWT payload.");
+        return null;
+    }
     
     return { accessToken: token, phoneNumber };
 }
@@ -77,8 +81,8 @@ export async function POST(request: NextRequest) {
             },
             body: JSON.stringify({ 
                 phoneNumber: authDetails.phoneNumber,
-                currentPassword, 
-                newPassword 
+                currentPassword: currentPassword, 
+                newPassword: newPassword 
             }),
         });
 
