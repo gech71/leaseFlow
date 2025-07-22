@@ -48,7 +48,7 @@ export async function createTenantAction(data: {
     
     const requestHeaders = await headers();
     
-    const registrationResponse = await fetch(`${requestHeaders.get('origin')}/api/admin/register-user`, {
+    const registrationResponse = await fetch(`${requestHeaders.get('origin')}/api/Auth/register`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -167,7 +167,7 @@ async function deleteIdentityServerUser(phoneNumber: string) {
             return { success: false, error: "Admin authentication token not found." };
         }
         
-        const response = await fetch(`${AUTH_API_BASE_URL}/delete-users`, {
+        const response = await fetch(`${AUTH_API_BASE_URL}/api/Auth/delete-users`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
