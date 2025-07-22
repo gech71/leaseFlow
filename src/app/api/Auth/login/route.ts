@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // 1. Authenticate against the external identity provider
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/login`, {
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ Phone: phoneNumber, Password: password }),
@@ -69,8 +69,6 @@ export async function POST(request: NextRequest) {
 
     const requiresPasswordChange = tokenPayload.requiresPasswordChange === 'True' || tokenPayload.requiresPasswordChange === true;
     
-    // For admin login, we still proceed to check local user existence even if password change is needed
-    // The front end can be designed to handle this state.
     const userIdFromToken = tokenPayload.sub;
     if (!userIdFromToken) {
        return NextResponse.json({ isSuccess: false, errors: ["Token is missing user identifier (sub)."] }, { status: 500 });

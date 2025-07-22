@@ -56,7 +56,7 @@ export default function UserRegistrationPage() {
     setApiError(null);
 
     try {
-      const response = await fetch('/api/admin/register-user', {
+      const response = await fetch('/api/Auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),

@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Authorization header is needed for the external service to recognize the admin
         'Authorization': `Bearer ${adminAccessToken}`
       },
       body: JSON.stringify({ firstName, lastName, phoneNumber, email, password }),
@@ -132,7 +131,6 @@ export async function POST(request: NextRequest) {
   const newUserEmail = newUserPayload.email || email; 
   const newUserFirstName = newUserPayload.firstName || firstName;
   const newUserLastName = newUserPayload.lastName || lastName;
-  // Extract phone number from the specific claim
   const newUserPhoneNumber = newUserPayload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"] || phoneNumber;
   
   // 5. Store new user in local Prisma database. No password-related fields are stored.
