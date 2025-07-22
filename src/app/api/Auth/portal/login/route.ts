@@ -26,11 +26,15 @@ export async function POST(request: NextRequest) {
 
   const { phoneNumber, password } = await request.json();
 
+  if (!phoneNumber || !password) {
+      return NextResponse.json({ isSuccess: false, errors: ["Phone number and password are required."] }, { status: 400 });
+  }
+
   try {
     const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: phoneNumber, Password: password }),
+      body: JSON.stringify({ phoneNumber: phoneNumber, password: password }),
     });
 
     const responseData = await externalResponse.json();
@@ -63,7 +67,8 @@ export async function POST(request: NextRequest) {
     
     // If password change is not required, set the session cookie
     if (!requiresPasswordChange) {
-        cookies().set(PORTAL_ACCESS_TOKEN_KEY, accessToken, {
+        const cookieStore = await cookies();
+        cookieStore.set(PORTAL_ACCESS_TOKEN_KEY, accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             path: '/',

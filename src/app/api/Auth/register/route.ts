@@ -98,8 +98,12 @@ export async function POST(request: NextRequest) {
   }
 
   const externalResponseText = await externalRegisterResponse.text();
-
-  if (!externalRegisterResponse.ok) {
+  
+  // Handle case where success is indicated by 2xx status and an empty body
+  if (externalRegisterResponse.ok && !externalResponseText) {
+      // Success, but no content. We need to log the user in to get their ID.
+      // This part remains the same as before.
+  } else if (!externalRegisterResponse.ok) {
     let errorMessages = [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     if (externalResponseText) {
         try {

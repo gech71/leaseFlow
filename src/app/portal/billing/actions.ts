@@ -182,4 +182,3 @@ export async function getBillStatusAction(billId: string): Promise<{ status: Bil
     return { status: null, error: "Database error." };
   }
 }
-
