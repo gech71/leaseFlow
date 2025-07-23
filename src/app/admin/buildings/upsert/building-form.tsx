@@ -47,13 +47,14 @@ export interface BuildingUpsertFormInternalProps {
   } | null;
   allUsers?: UserPrisma[];
   formMode: 'add' | 'edit';
+  currentUserId: string;
 }
 
-export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [], formMode }: BuildingUpsertFormInternalProps) {
+export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [], formMode, currentUserId }: BuildingUpsertFormInternalProps) {
   const router = useRouter();
   const searchParams = useSearchParams(); 
   const { toast } = useToast();
-  const { currentUser, hasPermission, isSuperAdmin } = usePermissions(); 
+  const { hasPermission, isSuperAdmin } = usePermissions(); 
 
   const isViewOnlyMode = searchParams.get('view') === 'true';
   
@@ -270,7 +271,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
 
     let result;
     if (formMode === 'add') {
-      if (!currentUser?.id) {
+      if (!currentUserId) {
         toast({ title: "Error", description: "Could not identify the current user to assign as manager.", variant: "destructive" });
         setIsSaving(false);
         return;
@@ -282,7 +283,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
           create: finalPenaltyTiersCreateInput,
         },
         managers: {
-          connect: { id: currentUser.id }
+          connect: { id: currentUserId }
         }
       };
       result = await createBuildingAction(buildingCreateInput);

@@ -17,6 +17,9 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
   let formMode: 'add' | 'edit' = 'add';
   let allUsers: User[] = [];
 
+  const { currentUser } = await getUserAndManagedIds();
+  const currentUserId = currentUser.id;
+
   if (buildingId) {
     let buildingToEdit = await databaseService.getBuildingById(buildingId, {
       penaltyPolicyTiers: true,
@@ -54,6 +57,7 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
       initialBuildingData={initialBuildingDataSerializable}
       allUsers={allUsers}
       formMode={formMode}
+      currentUserId={currentUserId}
     />
   );
 }
