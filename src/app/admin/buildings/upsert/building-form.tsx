@@ -7,14 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock } from 'lucide-react';
-import type { PenaltyTier as PenaltyTierTypePrisma, Prisma } from '@prisma/client';
+import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock, User, Checkbox, Search } from 'lucide-react';
+import type { PenaltyTier as PenaltyTierTypePrisma, Prisma, User as UserPrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link'; 
 import { createBuildingAction, updateBuildingAction } from '../actions';
 import { usePermissions } from '@/contexts/PermissionContext'; 
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface UIPenaltyRule {
   id: string; 
@@ -40,12 +41,14 @@ export interface BuildingUpsertFormInternalProps {
     name: string;
     address: string | null; 
     penaltyPolicyTiers: PenaltyTierTypePrisma[];
+    managers: { id: string }[];
     createdAt: string; 
   } | null;
+  allUsers?: UserPrisma[];
   formMode: 'add' | 'edit';
 }
 
-export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: BuildingUpsertFormInternalProps) {
+export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [], formMode }: BuildingUpsertFormInternalProps) {
   const router = useRouter();
   const searchParams = useSearchParams(); 
   const { toast } = useToast();
@@ -53,20 +56,19 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
 
   const isViewOnlyMode = searchParams.get('view') === 'true';
   
-  // Determine manage permission based on formMode and user's capabilities
   let canManageThisForm: boolean;
   if (formMode === 'add') {
     canManageThisForm = isSuperAdmin || hasPermission('building:create');
-  } else { // edit mode
+  } else { 
     canManageThisForm = isSuperAdmin || hasPermission('building:edit');
   }
-  // If it's view-only mode, then cannot manage, regardless of other perms
   if (isViewOnlyMode) {
     canManageThisForm = false;
   }
 
-
   const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', uiPenaltyRules: [] });
+  const [selectedManagerIds, setSelectedManagerIds] = useState<Set<string>>(new Set());
+  const [managerSearchTerm, setManagerSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
   useEffect(() => {
@@ -104,11 +106,31 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
         address: initialBuildingData.address || '',
         uiPenaltyRules: uiRules,
       });
+
+      setSelectedManagerIds(new Set(initialBuildingData.managers.map(m => m.id)));
     } else {
       setCurrentBuildingForm({ name: '', address: '', uiPenaltyRules: [] });
+      setSelectedManagerIds(new Set());
     }
   }, [initialBuildingData]);
 
+  const handleManagerToggle = (userId: string) => {
+    if (!canManageThisForm) return;
+    setSelectedManagerIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  const filteredManagers = allUsers.filter(user =>
+    (user.name || `${user.firstName} ${user.lastName}`).toLowerCase().includes(managerSearchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(managerSearchTerm.toLowerCase())
+  );
 
   const handleAddUIPenaltyRule = () => {
     if (!canManageThisForm) return;
@@ -173,7 +195,6 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
     const groupedUIRules: Record<string, UIPenaltyRule[]> = {};
 
     try {
-      // Filter out incomplete rules before processing. A rule is considered complete if it has a fee value.
       const configuredRules = currentBuildingForm.uiPenaltyRules.filter(
         rule => rule.feeValue !== undefined && rule.feeValue >= 0
       );
@@ -265,7 +286,8 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
           create: finalPenaltyTiersCreateInput, 
         },
       };
-      result = await updateBuildingAction(currentBuildingForm.id!, buildingUpdateInput);
+      const managerIds = Array.from(selectedManagerIds);
+      result = await updateBuildingAction(currentBuildingForm.id!, buildingUpdateInput, managerIds);
     }
 
     setIsSaving(false);
@@ -278,7 +300,6 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
     }
   };
   
-  // Check overall view permission for the page
   const canViewPage = isSuperAdmin || hasPermission('building:view') || hasPermission('building:create') || hasPermission('building:edit');
 
   if (!canViewPage) {
@@ -301,42 +322,76 @@ export function BuildingUpsertFormInternal({ initialBuildingData, formMode }: Bu
   return (
       <Card className="shadow-lg">
         <form onSubmit={handleFormSubmit}>
-          <CardContent className="p-6 space-y-6">
+          <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
              {isViewOnlyMode && (
-              <div className="p-3 bg-yellow-50 border border-yellow-300 text-yellow-700 text-sm rounded-md flex items-center">
+              <div className="p-3 bg-yellow-50 border border-yellow-300 text-yellow-700 text-sm rounded-md flex items-center md:col-span-2">
                 <EyeOff className="h-5 w-5 mr-2 shrink-0" />
                 You are in view-only mode. Editing is disabled.
               </div>
             )}
-            <div className="space-y-4 border-b pb-6">
-              <div>
-                <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
-                  Name<span className="text-destructive ml-1">*</span>
-                </Label>
-                <Input
-                  id="buildingNameMain"
-                  value={currentBuildingForm.name || ''}
-                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Sunrise Tower"
-                  required
-                  className="mt-1"
-                  disabled={isSaving || !canManageThisForm}
-                />
+            <div className="space-y-6">
+              <div className="space-y-4 border-b pb-6">
+                <div>
+                  <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
+                    Name<span className="text-destructive ml-1">*</span>
+                  </Label>
+                  <Input
+                    id="buildingNameMain"
+                    value={currentBuildingForm.name || ''}
+                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Sunrise Tower"
+                    required
+                    className="mt-1"
+                    disabled={isSaving || !canManageThisForm}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
+                    Address (Optional)
+                  </Label>
+                  <Textarea
+                    id="buildingAddressMain"
+                    value={currentBuildingForm.address || ''}
+                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))}
+                    placeholder="e.g., 123 Main St, Anytown, USA"
+                    rows={2}
+                    className="mt-1"
+                    disabled={isSaving || !canManageThisForm}
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
-                  Address (Optional)
-                </Label>
-                <Textarea
-                  id="buildingAddressMain"
-                  value={currentBuildingForm.address || ''}
-                  onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="e.g., 123 Main St, Anytown, USA"
-                  rows={2}
-                  className="mt-1"
-                  disabled={isSaving || !canManageThisForm}
-                />
-              </div>
+               {formMode === 'edit' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2"><User />Assign Managers</h3>
+                   <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                          type="text"
+                          placeholder="Search users..."
+                          value={managerSearchTerm}
+                          onChange={(e) => setManagerSearchTerm(e.target.value)}
+                          className="pl-8 h-9"
+                          disabled={isSaving || !canManageThisForm}
+                      />
+                  </div>
+                  <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 h-48">
+                    {filteredManagers.length > 0 ? filteredManagers.map(user => (
+                      <div key={user.id} className="flex items-center space-x-2 py-1">
+                        <Checkbox
+                          id={`user-${user.id}`}
+                          checked={selectedManagerIds.has(user.id)}
+                          onCheckedChange={() => handleManagerToggle(user.id)}
+                          disabled={isSaving || !canManageThisForm}
+                        />
+                        <Label htmlFor={`user-${user.id}`} className="text-sm font-normal cursor-pointer flex flex-col">
+                          <span>{user.name || `${user.firstName} ${user.lastName}`}</span>
+                          <span className="text-xs text-muted-foreground">{user.email}</span>
+                        </Label>
+                      </div>
+                    )) : <p className="text-sm text-center text-muted-foreground p-2">No users found.</p>}
+                  </ScrollArea>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">

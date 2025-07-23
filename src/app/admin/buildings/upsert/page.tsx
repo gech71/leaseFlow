@@ -15,10 +15,12 @@ import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
   let initialBuildingDataSerializable: BuildingUpsertFormInternalProps['initialBuildingData'] = null;
   let formMode: 'add' | 'edit' = 'add';
+  let allUsers: User[] = [];
 
   if (buildingId) {
     let buildingToEdit = await databaseService.getBuildingById(buildingId, {
-      penaltyPolicyTiers: true
+      penaltyPolicyTiers: true,
+      managers: { select: { id: true } }
     });
 
     if (buildingToEdit) {
@@ -41,13 +43,16 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
         penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map(tier => ({
           ...tier,
         })),
+        managers: buildingToEdit.managers.map(m => ({id: m.id})),
       };
+      allUsers = await databaseService.getAllUsers({ orderBy: { name: 'asc' }});
     }
   }
 
   return (
     <BuildingUpsertFormInternal
       initialBuildingData={initialBuildingDataSerializable}
+      allUsers={allUsers}
       formMode={formMode}
     />
   );

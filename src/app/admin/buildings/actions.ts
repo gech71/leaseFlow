@@ -32,15 +32,26 @@ export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
   }
 }
 
-export async function updateBuildingAction(id: string, data: Prisma.BuildingUpdateInput) {
+export async function updateBuildingAction(
+  id: string, 
+  data: Prisma.BuildingUpdateInput,
+  managerIds?: string[]
+) {
   try {
     if ((data as any).managers) {
         delete (data as any).managers;
+    }
+    
+    if (managerIds !== undefined) {
+      data.managers = {
+        set: managerIds.map(id => ({ id }))
+      };
     }
 
     const updatedBuilding = await databaseService.updateBuilding(id, data);
     revalidatePath('/admin/buildings');
     revalidatePath(`/admin/buildings/upsert?id=${id}`);
+    revalidatePath('/admin/settings/user-management');
     return { success: true, building: updatedBuilding };
   } catch (error: any) {
     console.error("Error updating building:", error);
