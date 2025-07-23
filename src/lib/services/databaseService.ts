@@ -44,6 +44,15 @@ export class DatabaseService {
   }
 
   async deleteBuilding(id: string): Promise<Building> {
+    // Before deleting a building, we need to manually disconnect it from any users who manage it.
+    await prisma.building.update({
+        where: { id },
+        data: {
+            managers: {
+                set: []
+            }
+        }
+    });
     return prisma.building.delete({ where: { id } });
   }
 
