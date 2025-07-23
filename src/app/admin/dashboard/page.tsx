@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Building, Building2, FileText, Banknote, LayoutGrid, AlertCircle, User, Loader2 } from 'lucide-react';
 import { BuildingFinancialCard } from '@/components/custom/BuildingFinancialCard';
 import { DashboardChart } from '@/components/custom/DashboardChart';
