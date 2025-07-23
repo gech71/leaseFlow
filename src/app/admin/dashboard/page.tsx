@@ -226,7 +226,7 @@ export default function AdminDashboardPage() {
     <div className="animate-fadeIn">
       <PageHeader title="Admin Dashboard" icon={LayoutGrid} description="Overview of your rental properties and finances." />
 
-      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 mb-8">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 mb-8">
         <StatCard title="Total Buildings" value={String(filteredData.stats.totalBuildings)} icon={Building} description="Number of managed buildings." />
         <OccupancyCard 
           spaces={allData.spaces} 
@@ -234,7 +234,16 @@ export default function AdminDashboardPage() {
         />
         <StatCard title="Active Tenants" value={String(filteredData.stats.totalTenants)} icon={User} description="Currently active tenants." />
         <StatCard title="Active Agreements" value={String(filteredData.stats.activeAgreements)} icon={FileText} description="Currently active leases." />
-        <StatCard title="Revenue" value={filteredData.stats.totalRevenueThisPeriod} icon={Banknote} description={`Collected in ${periodDescription}.`} />
+        <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px] sm:col-span-2 lg:col-span-full xl:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
+            <Banknote className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent className="flex flex-col flex-grow justify-center">
+            <div className="text-3xl lg:text-4xl font-bold font-headline text-foreground">{filteredData.stats.totalRevenueThisPeriod}</div>
+            <p className="text-xs text-muted-foreground pt-1">{`Collected in ${periodDescription}.`}</p>
+            </CardContent>
+        </Card>
       </div>
       
        <Card className="mb-10 shadow-sm">
