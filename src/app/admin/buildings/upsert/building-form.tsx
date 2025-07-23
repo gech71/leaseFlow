@@ -270,7 +270,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
 
     let result;
     if (formMode === 'add') {
-      if (!currentUser) {
+      if (!currentUser?.id) {
         toast({ title: "Error", description: "Could not identify the current user to assign as manager.", variant: "destructive" });
         setIsSaving(false);
         return;

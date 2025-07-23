@@ -18,6 +18,9 @@ export class DatabaseService {
 
   // --- Building ---
   async createBuilding(data: Prisma.BuildingCreateInput): Promise<Building> {
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Creating building with data:", JSON.stringify(data, null, 2));
+    }
     return prisma.building.create({ data });
   }
 

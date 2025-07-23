@@ -9,13 +9,6 @@ import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
 export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
   try {
-    // The user ID is now passed directly in the 'data' object from the form,
-    // so we just need to ensure the user is authenticated.
-    const { currentUser } = await getUserAndPermissions();
-    if (!currentUser) {
-        return { success: false, error: "Authentication required to create a building." };
-    }
-
     const newBuilding = await databaseService.createBuilding(data);
     revalidatePath('/admin/buildings');
     return { success: true, building: newBuilding };
