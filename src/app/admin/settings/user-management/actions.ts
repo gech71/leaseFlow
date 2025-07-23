@@ -49,57 +49,16 @@ export async function updateUserAssignments(
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
         return { success: false, error: "Permission denied." };
     }
-
-    const userToUpdate = await databaseService.getUserById(targetUserId, { managedBuildings: true });
-    if (!userToUpdate) {
-      throw new Error("User not found for assignment update.");
-    }
     
-    // --- Corrected Logic ---
-    // Instead of using connect/disconnect on the user, we will now use a transaction to
-    // update the user's role and then update each affected building's list of managers.
-    
-    await prisma.$transaction(async (tx) => {
-        // 1. Update the user's role. This part is simple.
-        await tx.user.update({
-            where: { id: targetUserId },
-            data: {
-                roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] }
+    await prisma.user.update({
+        where: { id: targetUserId },
+        data: {
+            roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] },
+            managedBuildings: {
+                set: selectedManagedBuildingIds.map(id => ({ id: id }))
             }
-        });
-
-        // 2. Determine which buildings need to be added or removed from the user's management list.
-        const currentBuildingIds = new Set(userToUpdate.managedBuildings.map(b => b.id));
-        const newBuildingIds = new Set(selectedManagedBuildingIds);
-
-        const buildingsToConnect = selectedManagedBuildingIds.filter(id => !currentBuildingIds.has(id));
-        const buildingsToDisconnect = Array.from(currentBuildingIds).filter(id => !newBuildingIds.has(id));
-
-        // 3. For each building to connect, add the user to its list of managers.
-        for (const buildingId of buildingsToConnect) {
-            await tx.building.update({
-                where: { id: buildingId },
-                data: {
-                    managers: {
-                        connect: { id: targetUserId }
-                    }
-                }
-            });
-        }
-
-        // 4. For each building to disconnect, remove the user from its list of managers.
-        for (const buildingId of buildingsToDisconnect) {
-            await tx.building.update({
-                where: { id: buildingId },
-                data: {
-                    managers: {
-                        disconnect: { id: targetUserId }
-                    }
-                }
-            });
         }
     });
-
 
     revalidatePath('/admin/settings/user-management');
     revalidatePath('/admin/buildings');
