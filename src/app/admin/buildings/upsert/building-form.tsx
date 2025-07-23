@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock, User, Checkbox, Search } from 'lucide-react';
+import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock, User, Search } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierTypePrisma, Prisma, User as UserPrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { createBuildingAction, updateBuildingAction } from '../actions';
 import { usePermissions } from '@/contexts/PermissionContext'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface UIPenaltyRule {
   id: string; 
