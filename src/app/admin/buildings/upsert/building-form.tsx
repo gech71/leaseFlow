@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock, User, Search } from 'lucide-react';
+import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock, User, Check, Search } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierTypePrisma, Prisma, User as UserPrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -53,7 +53,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
   const router = useRouter();
   const searchParams = useSearchParams(); 
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin } = usePermissions(); 
+  const { currentUser, hasPermission, isSuperAdmin } = usePermissions(); 
 
   const isViewOnlyMode = searchParams.get('view') === 'true';
   
@@ -270,12 +270,20 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
 
     let result;
     if (formMode === 'add') {
+      if (!currentUser) {
+        toast({ title: "Error", description: "Could not identify the current user to assign as manager.", variant: "destructive" });
+        setIsSaving(false);
+        return;
+      }
       const buildingCreateInput: Prisma.BuildingCreateInput = {
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
         },
+        managers: {
+          connect: { id: currentUser.id }
+        }
       };
       result = await createBuildingAction(buildingCreateInput);
     } else {
