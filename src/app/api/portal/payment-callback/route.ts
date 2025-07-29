@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client';
 const NIB_VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
 
 // Helper to validate the Authorization token from NIB
-async function validateNibToken(authHeader: string | null): Promise<boolean> {
+async function validateNibToken(authHeader: string | undefined): Promise<boolean> {
     if (!NIB_VALIDATE_TOKEN_URL) {
         console.error("Callback Error: Token validation URL is not configured.");
         return false;
@@ -34,7 +34,8 @@ async function validateNibToken(authHeader: string | null): Promise<boolean> {
 export async function POST(request: NextRequest) {
     // --- Step 1: Token Validation ---
     const authHeader = request.headers.get('Authorization');
-    const isTokenValid = await validateNibToken(authHeader);
+    const tokenFromHeader = authHeader?.substring(7);
+    const isTokenValid = await validateNibToken(tokenFromHeader);
     if (!isTokenValid) {
         return NextResponse.json({ message: "Invalid or missing authorization token." }, { status: 401 });
     }
