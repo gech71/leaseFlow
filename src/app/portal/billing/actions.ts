@@ -149,8 +149,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
               paymentReference: signature
             }
         });
-
-
+        
         return {
             success: true,
             message: "Payment initiated successfully!",
