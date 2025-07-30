@@ -35,8 +35,22 @@ async function validateNibToken(authHeader: string | null): Promise<boolean> {
 export async function POST(request: NextRequest) {
     // --- Step 1: Token Validation ---
     const authHeader = request.headers.get('Authorization');
-    console.log({authHeader});
-    const isTokenValid = await validateNibToken(authHeader);
+    console.log({ authHeader });
+
+    // Extract the token from the string like: Bearer {token: YOUR_TOKEN}
+    const tokenMatch = authHeader?.match(/token:\s*(.+)\s*}/);
+    const rawToken = tokenMatch?.[1];
+
+    // Reconstruct the standard Bearer token format
+    const fixedAuthHeader = rawToken ? `Bearer ${rawToken}` : null;
+    
+    if (!fixedAuthHeader) {
+    throw new Error('Invalid Authorization header format.');
+    }
+
+    console.log({ fixedAuthHeader });
+
+    const isTokenValid = await validateNibToken(fixedAuthHeader);
     if (!isTokenValid) {
         return NextResponse.json({ message: "Invalid or missing authorization token." }, { status: 401 });
     }
