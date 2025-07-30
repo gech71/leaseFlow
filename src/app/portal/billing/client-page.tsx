@@ -77,7 +77,6 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
       }
       setIsLoading(true);
       const result = await initiatePaymentAction(billingInfo.billId, billingInfo.amount);
-      console.log("Payment initiation result token:", result.data?.token);
       
       
       if (result.success && result.data?.token) {

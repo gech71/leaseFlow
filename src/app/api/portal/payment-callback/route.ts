@@ -19,6 +19,7 @@ async function validateNibToken(authHeader: string | null): Promise<boolean> {
     }
 
     try {
+        console.log({NIB_VALIDATE_TOKEN_URL});
         const externalResponse = await fetch(NIB_VALIDATE_TOKEN_URL, {
             method: 'GET',
             headers: { 'Authorization': authHeader, 'Accept': 'application/json' },
