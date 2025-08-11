@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Users, ShieldCheck } from 'lucide-react'; // Added ShieldCheck icon
+import { UserPlus, Users, ShieldCheck, Mail } from 'lucide-react'; // Added Mail icon
 import Link from 'next/link';
 
 // This page will act as a hub for different settings.
@@ -67,6 +67,27 @@ export default function SettingsPage() {
           <Link href="/admin/settings/role-management" passHref>
             <Button>
               <ShieldCheck className="mr-2 h-4 w-4" /> Go to Role Management
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
+
+      <Card className="flex flex-col">
+        <CardHeader>
+          <CardTitle className="font-headline">Email Configuration</CardTitle>
+          <CardDescription>
+            View current SMTP settings for sending emails.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow">
+          <p className="text-sm text-muted-foreground mb-4">
+            Check the email account used for system notifications and get instructions on how to update its credentials.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Link href="/admin/settings/email-configuration" passHref>
+            <Button>
+              <Mail className="mr-2 h-4 w-4" /> View Configuration
             </Button>
           </Link>
         </CardFooter>
