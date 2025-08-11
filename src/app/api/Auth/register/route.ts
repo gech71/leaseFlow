@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
       <h1>Welcome to Building Management Solution!</h1>
       <p>Hello ${firstName},</p>
       <p>A new account has been created for you. You can use these credentials to log in.</p>
-      <p><strong>Username:</strong> ${phoneNumber}</p>
+      <p><strong>Phone Number:</strong> ${phoneNumber}</p>
       <p><strong>Temporary Password:</strong> ${tempPassword}</p>
       <p>For your security, you will be required to change this password upon your first login.</p>
       <p>Thank you,</p>
