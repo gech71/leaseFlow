@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma } from '@prisma/client'; // Import Prisma namespace for error types
+import { sendEmail } from '@/lib/services/emailService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
@@ -27,6 +28,27 @@ function decodeJwtPayload(token: string): any | null {
     console.error('Failed to decode JWT payload:', e);
     return null;
   }
+}
+
+function generateTempPassword(length = 12) {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+  let password = '';
+  password += upper[Math.floor(Math.random() * upper.length)];
+  password += lower[Math.floor(Math.random() * lower.length)];
+  password += numbers[Math.floor(Math.random() * numbers.length)];
+  password += symbols[Math.floor(Math.random() * symbols.length)];
+
+  const allChars = upper + lower + numbers + symbols;
+
+  for (let i = 4; i < length; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+
+  return password.split('').sort(() => 0.5 - Math.random()).join('');
 }
 
 export async function POST(request: NextRequest) {
@@ -75,10 +97,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  const { firstName, lastName, phoneNumber, email, password } = newUserRegistrationData;
+  const { firstName, lastName, phoneNumber, email } = newUserRegistrationData;
+  const tempPassword = generateTempPassword();
 
-  if (!firstName || !lastName || !phoneNumber || !email || !password) {
-    return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email, password)."] }, { status: 400 });
+  if (!firstName || !lastName || !phoneNumber || !email) {
+    return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email)."] }, { status: 400 });
   }
 
   // 3. Call external identity server to register the user
@@ -90,7 +113,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${adminAccessToken}`
       },
-      body: JSON.stringify({ firstName, lastName, phoneNumber, email, password }),
+      body: JSON.stringify({ firstName, lastName, phoneNumber, email, password: tempPassword }),
     });
   } catch (networkError: any) {
     console.error("Network error calling external registration service:", networkError.message);
@@ -122,7 +145,7 @@ export async function POST(request: NextRequest) {
       loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumber, password }),
+          body: JSON.stringify({ phoneNumber, password: tempPassword }),
       });
   } catch (networkError: any) {
       console.error("Network error during post-registration login:", networkError.message);
@@ -155,9 +178,28 @@ export async function POST(request: NextRequest) {
       firstName: firstName,
       lastName: lastName,
       phoneNumber: phoneNumber,
+      tempPassword: tempPassword,
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
+
+    // 6. Send welcome email
+     const emailHtml = `
+      <h1>Welcome to Building Management Solution!</h1>
+      <p>Hello ${firstName},</p>
+      <p>A new account has been created for you. You can use these credentials to log in.</p>
+      <p><strong>Username:</strong> ${phoneNumber}</p>
+      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+      <p>For your security, you will be required to change this password upon your first login.</p>
+      <p>Thank you,</p>
+      <p>The Management Team</p>
+    `;
+
+    await sendEmail({
+      to: email,
+      subject: 'Your New Account Credentials',
+      html: emailHtml
+    });
     
     return NextResponse.json({ isSuccess: true, message: "User registered successfully.", userId: localUser.userId });
 

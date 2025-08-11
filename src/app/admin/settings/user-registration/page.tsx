@@ -21,7 +21,6 @@ const registrationFormSchema = z.object({
   phoneNumber: z.string().min(1, { message: "Phone number is required." })
                  .regex(/^(09|07)\d{8}$/, { message: "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678)."}),
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
 
 type RegistrationFormValues = z.infer<typeof registrationFormSchema>;
@@ -31,7 +30,6 @@ export default function UserRegistrationPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canManageUsersRegistration = isSuperAdmin || hasPermission('settings:user_registration:manage');
@@ -43,7 +41,6 @@ export default function UserRegistrationPage() {
       lastName: "",
       phoneNumber: "",
       email: "",
-      password: "",
     },
   });
 
@@ -67,7 +64,7 @@ export default function UserRegistrationPage() {
       if (response.ok && data.isSuccess) {
         toast({
           title: "User Registered Successfully",
-          description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management.`,
+          description: `User ${values.firstName} ${values.lastName} has been created and an email with credentials has been sent. You can now assign them a role in User Management.`,
         });
         form.reset(); 
       } else {
@@ -116,8 +113,7 @@ export default function UserRegistrationPage() {
           <UserPlus className="mr-2 h-6 w-6 text-primary" /> Register New User
         </CardTitle>
         <CardDescription>
-          Enter the details for the new user. They will be registered with the external identity provider and a local record will be created.
-          New users are created without any roles by default.
+          Enter the details for the new user. An account will be created and an email with a temporary password will be sent. New users are created without any roles by default.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -135,38 +131,6 @@ export default function UserRegistrationPage() {
             </div>
             <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="user@example.com" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="0912345678" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password<span className="text-destructive ml-1">*</span></FormLabel>
-                  <div className="relative">
-                    <FormControl>
-                      <Input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        className="pr-10"
-                        {...field}
-                        disabled={isLoading || !canManageUsersRegistration}
-                      />
-                    </FormControl>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading || !canManageUsersRegistration}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </Button>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading || !canManageUsersRegistration}>
