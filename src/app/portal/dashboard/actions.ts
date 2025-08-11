@@ -266,7 +266,9 @@ export async function sendContactEmailAction(formData: { subject: string; body: 
     `;
 
     // The `to` field can be a comma-separated string of emails
+    // The `from` field is now customized for this action
     const result = await sendEmail({
+      from: `"${tenant.name}" <${tenant.email}>`, // Use tenant's name and email as the sender
       to: managerEmails.join(', '),
       subject: `[Tenant Portal] ${formData.subject}`,
       html: emailHtml
