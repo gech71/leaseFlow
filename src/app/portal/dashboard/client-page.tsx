@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/custom/PageHeader';
-import { FileSignature, Banknote, AlertTriangle, CheckCircle, Info, UploadCloud, Download, User, Clock, Home, CreditCard, Landmark, Wallet, HelpCircle, FileText, Paperclip, MessageSquare } from 'lucide-react';
+import { FileSignature, Banknote, AlertTriangle, CheckCircle, Info, UploadCloud, Download, User, Clock, Home, CreditCard, Landmark, Wallet, HelpCircle, FileText, Paperclip, MessageSquare, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, parseISO, isBefore, startOfDay, differenceInDays, addMonths } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -39,7 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { submitPaymentProofAction } from './actions';
+import { submitPaymentProofAction, sendContactEmailAction } from './actions';
 import { Loader2 } from 'lucide-react';
 
 
@@ -56,12 +56,21 @@ const paymentProofSchema = z.object({
 });
 type PaymentProofFormValues = z.infer<typeof paymentProofSchema>;
 
+const contactFormSchema = z.object({
+  subject: z.string().min(3, { message: "Subject must be at least 3 characters." }).max(100, { message: "Subject cannot exceed 100 characters." }),
+  body: z.string().min(10, { message: "Message body must be at least 10 characters." }).max(2000, { message: "Message body cannot exceed 2000 characters." }),
+});
+type ContactFormValues = z.infer<typeof contactFormSchema>;
+
+
 export function CustomerDashboardClientPage({ initialData }: { initialData: SerializedTenantPortalData | null }) {
   const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeBillForPayment, setActiveBillForPayment] = useState<ClientBill | null>(null);
+  const [isContactFormOpen, setIsContactFormOpen] = useState(false);
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -80,6 +89,11 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
   const paymentProofForm = useForm<PaymentProofFormValues>({
     resolver: zodResolver(paymentProofSchema),
     defaultValues: { paymentMethod: "", paymentReference: "", notes: "", paymentSlip: undefined },
+  });
+
+  const contactForm = useForm<ContactFormValues>({
+    resolver: zodResolver(contactFormSchema),
+    defaultValues: { subject: "", body: "" },
   });
 
   const handleOpenPaymentDialog = (bill: ClientBill) => {
@@ -115,6 +129,19 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
       window.location.reload();
     } else {
       toast({ title: "Submission Failed", description: result.error, variant: "destructive" });
+    }
+  };
+
+  const handleContactFormSubmit = async (values: ContactFormValues) => {
+    setIsSubmitting(true);
+    const result = await sendContactEmailAction(values);
+    setIsSubmitting(false);
+    if (result.success) {
+      toast({ title: "Message Sent", description: "Your message has been sent to the building manager." });
+      setIsContactFormOpen(false);
+      contactForm.reset();
+    } else {
+      toast({ title: "Failed to Send", description: result.error, variant: "destructive" });
     }
   };
 
@@ -273,6 +300,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
         title={`Welcome, ${agreement.tenant.name}!`}
         icon={User}
         description="View your lease details and billing history."
+        actions={<Button onClick={() => setIsContactFormOpen(true)}><Mail className="mr-2 h-4 w-4" /> Contact Manager</Button>}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -436,6 +464,56 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                     </DialogFooter>
                 </form>
             </Form>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isContactFormOpen} onOpenChange={setIsContactFormOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-headline text-xl">Contact Manager</DialogTitle>
+            <DialogDescription>
+              Send a message directly to the manager(s) of your building.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...contactForm}>
+            <form onSubmit={contactForm.handleSubmit(handleContactFormSubmit)} className="space-y-4 py-2">
+              <FormField
+                control={contactForm.control}
+                name="subject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subject</FormLabel>
+                    <FormControl>
+                      <Input placeholder="E.g., Question about my bill" {...field} disabled={isSubmitting} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={contactForm.control}
+                name="body"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Message</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Please type your message here..." {...field} disabled={isSubmitting} rows={6} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter className="pt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Send Message
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </>
