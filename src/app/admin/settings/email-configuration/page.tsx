@@ -19,7 +19,7 @@ export default function EmailConfigurationPage() {
       <PageHeader
         title="Email Configuration"
         icon={Mail}
-        description="View current SMTP settings used for sending system emails."
+        description="See the current email settings for sending messages, check which email account is used for system notifications"
         actions={
           <Link href="/admin/settings" passHref>
             <Button variant="outline">
@@ -31,7 +31,7 @@ export default function EmailConfigurationPage() {
       <div className="grid gap-8 md:grid-cols-2">
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Current SMTP Settings</CardTitle>
+            <CardTitle>Email Setup Used by Your System</CardTitle>
             <CardDescription>
               These are the settings the application is currently using. They are read from the server's environment variables.
             </CardDescription>
@@ -78,7 +78,6 @@ export default function EmailConfigurationPage() {
               </p>
               <pre className="mt-2 p-3 bg-background rounded-md text-xs font-mono">
                 <code>
-                  SMTP_HOST="smtp.gmail.com"<br/>
                   SMTP_PORT=587<br/>
                   SMTP_USER="your-email@gmail.com"<br/>
                   SMTP_PASS="YOUR_16_CHARACTER_APP_PASSWORD"<br/>
