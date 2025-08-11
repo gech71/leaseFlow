@@ -7,6 +7,7 @@ import { Prisma, type User as PrismaUser, type Role as PrismaRole } from '@prism
 import { addMonths, isAfter } from 'date-fns'; 
 import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import { sendEmail } from '@/lib/services/emailService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
@@ -130,6 +131,25 @@ export async function createTenantAction(data: {
       representativePhone: data.representativePhone,
       user: { connect: { id: newUser.id } }
     });
+
+    // Send welcome email with credentials
+    const emailHtml = `
+      <h1>Welcome to Building Management Solution!</h1>
+      <p>Hello ${data.name},</p>
+      <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
+      <p><strong>Username:</strong> ${data.phone}</p>
+      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+      <p>For your security, you will be required to change this password upon your first login.</p>
+      <p>Thank you,</p>
+      <p>The Management Team</p>
+    `;
+
+    await sendEmail({
+      to: data.email,
+      subject: 'Your New Tenant Portal Account Credentials',
+      html: emailHtml
+    });
+
 
     revalidatePath('/admin/tenants');
     return { success: true, tenant: newTenant, tempPassword: tempPassword };
