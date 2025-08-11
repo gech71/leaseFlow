@@ -75,7 +75,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="font-headline">Email Configuration</CardTitle>
           <CardDescription>
-            See the current email settings for sending messages.
+            View current Email setup settings used for sending system emails.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-grow">
