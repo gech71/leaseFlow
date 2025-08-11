@@ -12,7 +12,6 @@ export const dynamic = 'force-dynamic';
 // This is a Server Component, so we can safely read environment variables.
 export default function EmailConfigurationPage() {
   const smtpUser = process.env.SMTP_USER || 'Not Set';
-  const smtpHost = process.env.SMTP_HOST || 'Not Set';
   const isSmtpPassSet = !!process.env.SMTP_PASS;
 
   return (
@@ -41,10 +40,6 @@ export default function EmailConfigurationPage() {
             <div className="space-y-1">
               <Label htmlFor="smtpUser">Email Address (SMTP_USER)</Label>
               <Input id="smtpUser" value={smtpUser} readOnly disabled />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="smtpHost">Email Host (SMTP_HOST)</Label>
-              <Input id="smtpHost" value={smtpHost} readOnly disabled />
             </div>
             <div className="space-y-1">
               <Label htmlFor="smtpPass">App Password (SMTP_PASS)</Label>
