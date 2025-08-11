@@ -192,3 +192,82 @@ export async function deleteAgreementAction(agreementId: string) {
         return { success: false, error: error.message || "Failed to delete agreement." };
     }
 }
+
+
+export interface RenewAgreementData {
+    startDate: string; // ISO String from client
+    paymentTermMonths: number;
+    monthlyRentalPrice: number;
+    initialPaymentMonths: number;
+    
+    // Initial Payment details from form
+    initialPaymentMethod: string;
+    initialPaymentReference?: string | null;
+    initialPaymentBankOrWalletName?: string | null;
+}
+
+export async function updateAgreementAction(agreementId: string, data: Partial<RenewAgreementData>) {
+    try {
+        const agreement = await databaseService.getAgreementById(agreementId);
+        if (!agreement) {
+            return { success: false, error: "Agreement not found." };
+        }
+
+        const updatedAgreement = await prisma.$transaction(async (tx) => {
+            const startDateObj = data.startDate ? parseISO(data.startDate) : agreement.startDate;
+            const termMonths = data.paymentTermMonths ?? agreement.paymentTermMonths;
+            const initialPaymentMonths = data.initialPaymentMonths ?? 0;
+            const monthlyRent = data.monthlyRentalPrice ?? agreement.monthlyRentalPrice;
+
+            const nextPaymentDueDate = addMonths(startDateObj, initialPaymentMonths);
+
+            // Update the agreement itself
+            const renewedAgreement = await tx.agreement.update({
+                where: { id: agreementId },
+                data: {
+                    startDate: data.startDate ? parseISO(data.startDate) : undefined,
+                    paymentTermMonths: data.paymentTermMonths,
+                    monthlyRentalPrice: data.monthlyRentalPrice,
+                    initialPaymentMonths: data.initialPaymentMonths,
+                    nextPaymentDueDate: nextPaymentDueDate,
+                },
+            });
+
+            // If there's an initial payment for the renewal, create a new bill for it
+            if (initialPaymentMonths > 0 && data.initialPaymentMethod) {
+                const initialPaymentAmount = monthlyRent * initialPaymentMonths;
+                await tx.bill.create({
+                    data: {
+                        agreementId: agreementId,
+                        tenantId: agreement.tenantId,
+                        billDate: startDateObj,
+                        dueDate: startDateObj,
+                        rentAmount: initialPaymentAmount,
+                        utilityBreakdown: Prisma.JsonNull,
+                        penaltyAmount: 0,
+                        totalAmount: initialPaymentAmount,
+                        status: 'Paid',
+                        paymentDate: startDateObj, // Assume payment is made on the renewal start date
+                        paymentMethod: data.initialPaymentMethod,
+                        paymentReference: data.initialPaymentReference,
+                        bankOrWalletName: (data.initialPaymentMethod === "Bank Transfer" || data.initialPaymentMethod === "Wallet") ? data.initialPaymentBankOrWalletName : null,
+                        adminVerifiedPayment: true,
+                        tenantPaymentNotes: "Initial payment for agreement renewal."
+                    }
+                });
+            }
+
+            return renewedAgreement;
+        });
+
+        revalidatePath('/admin/agreements');
+        revalidatePath(`/admin/agreements/${agreementId}`);
+        revalidatePath('/admin/billing');
+
+        return { success: true, agreement: updatedAgreement };
+
+    } catch (error: any) {
+        console.error("Error renewing agreement:", error);
+        return { success: false, error: error.message || "Failed to renew agreement." };
+    }
+}

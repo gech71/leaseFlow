@@ -7,13 +7,13 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw, Trash2, Loader2, EyeOff } from 'lucide-react';
+import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw, Trash2, Loader2, EyeOff, Coins, CreditCard, HelpCircle, Landmark, Wallet, Sigma, CalendarDays, CalendarClock, Info } from 'lucide-react';
 import type { Agreement as AgreementPrisma, Tenant, Space } from '@prisma/client';
 import { Input } from '@/components/ui/input';
 import { addMonths, format, isBefore, startOfDay, subDays, isAfter, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { deleteAgreementAction } from './actions';
+import { deleteAgreementAction, updateAgreementAction, type RenewAgreementData } from './actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,15 +24,48 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogHeader, DialogTrigger, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { jsPDF } from "jspdf";
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Popover, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
 };
+
+const renewalFormSchema = z.object({
+  startDate: z.date({ required_error: "New start date is required."}),
+  paymentTermMonths: z.coerce.number().int().positive({ message: "Term must be a positive number." }).min(1, "Term must be at least 1 month."),
+  monthlyRentalPrice: z.coerce.number().positive({ message: "Monthly rent must be a positive number." }),
+  initialPaymentMonths: z.coerce.number().int().gte(0, "Initial payment cannot be negative."),
+  initialPaymentMethod: z.string().optional(),
+  initialPaymentReference: z.string().optional(),
+  initialPaymentBankOrWalletName: z.string().optional(),
+}).refine(data => data.initialPaymentMonths <= data.paymentTermMonths, {
+  message: "Initial payment months cannot exceed total term months.",
+  path: ["initialPaymentMonths"],
+}).refine(data => {
+  if (data.initialPaymentMonths > 0 && !data.initialPaymentMethod) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Payment method is required if there is an initial payment.",
+  path: ["initialPaymentMethod"],
+});
+
+type RenewalFormValues = z.infer<typeof renewalFormSchema>;
 
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
@@ -57,7 +90,8 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const renewalWindowDays = 30;
 
   const [agreementToDelete, setAgreementToDelete] = useState<AgreementWithRelations | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [agreementToRenew, setAgreementToRenew] = useState<AgreementWithRelations | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
@@ -68,6 +102,10 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const canDeleteAgreements = isSuperAdmin || hasPermission('agreement:delete');
   const canViewAgreements = isSuperAdmin || hasPermission('agreement:view') || canCreateAgreements || canEditAgreements || canDeleteAgreements;
 
+  const renewalForm = useForm<RenewalFormValues>({
+    resolver: zodResolver(renewalFormSchema),
+  });
+
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
     setCurrentPage(1);
@@ -75,9 +113,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
 
   useEffect(() => {
     setIsMounted(true);
-    setAgreements(initialAgreements.map(ag => ({
-        ...ag,
-    })));
+    setAgreements(initialAgreements.map(ag => ({ ...ag })));
     setToday(startOfDay(new Date())); 
   }, [initialAgreements]);
   
@@ -116,7 +152,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
     if (isBefore(agreementEndDate, today)) return false; 
     const renewalEligibilityStartDate = subDays(agreementEndDate, renewalWindowDays);
-    return !isBefore(today, renewalEligibilityStartDate) && !isAfter(today, agreementEndDate);
+    return !isBefore(today, renewalEligibilityStartDate) || isAfter(today, agreementEndDate);
   };
 
   const handleDownloadPdf = (agreementId: string) => {
@@ -146,23 +182,52 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     toast({ title: "Download Started", description: "The agreement PDF is downloading." });
   };
 
-  const handleRenewAgreement = (agreement: AgreementWithRelations) => {
-    if (!canEditAgreements) { // Assuming renew is an edit-like operation
+  const handleOpenRenewDialog = (agreement: AgreementWithRelations) => {
+    if (!canEditAgreements) {
       toast({ title: "Permission Denied", description: "You do not have permission to renew agreements.", variant: "destructive" });
       return;
     }
-    toast({ title: "Renew Agreement", description: `Initiating renewal for ${agreement.tenant?.name}'s agreement. (This is a placeholder action)`});
+    setAgreementToRenew(agreement);
+    renewalForm.reset({
+      startDate: addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths),
+      paymentTermMonths: agreement.paymentTermMonths,
+      monthlyRentalPrice: agreement.monthlyRentalPrice,
+      initialPaymentMonths: 1,
+      initialPaymentMethod: "",
+      initialPaymentReference: "",
+      initialPaymentBankOrWalletName: "",
+    });
   };
   
+  const handleRenewAgreementSubmit = async (values: RenewalFormValues) => {
+    if (!agreementToRenew) return;
+    setIsSubmitting(true);
+
+    const result = await updateAgreementAction(agreementToRenew.id, {
+      ...values,
+      startDate: values.startDate.toISOString(),
+    });
+
+    setIsSubmitting(false);
+
+    if (result.success) {
+      toast({ title: "Agreement Renewed", description: "The agreement has been successfully updated." });
+      setAgreementToRenew(null);
+      router.refresh();
+    } else {
+      toast({ title: "Error Renewing Agreement", description: result.error, variant: "destructive" });
+    }
+  };
+
   const handleDeleteAgreement = async () => {
     if (!agreementToDelete) return;
     if (!canDeleteAgreements) {
        toast({ title: "Permission Denied", description: "You do not have permission to delete agreements.", variant: "destructive" });
        return;
     }
-    setIsDeleting(true);
+    setIsSubmitting(true);
     const result = await deleteAgreementAction(agreementToDelete.id);
-    setIsDeleting(false);
+    setIsSubmitting(false);
     if (result.success) {
         toast({title: "Agreement Deleted", description: "The agreement has been removed."});
         setAgreements(prev => prev.filter(ag => ag.id !== agreementToDelete.id)); 
@@ -202,6 +267,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
           )
         }
       />
+      
       <AlertDialog open={!!agreementToDelete} onOpenChange={(open) => { if(!open) setAgreementToDelete(null); }}>
         <AlertDialogContent>
             <AlertDialogHeader><AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-5 w-5"/>Confirm Deletion</AlertDialogTitle>
@@ -209,13 +275,47 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                 Are you sure you want to delete the agreement for {agreementToDelete?.tenant?.name} at {agreementToDelete?.space?.spaceIdName}? This action cannot be undone. Associated bills might prevent deletion.
             </AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter> 
-              <AlertDialogCancel onClick={() => setAgreementToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel> 
-              <AlertDialogAction onClick={handleDeleteAgreement} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting || !canDeleteAgreements}> 
-                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Agreement 
+              <AlertDialogCancel onClick={() => setAgreementToDelete(null)} disabled={isSubmitting}>Cancel</AlertDialogCancel> 
+              <AlertDialogAction onClick={handleDeleteAgreement} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting || !canDeleteAgreements}> 
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Agreement 
               </AlertDialogAction> 
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!agreementToRenew} onOpenChange={() => setAgreementToRenew(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renew Agreement</DialogTitle>
+            <DialogDescription>
+              Update the terms for {agreementToRenew?.tenant?.name}. A new bill will be created for any initial payment.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...renewalForm}>
+            <form onSubmit={renewalForm.handleSubmit(handleRenewAgreementSubmit)} className="space-y-4">
+              <FormField control={renewalForm.control} name="startDate" render={({ field }) => ( <FormItem className="flex flex-col"> <FormLabel className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary"/>New Start Date<span className="text-destructive ml-1">*</span></FormLabel> <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarDays className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={renewalForm.control} name="paymentTermMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary"/>New Term<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={renewalForm.control} name="monthlyRentalPrice" render={({ field }) => (<FormItem><FormLabel>New Rent<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              </div>
+              <FormField control={renewalForm.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel>Initial Payment (Months)<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              {renewalForm.watch('initialPaymentMonths') > 0 && (
+                <div className="space-y-4 pt-2 border-t">
+                  <FormField control={renewalForm.control} name="initialPaymentMethod" render={({ field }) => (<FormItem><FormLabel>Payment Method<span className="text-destructive ml-1">*</span></FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select method"/></SelectTrigger></FormControl><SelectContent><SelectItem value="Card"><CreditCard className="mr-2 h-4 w-4 inline-block"/>Card</SelectItem><SelectItem value="Cash"><Coins className="mr-2 h-4 w-4 inline-block"/>Cash</SelectItem><SelectItem value="Bank Transfer"><Landmark className="mr-2 h-4 w-4 inline-block"/>Bank Transfer</SelectItem><SelectItem value="Wallet"><Wallet className="mr-2 h-4 w-4 inline-block"/>Digital Wallet</SelectItem><SelectItem value="Other"><HelpCircle className="mr-2 h-4 w-4 inline-block"/>Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormField control={renewalForm.control} name="initialPaymentReference" render={({ field }) => (<FormItem><FormLabel>Payment Reference</FormLabel><FormControl><Input placeholder="e.g. TXN ID" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                </div>
+              )}
+              <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Renew
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
       <Card className="mb-6 shadow-sm">
         <CardContent className="p-4">
           <div className="relative">
@@ -274,7 +374,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                       {eligibleForRenewal && canEditAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRenewAgreement(agreement)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRenewDialog(agreement)}>
                               <RefreshCw className="h-4 w-4 text-purple-600" />
                               <span className="sr-only">Renew Agreement</span>
                             </Button>
