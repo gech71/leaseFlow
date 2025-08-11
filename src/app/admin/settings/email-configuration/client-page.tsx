@@ -130,15 +130,7 @@ export function EmailConfigurationClientPage({ initialSmtpUser, initialIsSmtpPas
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <div className="p-3 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm rounded-md flex items-start">
-                <AlertTriangle className="h-5 w-5 mr-3 mt-0.5 shrink-0" />
-                <div>
-                  <h4 className="font-semibold mb-1">Important: Encryption Key</h4>
-                  <p>
-                    This feature requires an `ENCRYPTION_KEY` in your `.env` file. If this key is not set, saving the password will fail.
-                  </p>
-                </div>
-            </div>
+            
             <div>
               <h4 className="font-semibold mb-1">Step 1: Generate a Gmail App Password</h4>
               <p className="text-muted-foreground">
