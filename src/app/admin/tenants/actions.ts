@@ -137,7 +137,7 @@ export async function createTenantAction(data: {
       <h1>Welcome to Building Management Solution!</h1>
       <p>Hello ${data.name},</p>
       <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
-      <p><strong>Username:</strong> ${data.phone}</p>
+      <p><strong>Phone Number:</strong> ${data.phone}</p>
       <p><strong>Temporary Password:</strong> ${tempPassword}</p>
       <p>For your security, you will be required to change this password upon your first login.</p>
       <p>Thank you,</p>

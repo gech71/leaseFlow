@@ -7,6 +7,7 @@ import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePr
 import { addMonths, isAfter } from 'date-fns';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import { sendEmail } from '@/lib/services/emailService';
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -20,6 +21,7 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
   space: SpacePrisma & {
     building: BuildingPrisma & {
       penaltyPolicyTiers: PenaltyTierPrisma[];
+      managers: User[]; // <-- Ensure managers are included
     };
   };
   tenant: TenantPrisma;
@@ -105,7 +107,10 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         space: {
           include: {
             building: {
-              include: { penaltyPolicyTiers: true },
+              include: { 
+                penaltyPolicyTiers: true,
+                managers: true, // Fetch managers
+              },
             },
           },
         },
@@ -219,5 +224,62 @@ export async function submitPaymentProofAction(
   } catch (error: any) {
     console.error("Error submitting payment proof:", error);
     return { success: false, error: `Failed to submit proof: ${(error as Error).message}` };
+  }
+}
+
+export async function sendContactEmailAction(formData: { subject: string; body: string }): Promise<{ success: boolean; error?: string }> {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const tenant = await databaseService.findTenantByEmailOrPhone(currentUser.email, currentUser.phoneNumber);
+    if (!tenant) {
+      return { success: false, error: "No tenant profile associated with your user account." };
+    }
+    
+    const agreement = await prisma.agreement.findFirst({
+      where: { tenantId: tenant.id },
+      include: { space: { include: { building: { include: { managers: true } } } } },
+      orderBy: { startDate: 'desc' }
+    });
+    
+    if (!agreement?.space?.building?.managers || agreement.space.building.managers.length === 0) {
+      return { success: false, error: "No manager is assigned to your building. Cannot send email." };
+    }
+
+    const managerEmails = agreement.space.building.managers.map(m => m.email).filter((email): email is string => !!email);
+
+    if (managerEmails.length === 0) {
+      return { success: false, error: "Building manager(s) do not have an email address configured." };
+    }
+    
+    const emailHtml = `
+      <h1>Contact Form Submission from Tenant Portal</h1>
+      <p><strong>From Tenant:</strong> ${tenant.name} (${tenant.email})</p>
+      <p><strong>Building:</strong> ${agreement.space.building.name}</p>
+      <p><strong>Space:</strong> ${agreement.space.spaceIdName}</p>
+      <hr>
+      <h2>Subject: ${formData.subject}</h2>
+      <p>${formData.body.replace(/\n/g, '<br>')}</p>
+    `;
+
+    // The `to` field can be a comma-separated string of emails
+    const result = await sendEmail({
+      to: managerEmails.join(', '),
+      subject: `[Tenant Portal] ${formData.subject}`,
+      html: emailHtml
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || "Email service failed.");
+    }
+
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error in sendContactEmailAction:", error);
+    return { success: false, error: `Failed to send message: ${error.message}` };
   }
 }
