@@ -4,8 +4,8 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-const ADMIN_REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
+const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token'; // Unified access token
+const REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token'; // Unified refresh token
 
 // Insecure JWT payload decoder for prototype purposes. Not for production.
 function decodeJwtPayload(token: string): any | null {
@@ -82,26 +82,30 @@ export async function POST(request: NextRequest) {
        return NextResponse.json({ isSuccess: false, errors: ["Token is missing user identifier (sub)."] }, { status: 500 });
     }
     
-    // 3. Verify user exists in the local database and check for temp password
+    // 3. Verify user exists in the local database and check their roles/temp password
     const localUser = await databaseService.getUserByExternalId(userIdFromToken, { roles: true });
     if (!localUser) {
-        console.warn(`Admin Login Warning: User ${userIdFromToken} authenticated successfully but is not found or provisioned in the local system.`);
+        console.warn(`Login Warning: User ${userIdFromToken} authenticated successfully but is not found or provisioned in the local system.`);
         return NextResponse.json({ isSuccess: false, errors: ["Login successful, but this user is not configured for access to this system. Please contact an administrator."] }, { status: 403 });
     }
 
-    // NEW: Check if the user has a temporary password set
+    // Check if the user has a temporary password set
     const requiresPasswordChange = !!localUser.tempPassword;
 
+    // Determine user type and redirect path
+    const isTenantOnly = localUser.roles.length === 1 && localUser.roles[0].name === 'TENANT';
+    const redirectPath = isTenantOnly ? '/portal/dashboard' : '/admin/dashboard';
+    
     // 4. Set cookies if password change is NOT required
     if (!requiresPasswordChange) {
       const cookieStore = await cookies();
-      cookieStore.set(ADMIN_ACCESS_TOKEN_KEY, accessToken, {
+      cookieStore.set(ACCESS_TOKEN_KEY, accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/',
         sameSite: 'lax',
       });
-      cookieStore.set(ADMIN_REFRESH_TOKEN_KEY, refreshToken, {
+      cookieStore.set(REFRESH_TOKEN_KEY, refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/',
@@ -109,12 +113,7 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // 5. Determine redirect path and return appropriate response
-    let redirectPath = '/admin/dashboard'; // Default admin path
-    if (localUser.roles.length === 1 && localUser.roles[0].name === 'TENANT') {
-      redirectPath = '/portal/dashboard'; // A tenant role user trying to log in via admin page
-    }
-
+    // 5. Return appropriate response
     return NextResponse.json({ 
       isSuccess: true, 
       redirectPath,

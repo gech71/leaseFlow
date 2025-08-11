@@ -14,6 +14,8 @@ import { OccupancyCard } from '@/components/custom/OccupancyCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { getDashboardDataAction, type DashboardData, type ClientAgreement, type ClientBill, type ClientUtility, type ClientBuilding, type ClientSpace } from './actions';
+import { usePermissions } from '@/contexts/PermissionContext';
+import { useRouter } from 'next/navigation';
 
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
@@ -41,6 +43,8 @@ interface BuildingFinancialSummary {
 
 
 export default function AdminDashboardPage() {
+    const { currentUser, isLoading: isUserLoading } = usePermissions();
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [today, setToday] = useState(new Date());
@@ -59,6 +63,14 @@ export default function AdminDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
 
     useEffect(() => {
+        if (!isUserLoading && currentUser) {
+            const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
+            if (isTenantOnly) {
+                router.replace('/portal/dashboard');
+                return;
+            }
+        }
+
         const fetchData = async () => {
             setIsLoading(true);
             try {
@@ -79,8 +91,11 @@ export default function AdminDashboardPage() {
             }
             setIsLoading(false);
         };
-        fetchData();
-    }, []);
+
+        if (!isUserLoading) {
+            fetchData();
+        }
+    }, [isUserLoading, currentUser, router]);
 
     const periodDescription = format(new Date(selectedYear, selectedMonth), "MMMM yyyy");
 
@@ -199,7 +214,7 @@ export default function AdminDashboardPage() {
         return Array.from(years).sort((a,b) => b - a);
     }, [allData.allBills]);
 
-    if (isLoading) {
+    if (isLoading || isUserLoading) {
       return (
         <div className="flex justify-center items-center h-screen">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />

@@ -33,7 +33,7 @@ export interface TenantPortalData {
 }
 
 // --- User Authentication Helpers ---
-const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
+const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
 // Insecure JWT payload decoder
 async function decodeJwtPayload(token: string): Promise<any | null> {
@@ -59,7 +59,7 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
 // Gets current user from the session cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     const cookieStore = await cookies();
-    const accessToken = cookieStore.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value; // Use the unified token key
 
     if (!accessToken) {
         console.error("Portal Auth Error: No session access token found in cookie.");

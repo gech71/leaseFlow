@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
 function decodeJwtPayload(token: string): any | null {
   try {
@@ -32,10 +33,8 @@ async function getAccessToken(request: NextRequest): Promise<string | null> {
         return authHeader.substring(7);
     }
     const cookieStore = await cookies();
-    const adminToken = cookieStore.get('leaseflow_admin_access_token')?.value;
-    if (adminToken) return adminToken;
-    const portalToken = cookieStore.get('leaseflow_portal_access_token')?.value;
-    return portalToken || null;
+    const token = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    return token || null;
 }
 
 export async function POST(request: NextRequest) {

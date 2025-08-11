@@ -78,7 +78,7 @@ export default function AdminLoginPage() {
         } else {
             toast({
               title: "Login Successful",
-              description: "Welcome!",
+              description: "Redirecting...",
             });
             router.push(data.redirectPath || '/admin/dashboard');
         }

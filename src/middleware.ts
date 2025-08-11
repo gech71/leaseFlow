@@ -3,16 +3,15 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 const ADMIN_REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
-const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
+const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token'; // This will be phased out but we clear it for safety
 
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
-const ADMIN_LOGIN_PATH = '/auth/login';
 const PORTAL_DASHBOARD_PATH = '/portal/dashboard';
-const PORTAL_LOGIN_PATH = '/portal/login';
+const LOGIN_PATH = '/auth/login';
+
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
-// DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
 function decodeJwtPayload(token: string): any | null {
   try {
     const base64Url = token.split('.')[1];
@@ -33,13 +32,13 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-async function handleAdminSession(request: NextRequest): Promise<NextResponse> {
+async function handleAuthenticatedSession(request: NextRequest): Promise<NextResponse> {
   const adminToken = request.cookies.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
   const refreshToken = request.cookies.get(ADMIN_REFRESH_TOKEN_KEY)?.value;
-  const { pathname } = request.nextUrl;
 
   if (!adminToken || !refreshToken) {
-    return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+    // If either token is missing, redirect to login
+    return NextResponse.redirect(new URL(LOGIN_PATH, request.url));
   }
   
   const tokenPayload = decodeJwtPayload(adminToken);
@@ -53,7 +52,7 @@ async function handleAdminSession(request: NextRequest): Promise<NextResponse> {
   // --- Token is expired, try to refresh it ---
   if (!AUTH_API_BASE_URL) {
       console.error("Middleware Error: Auth API base URL is not configured for token refresh.");
-      return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+      return NextResponse.redirect(new URL(LOGIN_PATH, request.url));
   }
 
   try {
@@ -90,40 +89,30 @@ async function handleAdminSession(request: NextRequest): Promise<NextResponse> {
       console.error("Middleware: Error refreshing token:", error);
   }
 
-  // If refresh fails for any reason, redirect to login
-  const redirectResponse = NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
-  // Clear the invalid tokens
+  // If refresh fails for any reason, redirect to login and clear invalid tokens
+  const redirectResponse = NextResponse.redirect(new URL(LOGIN_PATH, request.url));
   redirectResponse.cookies.delete(ADMIN_ACCESS_TOKEN_KEY);
   redirectResponse.cookies.delete(ADMIN_REFRESH_TOKEN_KEY);
+  redirectResponse.cookies.delete(PORTAL_ACCESS_TOKEN_KEY); // Clean up old portal cookie too
   return redirectResponse;
 }
-
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  const adminToken = request.cookies.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-  const portalToken = request.cookies.get(PORTAL_ACCESS_TOKEN_KEY)?.value;
-
-  // --- Redirect from /login to /auth/login ---
-  if (pathname === '/login') {
-    return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
-  }
+  const hasSessionToken = request.cookies.has(ADMIN_ACCESS_TOKEN_KEY);
 
   // --- Public Unprotected Routes ---
   const publicPaths = [
-    ADMIN_LOGIN_PATH, 
+    LOGIN_PATH, 
     '/auth/forgot-password',
     '/auth/reset-password',
-    PORTAL_LOGIN_PATH, 
-    '/portal/connect',
-    '/portal/billing'
+    '/portal/connect', // NIB App entry point remains public
+    '/portal/billing'  // NIB App billing page remains public
   ];
   const publicApiPaths = [
     '/api/Auth/login', 
-    '/api/Auth/portal/login', 
-    '/api/Auth/logout', 
-    '/api/Auth/portal/logout', 
+    '/api/Auth/logout',
     '/api/Auth/forgot-password',
     '/api/Auth/reset-password',
     '/api/Auth/change-password',
@@ -132,34 +121,32 @@ export async function middleware(request: NextRequest) {
     '/api/Auth/register',
   ];
 
-  if (publicPaths.some(path => pathname.startsWith(path)) || publicApiPaths.some(path => pathname.startsWith(path))) {
-    if(pathname === ADMIN_LOGIN_PATH && adminToken) {
-      return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
-    }
-     if(pathname === PORTAL_LOGIN_PATH && portalToken) {
-      return NextResponse.redirect(new URL(PORTAL_DASHBOARD_PATH, request.url));
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path)) || 
+                       publicApiPaths.some(path => pathname.startsWith(path));
+
+  if (isPublicPath) {
+    // If user is already logged in and trying to access login page, redirect them to their dashboard
+    if (pathname === LOGIN_PATH && hasSessionToken) {
+        // We can't know the role here without a DB call, so we redirect to a generic home
+        // which will then redirect to the correct dashboard.
+        return NextResponse.redirect(new URL('/', request.url));
     }
     return NextResponse.next();
   }
 
-  // --- Protected Admin Routes ---
-  if (pathname.startsWith('/admin') || (pathname.startsWith('/api/') && !publicApiPaths.some(path => pathname.startsWith(path)))) {
-    return handleAdminSession(request);
-  }
-  
-  // --- Protected Portal Routes ---
-  if (pathname.startsWith('/portal')) {
-     if (!portalToken) {
-      return NextResponse.redirect(new URL(PORTAL_LOGIN_PATH, request.url));
-    }
+  // --- Protected Routes ---
+  // All other routes under /admin and /portal require an authenticated session
+  if (pathname.startsWith('/admin') || pathname.startsWith('/portal')) {
+    return handleAuthenticatedSession(request);
   }
   
   // --- Root Path Redirect ---
   if (pathname === '/') {
-    if (adminToken) {
+    if (hasSessionToken) {
+      // Redirect to admin dashboard by default; user-specific redirect will be handled by the dashboard page itself if needed.
       return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
     }
-    return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+    return NextResponse.redirect(new URL(LOGIN_PATH, request.url));
   }
   
   return NextResponse.next();
