@@ -2,6 +2,8 @@
 "use server";
 
 import nodemailer from 'nodemailer';
+import { databaseService } from './databaseService';
+import { encryptionService } from './encryptionService';
 
 interface EmailOptions {
   to: string;
@@ -10,26 +12,49 @@ interface EmailOptions {
   from?: string; // Add optional 'from' field
 }
 
-const smtpConfig = {
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: Number(process.env.SMTP_PORT || 587) === 465, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-};
+// SMTP configuration is now built dynamically
+async function getTransporter() {
+  const smtpUser = process.env.SMTP_USER;
+  const encryptedPassword = await databaseService.getSecret('SMTP_PASS');
 
-const transporter = nodemailer.createTransport(smtpConfig);
-
-export async function sendEmail({ to, subject, html, from }: EmailOptions): Promise<{ success: boolean; error?: string }> {
-  if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
-    console.error("❌ SMTP configuration is missing. Cannot send email.");
-    return { success: false, error: "Email service is not configured on the server." };
+  if (!smtpUser || !encryptedPassword) {
+    console.error("❌ SMTP user or password is not configured in the system.");
+    return null;
   }
 
+  try {
+    const smtpPass = encryptionService.decrypt(encryptedPassword.value);
+
+    const smtpConfig = {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: Number(process.env.SMTP_PORT || 587) === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    };
+
+    return nodemailer.createTransport(smtpConfig);
+  } catch (error) {
+    console.error("❌ Failed to create transporter due to decryption error:", error);
+    return null;
+  }
+}
+
+export async function sendEmail({ to, subject, html, from }: EmailOptions): Promise<{ success: boolean; error?: string }> {
+  const transporter = await getTransporter();
+
+  if (!transporter) {
+    const errorMsg = "Email service is not configured correctly (check user, password, and encryption key).";
+    console.error(errorMsg);
+    return { success: false, error: errorMsg };
+  }
+  
+  const defaultFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
+
   const mailOptions = {
-    from: from || process.env.SMTP_FROM, // Use provided 'from' or fallback to default
+    from: from || defaultFrom, // Use provided 'from' or fallback to default
     to,
     subject,
     html,

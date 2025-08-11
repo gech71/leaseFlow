@@ -11,7 +11,8 @@ import type {
   BuildingMonthlyUtilities, 
   PenaltyTier,
   User, 
-  Role 
+  Role,
+  Secret
 } from '@prisma/client';
 
 export class DatabaseService {
@@ -380,6 +381,19 @@ export class DatabaseService {
       throw new Error("Cannot delete role as it is currently assigned to one or more users.");
     }
     return prisma.role.delete({ where: { id } });
+  }
+
+  // --- Secret ---
+  async getSecret(key: string): Promise<Secret | null> {
+    return prisma.secret.findUnique({ where: { key } });
+  }
+
+  async setSecret(key: string, value: string): Promise<Secret> {
+    return prisma.secret.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
   }
 }
 
