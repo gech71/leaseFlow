@@ -141,7 +141,7 @@ export function EmailConfigurationClientPage({ initialSmtpUser, initialIsSmtpPas
                 <li>Navigate to the "Security" section.</li>
                 <li>Under "How you sign in to Google", find and click on "2-Step Verification". You must have this enabled.</li>
                 <li>At the bottom of the 2-Step Verification page, click on "App passwords".</li>
-                <li>Generate a new password. For the app name, you can enter "LeaseFlow" or something similar.</li>
+                <li>Generate a new password.</li>
                 <li>Copy the 16-character password that is generated.</li>
               </ol>
             </div>
