@@ -30,8 +30,8 @@ export default function PortalLayout({
   const handleLogout = async () => {
       setIsLoggingOut(true);
       try {
-          // Call the dedicated portal logout endpoint
-          const response = await fetch('/api/Auth/portal/logout', {
+          // Call the unified logout endpoint
+          const response = await fetch('/api/Auth/logout', {
               method: 'POST',
           });
           const data = await response.json();
@@ -39,7 +39,7 @@ export default function PortalLayout({
           if (response.ok && data.isSuccess) {
               toast({
                   title: "Logged Out",
-                  description: "You have been successfully logged out from the portal.",
+                  description: "You have been successfully logged out.",
               });
           } else {
               toast({
@@ -49,15 +49,15 @@ export default function PortalLayout({
               });
           }
       } catch (error) {
-          console.error("Portal logout API call error:", error);
+          console.error("Unified logout API call error:", error);
           toast({
               title: "Logout Error",
               description: "Could not connect to the logout service. Cleared local session.",
               variant: "default"
           });
       } finally {
-          // Redirect to the portal login page
-          router.push('/portal/login');
+          // Redirect to the main login page
+          router.push('/auth/login');
           setIsLoggingOut(false);
       }
   };
