@@ -2,7 +2,7 @@
 "use server";
 
 import { revalidatePath } from 'next/cache';
-import { databaseService } from '@/lib/services/databaseService';
+import { prisma } from '@/lib/prisma';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import { encryptionService } from '@/lib/services/encryptionService';
 
@@ -14,7 +14,8 @@ export async function getSmtpConfigurationAction(): Promise<{
 }> {
   try {
     const smtpUser = process.env.SMTP_USER || '';
-    const encryptedSmtpPass = await databaseService.getSecret('SMTP_PASS');
+    // Use prisma directly here
+    const encryptedSmtpPass = await prisma.secret.findUnique({ where: { key: 'SMTP_PASS' } });
     const isSmtpPassSet = !!encryptedSmtpPass;
     
     return { success: true, smtpUser, isSmtpPassSet };
@@ -36,7 +37,13 @@ export async function updateSmtpPasswordAction(newPassword: string): Promise<{ s
     }
 
     const encryptedPassword = encryptionService.encrypt(newPassword);
-    await databaseService.setSecret('SMTP_PASS', encryptedPassword);
+    
+    // Use prisma directly here
+    await prisma.secret.upsert({
+      where: { key: 'SMTP_PASS' },
+      update: { value: encryptedPassword },
+      create: { key: 'SMTP_PASS', value: encryptedPassword },
+    });
     
     revalidatePath('/admin/settings/email-configuration');
     
