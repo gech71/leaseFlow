@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,12 +75,12 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="font-headline">Email Configuration</CardTitle>
           <CardDescription>
-            View current SMTP settings for sending emails.
+            See the current email settings for sending messages.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-grow">
           <p className="text-sm text-muted-foreground mb-4">
-            Check the email account used for system notifications and get instructions on how to update its credentials.
+            check which email account is used for system notifications
           </p>
         </CardContent>
         <CardFooter>
