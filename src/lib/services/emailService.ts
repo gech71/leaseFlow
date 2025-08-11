@@ -2,7 +2,7 @@
 "use server";
 
 import nodemailer from 'nodemailer';
-import { databaseService } from './databaseService';
+import { prisma } from '@/lib/prisma';
 import { encryptionService } from './encryptionService';
 
 interface EmailOptions {
@@ -15,7 +15,7 @@ interface EmailOptions {
 // SMTP configuration is now built dynamically
 async function getTransporter() {
   const smtpUser = process.env.SMTP_USER;
-  const encryptedPassword = await databaseService.getSecret('SMTP_PASS');
+  const encryptedPassword = await prisma.secret.findUnique({ where: { key: 'SMTP_PASS' } });
 
   if (!smtpUser || !encryptedPassword) {
     console.error("❌ SMTP user or password is not configured in the system.");
