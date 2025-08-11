@@ -7,6 +7,7 @@ interface EmailOptions {
   to: string;
   subject: string;
   html: string;
+  from?: string; // Add optional 'from' field
 }
 
 const smtpConfig = {
@@ -21,16 +22,14 @@ const smtpConfig = {
 
 const transporter = nodemailer.createTransport(smtpConfig);
 
-export async function sendEmail({ to, subject, html }: EmailOptions): Promise<{ success: boolean; error?: string }> {
+export async function sendEmail({ to, subject, html, from }: EmailOptions): Promise<{ success: boolean; error?: string }> {
   if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
     console.error("❌ SMTP configuration is missing. Cannot send email.");
-    // In a real app, you might want to avoid exposing this detailed error to the client.
-    // For this prototype, we'll log it and return a generic message.
     return { success: false, error: "Email service is not configured on the server." };
   }
 
   const mailOptions = {
-    from: process.env.SMTP_FROM,
+    from: from || process.env.SMTP_FROM, // Use provided 'from' or fallback to default
     to,
     subject,
     html,
