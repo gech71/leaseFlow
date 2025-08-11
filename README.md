@@ -33,6 +33,7 @@ This document provides an overview of the project setup, key features, and a det
 -   **Role-Based Access Control (RBAC)**: Fine-grained permission system for different user roles (Super Admin, Property Manager, Accountant, etc.).
 -   **Tenant Portal**: A secure portal for tenants to view their bills and payment history.
 -   **Secure Payment Integration**: Seamless payment flow integrated with NIB Bank's Mini App.
+-   **Email Notifications**: Automated welcome emails with credentials for new users.
 
 ## Tech Stack
 
@@ -41,6 +42,7 @@ This document provides an overview of the project setup, key features, and a det
 -   **Styling**: Tailwind CSS with ShadCN UI components
 -   **Database**: PostgreSQL with Prisma ORM
 -   **Authentication**: Handled by an external identity provider, with session management via JWTs.
+-   **Email**: Nodemailer with Gmail SMTP
 
 ## Getting Started
 
@@ -50,6 +52,7 @@ This document provides an overview of the project setup, key features, and a det
 -   npm or yarn
 -   PostgreSQL database
 -   Access to NIB Bank's pre-production environment credentials.
+-   A Gmail account with an App Password for sending emails.
 
 ### Environment Setup
 
@@ -81,6 +84,17 @@ NIB_ACCOUNT_NO=7000101633387
 
 # Your company name as registered with NIB
 NIB_COMPANY_NAME=BUILDING
+
+# --- Nodemailer SMTP Configuration ---
+# For Gmail, use smtp.gmail.com and port 587.
+# IMPORTANT: You must generate an "App Password" for your Google Account.
+# See: https://support.google.com/accounts/answer/185833
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-gmail-app-password"
+SMTP_FROM="Your Company Name <your-email@gmail.com>"
+
 ```
 
 ### Installation
