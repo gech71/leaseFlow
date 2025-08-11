@@ -38,11 +38,11 @@ export default function EmailConfigurationPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1">
-              <Label htmlFor="smtpUser">Email Address (SMTP_USER)</Label>
+              <Label htmlFor="smtpUser">Email Address</Label>
               <Input id="smtpUser" value={smtpUser} readOnly disabled />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="smtpPass">App Password (SMTP_PASS)</Label>
+              <Label htmlFor="smtpPass">App Password</Label>
               <Input id="smtpPass" value={isSmtpPassSet ? '********' : 'Not Set'} readOnly disabled />
               <p className="text-xs text-muted-foreground">For security, the password cannot be displayed.</p>
             </div>
