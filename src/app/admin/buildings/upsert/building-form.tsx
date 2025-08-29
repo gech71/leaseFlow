@@ -349,7 +349,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                     id="buildingNameMain"
                     value={currentBuildingForm.name || ''}
                     onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., Sunrise Tower"
+                    placeholder="Building Name"
                     required
                     className="mt-1"
                     disabled={isSaving || !canManageThisForm}
@@ -363,7 +363,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                     id="buildingAddressMain"
                     value={currentBuildingForm.address || ''}
                     onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))}
-                    placeholder="e.g., 123 Main St, Anytown, USA"
+                    placeholder="Building Address"
                     rows={2}
                     className="mt-1"
                     disabled={isSaving || !canManageThisForm}
@@ -377,7 +377,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                           type="text"
-                          placeholder="Search users..."
+                          placeholder="Search users by name or email..."
                           value={managerSearchTerm}
                           onChange={(e) => setManagerSearchTerm(e.target.value)}
                           className="pl-8 h-9"
@@ -447,7 +447,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                           <div>
                               <Label htmlFor={`ruleFeeType-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Fee Type<span className="text-destructive ml-1">*</span></Label>
                               <Select value={uiRule.feeType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as UIPenaltyRule['feeType'])} disabled={isSaving || !canManageThisForm}>
-                                  <SelectTrigger id={`ruleFeeType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue /></SelectTrigger>
+                                  <SelectTrigger id={`ruleFeeType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue placeholder="Select fee type" /></SelectTrigger>
                                   <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
                               </Select>
                           </div>
@@ -463,7 +463,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                           <div>
                               <Label htmlFor={`scopeType-${uiRule.id}`} className="text-xs flex items-center"><Layers className="mr-1 h-3 w-3"/>Scope<span className="text-destructive ml-1">*</span></Label>
                               <Select value={uiRule.scope} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'scope', value as UIPenaltyRule['scope'])} disabled={isSaving || !canManageThisForm}>
-                                  <SelectTrigger id={`scopeType-${uiRule.id}`} className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                                  <SelectTrigger id={`scopeType-${uiRule.id}`} className="mt-1 h-9"><SelectValue placeholder="Select scope" /></SelectTrigger>
                                   <SelectContent>
                                       <SelectItem value="Building">Entire Building</SelectItem>
                                       <SelectItem value="Floor">Specific Floor</SelectItem>
@@ -474,7 +474,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                           {uiRule.scope === 'Floor' && (
                               <div>
                                   <Label htmlFor={`applicableFloor-${uiRule.id}`} className="text-xs">Floor Name<span className="text-destructive ml-1">*</span></Label>
-                                  <Input id={`applicableFloor-${uiRule.id}`} placeholder="e.g., 5th Floor" value={uiRule.applicableFloor || ''}
+                                  <Input id={`applicableFloor-${uiRule.id}`} placeholder="Floor Name" value={uiRule.applicableFloor || ''}
                                           onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableFloor', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
                               </div>
                           )}
@@ -482,7 +482,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                       {uiRule.scope === 'SpecificSpaces' && (
                           <div>
                               <Label htmlFor={`applicableSpaces-${uiRule.id}`} className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)<span className="text-destructive ml-1">*</span></Label>
-                              <Input id={`applicableSpaces-${uiRule.id}`} placeholder="e.g., Unit 10A, Office 202B" value={uiRule.applicableSpaceIdNamesStr || ''}
+                              <Input id={`applicableSpaces-${uiRule.id}`} placeholder="Space ID, e.g., Unit 10A, Office 202B" value={uiRule.applicableSpaceIdNamesStr || ''}
                                       onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableSpaceIdNamesStr', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
                               <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>
                           </div>

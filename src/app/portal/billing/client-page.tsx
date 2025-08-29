@@ -150,7 +150,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="e.g., 251912345678"
+                  placeholder="Enter your phone number"
                   className="text-lg h-12 flex-grow"
                   disabled={isLoading}
                 />

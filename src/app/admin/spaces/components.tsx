@@ -314,15 +314,15 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
               </div>
               <div>
                 <Label htmlFor="spaceIdName">Space ID/Name<span className="text-destructive ml-1">*</span></Label>
-                <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="e.g., Unit 10A, Suite 200" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
+                <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="Space ID/Name" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="area">Area (m²)<span className="text-destructive ml-1">*</span></Label>
-                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 120" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
+                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="Area in square meters" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="floor">Floor<span className="text-destructive ml-1">*</span></Label>
-                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 10th, Ground" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
+                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 1st Floor, Ground" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
               <div>
                 <Label htmlFor="utilityProrationShare">Proration Share (%)<span className="text-destructive ml-1">*</span></Label>
@@ -343,14 +343,14 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                       }
                   }}
                   className="mt-1"
-                  placeholder="e.g., 10"
+                  placeholder="Utility proration share percentage"
                   required
                   disabled={isSaving || (!canCreateSpaces && formMode === 'add') || (!canEditSpaces && formMode === 'edit')}
                 />
               </div>
               <div>
                 <Label htmlFor="monthlyRentalPrice">Monthly Rent<span className="text-destructive ml-1">*</span></Label>
-                <Input id="monthlyRentalPrice" type="number" value={currentSpaceData.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="e.g., 2500" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
+                <Input id="monthlyRentalPrice" type="number" value={currentSpaceData.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="Monthly rental price" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
               </div>
             </div>
             <DialogFooter>

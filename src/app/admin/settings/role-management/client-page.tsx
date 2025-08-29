@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -294,7 +295,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               <div>
                 <FormLabel htmlFor="roleName">Role Name<span className="text-destructive ml-1">*</span></FormLabel>
                 <FormControl>
-                  <Input id="roleName" {...form.register("name")} placeholder="E.g., PROPERTY_MANAGER" className="mt-1" disabled={isSaving || !canManageRoles || (formMode === 'edit' && (currentRoleForForm?.name === 'SUPER_ADMIN' || currentRoleForForm?.name === 'PROPERTY_MANAGER' || currentRoleForForm?.name === 'ACCOUNTANT' || currentRoleForForm?.name === 'SUPPORT_STAFF'))} />
+                  <Input id="roleName" {...form.register("name")} placeholder="ROLE_NAME" className="mt-1" disabled={isSaving || !canManageRoles || (formMode === 'edit' && (currentRoleForForm?.name === 'SUPER_ADMIN' || currentRoleForForm?.name === 'PROPERTY_MANAGER' || currentRoleForForm?.name === 'ACCOUNTANT' || currentRoleForForm?.name === 'SUPPORT_STAFF'))} />
                 </FormControl>
                 <FormMessage>{form.formState.errors.name?.message}</FormMessage>
                 <p className="text-xs text-muted-foreground mt-1">Must be uppercase with underscores (e.g., BILLING_CLERK). System roles (SUPER_ADMIN, PROPERTY_MANAGER, ACCOUNTANT, SUPPORT_STAFF) cannot have their names changed.</p>
@@ -302,7 +303,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               <div>
                 <FormLabel htmlFor="roleDescription">Description (Optional)</FormLabel>
                 <FormControl>
-                  <Textarea id="roleDescription" {...form.register("description")} placeholder="Briefly describe this role's purpose" className="mt-1" rows={2} disabled={isSaving || !canManageRoles}/>
+                  <Textarea id="roleDescription" {...form.register("description")} placeholder="Role description" className="mt-1" rows={2} disabled={isSaving || !canManageRoles}/>
                 </FormControl>
                 <FormMessage>{form.formState.errors.description?.message}</FormMessage>
               </div>

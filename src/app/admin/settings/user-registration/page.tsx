@@ -126,11 +126,11 @@ export default function UserRegistrationPage() {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem> <FormLabel>First Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="John" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Doe" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem> <FormLabel>First Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="First Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Last Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
             </div>
-            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="user@example.com" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="0912345678" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="Email Address" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="Phone Number" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading || !canManageUsersRegistration}>

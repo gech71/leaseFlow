@@ -128,7 +128,7 @@ export default function ForgotPasswordPage() {
                           <Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number
                         </FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="e.g., 0912345678" className="text-base" disabled={isLoading} />
+                          <Input {...field} placeholder="Enter your phone number" className="text-base" disabled={isLoading} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -167,8 +167,8 @@ export default function ForgotPasswordPage() {
                     <Input id="phoneNumberDisplay" value={phoneNumber} readOnly disabled className="bg-muted/50" />
                   </div>
                   
-                  <FormField control={resetPasswordForm.control} name="newPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> New Password</FormLabel> <div className="relative"> <FormControl><Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowNewPassword(!showNewPassword)}> {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
-                  <FormField control={resetPasswordForm.control} name="confirmPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> Confirm New Password</FormLabel> <div className="relative"> <FormControl><Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowConfirmPassword(!showConfirmPassword)}> {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
+                  <FormField control={resetPasswordForm.control} name="newPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> New Password</FormLabel> <div className="relative"> <FormControl><Input type={showNewPassword ? 'text' : 'password'} placeholder="New Password" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowNewPassword(!showNewPassword)}> {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
+                  <FormField control={resetPasswordForm.control} name="confirmPassword" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4" /> Confirm New Password</FormLabel> <div className="relative"> <FormControl><Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm New Password" {...field} /></FormControl> <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowConfirmPassword(!showConfirmPassword)}> {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />} </Button> </div> <FormMessage /> </FormItem> )} />
                   <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base" disabled={isLoading}>
                     {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Reset Password"}
                   </Button>

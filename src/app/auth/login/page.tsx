@@ -174,7 +174,7 @@ export default function AdminLoginPage() {
               <Input 
                 id="phoneNumber" 
                 type="tel" 
-                placeholder="e.g., 0912345678" 
+                placeholder="Enter your phone number" 
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 required 
@@ -192,7 +192,7 @@ export default function AdminLoginPage() {
                 <Input 
                   id="password" 
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••" 
+                  placeholder="Enter your password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required 

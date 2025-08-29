@@ -404,7 +404,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                         <FormItem>
                           <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary"/>Payment Method<span className="text-destructive ml-1">*</span></FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select a payment method" /></SelectTrigger></FormControl>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl>
                             <SelectContent>
                               <SelectItem value="Bank Transfer"><Landmark className="mr-2 h-4 w-4 inline-block"/>Bank Transfer</SelectItem>
                               <SelectItem value="Wallet"><Wallet className="mr-2 h-4 w-4 inline-block"/>Digital Wallet</SelectItem>
@@ -421,7 +421,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="flex items-center"><FileText className="mr-2 h-4 w-4 text-primary"/>Payment Reference<span className="text-destructive ml-1">*</span></FormLabel>
-                                <FormControl><Input placeholder="e.g., Transaction ID, Receipt No." {...field} disabled={isSubmitting}/></FormControl>
+                                <FormControl><Input placeholder="Payment Reference" {...field} disabled={isSubmitting}/></FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -450,7 +450,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="flex items-center"><MessageSquare className="mr-2 h-4 w-4 text-primary"/>Notes (Optional)</FormLabel>
-                                <FormControl><Textarea placeholder="Add any relevant notes for the admin..." {...field} disabled={isSubmitting}/></FormControl>
+                                <FormControl><Textarea placeholder="Notes for the admin..." {...field} disabled={isSubmitting}/></FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -484,7 +484,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                   <FormItem>
                     <FormLabel>Subject</FormLabel>
                     <FormControl>
-                      <Input placeholder="E.g., Question about my bill" {...field} disabled={isSubmitting} />
+                      <Input placeholder="Message subject" {...field} disabled={isSubmitting} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -497,7 +497,7 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                   <FormItem>
                     <FormLabel>Message</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Please type your message here..." {...field} disabled={isSubmitting} rows={6} />
+                      <Textarea placeholder="Your message..." {...field} disabled={isSubmitting} rows={6} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
