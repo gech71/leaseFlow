@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -66,7 +65,7 @@ export function EmailConfigurationClientPage({ initialSmtpUser, initialIsSmtpPas
         <CardHeader>
           <CardTitle>Email Setup Used by Your System</CardTitle>
           <CardDescription>
-            These are the settings the application is currently using. The user is from your environment variables, and the password is secure in the database.
+            These are the settings the application is currently using.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
