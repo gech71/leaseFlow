@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/contexts/PermissionContext';
-import { Loader2, Save, Info, PlusCircle, Edit, Trash2, AlertTriangle, EyeOff } from 'lucide-react';
+import { Loader2, Save, Info, PlusCircle, Edit, Trash2, AlertTriangle, EyeOff, ChevronDown, Eye, Clipboard } from 'lucide-react';
 import { upsertAgreementTemplateAction, deleteAgreementTemplateAction } from './actions';
 import type { AgreementTemplate } from '@prisma/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from 'next/navigation';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const templateFormSchema = z.object({
     name: z.string().min(3, "Template name must be at least 3 characters."),
@@ -59,18 +60,18 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
   });
 
   const placeholders = [
-    { value: '{{tenantName}}', description: "The full name of the tenant." },
-    { value: '{{buildingName}}', description: "The name of the building." },
-    { value: '{{spaceIdName}}', description: "The specific ID or name of the rented space (e.g., 'Unit 101')." },
-    { value: '{{floor}}', description: "The floor the space is on." },
-    { value: '{{area}}', description: "The area of the space in square meters." },
-    { value: '{{startDate}}', description: "The start date of the agreement (e.g., 'January 1, 2024')." },
-    { value: '{{paymentTermMonths}}', description: "The total length of the lease in months." },
-    { value: '{{monthlyRent}}', description: "The monthly rental price (e.g., '5,000.00')." },
-    { value: '{{initialPaymentMonths}}', description: "The number of months paid upfront." },
-    { value: '{{initialPaymentAmount}}', description: "The total initial payment amount (e.g., '10,000.00')." },
-    { value: '{{nextPaymentDueDate}}', description: "The calculated due date for the next regular payment." },
-    { value: '{{additionalTerms}}', description: "Any additional terms entered in the form." },
+    { label: 'Tenant Name', value: '{{tenantName}}', description: "The full name of the tenant." },
+    { label: 'Building Name', value: '{{buildingName}}', description: "The name of the building." },
+    { label: 'Space ID/Name', value: '{{spaceIdName}}', description: "The specific ID of the rented space." },
+    { label: 'Floor', value: '{{floor}}', description: "The floor the space is on." },
+    { label: 'Area (sqm)', value: '{{area}}', description: "The area of the space." },
+    { label: 'Start Date', value: '{{startDate}}', description: "The start date of the agreement." },
+    { label: 'Term (Months)', value: '{{paymentTermMonths}}', description: "The total length of the lease in months." },
+    { label: 'Monthly Rent', value: '{{monthlyRent}}', description: "The monthly rental price." },
+    { label: 'Initial Payment (Months)', value: '{{initialPaymentMonths}}', description: "The number of months paid upfront." },
+    { label: 'Initial Payment Amount', value: '{{initialPaymentAmount}}', description: "The total initial payment amount." },
+    { label: 'Next Payment Due', value: '{{nextPaymentDueDate}}', description: "The next regular payment due date." },
+    { label: 'Additional Terms', value: '{{additionalTerms}}', description: "Any additional terms from the form." },
   ];
 
   const handleOpenAddForm = () => {
@@ -207,17 +208,32 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                 <Card className="h-full hidden md:flex md:flex-col">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Available Placeholders</CardTitle>
-                        <CardDescription className="text-xs">Click a placeholder to copy it to your clipboard.</CardDescription>
+                        <CardDescription className="text-xs">Click the copy button to get the placeholder variable.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-2 overflow-y-auto flex-grow">
-                        {placeholders.map(p => (
-                            <div key={p.value} className="p-2 bg-secondary/30 rounded-md">
-                            <code className="font-semibold text-primary cursor-pointer" onClick={() => { navigator.clipboard.writeText(p.value); toast({ title: "Copied!", description: `${p.value} copied to clipboard.` }); }} >
-                                {p.value}
-                            </code>
-                            <p className="text-xs text-muted-foreground mt-1">{p.description}</p>
-                            </div>
-                        ))}
+                    <CardContent className="flex-grow overflow-y-hidden">
+                        <ScrollArea className="h-full pr-4">
+                          <div className="space-y-2">
+                            {placeholders.map(p => (
+                                <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
+                                    <div>
+                                      <p className="font-semibold text-primary text-sm">{p.label}</p>
+                                      <p className="text-xs text-muted-foreground">{p.description}</p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0 text-muted-foreground"
+                                        onClick={() => { 
+                                            navigator.clipboard.writeText(p.value); 
+                                            toast({ title: "Copied!", description: `${p.value} copied to clipboard.` }); 
+                                        }}
+                                    >
+                                        <Clipboard className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
                     </CardContent>
                 </Card>
             </div>
