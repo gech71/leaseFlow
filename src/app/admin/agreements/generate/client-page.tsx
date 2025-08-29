@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,9 +69,10 @@ type AgreementFormValues = z.infer<typeof agreementFormSchema>;
 interface GenerateAgreementClientPageProps {
   tenants: ClientTenant[];
   availableSpaces: ClientSpace[];
+  initialTemplate: string;
 }
 
-export function GenerateAgreementClientPage({ tenants, availableSpaces }: GenerateAgreementClientPageProps) {
+export function GenerateAgreementClientPage({ tenants, availableSpaces, initialTemplate }: GenerateAgreementClientPageProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSavingToDb, setIsSavingToDb] = useState(false);
@@ -118,6 +119,33 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
 
   useEffect(() => setIsMounted(true), []);
 
+  const generateAgreementTextFromTemplate = useCallback((template: string, data: AgreementFormValues, tenant: ClientTenant, space: ClientSpace) => {
+    const initialPaymentAmount = (space.monthlyRentalPrice * data.initialPaymentMonths).toLocaleString();
+    const nextPaymentDueDate = format(addMonths(data.startDate, data.initialPaymentMonths), 'PPP');
+    
+    let processedText = template;
+    const replacements: Record<string, string> = {
+      '{{tenantName}}': tenant.name,
+      '{{buildingName}}': space.buildingName,
+      '{{spaceIdName}}': space.spaceIdName,
+      '{{floor}}': space.floor,
+      '{{area}}': String(space.area),
+      '{{startDate}}': format(data.startDate, 'PPP'),
+      '{{paymentTermMonths}}': String(data.paymentTermMonths),
+      '{{monthlyRent}}': space.monthlyRentalPrice.toLocaleString(),
+      '{{initialPaymentMonths}}': String(data.initialPaymentMonths),
+      '{{initialPaymentAmount}}': initialPaymentAmount,
+      '{{nextPaymentDueDate}}': nextPaymentDueDate,
+      '{{additionalTerms}}': data.additionalTerms || "No additional terms specified.",
+    };
+
+    for (const key in replacements) {
+      processedText = processedText.replace(new RegExp(key, 'g'), replacements[key]);
+    }
+    
+    return processedText;
+  }, []);
+
   const handlePreviewAgreement = (data: AgreementFormValues) => {
     if (!canCreateAgreements) {
       toast({ title: "Permission Denied", description: "You do not have permission to generate agreement text.", variant: "destructive" });
@@ -138,48 +166,15 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces }: Genera
       return;
     }
 
-    const agreementTemplate = `
-RENTAL AGREEMENT
-
-This Rental Agreement ("Agreement") is made and entered into on ${format(data.startDate, 'PPP')}, by and between the Landlord and the Tenant.
-
-1.  PARTIES
-    -   Tenant: ${selectedTenant.name}
-    -   Landlord: [Landlord Name/Company]
-
-2.  PROPERTY
-    -   Building: ${selectedSpace.buildingName}
-    -   Space: ${selectedSpace.spaceIdName}
-    -   Floor: ${selectedSpace.floor}
-    -   Area: ${selectedSpace.area} m²
-
-3.  TERM
-    This Agreement shall commence on ${format(data.startDate, 'PPP')} and continue for a term of ${data.paymentTermMonths} month(s).
-
-4.  RENT
-    -   Monthly Rent: ${selectedSpace.monthlyRentalPrice.toLocaleString()} Birr
-    -   Initial Payment: An amount equivalent to ${data.initialPaymentMonths} month(s) rent, totaling ${(selectedSpace.monthlyRentalPrice * data.initialPaymentMonths).toLocaleString()} Birr, has been paid upfront.
-    -   Next Payment Due: ${format(addMonths(data.startDate, data.initialPaymentMonths), 'PPP')}
-
-5.  UTILITIES
-    Tenant shall be responsible for a pro-rated share of building utilities as determined by the Landlord's policies and the space's assigned proration share of ${selectedSpace.utilityProrationShare * 100}%.
-
-6.  ADDITIONAL TERMS
-    ${data.additionalTerms || "No additional terms specified."}
-
-7.  GOVERNING LAW
-    This Agreement shall be governed by and construed in accordance with the laws of the applicable jurisdiction.
-
-IN WITNESS WHEREOF, the parties have executed this Agreement as of the date first above written.
-
-_________________________
-Tenant: ${selectedTenant.name}
-
-_________________________
-Landlord/Authorized Representative
-    `;
+    if (!initialTemplate) {
+        toast({ title: "Template Missing", description: "No agreement template found. Please create one in the settings.", variant: "destructive" });
+        setIsPreviewing(false);
+        return;
+    }
     
-    setGeneratedAgreementText(agreementTemplate.trim());
+    const agreementText = generateAgreementTextFromTemplate(initialTemplate, data, selectedTenant, selectedSpace);
+    
+    setGeneratedAgreementText(agreementText.trim());
     toast({ title: "Agreement Preview Generated!", description: "Review the text and proceed to save." });
     setIsPreviewing(false);
   };

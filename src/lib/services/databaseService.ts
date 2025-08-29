@@ -12,7 +12,8 @@ import type {
   PenaltyTier,
   User, 
   Role,
-  Secret
+  Secret,
+  Setting
 } from '@prisma/client';
 
 export class DatabaseService {
@@ -390,6 +391,19 @@ export class DatabaseService {
 
   async setSecret(key: string, value: string): Promise<Secret> {
     return prisma.secret.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
+  }
+
+  // --- Setting ---
+  async getSetting(key: string): Promise<Setting | null> {
+    return prisma.setting.findUnique({ where: { key } });
+  }
+
+  async setSetting(key: string, value: string): Promise<Setting> {
+    return prisma.setting.upsert({
       where: { key },
       update: { value },
       create: { key, value },
