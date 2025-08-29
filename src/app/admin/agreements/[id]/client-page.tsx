@@ -120,8 +120,8 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
           <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Full Agreement Text</h3>
           <ScrollArea className="h-[300px] sm:h-[400px] w-full rounded-md border p-4 bg-secondary/30"> 
             <div 
-              className="prose prose-sm dark:prose-invert" 
-              dangerouslySetInnerHTML={{ __html: agreement.agreementText }} 
+                className="prose prose-sm dark:prose-invert max-w-none" 
+                dangerouslySetInnerHTML={{ __html: agreement.agreementText }} 
             />
           </ScrollArea>
           {agreement.additionalTerms && ( <> <h3 className="text-lg font-semibold mb-2 font-headline mt-4">Additional Terms</h3> <p className="text-sm text-muted-foreground p-4 border rounded-md bg-secondary/30">{agreement.additionalTerms}</p> </> )}

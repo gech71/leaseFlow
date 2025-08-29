@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useRouter } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { RichTextEditor } from '@/components/custom/RichTextEditor';
+import { Textarea } from '@/components/ui/textarea';
 
 const templateFormSchema = z.object({
     name: z.string().min(3, "Template name must be at least 3 characters."),
@@ -203,11 +203,12 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                             name="content"
                             render={({ field }) => (
                                 <FormItem className="flex flex-col flex-grow">
-                                    <FormLabel>Template Content</FormLabel>
+                                    <FormLabel>Template Content (HTML allowed)</FormLabel>
                                     <FormControl>
-                                        <RichTextEditor
-                                            value={field.value}
-                                            onChange={field.onChange}
+                                        <Textarea
+                                            placeholder="Enter your agreement text here. You can use HTML tags like <p>, <b>, <ul>, etc."
+                                            className="h-full"
+                                            {...field}
                                         />
                                     </FormControl>
                                     <FormMessage />
