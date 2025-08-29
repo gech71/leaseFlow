@@ -1,10 +1,11 @@
 
 "use client";
 
-import React from 'react';
-import ReactQuill from 'react-quill';
+import React, { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import 'react-quill/dist/quill.snow.css';
 import './quill-custom.css';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface RichTextEditorProps {
   value: string;
@@ -32,6 +33,12 @@ const modules = {
 
 
 export function RichTextEditor({ value, onChange, readOnly = false }: RichTextEditorProps) {
+  // Use dynamic import for ReactQuill to ensure it only loads on the client side.
+  const ReactQuill = useMemo(() => dynamic(() => import('react-quill'), { 
+    ssr: false,
+    loading: () => <Skeleton className="h-[200px] w-full rounded-md" />,
+  }), []);
+
   return (
     <div className="bg-background rounded-md border border-input">
         <ReactQuill 
