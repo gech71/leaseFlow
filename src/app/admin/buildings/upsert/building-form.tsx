@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock, User, Check, Search } from 'lucide-react';
+import { PlusCircle, Trash2, MapPin, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, Clock, User, Check, Search, Hash } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierTypePrisma, Prisma, User as UserPrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,6 +33,7 @@ interface BuildingFormState {
   id?: string; 
   name: string;
   address: string;
+  accountNumber?: string;
   uiPenaltyRules: UIPenaltyRule[];
 }
 
@@ -41,6 +42,7 @@ export interface BuildingUpsertFormInternalProps {
     id: string;
     name: string;
     address: string | null; 
+    accountNumber: string | null;
     penaltyPolicyTiers: PenaltyTierTypePrisma[];
     managers: { id: string }[];
     createdAt: string; 
@@ -68,7 +70,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
     canManageThisForm = false;
   }
 
-  const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', uiPenaltyRules: [] });
+  const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', accountNumber: '', uiPenaltyRules: [] });
   const [selectedManagerIds, setSelectedManagerIds] = useState<Set<string>>(new Set());
   const [managerSearchTerm, setManagerSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -106,12 +108,13 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         id: initialBuildingData.id,
         name: initialBuildingData.name,
         address: initialBuildingData.address || '',
+        accountNumber: initialBuildingData.accountNumber || '',
         uiPenaltyRules: uiRules,
       });
 
       setSelectedManagerIds(new Set(initialBuildingData.managers.map(m => m.id)));
     } else {
-      setCurrentBuildingForm({ name: '', address: '', uiPenaltyRules: [] });
+      setCurrentBuildingForm({ name: '', address: '', accountNumber: '', uiPenaltyRules: [] });
       setSelectedManagerIds(new Set());
     }
   }, [initialBuildingData]);
@@ -279,6 +282,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       const buildingCreateInput: Prisma.BuildingCreateInput = {
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
+        accountNumber: currentBuildingForm.accountNumber?.trim() || undefined,
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
         },
@@ -291,6 +295,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
+        accountNumber: currentBuildingForm.accountNumber?.trim() || undefined,
         penaltyPolicyTiers: {
           deleteMany: {}, 
           create: finalPenaltyTiersCreateInput, 
@@ -351,6 +356,19 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                     onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Building Name"
                     required
+                    className="mt-1"
+                    disabled={isSaving || !canManageThisForm}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="buildingAccountNumber" className="flex items-center text-sm font-medium">
+                    Account Number (Optional)
+                  </Label>
+                  <Input
+                    id="buildingAccountNumber"
+                    value={currentBuildingForm.accountNumber || ''}
+                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, accountNumber: e.target.value }))}
+                    placeholder="Building Account Number"
                     className="mt-1"
                     disabled={isSaving || !canManageThisForm}
                   />

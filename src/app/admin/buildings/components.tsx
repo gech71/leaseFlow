@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search } from 'lucide-react';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search, Hash } from 'lucide-react';
 import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -55,7 +55,10 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
     <Card key={building.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
       <CardHeader>
         <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
-        {building.address && <CardDescription className="text-sm flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</CardDescription>}
+        <CardDescription className="text-sm flex flex-col gap-1">
+          {building.address && <span className="flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</span>}
+          {building.accountNumber && <span className="flex items-center"><Hash className="mr-1.5 h-4 w-4 text-muted-foreground" />A/C: {building.accountNumber}</span>}
+        </CardDescription>
       </CardHeader>
       <CardContent className="text-sm space-y-2 flex-grow">
            <p className="text-xs text-muted-foreground">Registered: {building.createdAt ? format(new Date(building.createdAt), 'PP') : 'N/A'}</p>

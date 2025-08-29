@@ -14,6 +14,11 @@ export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
     return { success: true, building: newBuilding };
   } catch (error: any) {
     console.error("Error creating building:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2002' && error.meta?.target === 'Building_accountNumber_key') {
+        return { success: false, error: "This account number is already in use by another building." };
+      }
+    }
     return { success: false, error: error.message || "Failed to create building." };
   }
 }
@@ -41,6 +46,9 @@ export async function updateBuildingAction(
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') {
         return { success: false, error: "Failed to update building. Record not found." };
+      }
+      if (error.code === 'P2002' && error.meta?.target === 'Building_accountNumber_key') {
+        return { success: false, error: "This account number is already in use by another building." };
       }
     }
     return { success: false, error: error.message || "Failed to update building." };
