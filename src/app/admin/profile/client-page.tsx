@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { usePermissions } from '@/contexts/PermissionContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -186,6 +187,11 @@ export function AdminProfileClientPage() {
             </form>
           </Form>
         </CardContent>
+        <CardFooter className="pt-4 border-t">
+          <Link href="/auth/forgot-password" passHref>
+            <Button variant="link" className="p-0 h-auto">I forgot my password</Button>
+          </Link>
+        </CardFooter>
       </Card>
     </div>
   );
