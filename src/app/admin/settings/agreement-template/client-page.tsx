@@ -223,7 +223,7 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                 <Card className="h-full hidden md:flex md:flex-col">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Available Placeholders</CardTitle>
-                        <CardDescription className="text-xs">Click the variable name to copy it.</CardDescription>
+                        <CardDescription className="text-xs">Click a placeholder to copy it to your clipboard.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow overflow-y-hidden">
                         <ScrollArea className="h-full pr-4">
@@ -232,19 +232,20 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                                 {placeholders.map(p => (
                                     <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
                                         <div>
-                                            <Button
-                                                variant="link"
-                                                size="sm"
-                                                className="p-0 h-auto font-semibold text-primary"
-                                                onClick={() => { 
-                                                    navigator.clipboard.writeText(p.value); 
-                                                    toast({ title: "Copied!", description: `${p.value} copied to clipboard.` }); 
-                                                }}
-                                            >
-                                                {p.label}
-                                            </Button>
+                                            <p className="font-semibold text-primary">{p.label}</p>
                                             <p className="text-xs text-muted-foreground">{p.description}</p>
                                         </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0"
+                                            onClick={() => { 
+                                                navigator.clipboard.writeText(p.value); 
+                                                toast({ title: "Copied!", description: `Placeholder ${p.value} copied.` }); 
+                                            }}
+                                        >
+                                            <Clipboard className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 ))}
                             </div>
