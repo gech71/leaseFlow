@@ -127,7 +127,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
     };
 
     for (const key in replacements) {
-      processedText = processedText.replace(new RegExp(key, 'g'), replacements[key]);
+      processedText = processedText.replace(new RegExp(key.replace(/{{|}}/g, ''), 'g'), replacements[key]);
     }
     
     return processedText;
@@ -174,18 +174,18 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
     }
     
     const doc = new jsPDF();
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-
-    const textLines = doc.splitTextToSize(generatedAgreementText, 180);
-    doc.text(textLines, 15, 15);
-
-    const tenantName = tenants.find(t => t.id === form.getValues().tenantId)?.name || 'Tenant';
-    const safeTenantName = sanitizeFilename(tenantName);
-
-    doc.save(`Draft-Agreement-${safeTenantName}.pdf`);
-    
-    toast({ title: "Download Started", description: "Your draft agreement PDF is downloading." });
+    doc.html(generatedAgreementText, {
+      callback: function(doc) {
+        const tenantName = tenants.find(t => t.id === form.getValues().tenantId)?.name || 'Tenant';
+        const safeTenantName = sanitizeFilename(tenantName);
+        doc.save(`Draft-Agreement-${safeTenantName}.pdf`);
+        toast({ title: "Download Started", description: "Your draft agreement PDF is downloading." });
+      },
+      x: 15,
+      y: 15,
+      width: 170,
+      windowWidth: 650
+    });
   };
 
   const handleSaveFullAgreement = async () => {
@@ -383,7 +383,12 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
           {generatedAgreementText && !finalizedAgreement && !isPreviewing && !error && (
             <div className="space-y-4">
               <div className="flex items-center text-green-600 bg-green-50 p-3 rounded-md"><CheckCircle className="h-5 w-5 mr-2" /><p className="font-medium">Agreement text generated!</p></div>
-              <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-secondary/30"><pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">{generatedAgreementText}</pre></ScrollArea>
+              <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-secondary/30">
+                <div 
+                  className="prose prose-sm dark:prose-invert max-w-none" 
+                  dangerouslySetInnerHTML={{ __html: generatedAgreementText }} 
+                />
+              </ScrollArea>
                <div className="flex flex-col sm:flex-row gap-2">
                 <Button onClick={handleSaveFullAgreement} disabled={isSavingToDb || isPreviewing || !canCreateAgreements} className="w-full">
                   {isSavingToDb ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Finalize & Save Agreement"}

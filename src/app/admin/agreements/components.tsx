@@ -49,20 +49,9 @@ const renewalFormSchema = z.object({
   paymentTermMonths: z.coerce.number().int().positive({ message: "Term must be a positive number." }).min(1, "Term must be at least 1 month."),
   monthlyRentalPrice: z.coerce.number().positive({ message: "Monthly rent must be a positive number." }),
   initialPaymentMonths: z.coerce.number().int().gte(0, "Initial payment cannot be negative."),
-  initialPaymentMethod: z.string().optional(),
-  initialPaymentReference: z.string().optional(),
-  initialPaymentBankOrWalletName: z.string().optional(),
 }).refine(data => data.initialPaymentMonths <= data.paymentTermMonths, {
   message: "Initial payment months cannot exceed total term months.",
   path: ["initialPaymentMonths"],
-}).refine(data => {
-  if (data.initialPaymentMonths > 0 && !data.initialPaymentMethod) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Payment method is required if there is an initial payment.",
-  path: ["initialPaymentMethod"],
 });
 
 type RenewalFormValues = z.infer<typeof renewalFormSchema>;
@@ -168,18 +157,19 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     }
     
     const doc = new jsPDF();
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
 
-    const textLines = doc.splitTextToSize(agreement.agreementText, 180);
-    doc.text(textLines, 15, 15);
-
-    const tenantName = agreement.tenant?.name || 'UnknownTenant';
-    const safeTenantName = sanitizeFilename(tenantName);
-
-    doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
-    
-    toast({ title: "Download Started", description: "The agreement PDF is downloading." });
+    doc.html(agreement.agreementText, {
+      callback: function (doc) {
+        const tenantName = agreement.tenant?.name || 'UnknownTenant';
+        const safeTenantName = sanitizeFilename(tenantName);
+        doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+        toast({ title: "Download Started", description: "The agreement PDF is downloading." });
+      },
+      x: 15,
+      y: 15,
+      width: 170,
+      windowWidth: 650
+    });
   };
 
   const handleOpenRenewDialog = (agreement: AgreementWithRelations) => {
@@ -193,9 +183,6 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
       paymentTermMonths: agreement.paymentTermMonths,
       monthlyRentalPrice: Number(agreement.monthlyRentalPrice),
       initialPaymentMonths: 1,
-      initialPaymentMethod: "",
-      initialPaymentReference: "",
-      initialPaymentBankOrWalletName: "",
     });
   };
   
@@ -300,12 +287,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                 <FormField control={renewalForm.control} name="monthlyRentalPrice" render={({ field }) => (<FormItem><FormLabel>New Rent<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="Monthly rent amount" {...field} /></FormControl><FormMessage /></FormItem>)} />
               </div>
               <FormField control={renewalForm.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel>Initial Payment (Months)<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} /></FormControl><FormMessage /></FormItem>)} />
-              {renewalForm.watch('initialPaymentMonths') > 0 && (
-                <div className="space-y-4 pt-2 border-t">
-                  <FormField control={renewalForm.control} name="initialPaymentMethod" render={({ field }) => (<FormItem><FormLabel>Payment Method<span className="text-destructive ml-1">*</span></FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method"/></SelectTrigger></FormControl><SelectContent><SelectItem value="Card"><CreditCard className="mr-2 h-4 w-4 inline-block"/>Card</SelectItem><SelectItem value="Cash"><Coins className="mr-2 h-4 w-4 inline-block"/>Cash</SelectItem><SelectItem value="Bank Transfer"><Landmark className="mr-2 h-4 w-4 inline-block"/>Bank Transfer</SelectItem><SelectItem value="Wallet"><Wallet className="mr-2 h-4 w-4 inline-block"/>Digital Wallet</SelectItem><SelectItem value="Other"><HelpCircle className="mr-2 h-4 w-4 inline-block"/>Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                  <FormField control={renewalForm.control} name="initialPaymentReference" render={({ field }) => (<FormItem><FormLabel>Payment Reference</FormLabel><FormControl><Input placeholder="Payment transaction reference" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                </div>
-              )}
+              
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                 <Button type="submit" disabled={isSubmitting}>

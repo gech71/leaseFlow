@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/contexts/PermissionContext';
-import { Loader2, Save, Info, PlusCircle, Edit, Trash2, AlertTriangle, EyeOff, ChevronDown, Eye, Clipboard } from 'lucide-react';
+import { Loader2, Save, Info, PlusCircle, Edit, Trash2, AlertTriangle, EyeOff, ChevronDown, Eye, Clipboard, Bold, Italic, Underline, List } from 'lucide-react';
 import { upsertAgreementTemplateAction, deleteAgreementTemplateAction } from './actions';
 import type { AgreementTemplate } from '@prisma/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -73,6 +73,16 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
     { label: 'Next Payment Due', value: '{{nextPaymentDueDate}}', description: "The next regular payment due date." },
     { label: 'Additional Terms', value: '{{additionalTerms}}', description: "Any additional terms from the form." },
   ];
+  
+  const formattingPlaceholders = [
+    { label: 'Bold Text', value: '<b>Your text here</b>', description: 'Makes text bold.', icon: Bold },
+    { label: 'Italic Text', value: '<i>Your text here</i>', description: 'Makes text italic.', icon: Italic },
+    { label: 'Underline Text', value: '<u>Your text here</u>', description: 'Underlines text.', icon: Underline },
+    { label: 'Paragraph', value: '<p>Your paragraph.</p>', description: 'Creates a new paragraph.', icon: () => <span className="font-bold">P</span> },
+    { label: 'Heading 1', value: '<h1>Your heading</h1>', description: 'Creates a main heading.', icon: () => <span className="font-bold">H1</span> },
+    { label: 'Unordered List', value: '<ul><li>Item 1</li><li>Item 2</li></ul>', description: 'Creates a bulleted list.', icon: List },
+  ];
+
 
   const handleOpenAddForm = () => {
     setFormMode('add');
@@ -192,13 +202,14 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                 <DialogTitle className="text-xl font-headline">{formMode === 'add' ? 'Add New' : 'Edit'} Agreement Template</DialogTitle>
                 <DialogDescription>
                     {formMode === 'add' ? 'Create a new reusable template.' : `Editing the "${currentTemplate?.name}" template.`}
+                    Use HTML for formatting (e.g., &lt;b&gt; for bold).
                 </DialogDescription>
             </DialogHeader>
             <div className="grid md:grid-cols-3 gap-6 py-4 flex-grow overflow-y-hidden">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 md:col-span-2 flex flex-col">
                         <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="e.g., Standard 12-Month Commercial Lease" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                        <FormField control={form.control} name="content" render={({ field }) => ( <FormItem className="flex flex-col flex-grow"> <FormLabel>Template Content</FormLabel> <FormControl><Textarea placeholder="Enter your rental agreement text here..." className="flex-grow resize-none font-mono text-sm" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                        <FormField control={form.control} name="content" render={({ field }) => ( <FormItem className="flex flex-col flex-grow"> <FormLabel>Template Content (HTML Supported)</FormLabel> <FormControl><Textarea placeholder="<h1>Lease Agreement</h1><p>This lease is made between {{tenantName}} and...</p>" className="flex-grow resize-none font-mono text-sm" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                         <DialogFooter className="pt-4 border-t">
                             <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                             <Button type="submit" disabled={isSaving}> {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Template </Button>
@@ -208,31 +219,52 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                 <Card className="h-full hidden md:flex md:flex-col">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Available Placeholders</CardTitle>
-                        <CardDescription className="text-xs">Click the copy button to get the placeholder variable.</CardDescription>
+                        <CardDescription className="text-xs">Click to copy the placeholder variable.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow overflow-y-hidden">
                         <ScrollArea className="h-full pr-4">
-                          <div className="space-y-2">
-                            {placeholders.map(p => (
-                                <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
-                                    <div>
-                                      <p className="font-semibold text-primary text-sm">{p.label}</p>
-                                      <p className="text-xs text-muted-foreground">{p.description}</p>
+                            <div className="space-y-2">
+                                <h4 className="font-semibold text-sm mt-4">Data Fields</h4>
+                                {placeholders.map(p => (
+                                    <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
+                                        <div>
+                                        <p className="font-semibold text-primary text-sm">{p.label}</p>
+                                        <p className="text-xs text-muted-foreground">{p.description}</p>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0 text-muted-foreground"
+                                            onClick={() => { 
+                                                navigator.clipboard.writeText(p.value); 
+                                                toast({ title: "Copied!", description: `${p.value} copied to clipboard.` }); 
+                                            }}
+                                        >
+                                            <Clipboard className="h-4 w-4" />
+                                        </Button>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 shrink-0 text-muted-foreground"
-                                        onClick={() => { 
-                                            navigator.clipboard.writeText(p.value); 
-                                            toast({ title: "Copied!", description: `${p.value} copied to clipboard.` }); 
-                                        }}
-                                    >
-                                        <Clipboard className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                          </div>
+                                ))}
+                                <h4 className="font-semibold text-sm mt-4 pt-2 border-t">Formatting Tags</h4>
+                                {formattingPlaceholders.map(p => (
+                                    <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
+                                        <div>
+                                            <p className="font-semibold text-primary text-sm flex items-center gap-1.5"><p.icon /> {p.label}</p>
+                                            <p className="text-xs text-muted-foreground">{p.description}</p>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 shrink-0 text-muted-foreground"
+                                            onClick={() => { 
+                                                navigator.clipboard.writeText(p.value); 
+                                                toast({ title: "Copied!", description: `HTML tag copied to clipboard.` }); 
+                                            }}
+                                        >
+                                            <Clipboard className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
                         </ScrollArea>
                     </CardContent>
                 </Card>

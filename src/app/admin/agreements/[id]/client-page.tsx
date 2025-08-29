@@ -56,20 +56,22 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
       toast({ title: "Cannot Download", description: "Agreement text is empty or not available.", variant: "destructive"});
       return;
     }
-
+    
     const doc = new jsPDF();
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
     
-    const textLines = doc.splitTextToSize(agreement.agreementText, 180);
-    doc.text(textLines, 15, 15);
-
-    const tenantName = agreement.tenant?.name || 'UnknownTenant';
-    const safeTenantName = sanitizeFilename(tenantName);
-
-    doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
-    
-    toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
+    // Add HTML content to jsPDF
+    doc.html(agreement.agreementText, {
+      callback: function (doc) {
+        const tenantName = agreement.tenant?.name || 'UnknownTenant';
+        const safeTenantName = sanitizeFilename(tenantName);
+        doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+        toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
+      },
+      x: 15,
+      y: 15,
+      width: 170, // A4 width in mm minus margins
+      windowWidth: 650 // An arbitrary number that works well for scaling
+    });
   };
   
   if (!isMounted || !agreement) {
@@ -99,7 +101,7 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
             <div className="flex items-center"><HomeIcon className="mr-2 h-4 w-4 text-primary" /> <strong>Space:</strong> <span className="ml-2">{spaceDescription}</span></div>
             <div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Start Date:</strong> <span className="ml-2">{format(parseISO(agreement.startDate), 'PP')}</span></div>
             <div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Term:</strong> <span className="ml-2">{agreement.paymentTermMonths} months</span></div>
-            <div className="flex items-center"><BanknoteIcon className="mr-2 h-4 w-4 text-primary" /><strong>Monthly Rent:</strong> <span className="ml-2">{agreement.monthlyRentalPrice.toLocaleString()} Birr</span></div>
+            <div className="flex items-center"><BanknoteIcon className="mr-2 h-4 w-4 text-primary" /><strong>Monthly Rent:</strong> <span className="ml-2">{Number(agreement.monthlyRentalPrice).toLocaleString()} Birr</span></div>
             <div className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" /> <strong>Initial Payment:</strong> <span className="ml-2">{agreement.initialPaymentMonths} month(s) upfront</span></div>
             <div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Next Lease Payment:</strong> <span className="ml-2">{format(parseISO(agreement.nextPaymentDueDate), 'PP')}</span></div>
             <div className="flex items-center"><Printer className="mr-2 h-4 w-4 text-primary" /><strong>Generated:</strong> <span className="ml-2">{format(parseISO(agreement.createdAt), 'PPp')}</span></div>
@@ -110,13 +112,18 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
             <>
               <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Initial Payment Details</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-2 text-sm p-4 border rounded-md bg-secondary/30">
-                <div className="flex items-center"><BanknoteIcon className="mr-2 h-4 w-4 text-primary" /> <strong>Amount Paid:</strong> <span className="ml-2">{agreement.initialPaymentAmount.toLocaleString()} Birr</span></div>
+                <div className="flex items-center"><BanknoteIcon className="mr-2 h-4 w-4 text-primary" /> <strong>Amount Paid:</strong> <span className="ml-2">{Number(agreement.initialPaymentAmount).toLocaleString()} Birr</span></div>
                 {agreement.initialPaymentDate && (<div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Payment Date:</strong> <span className="ml-2">{format(parseISO(agreement.initialPaymentDate), 'PPp')}</span></div>)}
               </div>
             </>
           )}
           <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Full Agreement Text</h3>
-          <ScrollArea className="h-[300px] sm:h-[400px] w-full rounded-md border p-4 bg-secondary/30"> <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed"> {agreement.agreementText} </pre> </ScrollArea>
+          <ScrollArea className="h-[300px] sm:h-[400px] w-full rounded-md border p-4 bg-secondary/30"> 
+            <div 
+              className="prose prose-sm dark:prose-invert" 
+              dangerouslySetInnerHTML={{ __html: agreement.agreementText }} 
+            />
+          </ScrollArea>
           {agreement.additionalTerms && ( <> <h3 className="text-lg font-semibold mb-2 font-headline mt-4">Additional Terms</h3> <p className="text-sm text-muted-foreground p-4 border rounded-md bg-secondary/30">{agreement.additionalTerms}</p> </> )}
         </CardContent>
         <CardFooter className="border-t pt-4 flex justify-end">
