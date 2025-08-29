@@ -91,15 +91,13 @@ export async function updateUserDetailsAction(
       return { success: false, error: "Permission denied." };
     }
     
-    const requestHeaders = new Headers(cookies().toString());
-
     // We call our own internal API route, which then calls the external service.
     // This ensures cookies are forwarded correctly.
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/Auth/update-user`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Cookie': cookies().toString(),
+            'Cookie': cookies().toString(), // Correctly pass the cookie string
         },
         body: JSON.stringify({
             userId: userId,
