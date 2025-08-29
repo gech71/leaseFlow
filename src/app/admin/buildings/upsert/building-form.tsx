@@ -33,7 +33,7 @@ interface BuildingFormState {
   id?: string; 
   name: string;
   address: string;
-  accountNumber?: string;
+  accountNumber: string;
   uiPenaltyRules: UIPenaltyRule[];
 }
 
@@ -42,7 +42,7 @@ export interface BuildingUpsertFormInternalProps {
     id: string;
     name: string;
     address: string | null; 
-    accountNumber: string | null;
+    accountNumber: string;
     penaltyPolicyTiers: PenaltyTierTypePrisma[];
     managers: { id: string }[];
     createdAt: string; 
@@ -195,6 +195,13 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       setIsSaving(false);
       return;
     }
+    
+    if (!currentBuildingForm.accountNumber?.trim()) {
+      toast({ title: "Validation Error", description: "Account number is required.", variant: "destructive" });
+      setIsSaving(false);
+      return;
+    }
+
 
     const finalPenaltyTiersCreateInput: Prisma.PenaltyTierCreateWithoutBuildingInput[] = [];
     const groupedUIRules: Record<string, UIPenaltyRule[]> = {};
@@ -282,7 +289,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       const buildingCreateInput: Prisma.BuildingCreateInput = {
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
-        accountNumber: currentBuildingForm.accountNumber?.trim() || undefined,
+        accountNumber: currentBuildingForm.accountNumber!.trim(),
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
         },
@@ -295,7 +302,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: currentBuildingForm.name!.trim(),
         address: currentBuildingForm.address?.trim() || undefined,
-        accountNumber: currentBuildingForm.accountNumber?.trim() || undefined,
+        accountNumber: currentBuildingForm.accountNumber!.trim(),
         penaltyPolicyTiers: {
           deleteMany: {}, 
           create: finalPenaltyTiersCreateInput, 
@@ -362,7 +369,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                 </div>
                 <div>
                   <Label htmlFor="buildingAccountNumber" className="flex items-center text-sm font-medium">
-                    Account Number (Optional)
+                    Account Number<span className="text-destructive ml-1">*</span>
                   </Label>
                   <Input
                     id="buildingAccountNumber"
@@ -370,6 +377,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                     onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, accountNumber: e.target.value }))}
                     placeholder="Building Account Number"
                     className="mt-1"
+                    required
                     disabled={isSaving || !canManageThisForm}
                   />
                 </div>
