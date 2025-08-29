@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Users, ShieldCheck, Mail } from 'lucide-react'; // Added Mail icon
+import { UserPlus, Users, ShieldCheck, Mail, KeyRound } from 'lucide-react'; // Added Mail & KeyRound icons
 import Link from 'next/link';
 
 // This page will act as a hub for different settings.
@@ -87,6 +87,27 @@ export default function SettingsPage() {
           <Link href="/admin/settings/email-configuration" passHref>
             <Button>
               <Mail className="mr-2 h-4 w-4" /> View Configuration
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
+
+       <Card className="flex flex-col">
+        <CardHeader>
+          <CardTitle className="font-headline">Forgot Password</CardTitle>
+          <CardDescription>
+            Initiate the password reset process for an account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow">
+          <p className="text-sm text-muted-foreground mb-4">
+            Use this if you need to recover access to your account via the standard password reset flow.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Link href="/auth/forgot-password" passHref>
+            <Button>
+              <KeyRound className="mr-2 h-4 w-4" /> Reset Password
             </Button>
           </Link>
         </CardFooter>
