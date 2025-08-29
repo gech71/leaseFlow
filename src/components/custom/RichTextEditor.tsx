@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import 'react-quill/dist/quill.snow.css';
 import './quill-custom.css';
@@ -33,23 +33,29 @@ const modules = {
 
 
 export function RichTextEditor({ value, onChange, readOnly = false }: RichTextEditorProps) {
-  // Use dynamic import for ReactQuill to ensure it only loads on the client side.
-  const ReactQuill = useMemo(() => dynamic(() => import('react-quill'), { 
-    ssr: false,
-    loading: () => <Skeleton className="h-[200px] w-full rounded-md" />,
-  }), []);
+  const ReactQuill = useMemo(() => dynamic(() => import('react-quill'), { ssr: false }),[]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
 
   return (
     <div className="bg-background rounded-md border border-input">
-        <ReactQuill 
-          theme="snow" 
-          value={value} 
-          onChange={onChange}
-          readOnly={readOnly}
-          modules={modules}
-          formats={formats}
-          className="rich-text-editor"
-        />
+        {isClient ? (
+            <ReactQuill 
+              theme="snow" 
+              value={value} 
+              onChange={onChange}
+              readOnly={readOnly}
+              modules={modules}
+              formats={formats}
+              className="rich-text-editor"
+            />
+        ) : (
+            <Skeleton className="h-[244px] w-full" />
+        )}
     </div>
   );
 }
