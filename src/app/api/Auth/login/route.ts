@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!externalResponse.ok || !responseData.isSuccess) {
-      const errorMessages = responseData?.errors || ["Invalid credentials or authentication failed."];
+      const errorMessages = responseData?.errors || ["Invalid credentials. Please try again."];
       return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
     }
     
