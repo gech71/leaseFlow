@@ -13,14 +13,13 @@ export async function getAgreementTemplateAction(): Promise<{
   error?: string;
 }> {
   try {
-    const { permissions, isSuperAdmin } = await getUserAndPermissions();
-    // For now, let's assume any admin can view the template setting
-    
+    // Permission checks are handled by middleware for this route.
+    // The server action should focus on its specific task.
     const setting = await databaseService.getSetting(TEMPLATE_KEY);
     return { success: true, template: setting?.value };
   } catch (error: any) {
     console.error("Error fetching agreement template:", error);
-    return { success: false, template: null, error: "Failed to fetch template." };
+    return { success: false, template: null, error: "Failed to fetch template from the database." };
   }
 }
 
