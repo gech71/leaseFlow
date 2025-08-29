@@ -19,11 +19,6 @@ export interface CreateFullAgreementData {
   paymentTermMonths: number;
   initialPaymentMonths: number;
   additionalTerms?: string | null;
-  
-  // Initial Payment details from form
-  initialPaymentMethod: string;
-  initialPaymentReference?: string | null;
-  initialPaymentBankOrWalletName?: string | null;
 }
 
 export async function createFullAgreementAction(input: CreateFullAgreementData) {
@@ -46,9 +41,6 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
           additionalTerms: input.additionalTerms,
           
           initialPaymentAmount: initialPaymentAmount,
-          initialPaymentMethod: input.initialPaymentMethod,
-          initialPaymentReference: input.initialPaymentReference,
-          initialPaymentBankOrWalletName: (input.initialPaymentMethod === "Bank Transfer" || input.initialPaymentMethod === "Wallet") ? input.initialPaymentBankOrWalletName : null,
           initialPaymentDate: startDateObj,
 
           tenant: { connect: { id: input.tenantId } },
@@ -68,12 +60,11 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
             utilityBreakdown: Prisma.JsonNull,
             penaltyAmount: 0,
             totalAmount: initialPaymentAmount,
-            status: 'Pending', // Changed from 'Paid'
-            paymentDate: null, // No payment date on creation
-            paymentMethod: input.initialPaymentMethod, // Record intended method
-            paymentReference: input.initialPaymentReference,
-            bankOrWalletName: (input.initialPaymentMethod === "Bank Transfer" || input.initialPaymentMethod === "Wallet") ? input.initialPaymentBankOrWalletName : null,
-            adminVerifiedPayment: false, // Not verified on creation
+            status: 'Pending', // Not verified on creation
+            paymentDate: null,
+            paymentMethod: null,
+            paymentReference: null,
+            adminVerifiedPayment: false, 
           }
         });
       }

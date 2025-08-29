@@ -49,20 +49,9 @@ const agreementFormSchema = z.object({
   paymentTermMonths: z.coerce.number().int().positive({ message: "Payment term must be a positive number of months." }).min(1, {message: "Term must be at least 1 month."}),
   initialPaymentMonths: z.coerce.number().int().positive({ message: "Initial payment must be a positive number of months." }).min(1, {message: "Initial payment must be at least 1 month."}),
   additionalTerms: z.string().optional(),
-  paymentMethod: z.string().min(1, { message: "Please select a payment method."}),
-  paymentReference: z.string().optional(),
-  bankOrWalletName: z.string().optional(),
 }).refine(data => data.initialPaymentMonths <= data.paymentTermMonths, {
   message: "Initial payment months cannot exceed total payment term months.",
   path: ["initialPaymentMonths"],
-}).refine(data => {
-  if ((data.paymentMethod === "Bank Transfer" || data.paymentMethod === "Wallet") && (!data.bankOrWalletName || data.bankOrWalletName.trim() === "")) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Bank/Wallet name is required for Bank Transfer or Wallet payment methods.",
-  path: ["bankOrWalletName"],
 });
 
 type AgreementFormValues = z.infer<typeof agreementFormSchema>;
@@ -98,15 +87,11 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
       paymentTermMonths: 12,
       initialPaymentMonths: 1,
       additionalTerms: "",
-      paymentMethod: "",
-      paymentReference: "",
-      bankOrWalletName: "",
     },
   });
 
   const selectedSpaceId = form.watch("selectedSpaceId");
   const initialPaymentMonths = form.watch("initialPaymentMonths");
-  const paymentMethod = form.watch("paymentMethod");
 
   const selectedSpaceDetails = useMemo(() => {
     return availableSpaces.find(s => s.id === selectedSpaceId);
@@ -237,9 +222,6 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
       paymentTermMonths: formValues.paymentTermMonths,
       initialPaymentMonths: formValues.initialPaymentMonths,
       additionalTerms: formValues.additionalTerms,
-      initialPaymentMethod: formValues.paymentMethod,
-      initialPaymentReference: formValues.paymentReference,
-      initialPaymentBankOrWalletName: formValues.bankOrWalletName,
     };
     
     const result = await createFullAgreementAction(agreementDataForDb);
@@ -373,29 +355,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
                   <p className="text-xs text-muted-foreground">({initialPaymentMonths} month(s) upfront based on selected space)</p>
                 </div>
               )}
-              <FormField control={form.control} name="paymentMethod" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary" />Initial Payment Method<span className="text-destructive ml-1">*</span></FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}><FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="Card"><CreditCard className="mr-2 h-4 w-4 inline-block"/>Card</SelectItem>
-                        <SelectItem value="Cash"><Coins className="mr-2 h-4 w-4 inline-block"/>Cash</SelectItem>
-                        <SelectItem value="Bank Transfer"><Landmark className="mr-2 h-4 w-4 inline-block"/>Bank Transfer</SelectItem>
-                        <SelectItem value="Wallet"><Wallet className="mr-2 h-4 w-4 inline-block"/>Digital Wallet</SelectItem>
-                        <SelectItem value="Other"><HelpCircle className="mr-2 h-4 w-4 inline-block"/>Other</SelectItem>
-                      </SelectContent>
-                    </Select><FormMessage />
-                  </FormItem>
-              )}/>
-              {(paymentMethod === "Bank Transfer" || paymentMethod === "Wallet") && (
-                 <FormField control={form.control} name="bankOrWalletName" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center"> {paymentMethod === "Bank Transfer" ? <Landmark className="mr-2 h-4 w-4 text-primary"/> : <Wallet className="mr-2 h-4 w-4 text-primary"/>} {paymentMethod === "Bank Transfer" ? "Bank Name" : "Wallet Provider"} <span className="text-destructive ml-1">*</span></FormLabel>
-                      <FormControl><Input placeholder={`Enter ${paymentMethod === "Bank Transfer" ? "bank name" : "wallet provider"}`} {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage />
-                    </FormItem>
-                  )}/>
-              )}
-              <FormField control={form.control} name="paymentReference" render={({ field }) => (<FormItem><FormLabel>Payment Reference (Optional)</FormLabel><FormControl><Input placeholder="Transaction ID, Check No., etc." {...field} disabled={!canCreateAgreements}/></FormControl><FormMessage /></FormItem>)}/>
+             
               <FormField control={form.control} name="additionalTerms" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Additional Terms for Agreement (Optional)</FormLabel>

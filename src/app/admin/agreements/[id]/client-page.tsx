@@ -71,15 +71,6 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
     
     toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
   };
-
-  const getPaymentMethodIcon = (method?: string | null) => {
-    if (!method) return HelpCircle;
-    if (method.toLowerCase().includes('card')) return CreditCard;
-    if (method.toLowerCase().includes('bank')) return Landmark;
-    if (method.toLowerCase().includes('wallet')) return Wallet;
-    if (method.toLowerCase().includes('cash')) return Coins;
-    return HelpCircle;
-  }
   
   if (!isMounted || !agreement) {
     return (
@@ -120,9 +111,6 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
               <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Initial Payment Details</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-2 text-sm p-4 border rounded-md bg-secondary/30">
                 <div className="flex items-center"><BanknoteIcon className="mr-2 h-4 w-4 text-primary" /> <strong>Amount Paid:</strong> <span className="ml-2">{agreement.initialPaymentAmount.toLocaleString()} Birr</span></div>
-                {agreement.initialPaymentMethod && (<div className="flex items-center">{React.createElement(getPaymentMethodIcon(agreement.initialPaymentMethod), { className: "mr-2 h-4 w-4 text-primary" })}<strong>Method:</strong> <span className="ml-2">{agreement.initialPaymentMethod}</span></div>)}
-                {agreement.initialPaymentBankOrWalletName && (<div className="flex items-center"><Landmark className="mr-2 h-4 w-4 text-primary" /> <strong>Bank/Wallet:</strong> <span className="ml-2">{agreement.initialPaymentBankOrWalletName}</span></div>)}
-                {agreement.initialPaymentReference && (<div className="flex items-center"><Sigma className="mr-2 h-4 w-4 text-primary" /> <strong>Reference:</strong> <span className="ml-2">{agreement.initialPaymentReference}</span></div>)}
                 {agreement.initialPaymentDate && (<div className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <strong>Payment Date:</strong> <span className="ml-2">{format(parseISO(agreement.initialPaymentDate), 'PPp')}</span></div>)}
               </div>
             </>
