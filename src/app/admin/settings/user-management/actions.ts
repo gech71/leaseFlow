@@ -75,3 +75,48 @@ export async function updateUserAssignments(
     return { success: false, error: errorMessage };
   }
 }
+
+
+export async function updateUserDetailsAction(
+  userId: string,
+  data: {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
+      return { success: false, error: "Permission denied." };
+    }
+    
+    const requestHeaders = new Headers(cookies().toString());
+
+    // We call our own internal API route, which then calls the external service.
+    // This ensures cookies are forwarded correctly.
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/Auth/update-user`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Cookie': cookies().toString(),
+        },
+        body: JSON.stringify({
+            userId: userId,
+            ...data
+        })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ errors: ["Failed to update user."] }));
+        return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred.' };
+    }
+
+    revalidatePath('/admin/settings/user-management');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error in updateUserDetailsAction:", error);
+    return { success: false, error: error.message || "Failed to update user details." };
+  }
+}
