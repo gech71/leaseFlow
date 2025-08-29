@@ -1,25 +1,26 @@
+
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AgreementTemplateClientPage } from './client-page';
-import { getAgreementTemplateAction } from './actions';
+import { getAllAgreementTemplatesAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
 async function AgreementTemplateDataFetcher() {
-    const { success, template, error } = await getAgreementTemplateAction();
-    return <AgreementTemplateClientPage initialTemplate={template} error={error} />;
+    const { success, templates, error } = await getAllAgreementTemplatesAction();
+    return <AgreementTemplateClientPage initialTemplates={templates || []} error={error} />;
 }
 
 export default function AgreementTemplatePage() {
   return (
     <div className="animate-fadeIn">
       <PageHeader
-        title="Agreement Template"
+        title="Agreement Templates"
         icon={FileText}
-        description="Edit the default rental agreement template used for all new leases."
+        description="Create and manage reusable rental agreement templates for generating new leases."
         actions={
           <Link href="/admin/settings" passHref>
             <Button variant="outline">

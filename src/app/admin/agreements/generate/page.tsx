@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { FileText, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Tenant, Space, Prisma, User, Role } from '@prisma/client'; // For server-side fetching
+import type { Tenant, Space, Prisma, User, Role, AgreementTemplate } from '@prisma/client'; // For server-side fetching
 import { GenerateAgreementClientPage } from './client-page'; // Import the new client component
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
@@ -19,7 +19,7 @@ export default function GenerateAgreementPage() {
     <div className="animate-fadeIn">
        <PageHeader
         title="Generate Rental Agreement"
-        description="Select tenant and space, generate agreement text, then save the complete record."
+        description="Select a template, tenant, and space, then generate and save the complete record."
         actions={
             <Link href="/admin/agreements" passHref>
                 <Button variant="outline">
@@ -57,8 +57,7 @@ async function GenerateAgreementDataFetcher() {
 
   const tenants = await databaseService.getAllTenants({ where: tenantWhereClause, orderBy: { name: 'asc' }});
   const availableSpaces = await databaseService.getAllSpaces({ where: spaceWhereClause, orderBy: [{buildingName: 'asc'},{spaceIdName: 'asc'}] });
-  const agreementTemplateSetting = await databaseService.getSetting('agreementTemplate');
-  const agreementTemplate = agreementTemplateSetting?.value || '';
+  const agreementTemplates = await databaseService.getAllAgreementTemplates({ orderBy: { name: 'asc' } });
 
   // Serialize dates before passing to client component
   const serializableTenants = tenants.map(t => ({
@@ -75,5 +74,5 @@ async function GenerateAgreementDataFetcher() {
     updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString() // Fallback for updatedAt
   }));
   
-  return <GenerateAgreementClientPage tenants={serializableTenants} availableSpaces={serializableSpaces} initialTemplate={agreementTemplate} />;
+  return <GenerateAgreementClientPage tenants={serializableTenants} availableSpaces={serializableSpaces} agreementTemplates={agreementTemplates} />;
 }

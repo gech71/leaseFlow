@@ -13,7 +13,7 @@ import type {
   User, 
   Role,
   Secret,
-  Setting
+  AgreementTemplate
 } from '@prisma/client';
 
 export class DatabaseService {
@@ -397,20 +397,29 @@ export class DatabaseService {
     });
   }
 
-  // --- Setting ---
-  async getSetting(key: string): Promise<Setting | null> {
-    return prisma.setting.findUnique({ where: { key } });
+  // --- AgreementTemplate ---
+  async createAgreementTemplate(data: Prisma.AgreementTemplateCreateInput): Promise<AgreementTemplate> {
+    return prisma.agreementTemplate.create({ data });
   }
 
-  async setSetting(key: string, value: string): Promise<Setting> {
-    return prisma.setting.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value },
-    });
+  async getAgreementTemplateById(id: string): Promise<AgreementTemplate | null> {
+    return prisma.agreementTemplate.findUnique({ where: { id } });
+  }
+
+  async getAllAgreementTemplates(params?: {
+    where?: Prisma.AgreementTemplateWhereInput;
+    orderBy?: Prisma.AgreementTemplateOrderByWithRelationInput | Prisma.AgreementTemplateOrderByWithRelationInput[];
+  }): Promise<AgreementTemplate[]> {
+    return prisma.agreementTemplate.findMany(params);
+  }
+
+  async updateAgreementTemplate(id: string, data: Prisma.AgreementTemplateUpdateInput): Promise<AgreementTemplate> {
+    return prisma.agreementTemplate.update({ where: { id }, data });
+  }
+
+  async deleteAgreementTemplate(id: string): Promise<AgreementTemplate> {
+    return prisma.agreementTemplate.delete({ where: { id } });
   }
 }
 
 export const databaseService = new DatabaseService();
-
-    

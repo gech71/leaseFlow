@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Users, ShieldCheck, Mail, KeyRound, FileText } from 'lucide-react'; // Added FileText
+import { UserPlus, Users, ShieldCheck, Mail, KeyRound, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 // This page will act as a hub for different settings.
@@ -71,6 +71,27 @@ export default function SettingsPage() {
           </Link>
         </CardFooter>
       </Card>
+      
+       <Card className="flex flex-col">
+        <CardHeader>
+          <CardTitle className="font-headline">Agreement Templates</CardTitle>
+          <CardDescription>
+            Manage reusable templates for generating new lease agreements.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow">
+          <p className="text-sm text-muted-foreground mb-4">
+            Create and edit standard agreement text. Use placeholders to automatically insert details during generation.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Link href="/admin/settings/agreement-template" passHref>
+            <Button>
+              <FileText className="mr-2 h-4 w-4" /> Manage Templates
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
 
       <Card className="flex flex-col">
         <CardHeader>
@@ -88,27 +109,6 @@ export default function SettingsPage() {
           <Link href="/admin/settings/email-configuration" passHref>
             <Button>
               <Mail className="mr-2 h-4 w-4" /> View Configuration
-            </Button>
-          </Link>
-        </CardFooter>
-      </Card>
-
-      <Card className="flex flex-col">
-        <CardHeader>
-          <CardTitle className="font-headline">Agreement Template</CardTitle>
-          <CardDescription>
-            Define the standard rental agreement template for generating new leases.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-grow">
-          <p className="text-sm text-muted-foreground mb-4">
-            Use placeholders like {'{{tenantName}}'} to automatically insert details. This template will be used on the agreement generation page.
-          </p>
-        </CardContent>
-        <CardFooter>
-          <Link href="/admin/settings/agreement-template" passHref>
-            <Button>
-              <FileText className="mr-2 h-4 w-4" /> Manage Template
             </Button>
           </Link>
         </CardFooter>

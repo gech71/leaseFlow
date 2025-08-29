@@ -184,14 +184,14 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
 
   const handleOpenRenewDialog = (agreement: AgreementWithRelations) => {
     if (!canEditAgreements) {
-      toast({ title: "Permission Denied", description: "You do not have permission to renew agreements.", variant: "destructive" });
+      toast({ title: "Permission Denied", description: "You do not have permission to edit agreements.", variant: "destructive" });
       return;
     }
     setAgreementToRenew(agreement);
     renewalForm.reset({
       startDate: addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths),
       paymentTermMonths: agreement.paymentTermMonths,
-      monthlyRentalPrice: agreement.monthlyRentalPrice,
+      monthlyRentalPrice: Number(agreement.monthlyRentalPrice),
       initialPaymentMonths: 1,
       initialPaymentMethod: "",
       initialPaymentReference: "",
@@ -206,16 +206,17 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     const result = await updateAgreementAction(agreementToRenew.id, {
       ...values,
       startDate: values.startDate.toISOString(),
+      monthlyRentalPrice: Number(values.monthlyRentalPrice),
     });
 
     setIsSubmitting(false);
 
     if (result.success) {
-      toast({ title: "Agreement Renewed", description: "The agreement has been successfully updated." });
+      toast({ title: "Agreement Updated", description: "The agreement has been successfully updated." });
       setAgreementToRenew(null);
       router.refresh();
     } else {
-      toast({ title: "Error Renewing Agreement", description: result.error, variant: "destructive" });
+      toast({ title: "Error Updating Agreement", description: result.error, variant: "destructive" });
     }
   };
 
@@ -286,7 +287,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
       <Dialog open={!!agreementToRenew} onOpenChange={() => setAgreementToRenew(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Renew Agreement</DialogTitle>
+            <DialogTitle>Renew / Edit Agreement</DialogTitle>
             <DialogDescription>
               Update the terms for {agreementToRenew?.tenant?.name}. A new bill will be created for any initial payment.
             </DialogDescription>
@@ -308,7 +309,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Renew
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Renew / Save
                 </Button>
               </DialogFooter>
             </form>
@@ -351,7 +352,7 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                   <CardContent className="text-sm space-y-1.5">
                     <p><strong>Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
                     <p><strong>End Date:</strong> {format(agreementEndDate, 'PP')}</p>
-                    <p><strong>Rent:</strong> {agreement.monthlyRentalPrice.toLocaleString()} Birr/month</p>
+                    <p><strong>Rent:</strong> {Number(agreement.monthlyRentalPrice).toLocaleString()} Birr/month</p>
                     <p><strong>Term:</strong> {agreement.paymentTermMonths} months</p>
                     <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
                     <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
@@ -371,15 +372,15 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
                           <TooltipContent><p>View Agreement</p></TooltipContent>
                         </Tooltip>
                       )}
-                      {eligibleForRenewal && canEditAgreements && (
+                      {canEditAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRenewDialog(agreement)}>
                               <RefreshCw className="h-4 w-4 text-purple-600" />
-                              <span className="sr-only">Renew Agreement</span>
+                              <span className="sr-only">Renew / Edit Agreement</span>
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent><p>Renew Agreement</p></TooltipContent>
+                          <TooltipContent><p>Renew / Edit</p></TooltipContent>
                         </Tooltip>
                       )}
                       <Tooltip>

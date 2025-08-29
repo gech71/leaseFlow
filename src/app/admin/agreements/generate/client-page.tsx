@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, User, Home, Loader2, AlertTriangle, CheckCircle, Eye, CalendarClock, Sigma, CreditCard, Landmark, Wallet, Coins, HelpCircle, Info, CalendarDays, EyeOff, Download } from 'lucide-react';
-import type { Space as SpacePrismaType, Tenant as TenantPrismaType, Agreement as AgreementPrismaType } from '@prisma/client';
+import type { Space as SpacePrismaType, Tenant as TenantPrismaType, Agreement as AgreementPrismaType, AgreementTemplate } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { createFullAgreementAction, type CreateFullAgreementData } from '../actions';
 import { z } from 'zod';
@@ -44,6 +44,7 @@ interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt'> {
 const agreementFormSchema = z.object({
   tenantId: z.string().min(1, { message: "Please select a tenant." }),
   selectedSpaceId: z.string().min(1, { message: "Please select a space." }),
+  templateId: z.string().min(1, { message: "Please select an agreement template." }),
   startDate: z.date({ required_error: "Agreement start date is required."}),
   paymentTermMonths: z.coerce.number().int().positive({ message: "Payment term must be a positive number of months." }).min(1, {message: "Term must be at least 1 month."}),
   initialPaymentMonths: z.coerce.number().int().positive({ message: "Initial payment must be a positive number of months." }).min(1, {message: "Initial payment must be at least 1 month."}),
@@ -69,10 +70,10 @@ type AgreementFormValues = z.infer<typeof agreementFormSchema>;
 interface GenerateAgreementClientPageProps {
   tenants: ClientTenant[];
   availableSpaces: ClientSpace[];
-  initialTemplate: string;
+  agreementTemplates: AgreementTemplate[];
 }
 
-export function GenerateAgreementClientPage({ tenants, availableSpaces, initialTemplate }: GenerateAgreementClientPageProps) {
+export function GenerateAgreementClientPage({ tenants, availableSpaces, agreementTemplates }: GenerateAgreementClientPageProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSavingToDb, setIsSavingToDb] = useState(false);
@@ -92,6 +93,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
     defaultValues: {
       tenantId: "",
       selectedSpaceId: "",
+      templateId: "",
       startDate: new Date(),
       paymentTermMonths: 12,
       initialPaymentMonths: 1,
@@ -112,7 +114,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
 
   const calculatedInitialPaymentAmount = useMemo(() => {
     if (selectedSpaceDetails && initialPaymentMonths >= 0) {
-      return selectedSpaceDetails.monthlyRentalPrice * initialPaymentMonths;
+      return Number(selectedSpaceDetails.monthlyRentalPrice) * initialPaymentMonths;
     }
     return 0;
   }, [selectedSpaceDetails, initialPaymentMonths]);
@@ -120,7 +122,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
   useEffect(() => setIsMounted(true), []);
 
   const generateAgreementTextFromTemplate = useCallback((template: string, data: AgreementFormValues, tenant: ClientTenant, space: ClientSpace) => {
-    const initialPaymentAmount = (space.monthlyRentalPrice * data.initialPaymentMonths).toLocaleString();
+    const initialPaymentAmount = (Number(space.monthlyRentalPrice) * data.initialPaymentMonths).toLocaleString();
     const nextPaymentDueDate = format(addMonths(data.startDate, data.initialPaymentMonths), 'PPP');
     
     let processedText = template;
@@ -132,7 +134,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
       '{{area}}': String(space.area),
       '{{startDate}}': format(data.startDate, 'PPP'),
       '{{paymentTermMonths}}': String(data.paymentTermMonths),
-      '{{monthlyRent}}': space.monthlyRentalPrice.toLocaleString(),
+      '{{monthlyRent}}': Number(space.monthlyRentalPrice).toLocaleString(),
       '{{initialPaymentMonths}}': String(data.initialPaymentMonths),
       '{{initialPaymentAmount}}': initialPaymentAmount,
       '{{nextPaymentDueDate}}': nextPaymentDueDate,
@@ -159,6 +161,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
 
     const selectedTenant = tenants.find(t => t.id === data.tenantId);
     const selectedSpace = availableSpaces.find(s => s.id === data.selectedSpaceId);
+    const selectedTemplate = agreementTemplates.find(t => t.id === data.templateId);
 
     if (!selectedTenant || !selectedSpace) {
       toast({ title: "Error", description: "Selected tenant or space not found.", variant: "destructive" });
@@ -166,13 +169,13 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
       return;
     }
 
-    if (!initialTemplate) {
-        toast({ title: "Template Missing", description: "No agreement template found. Please create one in the settings.", variant: "destructive" });
+    if (!selectedTemplate) {
+        toast({ title: "Template Missing", description: "Please select an agreement template.", variant: "destructive" });
         setIsPreviewing(false);
         return;
     }
     
-    const agreementText = generateAgreementTextFromTemplate(initialTemplate, data, selectedTenant, selectedSpace);
+    const agreementText = generateAgreementTextFromTemplate(selectedTemplate.content, data, selectedTenant, selectedSpace);
     
     setGeneratedAgreementText(agreementText.trim());
     toast({ title: "Agreement Preview Generated!", description: "Review the text and proceed to save." });
@@ -230,7 +233,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
       spaceId: selectedSpace.id,
       agreementText: generatedAgreementText,
       startDate: formValues.startDate.toISOString(),
-      monthlyRentalPrice: selectedSpace.monthlyRentalPrice,
+      monthlyRentalPrice: Number(selectedSpace.monthlyRentalPrice),
       paymentTermMonths: formValues.paymentTermMonths,
       initialPaymentMonths: formValues.initialPaymentMonths,
       additionalTerms: formValues.additionalTerms,
@@ -278,6 +281,24 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
             <form onSubmit={form.handleSubmit(handlePreviewAgreement)} className="space-y-6">
               <FormField
                 control={form.control}
+                name="templateId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center"><FileText className="mr-2 h-4 w-4 text-primary" />Select Agreement Template<span className="text-destructive ml-1">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!canCreateAgreements}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Choose a template" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {agreementTemplates.length > 0 ? agreementTemplates.map(template => (
+                          <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                        )) : (<SelectItem value="no-templates" disabled>No templates found. Go to settings to create one.</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="tenantId"
                 render={({ field }) => (
                   <FormItem>
@@ -305,7 +326,7 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, initialT
                       <SelectContent>
                         {availableSpaces.length > 0 ? availableSpaces.map(space => (
                           <SelectItem key={space.id} value={space.id}>
-                            {space.spaceIdName} ({space.buildingName}) - {space.monthlyRentalPrice.toLocaleString()} Birr
+                            {space.spaceIdName} ({space.buildingName}) - {Number(space.monthlyRentalPrice).toLocaleString()} Birr
                           </SelectItem>
                         )) : (<SelectItem value="no-spaces" disabled>No available spaces</SelectItem>)}
                       </SelectContent>
