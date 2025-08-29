@@ -5,7 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type User, type Role } from '@prisma/client';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import { prisma } from '@/lib/prisma';
 
@@ -93,11 +93,19 @@ export async function updateUserDetailsAction(
     
     // We call our own internal API route, which then calls the external service.
     // This ensures cookies are forwarded correctly.
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/Auth/update-user`, {
+    const requestHeaders = await headers(); // Get headers from the incoming request
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+    if (!baseUrl) {
+      console.error("Error updating user details: NEXT_PUBLIC_BASE_URL is not set.");
+      return { success: false, error: "Application base URL is not configured." };
+    }
+    
+    const response = await fetch(`${baseUrl}/api/Auth/update-user`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Cookie': cookies().toString(), // Correctly pass the cookie string
+            'Cookie': requestHeaders.get('Cookie') || "", // Forward the cookie
         },
         body: JSON.stringify({
             userId: userId,
