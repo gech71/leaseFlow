@@ -36,6 +36,7 @@ export interface ClientUserWithAssignments extends Omit<UserPrisma, 'createdAt' 
   updatedAt?: string | null;
   roles: ClientRole[];
   managedBuildings: ClientBuildingForAssignment[];
+  tempPassword?: string | null;
 }
 
 interface UserManagementClientPageProps {
