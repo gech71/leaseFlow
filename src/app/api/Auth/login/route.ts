@@ -62,7 +62,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!externalResponse.ok || !responseData.isSuccess) {
-      const errorMessages = responseData?.errors || ["Invalid credentials. Please try again."];
+      // This is the corrected part. Always return a generic error.
+      const errorMessages = ["Invalid credentials. Please try again."];
       return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalResponse.status });
     }
     
