@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -101,7 +102,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="flex-grow">
           <p className="text-sm text-muted-foreground mb-4">
-            Use placeholders like `{{tenantName}}` to automatically insert details. This template will be used on the agreement generation page.
+            Use placeholders like {'{{tenantName}}'} to automatically insert details. This template will be used on the agreement generation page.
           </p>
         </CardContent>
         <CardFooter>
