@@ -68,6 +68,9 @@ async function GenerateAgreementDataFetcher() {
   }));
   const serializableSpaces = availableSpaces.map(s => ({
     ...s,
+    area: Number(s.area),
+    utilityProrationShare: Number(s.utilityProrationShare),
+    monthlyRentalPrice: Number(s.monthlyRentalPrice),
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString() // Fallback for updatedAt
   }));

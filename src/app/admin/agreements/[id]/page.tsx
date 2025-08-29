@@ -36,6 +36,8 @@ export default async function ViewAgreementPage({ params }: { params: { id: stri
     const fallbackDate = new Date(0).toISOString(); // Use epoch as a fallback for any null dates
     serializableAgreement = {
       ...agreementData,
+      monthlyRentalPrice: Number(agreementData.monthlyRentalPrice),
+      initialPaymentAmount: agreementData.initialPaymentAmount ? Number(agreementData.initialPaymentAmount) : null,
       startDate: agreementData.startDate?.toISOString() || fallbackDate,
       nextPaymentDueDate: agreementData.nextPaymentDueDate?.toISOString() || fallbackDate,
       createdAt: agreementData.createdAt?.toISOString() || fallbackDate,
@@ -47,7 +49,10 @@ export default async function ViewAgreementPage({ params }: { params: { id: stri
         updatedAt: agreementData.tenant.updatedAt?.toISOString() || agreementData.tenant.createdAt?.toISOString() || fallbackDate
       } : null,
       space: agreementData.space ? { 
-        ...agreementData.space, 
+        ...agreementData.space,
+        area: Number(agreementData.space.area),
+        utilityProrationShare: Number(agreementData.space.utilityProrationShare),
+        monthlyRentalPrice: Number(agreementData.space.monthlyRentalPrice),
         createdAt: agreementData.space.createdAt?.toISOString() || fallbackDate, 
         updatedAt: agreementData.space.updatedAt?.toISOString() || agreementData.space.createdAt?.toISOString() || fallbackDate
       } : null,

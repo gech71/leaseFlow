@@ -40,6 +40,9 @@ export default async function SpacesPage() {
     
     return {
       ...space,
+      area: Number(space.area),
+      utilityProrationShare: Number(space.utilityProrationShare),
+      monthlyRentalPrice: Number(space.monthlyRentalPrice),
       createdAt: space.createdAt.toISOString(),
       updatedAt: space.updatedAt?.toISOString() || new Date().toISOString(), 
       buildingName: space.building.name,

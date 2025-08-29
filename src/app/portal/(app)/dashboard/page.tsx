@@ -17,6 +17,8 @@ const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWit
 
   return {
     ...agreementWithParsedUtilities,
+    monthlyRentalPrice: Number(agreementWithParsedUtilities.monthlyRentalPrice),
+    initialPaymentAmount: agreementWithParsedUtilities.initialPaymentAmount ? Number(agreementWithParsedUtilities.initialPaymentAmount) : null,
     createdAt: agreementWithParsedUtilities.createdAt?.toISOString() || EPOCH_ISO_STRING,
     updatedAt: agreementWithParsedUtilities.updatedAt?.toISOString() || agreementWithParsedUtilities.createdAt?.toISOString() || EPOCH_ISO_STRING,
     startDate: agreementWithParsedUtilities.startDate?.toISOString() || EPOCH_ISO_STRING,
@@ -30,17 +32,23 @@ const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWit
     } : ({} as ClientTenant), 
     space: space ? {
       ...space,
+      area: Number(space.area),
+      utilityProrationShare: Number(space.utilityProrationShare),
+      monthlyRentalPrice: Number(space.monthlyRentalPrice),
       createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
       updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || EPOCH_ISO_STRING,
       building: building ? {
         ...building,
         createdAt: building.createdAt?.toISOString() || EPOCH_ISO_STRING,
         updatedAt: building.updatedAt?.toISOString() || building.createdAt?.toISOString() || EPOCH_ISO_STRING,
-        penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt })) || [],
+        penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt, feeValue: Number(pt.feeValue) })) || [],
       } : ({} as ClientBuilding),
     } : ({} as ClientSpace), 
     bills: (agreementWithParsedUtilities.bills || []).map(bill => ({
       ...bill,
+      rentAmount: Number(bill.rentAmount),
+      penaltyAmount: bill.penaltyAmount ? Number(bill.penaltyAmount) : null,
+      totalAmount: Number(bill.totalAmount),
       createdAt: bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
       updatedAt: bill.updatedAt?.toISOString() || bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
       billDate: bill.billDate?.toISOString() || EPOCH_ISO_STRING,

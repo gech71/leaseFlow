@@ -1,3 +1,4 @@
+
 'use server';
 
 import { databaseService } from '@/lib/services/databaseService';
@@ -87,7 +88,7 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
       buildingId: u.buildingId,
       year: u.year,
       month: u.month,
-      totalCost: u.utilities.reduce((sum, item) => sum + item.totalCost, 0),
+      totalCost: u.utilities.reduce((sum, item) => sum + Number(item.totalCost), 0),
     }));
 
     // Serialize dates for client components
@@ -98,14 +99,20 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
 
     const allBills = allBillsData.map(b => ({
         ...b,
+        totalAmount: Number(b.totalAmount),
         billDate: b.billDate.toISOString(),
         paymentDate: b.paymentDate?.toISOString() || null,
+    }));
+    
+    const spaces = spacesData.map(s => ({
+        ...s,
+        area: Number(s.area)
     }));
 
 
     return {
       buildings: buildingsData,
-      spaces: spacesData,
+      spaces,
       agreements,
       allBills,
       allUtilities,

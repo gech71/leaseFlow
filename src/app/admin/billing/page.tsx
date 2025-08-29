@@ -18,13 +18,19 @@ export interface SerializedParsedUtilityItem {
 // Client-side representation types, dates as strings
 // These types should match the structure of serialized data passed from Server Components
 
-interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id'> { id?: string; } 
+interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id' | 'feeValue'> { 
+  id?: string; 
+  feeValue: number;
+} 
 
-interface ClientSpaceForBuilding extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant' | 'building'> {
+interface ClientSpaceForBuilding extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant' | 'building' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
   createdAt: string;
   updatedAt: string;
   tenantId?: string | null;
   buildingId: string;
+  area: number;
+  utilityProrationShare: number;
+  monthlyRentalPrice: number;
 }
 
 interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers' | 'spaces' | 'buildingMonthlyUtilities'> {
@@ -35,12 +41,15 @@ interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updated
 }
 
 
-interface ClientSpaceForAgreement extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant'> {
+interface ClientSpaceForAgreement extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
   createdAt: string;
   updatedAt: string;
   building: ClientBuilding | null; // Building can be null if space.building relation wasn't fully populated
   tenantId?: string | null;
   buildingId: string;
+  area: number;
+  utilityProrationShare: number;
+  monthlyRentalPrice: number;
 }
 
 interface ClientTenant extends Omit<TenantPrismaOriginal, 'createdAt' | 'updatedAt' | 'rentedSpaceId' | 'agreements' | 'bills'> {
@@ -50,7 +59,7 @@ interface ClientTenant extends Omit<TenantPrismaOriginal, 'createdAt' | 'updated
 }
 
 
-interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space' | 'bills' | 'tenantId' | 'spaceId'> {
+interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space' | 'bills' | 'tenantId' | 'spaceId' | 'monthlyRentalPrice' | 'initialPaymentAmount'> {
   createdAt: string;
   updatedAt: string;
   startDate: string;
@@ -61,10 +70,12 @@ interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt
   space: ClientSpaceForAgreement | null; // Space can be null
   tenantId: string;
   spaceId: string;
+  monthlyRentalPrice: number;
+  initialPaymentAmount: number | null;
 }
 
 
-interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId'> {
+interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId' | 'rentAmount' | 'penaltyAmount' | 'totalAmount'> {
   createdAt: string;
   updatedAt: string;
   billDate: string;
@@ -74,18 +85,21 @@ interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' 
   utilityBreakdown: SerializedParsedUtilityItem[]; // Matches the parsed structure
   tenantId: string;
   agreementId: string;
+  rentAmount: number;
+  penaltyAmount: number | null;
+  totalAmount: number;
 }
 
 interface ClientBuildingMonthlyUtilities extends Omit<BuildingMonthlyUtilitiesPrisma, 'createdAt' | 'updatedAt' | 'utilities' | 'buildingId' | 'building'> {
     createdAt: string;
     updatedAt: string;
-    utilities: Prisma.BuildingUtilityItemGetPayload<{}>[];
+    utilities: (Prisma.BuildingUtilityItemGetPayload<{}> & { totalCost: number })[];
     buildingId: string;
 }
 
 export interface SerializedBillingPageData {
   agreements: ClientAgreement[];
-  spaces: (Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt'| 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant'> & { createdAt: string; updatedAt: string; building: ClientBuilding | null, tenantId?: string | null, buildingId: string; })[];
+  spaces: (Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt'| 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> & { createdAt: string; updatedAt: string; building: ClientBuilding | null, tenantId?: string | null, buildingId: string; area: number; utilityProrationShare: number; monthlyRentalPrice: number; })[];
   buildings: ClientBuilding[];
   bills: ClientBill[];
   buildingMonthlyUtilities: ClientBuildingMonthlyUtilities[];

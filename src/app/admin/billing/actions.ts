@@ -87,6 +87,8 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
   // Serialization logic moved here
   const serializedAgreements = agreementsData.map(ag => ({
     ...(ag as AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } } }),
+    monthlyRentalPrice: Number(ag.monthlyRentalPrice),
+    initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
     createdAt: ag.createdAt ? ag.createdAt.toISOString() : EPOCH_ISO_STRING,
     updatedAt: ag.updatedAt ? ag.updatedAt.toISOString() : (ag.createdAt ? ag.createdAt.toISOString() : EPOCH_ISO_STRING),
     startDate: ag.startDate ? ag.startDate.toISOString() : EPOCH_ISO_STRING,
@@ -100,6 +102,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
     } : null,
     space: ag.space ? {
         ...(ag.space as SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } }),
+        area: Number(ag.space.area),
+        utilityProrationShare: Number(ag.space.utilityProrationShare),
+        monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
         createdAt: ag.space.createdAt ? ag.space.createdAt.toISOString() : EPOCH_ISO_STRING,
         updatedAt: ag.space.updatedAt ? ag.space.updatedAt.toISOString() : (ag.space.createdAt ? ag.space.createdAt.toISOString() : EPOCH_ISO_STRING),
         building: ag.space.building ? {
@@ -109,6 +114,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
             penaltyPolicyTiers: (ag.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
             spaces: (ag.space.building.spaces || []).map(s => ({
                 ...s,
+                area: Number(s.area),
+                utilityProrationShare: Number(s.utilityProrationShare),
+                monthlyRentalPrice: Number(s.monthlyRentalPrice),
                 createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
                 updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
             }))
@@ -118,6 +126,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
 
   const serializedSpaces = spacesData.map(s => ({
     ...(s as SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } }),
+    area: Number(s.area),
+    utilityProrationShare: Number(s.utilityProrationShare),
+    monthlyRentalPrice: Number(s.monthlyRentalPrice),
     createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
     updatedAt: s.updatedAt ? s.updatedAt.toISOString() : (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING),
     building: s.building ? {
@@ -127,6 +138,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
         penaltyPolicyTiers: (s.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
           spaces: (s.building.spaces || []).map(sp => ({
             ...sp,
+            area: Number(sp.area),
+            utilityProrationShare: Number(sp.utilityProrationShare),
+            monthlyRentalPrice: Number(sp.monthlyRentalPrice),
             createdAt: sp.createdAt ? sp.createdAt.toISOString() : EPOCH_ISO_STRING,
             updatedAt: sp.updatedAt?.toISOString() || (sp.createdAt ? sp.createdAt.toISOString() : EPOCH_ISO_STRING)
         }))
@@ -140,6 +154,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
     penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(pt => ({...pt})),
     spaces: (b.spaces || []).map(s => ({
         ...s,
+        area: Number(s.area),
+        utilityProrationShare: Number(s.utilityProrationShare),
+        monthlyRentalPrice: Number(s.monthlyRentalPrice),
         createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
         updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
     }))
@@ -179,6 +196,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
 
     return {
       ...(billRaw as BillPrismaOriginal),
+      rentAmount: Number(billRaw.rentAmount),
+      penaltyAmount: billRaw.penaltyAmount ? Number(billRaw.penaltyAmount) : null,
+      totalAmount: Number(billRaw.totalAmount),
       createdAt: billCreatedAt,
       updatedAt: billUpdatedAt,
       billDate: billRaw.billDate ? billRaw.billDate.toISOString() : EPOCH_ISO_STRING,
@@ -187,6 +207,8 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
       utilityBreakdown: parsedUtilityBreakdown,
       agreement: agreementForBill ? {
           ...(agreementForBill),
+          monthlyRentalPrice: Number(agreementForBill.monthlyRentalPrice),
+          initialPaymentAmount: agreementForBill.initialPaymentAmount ? Number(agreementForBill.initialPaymentAmount) : null,
           createdAt: agreementForBill.createdAt ? agreementForBill.createdAt.toISOString() : EPOCH_ISO_STRING,
           updatedAt: agreementForBill.updatedAt ? agreementForBill.updatedAt.toISOString() : (agreementForBill.createdAt ? agreementForBill.createdAt.toISOString() : EPOCH_ISO_STRING),
           startDate: agreementForBill.startDate ? agreementForBill.startDate.toISOString() : EPOCH_ISO_STRING,
@@ -200,6 +222,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
           } : null,
           space: agreementForBill.space ? {
               ...(agreementForBill.space),
+              area: Number(agreementForBill.space.area),
+              utilityProrationShare: Number(agreementForBill.space.utilityProrationShare),
+              monthlyRentalPrice: Number(agreementForBill.space.monthlyRentalPrice),
               createdAt: agreementForBill.space.createdAt ? agreementForBill.space.createdAt.toISOString() : EPOCH_ISO_STRING,
               updatedAt: agreementForBill.space.updatedAt ? agreementForBill.space.updatedAt.toISOString() : (agreementForBill.space.createdAt ? agreementForBill.space.createdAt.toISOString() : EPOCH_ISO_STRING),
               building: agreementForBill.space.building ? {
@@ -209,6 +234,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
                     penaltyPolicyTiers: (agreementForBill.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
                     spaces: (agreementForBill.space.building.spaces || []).map(s => ({
                       ...s,
+                      area: Number(s.area),
+                      utilityProrationShare: Number(s.utilityProrationShare),
+                      monthlyRentalPrice: Number(s.monthlyRentalPrice),
                       createdAt: s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING,
                       updatedAt: s.updatedAt?.toISOString() || (s.createdAt ? s.createdAt.toISOString() : EPOCH_ISO_STRING)
                   }))
@@ -222,7 +250,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
     ...(bu as BuildingMonthlyUtilitiesPrisma & { utilities: Prisma.BuildingUtilityItemGetPayload<{}>[] }),
     createdAt: bu.createdAt ? bu.createdAt.toISOString() : EPOCH_ISO_STRING,
     updatedAt: bu.updatedAt ? bu.updatedAt.toISOString() : (bu.createdAt ? bu.createdAt.toISOString() : EPOCH_ISO_STRING),
-    utilities: (bu.utilities || []).map(u => ({...u})) 
+    utilities: (bu.utilities || []).map(u => ({...u, totalCost: Number(u.totalCost)})) 
   })) as SerializedBillingPageData['buildingMonthlyUtilities'];
 
   return { 
@@ -268,9 +296,9 @@ function calculateIndividualPenalty(
   for (const tier of sortedTiers) {
     if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
       if (tier.feeType === 'Fixed') {
-        calculatedPenalty = tier.feeValue;
+        calculatedPenalty = Number(tier.feeValue);
       } else if (tier.feeType === 'Percentage') {
-        calculatedPenalty = billAmount * (tier.feeValue / 100);
+        calculatedPenalty = billAmount * (Number(tier.feeValue) / 100);
       }
       break;
     }
@@ -333,7 +361,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const isFirstBill = isSameDay(targetBillDate, agreementStartDate);
 
     if (!isFirstBill && agreement.initialPaymentMonths > 0 && !isAfter(targetBillDate, firstChargeableRentDueDate) && !isSameDay(targetBillDate, firstChargeableRentDueDate)) {
-        rentAmount = 0;
+        rentAmount = new Prisma.Decimal(0);
     }
     
     // Calculate Utility Costs
@@ -379,10 +407,10 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const dueDate = targetBillDate; 
     if (isBefore(dueDate, today)) { 
         const daysOverdue = differenceInDays(today, dueDate); 
-        initialPenalty = calculateIndividualPenalty(rentAmount, daysOverdue, agreement.space.building, agreement.space);
+        initialPenalty = calculateIndividualPenalty(Number(rentAmount), daysOverdue, agreement.space.building, agreement.space);
     }
 
-    const totalAmount = rentAmount + totalUtilityCostForBill + initialPenalty;
+    const totalAmount = Number(rentAmount) + totalUtilityCostForBill + initialPenalty;
     
     const utilityBreakdownJson = utilityItemsForJson.length > 0 ? JSON.stringify(utilityItemsForJson) : Prisma.JsonNull;
 
@@ -414,6 +442,9 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 
     const serializedBill = {
       ...newBill,
+      rentAmount: Number(newBill.rentAmount),
+      penaltyAmount: newBill.penaltyAmount ? Number(newBill.penaltyAmount) : null,
+      totalAmount: Number(newBill.totalAmount),
       billDate: newBill.billDate.toISOString(),
       dueDate: newBill.dueDate.toISOString(),
       createdAt: newBill.createdAt.toISOString(),
@@ -490,11 +521,11 @@ export async function recordPaymentOrVerificationAction(
     let newStatus: Prisma.BillStatus = bill.status;
     let finalPaymentDate = paymentData.paymentDate ? parseISO(paymentData.paymentDate) : new Date();
 
-    let currentPenalty = bill.penaltyAmount || 0;
+    let currentPenalty = bill.penaltyAmount ? Number(bill.penaltyAmount) : 0;
     if ( (isBefore(parseISO(bill.dueDate.toISOString()), finalPaymentDate) || bill.status === 'Overdue') && actionType !== 'rejectVerification') {
         const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString()));
         if (daysOverdue > 0) {
-             currentPenalty = calculateIndividualPenalty(bill.rentAmount, daysOverdue, bill.agreement.space.building, bill.agreement.space);
+             currentPenalty = calculateIndividualPenalty(Number(bill.rentAmount), daysOverdue, bill.agreement.space.building, bill.agreement.space);
         } else { 
             currentPenalty = 0;
         }
@@ -508,7 +539,7 @@ export async function recordPaymentOrVerificationAction(
       penaltyAmount: currentPenalty > 0 ? currentPenalty : null,
     };
 
-    const baseAmount = bill.rentAmount + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
+    const baseAmount = Number(bill.rentAmount) + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
     billUpdateData.totalAmount = parseFloat((baseAmount + (currentPenalty > 0 ? currentPenalty : 0)).toFixed(2));
 
 
@@ -527,12 +558,12 @@ export async function recordPaymentOrVerificationAction(
       billUpdateData.paymentReference = null;
       billUpdateData.bankOrWalletName = null;
       
-      const rejectedBaseAmount = bill.rentAmount + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
+      const rejectedBaseAmount = Number(bill.rentAmount) + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
       let rejectedPenalty = 0;
       if (newStatus === 'Overdue') {
           const daysOverdueNow = differenceInDays(today, parseISO(bill.dueDate.toISOString()));
           if (daysOverdueNow > 0) {
-            rejectedPenalty = calculateIndividualPenalty(bill.rentAmount, daysOverdueNow, bill.agreement.space.building, bill.agreement.space);
+            rejectedPenalty = calculateIndividualPenalty(Number(bill.rentAmount), daysOverdueNow, bill.agreement.space.building, bill.agreement.space);
             billUpdateData.penaltyAmount = rejectedPenalty > 0 ? rejectedPenalty : null;
           } else {
              billUpdateData.penaltyAmount = null; 
@@ -560,6 +591,9 @@ export async function recordPaymentOrVerificationAction(
 
     const serializedBill = {
       ...updatedBill,
+      rentAmount: Number(updatedBill.rentAmount),
+      penaltyAmount: updatedBill.penaltyAmount ? Number(updatedBill.penaltyAmount) : null,
+      totalAmount: Number(updatedBill.totalAmount),
       billDate: updatedBill.billDate.toISOString(),
       dueDate: updatedBill.dueDate.toISOString(),
       createdAt: updatedBill.createdAt.toISOString(),
@@ -624,6 +658,9 @@ export async function updateBillAdminDetailsAction(
 
     const serializedBill = {
       ...updatedBill,
+      rentAmount: Number(updatedBill.rentAmount),
+      penaltyAmount: updatedBill.penaltyAmount ? Number(updatedBill.penaltyAmount) : null,
+      totalAmount: Number(updatedBill.totalAmount),
       billDate: updatedBill.billDate.toISOString(),
       dueDate: updatedBill.dueDate.toISOString(),
       createdAt: updatedBill.createdAt.toISOString(),

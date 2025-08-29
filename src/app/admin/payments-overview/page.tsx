@@ -21,6 +21,9 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
 
   return {
     ...bill,
+    rentAmount: Number(bill.rentAmount),
+    penaltyAmount: bill.penaltyAmount ? Number(bill.penaltyAmount) : null,
+    totalAmount: Number(bill.totalAmount),
     createdAt: bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
     updatedAt: bill.updatedAt?.toISOString() || bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
     billDate: bill.billDate?.toISOString() || EPOCH_ISO_STRING,
@@ -28,6 +31,8 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
     paymentDate: bill.paymentDate?.toISOString() || null,
     agreement: agreement ? {
       ...agreement,
+      monthlyRentalPrice: Number(agreement.monthlyRentalPrice),
+      initialPaymentAmount: agreement.initialPaymentAmount ? Number(agreement.initialPaymentAmount) : null,
       createdAt: agreement.createdAt?.toISOString() || EPOCH_ISO_STRING,
       updatedAt: agreement.updatedAt?.toISOString() || agreement.createdAt?.toISOString() || EPOCH_ISO_STRING,
       startDate: agreement.startDate?.toISOString() || EPOCH_ISO_STRING,
@@ -41,13 +46,16 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
       } : ({} as ClientTenant), // Provide a default empty object if tenant is null
       space: space ? {
         ...space,
+        area: Number(space.area),
+        utilityProrationShare: Number(space.utilityProrationShare),
+        monthlyRentalPrice: Number(space.monthlyRentalPrice),
         createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
         updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || EPOCH_ISO_STRING,
         building: building ? {
           ...building,
           createdAt: building.createdAt?.toISOString() || EPOCH_ISO_STRING,
           updatedAt: building.updatedAt?.toISOString() || building.createdAt?.toISOString() || EPOCH_ISO_STRING,
-          penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt })) || [],
+          penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt, feeValue: Number(pt.feeValue) })) || [],
         } : ({} as ClientBuilding), // Default empty object
       } : ({} as ClientSpaceForAgreement), // Default empty object
     } : ({} as ClientAgreementForBill), // Default empty object
@@ -59,6 +67,9 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
 const serializeSpace = (space: SpacePrisma): ClientSpaceForPotentialRevenue => {
   return {
     ...space,
+    area: Number(space.area),
+    utilityProrationShare: Number(space.utilityProrationShare),
+    monthlyRentalPrice: Number(space.monthlyRentalPrice),
     createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
     updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || EPOCH_ISO_STRING,
   };

@@ -23,6 +23,8 @@ export default async function AgreementsListPage() {
 
   const serializableAgreements = agreementsData.map(ag => ({
     ...ag,
+    monthlyRentalPrice: Number(ag.monthlyRentalPrice),
+    initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
     startDate: ag.startDate.toISOString(),
     nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
     createdAt: ag.createdAt.toISOString(),
@@ -35,6 +37,9 @@ export default async function AgreementsListPage() {
     } : null,
     space: ag.space ? { 
       ...ag.space, 
+      area: Number(ag.space.area),
+      utilityProrationShare: Number(ag.space.utilityProrationShare),
+      monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
       createdAt: ag.space.createdAt.toISOString(), 
       updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString() // Safe serialization
     } : null,
