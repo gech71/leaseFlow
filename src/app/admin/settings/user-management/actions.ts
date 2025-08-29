@@ -91,12 +91,15 @@ export async function updateUserNamesAction(
     }
     
     const requestHeaders = headers();
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-
-    if (!baseUrl) {
-      console.error("Error updating user details: NEXT_PUBLIC_BASE_URL is not set.");
-      return { success: false, error: "Application base URL is not configured." };
+    const protocol = requestHeaders.get('x-forwarded-proto') ?? 'http';
+    const host = requestHeaders.get('host');
+    
+    if (!host) {
+      console.error("Error updating user details: could not determine host from headers.");
+      return { success: false, error: "Application host is not configured." };
     }
+    
+    const baseUrl = `${protocol}://${host}`;
     
     const response = await fetch(`${baseUrl}/api/Auth/update-user`, {
         method: 'POST',
@@ -148,7 +151,7 @@ export async function changeUserPhoneNumberAction(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${requestHeaders.get('Authorization')?.split(' ')[1] || cookies().get(ADMIN_ACCESS_TOKEN_KEY)?.value}`
+        'Cookie': requestHeaders.get('Cookie') || ""
       },
       body: JSON.stringify({
         currentPhoneNumber: localUserToUpdate.phoneNumber,
