@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,7 @@ export function EmailConfigurationClientPage({ initialSmtpUser, initialIsSmtpPas
     const result = await updateSmtpPasswordAction(values.newPassword);
     setIsSaving(false);
     if (result.success) {
-      toast({ title: "Success", description: "SMTP App Password has been updated securely." });
+      toast({ title: "Success", description: "App Password has been updated securely." });
       form.reset();
       setIsSmtpPassSet(true);
     } else {
