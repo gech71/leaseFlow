@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff, InfoIcon } from 'lucide-react';
+import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff, InfoIcon, Clipboard } from 'lucide-react';
 import { updateUserAssignments } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -155,6 +155,11 @@ export function UserManagementClientPage({
     }
   };
   
+  const copyToClipboard = (textToCopy: string) => {
+    navigator.clipboard.writeText(textToCopy);
+    toast({ title: "Copied!", description: "Temporary password copied to clipboard."});
+  };
+
   if (!isMounted && users.length === 0 && allRoles.length === 0 && allBuildings.length === 0 && !canViewUserManagement) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -206,7 +211,17 @@ export function UserManagementClientPage({
                                         <InfoIcon className="h-4 w-4 text-primary cursor-help"/>
                                     </TooltipTrigger>
                                     <TooltipContent>
+                                      <div className="flex items-center gap-2">
                                         <p>Temp Password: <span className="font-semibold">{user.tempPassword}</span></p>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={() => copyToClipboard(user.tempPassword!)}
+                                        >
+                                          <Clipboard className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
                                     </TooltipContent>
                                 </Tooltip>
                             )}
