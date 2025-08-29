@@ -187,11 +187,6 @@ export function AdminProfileClientPage() {
             </form>
           </Form>
         </CardContent>
-        <CardFooter className="pt-4 border-t">
-          <Link href="/auth/forgot-password" passHref>
-            <Button variant="link" className="p-0 h-auto">I forgot my password</Button>
-          </Link>
-        </CardFooter>
       </Card>
     </div>
   );
