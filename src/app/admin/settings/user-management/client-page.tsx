@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff, InfoIcon, Clipboard, UserCog } from 'lucide-react';
-import { updateUserAssignments, updateUserDetailsAction } from './actions';
+import { updateUserAssignments, updateUserNamesAction, changeUserPhoneNumberAction } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/contexts/PermissionContext';
@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Separator } from '@/components/ui/separator';
 
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
@@ -43,12 +44,16 @@ export interface ClientUserWithAssignments extends Omit<UserPrisma, 'createdAt' 
   tempPassword?: string | null;
 }
 
-const userDetailsFormSchema = z.object({
+const userNamesFormSchema = z.object({
   firstName: z.string().min(1, "First name is required."),
   lastName: z.string().min(1, "Last name is required."),
-  phoneNumber: z.string().regex(/^(09|07)\d{8}$/, "Phone number must be valid (e.g., 0912345678)."),
 });
-type UserDetailsFormValues = z.infer<typeof userDetailsFormSchema>;
+type UserNamesFormValues = z.infer<typeof userNamesFormSchema>;
+
+const phoneFormSchema = z.object({
+    phoneNumber: z.string().regex(/^(09|07)\d{8}$/, "Phone number must be valid (e.g., 0912345678)."),
+});
+type PhoneFormValues = z.infer<typeof phoneFormSchema>;
 
 
 interface UserManagementClientPageProps {
@@ -85,8 +90,11 @@ export function UserManagementClientPage({
   const canManageUserAssignments = isSuperAdmin || hasPermission('settings:user_management:assign');
   const canViewUserManagement = isSuperAdmin || hasPermission('settings:user_management:view') || canManageUserAssignments;
   
-  const userDetailsForm = useForm<UserDetailsFormValues>({
-    resolver: zodResolver(userDetailsFormSchema)
+  const userNamesForm = useForm<UserNamesFormValues>({
+    resolver: zodResolver(userNamesFormSchema)
+  });
+  const phoneForm = useForm<PhoneFormValues>({
+      resolver: zodResolver(phoneFormSchema)
   });
 
   const handleItemsPerPageChange = (newSize: number) => {
@@ -123,9 +131,11 @@ export function UserManagementClientPage({
         return;
     }
     setCurrentUserToEdit(user);
-    userDetailsForm.reset({
+    userNamesForm.reset({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
+    });
+    phoneForm.reset({
         phoneNumber: user.phoneNumber || ''
     });
     setIsUserDetailsDialogOpen(true);
@@ -187,18 +197,31 @@ export function UserManagementClientPage({
     }
   };
   
-  const handleSaveUserDetails = async (values: UserDetailsFormValues) => {
+  const handleSaveUserNames = async (values: UserNamesFormValues) => {
     if (!currentUserToEdit) return;
     setIsSaving(true);
-    const result = await updateUserDetailsAction(currentUserToEdit.id, values);
+    const result = await updateUserNamesAction(currentUserToEdit.id, values);
     setIsSaving(false);
 
     if (result.success) {
-        toast({ title: "Success", description: "User details have been updated."});
-        setIsUserDetailsDialogOpen(false);
+        toast({ title: "Success", description: "User names have been updated."});
         setUsers(prev => prev.map(u => u.id === currentUserToEdit.id ? { ...u, ...values, name: `${values.firstName} ${values.lastName}`.trim() } : u));
     } else {
         toast({ title: "Update Failed", description: result.error, variant: "destructive"});
+    }
+  };
+  
+  const handleSavePhoneNumber = async (values: PhoneFormValues) => {
+    if (!currentUserToEdit) return;
+    setIsSaving(true);
+    const result = await changeUserPhoneNumberAction(currentUserToEdit.id, values.phoneNumber);
+    setIsSaving(false);
+    
+    if (result.success) {
+      toast({ title: "Success", description: "User phone number has been updated." });
+      setUsers(prev => prev.map(u => u.id === currentUserToEdit.id ? { ...u, ...values } : u));
+    } else {
+      toast({ title: "Update Failed", description: result.error, variant: "destructive" });
     }
   };
 
@@ -398,26 +421,44 @@ export function UserManagementClientPage({
                     <DialogTitle>Edit User Details</DialogTitle>
                     <DialogDescription>Update the name and phone number for {currentUserToEdit.name}.</DialogDescription>
                 </DialogHeader>
-                <Form {...userDetailsForm}>
-                    <form onSubmit={userDetailsForm.handleSubmit(handleSaveUserDetails)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField control={userDetailsForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={userDetailsForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        </div>
-                        <FormField control={userDetailsForm.control} name="phoneNumber" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <div>
-                            <Label>Email (Read-only)</Label>
-                            <Input value={currentUserToEdit.email} readOnly disabled />
-                        </div>
-                        <DialogFooter>
-                            <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
-                            <Button type="submit" disabled={isSaving}>
+                <div className="space-y-6 py-2">
+                    {/* Name Change Form */}
+                    <Form {...userNamesForm}>
+                        <form onSubmit={userNamesForm.handleSubmit(handleSaveUserNames)} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={userNamesForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={userNamesForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                            </div>
+                            <Button type="submit" disabled={isSaving} size="sm">
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save User Details
+                                Save Name
                             </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                        </form>
+                    </Form>
+                    
+                    <Separator />
+
+                    {/* Phone Number Change Form */}
+                    <Form {...phoneForm}>
+                        <form onSubmit={phoneForm.handleSubmit(handleSavePhoneNumber)} className="space-y-4">
+                            <FormField control={phoneForm.control} name="phoneNumber" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                            <Button type="submit" disabled={isSaving} size="sm">
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save Phone Number
+                            </Button>
+                        </form>
+                    </Form>
+                    
+                    <Separator />
+                    
+                    <div>
+                        <Label>Email (Read-only)</Label>
+                        <Input value={currentUserToEdit.email} readOnly disabled />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
+                </DialogFooter>
             </DialogContent>
           </Dialog>
         </>

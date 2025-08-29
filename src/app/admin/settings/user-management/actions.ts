@@ -77,12 +77,11 @@ export async function updateUserAssignments(
 }
 
 
-export async function updateUserDetailsAction(
+export async function updateUserNamesAction(
   userId: string,
   data: {
     firstName: string;
     lastName: string;
-    phoneNumber: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -91,9 +90,7 @@ export async function updateUserDetailsAction(
       return { success: false, error: "Permission denied." };
     }
     
-    // We call our own internal API route, which then calls the external service.
-    // This ensures cookies are forwarded correctly.
-    const requestHeaders = await headers(); // Get headers from the incoming request
+    const requestHeaders = headers();
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
     if (!baseUrl) {
@@ -105,7 +102,7 @@ export async function updateUserDetailsAction(
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Cookie': requestHeaders.get('Cookie') || "", // Forward the cookie
+            'Cookie': requestHeaders.get('Cookie') || "", 
         },
         body: JSON.stringify({
             userId: userId,
@@ -114,7 +111,7 @@ export async function updateUserDetailsAction(
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ errors: ["Failed to update user."] }));
+        const errorData = await response.json().catch(() => ({ errors: ["Failed to update user names."] }));
         return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred.' };
     }
 
@@ -122,7 +119,65 @@ export async function updateUserDetailsAction(
     return { success: true };
 
   } catch (error: any) {
-    console.error("Error in updateUserDetailsAction:", error);
-    return { success: false, error: error.message || "Failed to update user details." };
+    console.error("Error in updateUserNamesAction:", error);
+    return { success: false, error: error.message || "Failed to update user names." };
+  }
+}
+
+
+export async function changeUserPhoneNumberAction(
+  userId: string,
+  newPhoneNumber: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
+      return { success: false, error: "Permission denied." };
+    }
+
+    const localUserToUpdate = await databaseService.getUserById(userId);
+    if (!localUserToUpdate || !localUserToUpdate.phoneNumber) {
+        return { success: false, error: "User not found or current phone number is missing." };
+    }
+
+    // Step 1: Call external service to change the phone number
+    const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+    const requestHeaders = headers();
+
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-phone-number`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${requestHeaders.get('Authorization')?.split(' ')[1] || cookies().get(ADMIN_ACCESS_TOKEN_KEY)?.value}`
+      },
+      body: JSON.stringify({
+        currentPhoneNumber: localUserToUpdate.phoneNumber,
+        newPhoneNumber: newPhoneNumber,
+      }),
+    });
+
+    if (!externalResponse.ok) {
+      const errorData = await externalResponse.json().catch(() => ({ errors: ["Failed to change phone number on identity server."] }));
+      return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred.' };
+    }
+    
+    // Step 2: Update the local database
+    await databaseService.updateUser(userId, {
+      phoneNumber: newPhoneNumber,
+    });
+    
+    const tenantProfile = await databaseService.findTenantByEmailOrPhone(null, localUserToUpdate.phoneNumber);
+    if (tenantProfile) {
+      await databaseService.updateTenant(tenantProfile.id, {
+        phone: newPhoneNumber,
+      });
+    }
+
+    revalidatePath('/admin/settings/user-management');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error in changeUserPhoneNumberAction:", error);
+    return { success: false, error: error.message || "Failed to change phone number." };
   }
 }
