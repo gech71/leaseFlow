@@ -56,7 +56,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
         }
       });
 
-      // 2. Create a "Bill" for the initial payment, marked as Paid
+      // 2. Create a "Bill" for the initial payment, marked as Pending
       if (initialPaymentAmount > 0) {
         await tx.bill.create({
           data: {
@@ -68,12 +68,12 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
             utilityBreakdown: Prisma.JsonNull,
             penaltyAmount: 0,
             totalAmount: initialPaymentAmount,
-            status: 'Paid',
-            paymentDate: startDateObj,
-            paymentMethod: input.initialPaymentMethod,
+            status: 'Pending', // Changed from 'Paid'
+            paymentDate: null, // No payment date on creation
+            paymentMethod: input.initialPaymentMethod, // Record intended method
             paymentReference: input.initialPaymentReference,
             bankOrWalletName: (input.initialPaymentMethod === "Bank Transfer" || input.initialPaymentMethod === "Wallet") ? input.initialPaymentBankOrWalletName : null,
-            adminVerifiedPayment: true,
+            adminVerifiedPayment: false, // Not verified on creation
           }
         });
       }
