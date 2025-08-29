@@ -83,7 +83,7 @@ export default function AdminLoginPage() {
             router.push(data.redirectPath || '/admin/dashboard');
         }
       } else {
-        const errorMessages = data.errors?.join(', ') || "Invalid phone number or password. Please try again.";
+        const errorMessages = data.errors?.join(', ') || "Invalid credentials. Please try again.";
         toast({
           title: "Login Failed",
           description: errorMessages,
