@@ -911,17 +911,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                 </>
                               ) : ( // Pending or Overdue
                                 <>
-                                  {canManagePayments && (
-                                     <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" onClick={() => handleOpenPaymentDialog(bill)} className="h-8 w-8 text-green-600" disabled={isLoading}>
-                                          <CreditCard className="h-4 w-4" />
-                                          <span className="sr-only">Record Payment</span>
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent><p>Record Payment</p></TooltipContent>
-                                    </Tooltip>
-                                  )}
+                                  {/* This button is now removed based on user request */}
                                 </>
                               )}
                               {canDeleteBills && bill.currentStatus !== 'Paid' && (
@@ -958,4 +948,3 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     </div>
   );
 }
-
