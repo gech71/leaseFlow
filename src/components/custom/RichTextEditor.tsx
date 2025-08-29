@@ -33,29 +33,31 @@ const modules = {
 
 
 export function RichTextEditor({ value, onChange, readOnly = false }: RichTextEditorProps) {
-  const ReactQuill = useMemo(() => dynamic(() => import('react-quill'), { ssr: false }),[]);
+  const ReactQuill = useMemo(() => dynamic(() => import('react-quill'), { 
+      ssr: false,
+      loading: () => <Skeleton className="h-[244px] w-full" /> 
+    }),[]);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
+  if (!isClient) {
+    return <Skeleton className="h-[244px] w-full" />;
+  }
 
   return (
     <div className="bg-background rounded-md border border-input">
-        {isClient ? (
-            <ReactQuill 
-              theme="snow" 
-              value={value} 
-              onChange={onChange}
-              readOnly={readOnly}
-              modules={modules}
-              formats={formats}
-              className="rich-text-editor"
-            />
-        ) : (
-            <Skeleton className="h-[244px] w-full" />
-        )}
+        <ReactQuill 
+          theme="snow" 
+          value={value} 
+          onChange={onChange}
+          readOnly={readOnly}
+          modules={modules}
+          formats={formats}
+          className="rich-text-editor"
+        />
     </div>
   );
 }
