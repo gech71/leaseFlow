@@ -13,9 +13,12 @@ import { getAllBuildingUtilitiesForListAction, getRegisteredBuildingsAction } fr
 import { parseISO } from 'date-fns';
 
 // Define a client-safe Space type
-interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt'> {
+interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
   createdAt: string;
   updatedAt: string;
+  area: number;
+  utilityProrationShare: number;
+  monthlyRentalPrice: number;
 }
 
 // Define a client-safe Building type that includes spaces
@@ -47,13 +50,16 @@ async function BuildingUtilitiesDataFetcher() {
   const buildingsWithSpaces = await getRegisteredBuildingsAction();
   const initialRecordsRaw = await getAllBuildingUtilitiesForListAction();
   
-  // Serialize dates for client component props
+  // Serialize dates and Decimals for client component props
   const serializableBuildings: ClientBuilding[] = buildingsWithSpaces.map(b => ({
     ...b,
     createdAt: b.createdAt.toISOString(),
     updatedAt: b.updatedAt?.toISOString() || b.createdAt.toISOString(), // Safe serialization
     spaces: b.spaces.map(s => ({
       ...s,
+      area: Number(s.area),
+      utilityProrationShare: Number(s.utilityProrationShare),
+      monthlyRentalPrice: Number(s.monthlyRentalPrice),
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString(),
     }))
@@ -63,7 +69,7 @@ async function BuildingUtilitiesDataFetcher() {
     ...r,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(), // Safe serialization
-    utilities: r.utilities.map(u => ({...u})) // Assuming utility items don't have dates needing serialization
+    utilities: r.utilities.map(u => ({...u, totalCost: Number(u.totalCost)}))
   }));
 
   return <BuildingUtilitiesClientPage initialBuildings={serializableBuildings} initialUtilityRecords={serializableInitialRecords} />;
