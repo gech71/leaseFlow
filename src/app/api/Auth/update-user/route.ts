@@ -1,4 +1,5 @@
 
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -7,6 +8,9 @@ import { Prisma } from '@prisma/client';
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
+// This API route is kept for potential future direct API integrations but is no longer
+// called by the "Edit User" dialog in the admin panel. The logic is now handled
+// directly in the `updateUserNamesAction` and `changeUserPhoneNumberAction` server actions.
 export async function POST(request: NextRequest) {
     if (!AUTH_API_BASE_URL) {
         console.error("Auth API base URL is not configured.");

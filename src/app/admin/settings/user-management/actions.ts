@@ -9,6 +9,9 @@ import { cookies, headers } from 'next/headers';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import { prisma } from '@/lib/prisma';
 
+const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+
 
 export async function getUserManagementPageData() {
   try {
@@ -84,38 +87,56 @@ export async function updateUserNamesAction(
     lastName: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
+    if (!AUTH_API_BASE_URL) {
+        console.error("Auth API base URL is not configured.");
+        return { success: false, error: "Authentication service is not configured." };
+    }
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
       return { success: false, error: "Permission denied." };
     }
-    
-    const requestHeaders = headers();
-    const protocol = requestHeaders.get('x-forwarded-proto') ?? 'http';
-    const host = requestHeaders.get('host');
-    
-    if (!host) {
-      console.error("Error updating user details: could not determine host from headers.");
-      return { success: false, error: "Application host is not configured." };
+
+    const adminAccessToken = cookies().get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+    if (!adminAccessToken) {
+        return { success: false, error: "Admin authentication token not found." };
+    }
+
+    const localUserToUpdate = await databaseService.getUserById(userId);
+    if (!localUserToUpdate) {
+        return { success: false, error: "User not found." };
     }
     
-    const baseUrl = `${protocol}://${host}`;
-    
-    const response = await fetch(`${baseUrl}/api/Auth/update-user`, {
+    // Step 1: Update the external identity provider for names
+    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/update-user`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Cookie': requestHeaders.get('Cookie') || "", 
+            'Authorization': `Bearer ${adminAccessToken}`,
         },
         body: JSON.stringify({
-            userId: userId,
-            ...data
-        })
+            currentPhoneNumber: localUserToUpdate.phoneNumber, 
+            newPhoneNumber: localUserToUpdate.phoneNumber,   // Keep phone number the same
+            firstName: data.firstName,
+            lastName: data.lastName,
+        }),
     });
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ errors: ["Failed to update user names."] }));
-        return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred.' };
+    if (!externalResponse.ok) {
+        const errorData = await externalResponse.json().catch(() => ({ errors: ["Failed to update user name on identity server."] }));
+        return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred on the identity server.' };
+    }
+    
+    // Step 2: Update local DB
+    await databaseService.updateUser(userId, {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        name: `${data.firstName} ${data.lastName}`.trim(),
+    });
+    
+    const tenantProfile = await databaseService.findTenantByEmailOrPhone(localUserToUpdate.email, localUserToUpdate.phoneNumber);
+    if (tenantProfile) {
+        await databaseService.updateTenant(tenantProfile.id, { name: `${data.firstName} ${data.lastName}`.trim() });
     }
 
     revalidatePath('/admin/settings/user-management');
@@ -132,10 +153,19 @@ export async function changeUserPhoneNumberAction(
   userId: string,
   newPhoneNumber: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!AUTH_API_BASE_URL) {
+        console.error("Auth API base URL is not configured.");
+        return { success: false, error: "Authentication service is not configured." };
+    }
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
       return { success: false, error: "Permission denied." };
+    }
+
+    const adminAccessToken = cookies().get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+    if (!adminAccessToken) {
+        return { success: false, error: "Admin authentication token not found." };
     }
 
     const localUserToUpdate = await databaseService.getUserById(userId);
@@ -144,14 +174,11 @@ export async function changeUserPhoneNumberAction(
     }
 
     // Step 1: Call external service to change the phone number
-    const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-    const requestHeaders = headers();
-
     const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-phone-number`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': requestHeaders.get('Cookie') || ""
+        'Authorization': `Bearer ${adminAccessToken}`,
       },
       body: JSON.stringify({
         currentPhoneNumber: localUserToUpdate.phoneNumber,
