@@ -17,6 +17,16 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -93,6 +103,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [billForVerification, setBillForVerification] = useState<ClientBill | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [billForEdit, setBillForEdit] = useState<ClientBill | null>(null);
+  const [billToDelete, setBillToDelete] = useState<ClientBill | null>(null);
 
   const [adminSelectedProofFile, setAdminSelectedProofFile] = useState<File | null>(null);
   const adminProofFileInputRef = useRef<HTMLInputElement>(null);
@@ -532,13 +543,14 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     }
   };
   
-  const handleDeleteBillWithConfirmation = async (billId: string) => {
+  const handleDeleteBill = async () => {
+    if (!billToDelete) return;
     if (!canDeleteBills) {
       toast({ title: "Permission Denied", description: "You do not have permission to delete bills.", variant: "destructive" });
       return;
     }
     setIsLoading(true);
-    const result = await deleteBillAction(billId);
+    const result = await deleteBillAction(billToDelete.id);
     setIsLoading(false);
     if (result.success) {
       toast({ title: "Bill Deleted", description: "The bill has been removed." });
@@ -546,6 +558,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     } else {
       toast({ title: "Error Deleting Bill", description: result.error, variant: "destructive" });
     }
+    setBillToDelete(null);
   };
 
   const handleAdminFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -767,6 +780,23 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           </Form>
         </DialogContent>
       </Dialog>
+      
+      <AlertDialog open={!!billToDelete} onOpenChange={(open) => !open && setBillToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2"><AlertTriangle className="h-6 w-6 text-destructive"/>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this bill for {billToDelete?.tenantName}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBillToDelete(null)} disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteBill} disabled={isLoading} className="bg-destructive hover:bg-destructive/90">
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="space-y-4 mt-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -810,7 +840,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                       <SelectValue placeholder="Filter by month" />
                   </SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="all">All Months</SelectItem>
                       {monthsForFilter.map(month => (
                            <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
                       ))}
@@ -911,13 +940,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                 </>
                               ) : ( // Pending or Overdue
                                 <>
-                                  {/* This button is now removed based on user request */}
                                 </>
                               )}
                               {canDeleteBills && bill.currentStatus !== 'Paid' && (
                                  <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteBillWithConfirmation(bill.id)} disabled={isLoading}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => setBillToDelete(bill)} disabled={isLoading}>
                                       <Trash2 className="h-4 w-4" />
                                        <span className="sr-only">Delete Bill</span>
                                     </Button>
