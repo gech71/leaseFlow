@@ -208,10 +208,9 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                                         <FormLabel>Template Content (HTML supported)</FormLabel>
                                         <FormControl>
                                             <Textarea
-                                                className="min-h-[300px] resize-y"
-                                                placeholder="Enter your agreement text here. Use placeholders from the list on the right."
+                                                placeholder="Enter the agreement text here. Use placeholders from the right panel."
+                                                className="h-[400px] resize-none"
                                                 {...field}
-                                                disabled={isSaving}
                                             />
                                         </FormControl>
                                         <FormMessage />
