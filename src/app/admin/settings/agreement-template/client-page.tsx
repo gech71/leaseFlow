@@ -195,67 +195,64 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
             {formMode === 'add' ? 'Create a new reusable template.' : `Editing the "${currentTemplate?.name}" template.`}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-grow overflow-hidden">
+        <div className="flex-grow grid md:grid-cols-3 gap-6 overflow-hidden">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 flex flex-col h-full">
-              <div className="grid md:grid-cols-3 gap-6 flex-grow overflow-hidden">
-                <div className="md:col-span-2 space-y-4 flex flex-col overflow-y-auto pr-4">
-                   <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="e.g., Standard 12-Month Commercial Lease" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                   <FormField
-                      control={form.control}
-                      name="content"
-                      render={({ field }) => (
-                        <FormItem className="flex-grow flex flex-col">
-                          <FormLabel>Template Content</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Enter your agreement text here. You can use placeholders from the list on the right."
-                              className="flex-grow resize-none font-mono text-xs"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                </div>
-                <div className="hidden md:block">
-                  <Card className="h-full flex flex-col">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Placeholders</CardTitle>
-                      <CardDescription className="text-xs">Click to copy to clipboard.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow overflow-y-auto">
-                        <div className="space-y-2">
-                          {placeholders.map(p => (
-                            <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
-                                <p className="font-semibold text-sm text-primary">{p.label}</p>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 shrink-0"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(p.value);
-                                    toast({ title: "Copied!", description: `Placeholder ${p.value} copied.` });
-                                  }}
-                                >
-                                  <Clipboard className="h-4 w-4" />
-                                </Button>
-                            </div>
-                          ))}
-                        </div>
-                    </CardContent>
-                  </Card>
-                </div>
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="md:col-span-2 flex flex-col space-y-4">
+              <div className="flex-grow space-y-4 overflow-y-auto pr-4">
+                <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="e.g., Standard 12-Month Commercial Lease" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField
+                  control={form.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Template Content (HTML supported)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter your agreement text here. You can use placeholders from the list on the right."
+                          className="min-h-[300px] flex-grow resize-y font-mono text-xs"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-
               <DialogFooter className="pt-4 border-t flex-shrink-0">
                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                 <Button type="submit" disabled={isSaving}> {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Template </Button>
               </DialogFooter>
             </form>
           </Form>
+          <div className="hidden md:block">
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Available Placeholders</CardTitle>
+                <CardDescription className="text-xs">Click to copy to clipboard.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-grow overflow-y-auto">
+                  <div className="space-y-2">
+                    {placeholders.map(p => (
+                      <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
+                          <p className="font-semibold text-sm text-primary">{p.label}</p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => {
+                              navigator.clipboard.writeText(p.value);
+                              toast({ title: "Copied!", description: `Placeholder ${p.value} copied.` });
+                            }}
+                          >
+                            <Clipboard className="h-4 w-4" />
+                          </Button>
+                      </div>
+                    ))}
+                  </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
