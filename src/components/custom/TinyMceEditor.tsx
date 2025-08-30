@@ -12,7 +12,6 @@ interface TinyMceEditorProps {
 export function TinyMceEditor({ value, onEditorChange, disabled }: TinyMceEditorProps) {
   return (
     <Editor
-      // You can get a free API key from tiny.cloud and add it to your .env file
       apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || 'no-api-key'}
       value={value}
       onEditorChange={onEditorChange}
@@ -23,10 +22,11 @@ export function TinyMceEditor({ value, onEditorChange, disabled }: TinyMceEditor
         plugins: [
           'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
           'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-          'insertdatetime', 'media', 'table', 'help', 'wordcount'
+          'insertdatetime', 'media', 'table', 'help', 'wordcount', 
+          'textcolor', 'colorpicker'
         ],
         toolbar: 'undo redo | blocks | ' +
-          'bold italic forecolor | alignleft aligncenter ' +
+          'bold italic forecolor backcolor | alignleft aligncenter ' +
           'alignright alignjustify | bullist numlist outdent indent | ' +
           'removeformat | help',
         content_style: 'body { font-family:Inter,sans-serif; font-size:14px }',
