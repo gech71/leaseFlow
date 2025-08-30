@@ -1,20 +1,27 @@
+export const dynamic = "force-dynamic";
 
-export const dynamic = 'force-dynamic';
-
-import { Suspense } from 'react';
-import { PageHeader } from '@/components/custom/PageHeader';
-import { Button } from '@/components/ui/button';
-import { Building as BuildingIconLucide, ArrowLeft, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { databaseService } from '@/lib/services/databaseService';
-import { BuildingUpsertFormInternal, type BuildingUpsertFormInternalProps } from './building-form';
-import type { User, Role } from '@prisma/client';
-import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+import { Suspense } from "react";
+import { PageHeader } from "@/components/custom/PageHeader";
+import { Button } from "@/components/ui/button";
+import {
+  Building as BuildingIconLucide,
+  ArrowLeft,
+  Loader2,
+} from "lucide-react";
+import Link from "next/link";
+import { databaseService } from "@/lib/services/databaseService";
+import {
+  BuildingUpsertFormInternal,
+  type BuildingUpsertFormInternalProps,
+} from "./building-form";
+import type { User, Role } from "@prisma/client";
+import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
 
 // Data fetching component
 async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
-  let initialBuildingDataSerializable: BuildingUpsertFormInternalProps['initialBuildingData'] = null;
-  let formMode: 'add' | 'edit' = 'add';
+  let initialBuildingDataSerializable: BuildingUpsertFormInternalProps["initialBuildingData"] =
+    null;
+  let formMode: "add" | "edit" = "add";
   let allUsers: User[] = [];
 
   const { currentUser } = await getUserAndManagedIds();
@@ -23,33 +30,35 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
   if (buildingId) {
     let buildingToEdit = await databaseService.getBuildingById(buildingId, {
       penaltyPolicyTiers: true,
-      managers: { select: { id: true } }
+      managers: { select: { id: true } },
     });
 
     if (buildingToEdit) {
-        const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+      const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
-        if (!isSuperAdmin) {
-            if (!managedBuildingIds?.includes(buildingToEdit.id)) {
-                buildingToEdit = null;
-            }
+      if (!isSuperAdmin) {
+        if (!managedBuildingIds?.includes(buildingToEdit.id)) {
+          buildingToEdit = null;
         }
+      }
     }
 
     if (buildingToEdit) {
-      formMode = 'edit';
+      formMode = "edit";
       initialBuildingDataSerializable = {
         id: buildingToEdit.id,
         name: buildingToEdit.name,
-        address: buildingToEdit.address || '',
+        address: buildingToEdit.address || "",
         accountNumber: buildingToEdit.accountNumber,
         createdAt: buildingToEdit.createdAt.toISOString(),
-        penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map(tier => ({
+        penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map((tier) => ({
           ...tier,
         })),
-        managers: buildingToEdit.managers.map(m => ({id: m.id})),
+        managers: buildingToEdit.managers.map((m) => ({ id: m.id })),
       };
-      allUsers = await databaseService.getAllUsers({ orderBy: { name: 'asc' }});
+      allUsers = await databaseService.getAllUsers({
+        orderBy: { name: "asc" },
+      });
     }
   }
 
@@ -63,26 +72,36 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
   );
 }
 
-
 // This is the main Server Component for the page
-export default async function BuildingUpsertPage({ searchParams }: { searchParams?: { id?: string } }) {
-  const pageTitle = searchParams?.id ? "Edit Building" : "Add New Building";
-  
+export default async function BuildingUpsertPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ id?: string }>;
+}) {
+  const params = await searchParams;
+  const pageTitle = params?.id ? "Edit Building" : "Add New Building";
+
   return (
     <div className="animate-fadeIn">
       <PageHeader
         title={pageTitle}
         description="Define building details and late fee policies."
         actions={
-            <Link href="/admin/buildings" passHref>
-                <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Buildings
-                </Button>
-            </Link>
+          <Link href="/admin/buildings" passHref>
+            <Button variant="outline">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Buildings
+            </Button>
+          </Link>
         }
       />
-      <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-        <BuildingDataFetcher buildingId={searchParams?.id} />
+      <Suspense
+        fallback={
+          <div className="flex justify-center items-center h-[50vh]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          </div>
+        }
+      >
+        <BuildingDataFetcher buildingId={params?.id} />
       </Suspense>
     </div>
   );
