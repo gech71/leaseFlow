@@ -31,7 +31,8 @@ export function TinyMceEditor({ value, onEditorChange, disabled }: TinyMceEditor
           'removeformat | help',
         content_style: 'body { font-family:Inter,sans-serif; font-size:14px }',
         skin: (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'oxide-dark' : 'oxide',
-        content_css: (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'default'
+        content_css: (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'default',
+        branding: false
       }}
     />
   );
