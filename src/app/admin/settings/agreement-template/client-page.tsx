@@ -61,18 +61,18 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
   });
 
   const placeholders = [
-    { label: 'Tenant Name', value: '{{tenantName}}' },
-    { label: 'Building Name', value: '{{buildingName}}' },
-    { label: 'Space ID/Name', value: '{{spaceIdName}}' },
-    { label: 'Floor', value: '{{floor}}' },
-    { label: 'Area (sqm)', value: '{{area}}' },
-    { label: 'Start Date', value: '{{startDate}}' },
-    { label: 'Term (Months)', value: '{{paymentTermMonths}}' },
-    { label: 'Monthly Rent', value: '{{monthlyRent}}' },
-    { label: 'Initial Payment (Months)', value: '{{initialPaymentMonths}}' },
-    { label: 'Initial Payment Amount', value: '{{initialPaymentAmount}}' },
-    { label: 'Next Payment Due', value: '{{nextPaymentDueDate}}' },
-    { label: 'Additional Terms', value: '{{additionalTerms}}' },
+    { label: 'Tenant Name', value: '{{tenantName}}', description: 'The full name of the tenant.' },
+    { label: 'Building Name', value: '{{buildingName}}', description: 'The name of the building.' },
+    { label: 'Space ID/Name', value: '{{spaceIdName}}', description: 'The identifier for the rented space (e.g., "Unit 101").' },
+    { label: 'Floor', value: '{{floor}}', description: 'The floor where the space is located.' },
+    { label: 'Area (sqm)', value: '{{area}}', description: 'The total area of the space in square meters.' },
+    { label: 'Start Date', value: '{{startDate}}', description: 'The official start date of the lease agreement.' },
+    { label: 'Term (Months)', value: '{{paymentTermMonths}}', description: 'The total duration of the lease in months.' },
+    { label: 'Monthly Rent', value: '{{monthlyRent}}', description: 'The amount of rent due each month.' },
+    { label: 'Initial Payment (Months)', value: '{{initialPaymentMonths}}', description: 'The number of months paid upfront.' },
+    { label: 'Initial Payment Amount', value: '{{initialPaymentAmount}}', description: 'The total upfront payment amount.' },
+    { label: 'Next Payment Due', value: '{{nextPaymentDueDate}}', description: 'The date the next lease payment is due.' },
+    { label: 'Additional Terms', value: '{{additionalTerms}}', description: 'Any extra clauses or terms added to the agreement.' },
   ];
 
   const handleOpenAddForm = () => {
@@ -234,7 +234,10 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                   <div className="space-y-2">
                     {placeholders.map(p => (
                       <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
-                          <p className="font-semibold text-sm text-primary">{p.label}</p>
+                          <div>
+                            <p className="font-semibold text-sm text-primary">{p.label}</p>
+                            <p className="text-xs text-muted-foreground">{p.description}</p>
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
