@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -29,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useRouter } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 
 const templateFormSchema = z.object({
     name: z.string().min(3, "Template name must be at least 3 characters."),
@@ -203,12 +204,13 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                             name="content"
                             render={({ field }) => (
                                 <FormItem className="flex flex-col flex-grow">
-                                    <FormLabel>Template Content (HTML allowed)</FormLabel>
+                                    <FormLabel>Template Content (HTML supported)</FormLabel>
                                     <FormControl>
                                         <Textarea
-                                            placeholder="Enter your agreement text here. You can use HTML tags like <p>, <b>, <ul>, etc."
-                                            className="h-full"
+                                            placeholder="Enter your agreement text here. You can use HTML tags like <b> for bold, etc."
+                                            className="min-h-[300px] flex-grow resize-y"
                                             {...field}
+                                            disabled={isSaving}
                                         />
                                     </FormControl>
                                     <FormMessage />
