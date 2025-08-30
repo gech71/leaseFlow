@@ -195,29 +195,31 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                     {formMode === 'add' ? 'Create a new reusable template.' : `Editing the "${currentTemplate?.name}" template.`}
                 </DialogDescription>
             </DialogHeader>
-            <div className="grid md:grid-cols-3 gap-6 py-4 flex-grow overflow-y-hidden">
+            <div className="grid md:grid-cols-3 gap-6 py-4 flex-grow overflow-hidden">
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 md:col-span-2 flex flex-col">
-                        <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="e.g., Standard 12-Month Commercial Lease" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                        <FormField
-                            control={form.control}
-                            name="content"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-col flex-grow">
-                                    <FormLabel>Template Content (HTML supported)</FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            className="h-full min-h-[300px] resize-y"
-                                            placeholder="Enter your agreement text here. Use placeholders from the list on the right."
-                                            {...field}
-                                            disabled={isSaving}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <DialogFooter className="pt-4 border-t">
+                    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 md:col-span-2 flex flex-col overflow-hidden">
+                        <div className="flex-grow space-y-4 overflow-y-auto pr-4">
+                            <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="e.g., Standard 12-Month Commercial Lease" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                            <FormField
+                                control={form.control}
+                                name="content"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Template Content (HTML supported)</FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                className="min-h-[300px] resize-y"
+                                                placeholder="Enter your agreement text here. Use placeholders from the list on the right."
+                                                {...field}
+                                                disabled={isSaving}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <DialogFooter className="pt-4 border-t flex-shrink-0">
                             <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                             <Button type="submit" disabled={isSaving}> {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Template </Button>
                         </DialogFooter>
@@ -228,7 +230,7 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                         <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Available Placeholders</CardTitle>
                         <CardDescription className="text-xs">Click a placeholder to copy it to your clipboard.</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex-grow overflow-y-hidden">
+                    <CardContent className="flex-grow overflow-hidden">
                         <ScrollArea className="h-full pr-4">
                             <div className="space-y-2">
                                 <h4 className="font-semibold text-sm mt-4">Data Fields</h4>
