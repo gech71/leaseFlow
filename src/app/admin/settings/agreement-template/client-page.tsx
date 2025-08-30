@@ -342,51 +342,46 @@ export function AgreementTemplateClientPage({
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow grid md:grid-cols-3 gap-6 overflow-hidden">
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(handleFormSubmit)}
-                id="template-form"
-                className="md:col-span-2 flex flex-col space-y-4 flex-grow"
-              >
-                <div className="flex-grow space-y-4 overflow-y-auto pr-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Template Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Standard Commercial Lease"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="content"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Template Content</FormLabel>
-                        <FormControl>
-                          <TinyMceEditor
-                            value={field.value}
-                            onEditorChange={(content) =>
-                              field.onChange(content)
-                            }
-                            disabled={isSaving}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </form>
-            </Form>
+             <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(handleFormSubmit)}
+                  id="template-form"
+                  className="md:col-span-2 flex flex-col space-y-4 flex-grow"
+                >
+                  <div className="flex-grow space-y-4 overflow-y-auto pr-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Template Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Template Name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="content"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                           <FormLabel>Template Content</FormLabel>
+                           <FormControl>
+                                <TinyMceEditor
+                                    value={field.value}
+                                    onEditorChange={(content) => field.onChange(content)}
+                                    disabled={isSaving}
+                                />
+                           </FormControl>
+                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </form>
+              </Form>
             <div className="hidden md:block h-full">
               <Card className="h-[60vh] flex flex-col">
                 <CardHeader>
