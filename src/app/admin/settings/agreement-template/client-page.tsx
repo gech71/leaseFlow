@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -196,35 +195,33 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow grid md:grid-cols-3 gap-6 overflow-hidden">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="md:col-span-2 flex flex-col space-y-4">
-              <div className="flex-grow space-y-4 overflow-y-auto pr-4">
-                <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="e.g., Standard 12-Month Commercial Lease" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                <FormField
-                  control={form.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Template Content (HTML supported)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter your agreement text here. You can use placeholders from the list on the right."
-                          className="min-h-[300px] flex-grow resize-y font-mono text-xs"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <DialogFooter className="pt-4 border-t flex-shrink-0">
-                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                <Button type="submit" disabled={isSaving}> {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Template </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-          <div className="hidden md:block">
+          <div className="md:col-span-2 flex flex-col space-y-4">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleFormSubmit)} id="template-form" className="flex flex-col space-y-4 flex-grow">
+                <div className="flex-grow space-y-4 overflow-y-auto pr-4">
+                  <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="Template Name" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                  <FormField
+                    control={form.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Template Content (HTML supported)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter your agreement text here. You can use placeholders from the list on the right."
+                            className="min-h-[300px] flex-grow resize-y font-mono text-xs"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </form>
+            </Form>
+          </div>
+          <div className="hidden md:block h-full">
             <Card className="h-full flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Available Placeholders</CardTitle>
@@ -257,6 +254,10 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
             </Card>
           </div>
         </div>
+         <DialogFooter className="pt-4 border-t flex-shrink-0">
+          <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+          <Button type="submit" form="template-form" disabled={isSaving}> {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Template </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 
