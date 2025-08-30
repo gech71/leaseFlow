@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -197,19 +198,19 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
         <div className="flex-grow overflow-hidden">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 flex flex-col h-full">
-              <div className="grid md:grid-cols-3 gap-6 flex-grow overflow-y-auto pr-4">
-                <div className="md:col-span-2 space-y-4">
+              <div className="grid md:grid-cols-3 gap-6 flex-grow overflow-hidden">
+                <div className="md:col-span-2 space-y-4 flex flex-col overflow-y-auto pr-4">
                    <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Template Name</FormLabel> <FormControl><Input placeholder="e.g., Standard 12-Month Commercial Lease" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                    <FormField
                       control={form.control}
                       name="content"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex-grow flex flex-col">
                           <FormLabel>Template Content</FormLabel>
                           <FormControl>
                             <Textarea
                               placeholder="Enter your agreement text here. You can use placeholders from the list on the right."
-                              className="min-h-[400px] font-mono text-xs"
+                              className="flex-grow resize-none font-mono text-xs"
                               {...field}
                             />
                           </FormControl>
@@ -219,12 +220,12 @@ export function AgreementTemplateClientPage({ initialTemplates, error }: Agreeme
                     />
                 </div>
                 <div className="hidden md:block">
-                  <Card>
+                  <Card className="h-full flex flex-col">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-md"><Info className="h-5 w-5 text-primary" />Placeholders</CardTitle>
                       <CardDescription className="text-xs">Click to copy to clipboard.</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex-grow overflow-y-auto">
                         <div className="space-y-2">
                           {placeholders.map(p => (
                             <div key={p.value} className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2">
