@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { jsPDF } from 'jspdf';
+import { TinyMceEditor } from '@/components/custom/TinyMceEditor';
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -126,8 +127,14 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
       '{{additionalTerms}}': data.additionalTerms || "No additional terms specified.",
     };
 
+    // Helper function to escape special regex characters
+    const escapeRegExp = (string: string) => {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+    };
+    
     for (const key in replacements) {
-      processedText = processedText.replace(new RegExp(key.replace(/{{|}}/g, ''), 'g'), replacements[key]);
+        const regex = new RegExp(escapeRegExp(key), 'g');
+        processedText = processedText.replace(regex, replacements[key]);
     }
     
     return processedText;
@@ -356,13 +363,24 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
                 </div>
               )}
              
-              <FormField control={form.control} name="additionalTerms" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Additional Terms for Agreement (Optional)</FormLabel>
-                    <FormControl><Textarea placeholder="Enter any specific clauses or terms for the agreement..." className="resize-none" rows={3} {...field} disabled={!canCreateAgreements}/></FormControl>
-                    <FormDescription>These terms will be appended to the standard agreement clauses.</FormDescription><FormMessage />
-                  </FormItem>
-              )}/>
+              <FormField
+                  control={form.control}
+                  name="additionalTerms"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Additional Terms</FormLabel>
+                          <FormControl>
+                              <TinyMceEditor
+                                  value={field.value || ''}
+                                  onEditorChange={(content) => field.onChange(content)}
+                                  disabled={!canCreateAgreements || isSavingToDb || isPreviewing}
+                              />
+                          </FormControl>
+                          <FormDescription>These terms will be appended to the standard agreement clauses.</FormDescription>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
               <Button type="submit" disabled={isPreviewing || isSavingToDb || availableSpaces.length === 0 || tenants.length === 0 || !form.formState.isValid || !canCreateAgreements} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                 {isPreviewing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</> : "Preview Agreement"}
               </Button>
@@ -427,3 +445,5 @@ export function GenerateAgreementClientPage({ tenants, availableSpaces, agreemen
     </div>
   );
 }
+
+    
