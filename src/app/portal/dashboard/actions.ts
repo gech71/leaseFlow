@@ -1,4 +1,5 @@
 
+
 // src/app/portal/dashboard/actions.ts
 "use server";
 
@@ -246,8 +247,6 @@ export async function initiateArifpayPaymentAction(
       return { success: false, error: "Building account number is not configured for this bill." };
     }
 
-    const nonce = crypto.randomBytes(6).toString('hex');
-
     const requestBody = {
       phone: currentUser.phoneNumber,
       cbs: bill.agreement.space.building.accountNumber,
@@ -260,13 +259,6 @@ export async function initiateArifpayPaymentAction(
           description: `Bill payment for date: ${billDate}`
         }
       ],
-      // Adding required callback fields to the request
-      successURL: `${process.env.NEXT_PUBLIC_BASE_URL}/portal/success`,
-      errorURL: `${process.env.NEXT_PUBLIC_BASE_URL}/portal/error`,
-      cancelURL: `${process.env.NEXT_PUBLIC_BASE_URL}/portal/cancel`,
-      notifyURL: `${process.env.NEXT_PUBLIC_BASE_URL}/api/portal/Arifcallback`,
-      // Use billId as part of the transactionId for easy lookup on callback
-      transactionId: `${billId}__${nonce}`
     };
 
     const response = await fetch(ARIFPAY_API_URL, {
@@ -286,16 +278,17 @@ export async function initiateArifpayPaymentAction(
       return { success: false, error: `Payment gateway error: ${responseData.responseDescription || "An unknown error occurred."}` };
     }
     
-    if (!responseData.data?.url) {
-       console.error("ArifPay API Error - No URL:", responseData);
-      return { success: false, error: "Payment gateway did not return a valid payment URL." };
+    const sessionId = responseData?.data?.na;
+    if (!responseData.data?.url || !sessionId) {
+       console.error("ArifPay API Error - No URL or Session ID:", responseData);
+      return { success: false, error: "Payment gateway did not return a valid payment URL or session ID." };
     }
 
     await prisma.bill.update({
       where: { id: billId },
       data: {
         status: 'PendingVerification',
-        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${responseData.data.na}`
+        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${sessionId}`
       }
     });
 
