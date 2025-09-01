@@ -13,7 +13,8 @@ import type {
   User, 
   Role,
   Secret,
-  AgreementTemplate
+  AgreementTemplate,
+  ArifPayment
 } from '@prisma/client';
 
 export class DatabaseService {
@@ -419,6 +420,19 @@ export class DatabaseService {
 
   async deleteAgreementTemplate(id: string): Promise<AgreementTemplate> {
     return prisma.agreementTemplate.delete({ where: { id } });
+  }
+
+  // --- ArifPayment ---
+  async createArifPayment(data: Prisma.ArifPaymentCreateInput): Promise<ArifPayment> {
+    return prisma.arifPayment.create({ data });
+  }
+
+  async getArifPaymentBySessionId(sessionId: string): Promise<ArifPayment | null> {
+    return prisma.arifPayment.findUnique({ where: { sessionId } });
+  }
+  
+  async updateArifPayment(id: string, data: Prisma.ArifPaymentUpdateInput): Promise<ArifPayment> {
+    return prisma.arifPayment.update({ where: { id }, data });
   }
 }
 

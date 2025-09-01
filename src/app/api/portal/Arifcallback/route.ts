@@ -58,8 +58,7 @@ export async function POST(request: NextRequest) {
     const payload = normalizeKeys(rawPayload); // Normalize the incoming payload
     console.log("Received and normalized ArifPay callback payload:", payload);
 
-    // Destructure based on the expected callback payload
-    const { transaction, sessionId } = payload;
+    const { sessionId, transaction } = payload;
     const { transactionId, transactionStatus, paymentMethod } = transaction || {};
 
     if (!sessionId || !transactionId || !transactionStatus) {
@@ -67,39 +66,61 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Invalid payload: missing required fields." }, { status: 400 });
     }
     
-    // Find the bill using the session ID stored in the tenantPaymentNotes
-    const bill = await prisma.bill.findFirst({
-      where: {
-        tenantPaymentNotes: {
-          contains: `Session ID: ${sessionId}`
-        }
-      }
-    });
+    // Find the ArifPayment record using the session ID
+    const arifPayment = await databaseService.getArifPaymentBySessionId(sessionId);
 
-    if (!bill) {
-      console.warn(`ArifPay Callback: Bill with Session ID ${sessionId} not found.`);
-      // Return 200 to prevent ArifPay from retrying for a non-existent bill
-      return NextResponse.json({ message: "Bill not found, but callback acknowledged." }, { status: 200 });
+    if (!arifPayment) {
+      console.warn(`ArifPay Callback: ArifPayment record with Session ID ${sessionId} not found.`);
+      return NextResponse.json({ message: "Payment record not found, but callback acknowledged." }, { status: 200 });
     }
 
     // Process based on status
     if (transactionStatus === 'SUCCESS') {
-      await databaseService.updateBill(bill.id, {
-        status: 'Paid',
-        paymentDate: new Date(),
-        paymentMethod: paymentMethod || 'ArifPay', // Use method from payload if available
-        paymentReference: transactionId, // Store the final ArifPay transaction ID
-        adminVerifiedPayment: true,
-        adminVerificationNotes: `Payment confirmed via ArifPay callback. Session ID: ${sessionId}.`
+      await prisma.$transaction(async (tx) => {
+        // Update the ArifPayment record
+        await tx.arifPayment.update({
+          where: { id: arifPayment.id },
+          data: {
+            status: 'Success',
+            transactionId: transactionId,
+            paymentMethod: paymentMethod || 'ArifPay',
+          }
+        });
+        
+        // Update the associated Bill record
+        await tx.bill.update({
+          where: { id: arifPayment.billId },
+          data: {
+            status: 'Paid',
+            paymentDate: new Date(),
+            paymentMethod: paymentMethod || 'ArifPay',
+            paymentReference: transactionId,
+            adminVerifiedPayment: true,
+            adminVerificationNotes: `Payment confirmed via ArifPay callback. Session ID: ${sessionId}.`,
+          }
+        });
       });
-      console.log(`Updated bill ${bill.id} to 'Paid' based on ArifPay callback.`);
+      console.log(`Updated bill ${arifPayment.billId} to 'Paid' based on ArifPay callback.`);
     } else {
       // Handle other statuses like FAILED, CANCELED, EXPIRED
-      await databaseService.updateBill(bill.id, {
-        status: 'Pending', // Revert to Pending or keep as is
-        tenantPaymentNotes: `ArifPay payment attempt failed or was cancelled. Status: ${transactionStatus}.`
+       await prisma.$transaction(async (tx) => {
+         await tx.arifPayment.update({
+          where: { id: arifPayment.id },
+          data: {
+            status: 'Failed', // or transactionStatus
+            transactionId: transactionId,
+            paymentMethod: paymentMethod,
+          }
+        });
+        await tx.bill.update({
+          where: { id: arifPayment.billId },
+          data: {
+            status: 'Pending', // Revert to Pending
+            tenantPaymentNotes: `ArifPay payment attempt failed or was cancelled. Status: ${transactionStatus}.`
+          }
+        });
       });
-      console.log(`Payment for bill ${bill.id} was not successful. Status: ${transactionStatus}.`);
+      console.log(`Payment for bill ${arifPayment.billId} was not successful. Status: ${transactionStatus}.`);
     }
 
     // Acknowledge receipt to ArifPay

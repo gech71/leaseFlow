@@ -284,12 +284,23 @@ export async function initiateArifpayPaymentAction(
       return { success: false, error: "Payment gateway did not return a valid payment URL or session ID." };
     }
 
-    await prisma.bill.update({
-      where: { id: billId },
-      data: {
-        status: 'PendingVerification',
-        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${sessionId}`
-      }
+    await prisma.$transaction(async (tx) => {
+        // Create the ArifPayment record
+        await tx.arifPayment.create({
+            data: {
+                sessionId: sessionId,
+                status: 'Pending',
+                amount: billAmount,
+                paymentUrl: responseData.data.url,
+                bill: { connect: { id: billId } }
+            }
+        });
+
+        // Update the bill status
+        await tx.bill.update({
+            where: { id: billId },
+            data: { status: 'PendingVerification' }
+        });
     });
 
     return { success: true, paymentUrl: responseData.data.url };
