@@ -20,14 +20,17 @@ import { sendEmail } from "@/lib/services/emailService";
 import crypto from "crypto";
 
 // --- Normalization Helper ---
+// Corrected to handle PascalCase keys like 'URL' without mangling them.
 const toCamelCase = (s: string) => {
   if (typeof s !== 'string' || s.length === 0) {
     return s;
   }
-  // This handles PascalCase (like ResponseCode) and snake_case
-   return s.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
-         .replace(/^[A-Z]/, (L) => L.toLowerCase());
+  // This handles snake_case and ensures PascalCase like 'ResponseCode' becomes 'responseCode'
+  // but doesn't affect all-caps acronyms like 'URL'.
+  return s.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
+         .replace(/^[A-Z](?![A-Z]|$)/, (L) => L.toLowerCase());
 };
+
 
 const isObject = function (o: any) {
   return o === Object(o) && !Array.isArray(o) && typeof o !== "function";
@@ -305,10 +308,10 @@ export async function initiateArifpayPaymentAction(
     }
 
     let arifpayPhoneNumber = currentUser.phoneNumber;
-    if (arifpayPhoneNumber.startsWith('09')) {
-        arifpayPhoneNumber = '2519' + arifpayPhoneNumber.substring(2);
-    } else if (arifpayPhoneNumber.startsWith('07')) {
-        arifpayPhoneNumber = '2517' + arifpayPhoneNumber.substring(2);
+    if (arifpayPhoneNumber.startsWith("09")) {
+      arifpayPhoneNumber = "2519" + arifpayPhoneNumber.substring(2);
+    } else if (arifpayPhoneNumber.startsWith("07")) {
+      arifpayPhoneNumber = "2517" + arifpayPhoneNumber.substring(2);
     }
 
     const requestBody = {
@@ -351,9 +354,9 @@ export async function initiateArifpayPaymentAction(
 
     console.log("ArifPay Response Body:", responseText);
 
-    let rawResponseData;
+    let responseData;
     try {
-      rawResponseData = JSON.parse(responseText);
+      responseData = JSON.parse(responseText);
     } catch (e) {
       console.error(
         "ArifPay API Error: Failed to parse JSON response. Body:",
@@ -365,20 +368,19 @@ export async function initiateArifpayPaymentAction(
       };
     }
 
-    const responseData = normalizeKeys(rawResponseData); // Normalize the response
-
-    if (responseData.responseCode && responseData.responseCode !== "0") {
+    if (responseData.ResponseCode && responseData.ResponseCode !== "0") {
       console.error("ArifPay API Error:", responseData);
       return {
         success: false,
         error: `Payment gateway error: ${
-          responseData.responseDescription || "An unknown error occurred."
+          responseData.ResponseDescription || "An unknown error occurred."
         }`,
       };
     }
     
-    const paymentUrl = responseData?.data?.url;
-    const sessionId = responseData?.data?.na;
+    // Direct access to the response data without normalization
+    const paymentUrl = responseData?.Data?.URL;
+    const sessionId = responseData?.Data?.NA;
     
     if (!paymentUrl || !sessionId) {
       console.error("ArifPay API Error - No URL or Session ID:", responseData);
@@ -498,3 +500,5 @@ export async function sendContactEmailAction(formData: {
     };
   }
 }
+
+    
