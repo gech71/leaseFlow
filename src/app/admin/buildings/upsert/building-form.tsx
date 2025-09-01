@@ -21,8 +21,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 interface UIPenaltyRule {
   id: string; 
   dbId?: string; 
-  durationDays?: number;
-  feeType: 'Fixed' | 'Percentage';
+  fromDay?: number;
+  toDay?: number;
+  penaltyType: 'Fixed' | 'Percentage' | 'DailyPercentage';
   feeValue?: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string;
@@ -77,32 +78,17 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
   
   useEffect(() => {
     if (initialBuildingData) {
-      const uiRules: UIPenaltyRule[] = (initialBuildingData.penaltyPolicyTiers || []).map(tier => {
-        let duration: number | undefined;
-        if (tier.toDay !== null && tier.toDay !== undefined && tier.fromDay !== null && tier.fromDay !== undefined) {
-            duration = tier.toDay - tier.fromDay + 1; 
-        }
-        
-        return {
+      const uiRules: UIPenaltyRule[] = (initialBuildingData.penaltyPolicyTiers || []).map(tier => ({
           id: tier.id, 
           dbId: tier.id,
-          durationDays: duration,
-          feeType: tier.feeType as 'Fixed' | 'Percentage',
+          fromDay: tier.fromDay,
+          toDay: tier.toDay ?? undefined,
+          penaltyType: tier.penaltyType as UIPenaltyRule['penaltyType'],
           feeValue: tier.feeValue,
-          scope: tier.scope as 'Building' | 'Floor' | 'SpecificSpaces',
+          scope: tier.scope as UIPenaltyRule['scope'],
           applicableFloor: tier.applicableFloor || undefined,
           applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || undefined,
-        };
-      });
-       uiRules.sort((a, b) => {
-        if (a.scope !== b.scope) return a.scope.localeCompare(b.scope);
-        const aTier = initialBuildingData.penaltyPolicyTiers.find(t => t.id === a.id);
-        const bTier = initialBuildingData.penaltyPolicyTiers.find(t => t.id === b.id);
-        if (aTier && bTier) {
-            return aTier.fromDay - bTier.fromDay;
-        }
-        return 0;
-      });
+      })).sort((a,b) => (a.fromDay ?? 0) - (b.fromDay ?? 0));
 
       setCurrentBuildingForm({
         id: initialBuildingData.id,
@@ -142,9 +128,10 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
     const newRule: UIPenaltyRule = {
       id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       scope: 'Building',
-      feeType: 'Fixed',
+      penaltyType: 'Fixed',
       feeValue: undefined,
-      durationDays: undefined,
+      fromDay: undefined,
+      toDay: undefined,
     };
     setCurrentBuildingForm(prev => ({
       ...prev,
@@ -168,7 +155,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         if (rule.id !== ruleId) return rule;
         let updatedRule = { ...rule, [field]: value };
 
-        if (field === 'durationDays' || field === 'feeValue') {
+        if (field === 'fromDay' || field === 'toDay' || field === 'feeValue') {
            updatedRule[field] = (value === '' || value === null || value === undefined || isNaN(Number(value))) ? undefined : Number(value);
         }
 
@@ -204,75 +191,39 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
 
 
     const finalPenaltyTiersCreateInput: Prisma.PenaltyTierCreateWithoutBuildingInput[] = [];
-    const groupedUIRules: Record<string, UIPenaltyRule[]> = {};
 
     try {
-      const configuredRules = currentBuildingForm.uiPenaltyRules.filter(
-        rule => rule.feeValue !== undefined && rule.feeValue >= 0
-      );
+        const configuredRules = currentBuildingForm.uiPenaltyRules.filter(
+            rule => rule.feeValue !== undefined && rule.feeValue >= 0 && rule.fromDay !== undefined && rule.fromDay > 0
+        );
 
-      configuredRules.forEach(uiRule => {
-        if (!uiRule.feeType) {
-            toast({ title: "Validation Error", description: `A rule is missing a 'Fee Type'.`, variant: "destructive" });
-            throw new Error("Incomplete UI rule: missing fee type.");
-        }
-
-        let scopeKey = uiRule.scope;
-        if (uiRule.scope === 'Floor') {
-            if (!uiRule.applicableFloor?.trim()) {
-            toast({ title: "Validation Error", description: `Floor name is required for floor-scoped rule.`, variant: "destructive" });
-            throw new Error("Missing floor name.");
+        for (const uiRule of configuredRules) {
+             if (!uiRule.penaltyType) {
+                toast({ title: "Validation Error", description: `A rule is missing a 'Penalty Type'.`, variant: "destructive" });
+                throw new Error("Incomplete UI rule: missing penalty type.");
             }
-            scopeKey += `_Floor_${uiRule.applicableFloor.trim()}`;
-        } else if (uiRule.scope === 'SpecificSpaces') {
-            if (!uiRule.applicableSpaceIdNamesStr?.trim()) {
-            toast({ title: "Validation Error", description: `Space ID(s) are required for space-scoped rule.`, variant: "destructive" });
-            throw new Error("Missing space IDs.");
+            if (uiRule.toDay !== undefined && uiRule.fromDay !== undefined && uiRule.toDay < uiRule.fromDay) {
+                 toast({ title: "Validation Error", description: `Rule error: 'To Day' cannot be less than 'From Day'.`, variant: "destructive" });
+                throw new Error("Invalid day range.");
             }
-            const sortedSpaceIds = uiRule.applicableSpaceIdNamesStr.split(',').map(s => s.trim()).filter(s => s).sort().join(',');
-            scopeKey += `_Spaces_${sortedSpaceIds}`;
-        }
-
-        if (!groupedUIRules[scopeKey]) groupedUIRules[scopeKey] = [];
-        groupedUIRules[scopeKey].push(uiRule);
-      });
-
-      for (const scopeKey in groupedUIRules) {
-        const rulesInScope = groupedUIRules[scopeKey].sort((a,b) => (a.durationDays ?? Infinity) - (b.durationDays ?? Infinity));
-        let cumulativeStartDay = 1;
-
-        for (let i = 0; i < rulesInScope.length; i++) {
-            const uiRule = rulesInScope[i];
-            const fromDay = cumulativeStartDay;
-            let toDay: number | null = null;
-
-            if (uiRule.durationDays === undefined || uiRule.durationDays === null || uiRule.durationDays <= 0) {
-              if (i < rulesInScope.length -1) { 
-                toast({title: "Validation Error", description: `Only the last rule in a scope group can have an indefinite duration (blank or zero duration days). Please adjust rule for scope: ${scopeKey.split('_')[0]}.`, variant: "destructive"});
-                throw new Error("Invalid indefinite duration placement.");
-              }
-              toDay = null; 
-            } else {
-              toDay = fromDay + uiRule.durationDays - 1;
+            if (uiRule.scope === 'Floor' && !uiRule.applicableFloor?.trim()) {
+                toast({ title: "Validation Error", description: `Floor name is required for floor-scoped rule.`, variant: "destructive" });
+                throw new Error("Missing floor name.");
+            } else if (uiRule.scope === 'SpecificSpaces' && !uiRule.applicableSpaceIdNamesStr?.trim()) {
+                toast({ title: "Validation Error", description: `Space ID(s) are required for space-scoped rule.`, variant: "destructive" });
+                throw new Error("Missing space IDs.");
             }
 
             finalPenaltyTiersCreateInput.push({
-              fromDay: fromDay,
-              toDay: toDay,
-              feeType: uiRule.feeType,
-              feeValue: Number(uiRule.feeValue!), 
-              scope: uiRule.scope,
-              applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
-              applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : [],
+                fromDay: uiRule.fromDay!,
+                toDay: uiRule.toDay,
+                penaltyType: uiRule.penaltyType,
+                feeValue: Number(uiRule.feeValue!), 
+                scope: uiRule.scope,
+                applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
+                applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : [],
             });
-
-            if (toDay !== null) {
-              cumulativeStartDay = toDay + 1;
-            } else {
-              break; 
-            }
         }
-      }
     } catch (error: any) {
         console.error("Validation error during penalty tier processing:", error.message);
         setIsSaving(false);
@@ -440,7 +391,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                   )}
               </div>
               <CardDescription>
-                Define sequential penalty rules for each scope (Building, specific Floor, or specific Spaces). The last rule defined for a given scope will apply indefinitely if no duration (blank or zero days) is set.
+                Define sequential penalty rules. For the last rule in a group, leave "To Day" blank for an indefinite period.
               </CardDescription>
               {currentBuildingForm.uiPenaltyRules.length === 0 && <p className="text-sm text-muted-foreground text-center py-3">No penalty rules defined. {canManageThisForm ? 'Click "Add Rule" to begin.' : ''}</p>}
 
@@ -461,20 +412,32 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                       </div>
                     </CardHeader>
                     <CardContent className="p-0 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
-                              <Label htmlFor={`ruleDuration-${uiRule.id}`} className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>Duration (Days)</Label>
-                              <Input id={`ruleDuration-${uiRule.id}`} type="number" min="1" placeholder="e.g., 5"
-                                      value={uiRule.durationDays ?? ''} 
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'durationDays', e.target.value)}
+                              <Label htmlFor={`fromDay-${uiRule.id}`} className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>From Day<span className="text-destructive ml-1">*</span></Label>
+                              <Input id={`fromDay-${uiRule.id}`} type="number" min="1" placeholder="e.g., 1"
+                                      value={uiRule.fromDay ?? ''} 
+                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'fromDay', e.target.value)}
                                       className="mt-1 text-sm h-9" disabled={isSaving || !canManageThisForm}/>
-                              <p className="text-xs text-muted-foreground mt-0.5">For last rule in scope, leave blank/0 for indefinite.</p>
                           </div>
                           <div>
-                              <Label htmlFor={`ruleFeeType-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Fee Type<span className="text-destructive ml-1">*</span></Label>
-                              <Select value={uiRule.feeType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'feeType', value as UIPenaltyRule['feeType'])} disabled={isSaving || !canManageThisForm}>
-                                  <SelectTrigger id={`ruleFeeType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue placeholder="Select fee type" /></SelectTrigger>
-                                  <SelectContent><SelectItem value="Fixed">Fixed</SelectItem><SelectItem value="Percentage">Percentage</SelectItem></SelectContent>
+                              <Label htmlFor={`toDay-${uiRule.id}`} className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>To Day</Label>
+                              <Input id={`toDay-${uiRule.id}`} type="number" min={uiRule.fromDay} placeholder="e.g., 5"
+                                      value={uiRule.toDay ?? ''} 
+                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'toDay', e.target.value)}
+                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManageThisForm}/>
+                          </div>
+                      </div>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                           <div>
+                              <Label htmlFor={`rulePenaltyType-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Penalty Type<span className="text-destructive ml-1">*</span></Label>
+                              <Select value={uiRule.penaltyType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'penaltyType', value as UIPenaltyRule['penaltyType'])} disabled={isSaving || !canManageThisForm}>
+                                  <SelectTrigger id={`rulePenaltyType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue placeholder="Select penalty type" /></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="Fixed">Fixed Amount</SelectItem>
+                                      <SelectItem value="Percentage">Percentage (One-time)</SelectItem>
+                                      <SelectItem value="DailyPercentage">Daily Percentage</SelectItem>
+                                  </SelectContent>
                               </Select>
                           </div>
                           <div>

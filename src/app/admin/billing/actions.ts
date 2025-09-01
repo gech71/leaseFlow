@@ -295,12 +295,14 @@ function calculateIndividualPenalty(
 
   for (const tier of sortedTiers) {
     if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
-      if (tier.feeType === 'Fixed') {
-        calculatedPenalty = Number(tier.feeValue);
-      } else if (tier.feeType === 'Percentage') {
-        calculatedPenalty = billAmount * (Number(tier.feeValue) / 100);
+      if (tier.penaltyType === 'Fixed') {
+        calculatedPenalty = tier.feeValue;
+      } else if (tier.penaltyType === 'Percentage') {
+        calculatedPenalty = billAmount * (tier.feeValue / 100);
+      } else if (tier.penaltyType === 'DailyPercentage') {
+        calculatedPenalty = (billAmount * (tier.feeValue / 100)) * daysOverdue;
       }
-      break;
+      break; 
     }
   }
   return parseFloat(calculatedPenalty.toFixed(2));
@@ -354,9 +356,6 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const agreementStartDate = agreement.startDate;
     const firstChargeableRentDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
     
-    // FIX: The very first bill (whose due date matches the agreement start date) should include rent,
-    // as it represents the first payment (often handled at signing). Subsequent bills within the
-    // initial payment period will have zero rent.
     let rentAmount = agreement.monthlyRentalPrice;
     const isFirstBill = isSameDay(targetBillDate, agreementStartDate);
 

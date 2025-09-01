@@ -83,7 +83,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
                             return (
                                 <div key={`${tier.id}-${index}`} className="text-xs pl-2 py-0.5">
                                     <p><Clock className="inline mr-1 h-3 w-3"/>{tierDurationDesc}</p>
-                                    <p><BanknoteIcon className="inline mr-1 h-3 w-3"/>Fee: {tier.feeType === 'Fixed' ? `${tier.feeValue.toFixed(2)} Birr` : `${tier.feeValue}% of rent`}</p>
+                                    <p><BanknoteIcon className="inline mr-1 h-3 w-3"/>Fee: {tier.penaltyType === 'Fixed' ? `${tier.feeValue.toFixed(2)} Birr` : `${tier.feeValue}%`}{tier.penaltyType === 'DailyPercentage' ? ' daily' : ''}</p>
                                 </div>
                             )
                         })}
