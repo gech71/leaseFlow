@@ -25,12 +25,8 @@ const toCamelCase = (s: string) => {
     return s;
   }
   // This handles PascalCase (like ResponseCode) and snake_case
-  return s.replace(/([-_A-Z])([a-z_A-Z]+)/g, (match, first, rest, offset) => {
-    if (offset > 0) {
-      return first.toUpperCase() + rest.toLowerCase();
-    }
-    return first.toLowerCase() + rest.toLowerCase();
-  }).replace(/[-_]/g, '');
+   return s.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
+         .replace(/^[A-Z]/, (L) => L.toLowerCase());
 };
 
 const isObject = function (o: any) {
@@ -308,8 +304,15 @@ export async function initiateArifpayPaymentAction(
       };
     }
 
+    let arifpayPhoneNumber = currentUser.phoneNumber;
+    if (arifpayPhoneNumber.startsWith('09')) {
+        arifpayPhoneNumber = '2519' + arifpayPhoneNumber.substring(2);
+    } else if (arifpayPhoneNumber.startsWith('07')) {
+        arifpayPhoneNumber = '2517' + arifpayPhoneNumber.substring(2);
+    }
+
     const requestBody = {
-      phone: currentUser.phoneNumber,
+      phone: arifpayPhoneNumber,
       cbs: bill.agreement.space.building.accountNumber,
       email: currentUser.email,
       items: [
