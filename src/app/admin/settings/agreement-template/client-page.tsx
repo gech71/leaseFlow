@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -10,45 +11,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionContext";
 import {
   Loader2,
-  Save,
-  Info,
   PlusCircle,
   Edit,
   Trash2,
   AlertTriangle,
   EyeOff,
-  Clipboard,
 } from "lucide-react";
 import {
-  upsertAgreementTemplateAction,
   deleteAgreementTemplateAction,
 } from "./actions";
 import type { AgreementTemplate } from "@prisma/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
   Table,
   TableBody,
@@ -69,35 +45,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { TinyMceEditor } from "@/components/custom/TinyMceEditor";
-
-const templateFormSchema = z.object({
-  name: z.string().min(3, "Template name must be at least 3 characters."),
-  content: z
-    .string()
-    .min(50, "Template content must be at least 50 characters."),
-});
-
-type TemplateFormValues = z.infer<typeof templateFormSchema>;
+import Link from 'next/link';
 
 interface AgreementTemplateClientPageProps {
   initialTemplates: AgreementTemplate[];
   error?: string;
 }
-function EditorWrapper({
-  value,
-  onEditorChange,
-  isDialogOpen,
-}: {
-  value: string;
-  onEditorChange: (content: string) => void;
-  isDialogOpen: boolean;
-}) {
-  if (!isDialogOpen) return null;
 
-  return <TinyMceEditor value={value} onEditorChange={onEditorChange} />;
-}
 export function AgreementTemplateClientPage({
   initialTemplates,
   error,
@@ -106,124 +60,14 @@ export function AgreementTemplateClientPage({
   const router = useRouter();
   const { isSuperAdmin } = usePermissions();
   const [templates, setTemplates] = useState(initialTemplates);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState<"add" | "edit">("add");
-  const [currentTemplate, setCurrentTemplate] =
-    useState<AgreementTemplate | null>(null);
-  const [templateToDelete, setTemplateToDelete] =
-    useState<AgreementTemplate | null>(null);
-
-  const form = useForm<TemplateFormValues>({
-    resolver: zodResolver(templateFormSchema),
-    defaultValues: { name: "", content: "" },
-  });
-
-  const placeholders = [
-    {
-      label: "Tenant Name",
-      value: "{{tenantName}}",
-      description: "The full name of the tenant.",
-    },
-    {
-      label: "Building Name",
-      value: "{{buildingName}}",
-      description: "The name of the building.",
-    },
-    {
-      label: "Space ID/Name",
-      value: "{{spaceIdName}}",
-      description: 'The identifier for the rented space (e.g., "Unit 101").',
-    },
-    {
-      label: "Floor",
-      value: "{{floor}}",
-      description: "The floor where the space is located.",
-    },
-    {
-      label: "Area (sqm)",
-      value: "{{area}}",
-      description: "The total area of the space in square meters.",
-    },
-    {
-      label: "Start Date",
-      value: "{{startDate}}",
-      description: "The official start date of the lease agreement.",
-    },
-    {
-      label: "Term (Months)",
-      value: "{{paymentTermMonths}}",
-      description: "The total duration of the lease in months.",
-    },
-    {
-      label: "Monthly Rent",
-      value: "{{monthlyRent}}",
-      description: "The amount of rent due each month.",
-    },
-    {
-      label: "Initial Payment (Months)",
-      value: "{{initialPaymentMonths}}",
-      description: "The number of months paid upfront.",
-    },
-    {
-      label: "Initial Payment Amount",
-      value: "{{initialPaymentAmount}}",
-      description: "The total upfront payment amount.",
-    },
-    {
-      label: "Next Payment Due",
-      value: "{{nextPaymentDueDate}}",
-      description: "The date the next lease payment is due.",
-    },
-    {
-      label: "Additional Terms",
-      value: "{{additionalTerms}}",
-      description: "Any extra clauses or terms added to the agreement.",
-    },
-  ];
-
-  const handleOpenAddForm = () => {
-    setFormMode("add");
-    setCurrentTemplate(null);
-    form.reset({ name: "", content: "" });
-    setIsFormOpen(true);
-  };
-
-  const handleOpenEditForm = (template: AgreementTemplate) => {
-    setFormMode("edit");
-    setCurrentTemplate(template);
-    form.reset({ name: template.name, content: template.content });
-    setIsFormOpen(true);
-  };
-
-  const handleFormSubmit = async (values: TemplateFormValues) => {
-    setIsSaving(true);
-    const result = await upsertAgreementTemplateAction({
-      id: currentTemplate?.id,
-      ...values,
-    });
-    setIsSaving(false);
-    if (result.success) {
-      toast({
-        title: "Success",
-        description: `Template "${values.name}" has been saved.`,
-      });
-      setIsFormOpen(false);
-      router.refresh();
-    } else {
-      toast({
-        title: "Error",
-        description: result.error,
-        variant: "destructive",
-      });
-    }
-  };
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<AgreementTemplate | null>(null);
 
   const handleDeleteTemplate = async () => {
     if (!templateToDelete) return;
-    setIsSaving(true);
+    setIsDeleting(true);
     const result = await deleteAgreementTemplateAction(templateToDelete.id);
-    setIsSaving(false);
+    setIsDeleting(false);
     if (result.success) {
       toast({
         title: "Deleted",
@@ -284,9 +128,11 @@ export function AgreementTemplateClientPage({
               Create, edit, or delete reusable agreement templates.
             </CardDescription>
           </div>
-          <Button onClick={handleOpenAddForm}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Template
-          </Button>
+          <Link href="/admin/settings/agreement-template/upsert" passHref>
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Template
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent>
           {templates.length === 0 ? (
@@ -315,14 +161,11 @@ export function AgreementTemplateClientPage({
                         {format(new Date(template.updatedAt), "PPp")}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleOpenEditForm(template)}
-                        >
-                          <Edit className="h-4 w-4 text-blue-600" />
-                        </Button>
+                        <Link href={`/admin/settings/agreement-template/upsert?id=${template.id}`} passHref>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Edit className="h-4 w-4 text-blue-600" />
+                            </Button>
+                        </Link>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -340,128 +183,6 @@ export function AgreementTemplateClientPage({
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col overflow-visible">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-headline">
-              {formMode === "add" ? "Add New" : "Edit"} Agreement Template
-            </DialogTitle>
-            <DialogDescription>
-              {formMode === "add"
-                ? "Create a new reusable template."
-                : `Editing the "${currentTemplate?.name}" template.`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-grow grid md:grid-cols-3 gap-6 overflow-hidden">
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(handleFormSubmit)}
-                id="template-form"
-                className="md:col-span-2 flex flex-col space-y-4 flex-grow"
-              >
-                <div className="flex-grow space-y-4 overflow-y-auto pr-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Template Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Template Name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="content"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Template Content</FormLabel>
-                        <FormControl>
-                          <EditorWrapper
-                            key={isFormOpen ? "open" : "closed"}
-                            value={field.value || ""}
-                            onEditorChange={field.onChange}
-                            isDialogOpen={isFormOpen}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </form>
-            </Form>
-            <div className="hidden md:block h-full">
-              <Card className="h-[60vh] flex flex-col">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-md">
-                    <Info className="h-5 w-5 text-primary" />
-                    Available Placeholders
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Click to copy a placeholder to your clipboard.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow overflow-y-auto p-2">
-                  <ScrollArea className="h-full w-full pr-4">
-                    <div className="space-y-2">
-                      {placeholders.map((p) => (
-                        <div
-                          key={p.value}
-                          className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2"
-                        >
-                          <div>
-                            <p className="font-semibold text-sm text-primary">
-                              {p.label}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {p.description}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() => {
-                              navigator.clipboard.writeText(p.value);
-                              toast({
-                                title: "Copied!",
-                                description: `Placeholder ${p.value} copied.`,
-                              });
-                            }}
-                          >
-                            <Clipboard className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          <DialogFooter className="pt-4 border-t flex-shrink-0">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" form="template-form" disabled={isSaving}>
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Save Template
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={!!templateToDelete} onOpenChange={setTemplateToDelete}>
         <AlertDialogContent>
@@ -482,8 +203,9 @@ export function AgreementTemplateClientPage({
             <AlertDialogAction
               onClick={handleDeleteTemplate}
               className="bg-destructive hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              {isSaving ? (
+              {isDeleting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 "Delete"
