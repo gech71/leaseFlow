@@ -1,3 +1,4 @@
+
 // src/app/portal/dashboard/actions.ts
 "use server";
 
@@ -20,9 +21,16 @@ import crypto from "crypto";
 
 // --- Normalization Helper ---
 const toCamelCase = (s: string) => {
-  return s.replace(/([-_][a-z])/gi, ($1) => {
-    return $1.toUpperCase().replace("-", "").replace("_", "");
-  });
+  if (typeof s !== 'string' || s.length === 0) {
+    return s;
+  }
+  // This handles PascalCase (like ResponseCode) and snake_case
+  return s.replace(/([-_A-Z])([a-z_A-Z]+)/g, (match, first, rest, offset) => {
+    if (offset > 0) {
+      return first.toUpperCase() + rest.toLowerCase();
+    }
+    return first.toLowerCase() + rest.toLowerCase();
+  }).replace(/[-_]/g, '');
 };
 
 const isObject = function (o: any) {
@@ -325,7 +333,7 @@ export async function initiateArifpayPaymentAction(
       body: JSON.stringify(requestBody),
     });
 
-    console.log("ArifPay Response Status:", response);
+    console.log("ArifPay Response Status:", response.status);
 
     const responseText = await response.text();
     if (!responseText) {
@@ -365,9 +373,11 @@ export async function initiateArifpayPaymentAction(
         }`,
       };
     }
-
+    
+    const paymentUrl = responseData?.data?.url;
     const sessionId = responseData?.data?.na;
-    if (!responseData.data?.url || !sessionId) {
+    
+    if (!paymentUrl || !sessionId) {
       console.error("ArifPay API Error - No URL or Session ID:", responseData);
       return {
         success: false,
@@ -383,7 +393,7 @@ export async function initiateArifpayPaymentAction(
           sessionId: sessionId,
           status: "Pending",
           amount: billAmount,
-          paymentUrl: responseData.data.url,
+          paymentUrl: paymentUrl,
           bill: { connect: { id: billId } },
         },
       });
@@ -395,7 +405,7 @@ export async function initiateArifpayPaymentAction(
       });
     });
 
-    return { success: true, paymentUrl: responseData.data.url };
+    return { success: true, paymentUrl: paymentUrl };
   } catch (error: any) {
     console.error("Error in initiateArifpayPaymentAction:", error);
     return {

@@ -8,13 +8,13 @@ const toCamelCase = (s: string) => {
   if (typeof s !== 'string' || s.length === 0) {
     return s;
   }
-  // This handles PascalCase, camelCase, snake_case, and kebab-case
-  const camel = s.replace(/([-_][a-z])/ig, ($1) => {
-    return $1.toUpperCase()
-      .replace('-', '')
-      .replace('_', '');
-  });
-  return camel.charAt(0).toLowerCase() + camel.slice(1);
+  // This handles PascalCase (like ResponseCode) and snake_case
+  return s.replace(/([-_A-Z])([a-z_A-Z]+)/g, (match, first, rest, offset) => {
+    if (offset > 0) {
+      return first.toUpperCase() + rest.toLowerCase();
+    }
+    return first.toLowerCase() + rest.toLowerCase();
+  }).replace(/[-_]/g, '');
 };
 
 const isObject = function (o: any) {
