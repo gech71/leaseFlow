@@ -114,7 +114,6 @@ export default function AdminLoginPage() {
                 'Authorization': `Bearer ${changePasswordToken}`
              },
             body: JSON.stringify({
-                phoneNumber: phoneNumber,
                 currentPassword,
                 newPassword,
             }),

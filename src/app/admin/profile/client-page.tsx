@@ -44,6 +44,7 @@ export function AdminProfileClientPage() {
     setIsSaving(true);
     try {
         const { currentPassword, newPassword } = values;
+        // The API route will get the token from the cookie, so we don't need to pass it explicitly here.
         const response = await fetch('/api/Auth/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

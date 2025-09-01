@@ -46,8 +46,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["Current and new passwords are required."] }, { status: 400 });
     }
 
+    const authHeader = request.headers.get('Authorization');
     const cookieStore = cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    const cookieToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+
+    let accessToken: string | null = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        accessToken = authHeader.substring(7);
+    } else if (cookieToken) {
+        accessToken = cookieToken;
+    }
 
     if (!accessToken) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });

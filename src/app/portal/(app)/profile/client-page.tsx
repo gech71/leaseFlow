@@ -48,7 +48,7 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
     try {
-        // The API only needs the current and new passwords.
+        // The API route will get the token from the cookie
         const { currentPassword, newPassword } = values;
         const response = await fetch('/api/Auth/change-password', {
             method: 'POST',
@@ -61,7 +61,6 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
         if (response.ok && data.isSuccess) {
             toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
             form.reset();
-            // Optional: force logout after password change for better security
             await fetch('/api/Auth/logout', { method: 'POST' });
             window.location.href = '/login';
         } else {
