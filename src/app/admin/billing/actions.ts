@@ -361,12 +361,14 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
 
     // Determine if rent should be charged based on upfront payment
     const agreementStartDate = agreement.startDate;
+    // Calculate the date when the first chargeable rent is due.
     const firstChargeableRentDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
-    
-    let rentAmount = agreement.monthlyRentalPrice;
-    const isFirstBill = isSameDay(targetBillDate, agreementStartDate);
 
-    if (!isFirstBill && agreement.initialPaymentMonths > 0 && !isAfter(targetBillDate, firstChargeableRentDueDate) && !isSameDay(targetBillDate, firstChargeableRentDueDate)) {
+    let rentAmount = agreement.monthlyRentalPrice;
+
+    // Check if the current bill date is before the first chargeable due date.
+    if (agreement.initialPaymentMonths > 0 && !isAfter(targetBillDate, firstChargeableRentDueDate) && !isSameDay(targetBillDate, firstChargeableRentDueDate)) {
+        // This bill falls within the prepaid period, so rent is 0.
         rentAmount = new Prisma.Decimal(0);
     }
     
