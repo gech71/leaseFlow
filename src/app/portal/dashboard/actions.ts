@@ -1,3 +1,4 @@
+
 // src/app/portal/dashboard/actions.ts
 "use server";
 
@@ -11,12 +12,18 @@ import crypto from 'crypto';
 
 // --- Normalization Helper ---
 const toCamelCase = (s: string) => {
-  return s.replace(/([-_][a-z])/ig, ($1) => {
+  if (typeof s !== 'string' || s.length === 0) {
+    return s;
+  }
+  // This handles PascalCase, camelCase, snake_case, and kebab-case
+  const camel = s.replace(/([-_][a-z])/ig, ($1) => {
     return $1.toUpperCase()
       .replace('-', '')
       .replace('_', '');
   });
+  return camel.charAt(0).toLowerCase() + camel.slice(1);
 };
+
 
 const isObject = function (o: any) {
   return o === Object(o) && !Array.isArray(o) && typeof o !== 'function';
@@ -281,7 +288,8 @@ export async function initiateArifpayPaymentAction(
         console.error("ArifPay API Error: Failed to parse JSON response. Body:", responseText);
         return { success: false, error: "Payment gateway returned an invalid response." };
     }
-
+    
+    console.log("ArifPay API Response:", rawResponseData);
     const responseData = normalizeKeys(rawResponseData); // Normalize the response
     
     if (responseData.responseCode && responseData.responseCode !== "0") {

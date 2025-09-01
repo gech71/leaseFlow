@@ -5,11 +5,16 @@ import { databaseService } from '@/lib/services/databaseService';
 
 // --- Normalization Helper ---
 const toCamelCase = (s: string) => {
-  return s.replace(/([-_][a-z])/ig, ($1) => {
+  if (typeof s !== 'string' || s.length === 0) {
+    return s;
+  }
+  // This handles PascalCase, camelCase, snake_case, and kebab-case
+  const camel = s.replace(/([-_][a-z])/ig, ($1) => {
     return $1.toUpperCase()
       .replace('-', '')
       .replace('_', '');
   });
+  return camel.charAt(0).toLowerCase() + camel.slice(1);
 };
 
 const isObject = function (o: any) {
