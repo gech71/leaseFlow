@@ -94,7 +94,15 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     revalidatePath('/admin/spaces'); // Space occupancy changed
     revalidatePath('/admin/tenants'); // Tenant's rentedSpace changed
     revalidatePath('/admin/billing'); // Invalidate billing page data
-    return { success: true, agreement: newAgreement };
+    
+    // Convert Decimal fields to numbers before returning
+    const serializableAgreement = {
+      ...newAgreement,
+      monthlyRentalPrice: Number(newAgreement.monthlyRentalPrice),
+      initialPaymentAmount: newAgreement.initialPaymentAmount ? Number(newAgreement.initialPaymentAmount) : null,
+    };
+
+    return { success: true, agreement: serializableAgreement };
   } catch (error: any) {
     console.error("Error creating agreement:", error);
     let errorMessage = "Failed to create agreement.";
