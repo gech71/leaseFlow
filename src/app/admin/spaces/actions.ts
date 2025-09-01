@@ -10,7 +10,14 @@ export async function createSpaceAction(data: Prisma.SpaceCreateInput) {
   try {
     const newSpace = await databaseService.createSpace(data);
     revalidatePath('/admin/spaces');
-    return { success: true, space: newSpace };
+    // Convert Decimal fields to numbers before returning to the client
+    const serializableSpace = {
+      ...newSpace,
+      area: Number(newSpace.area),
+      utilityProrationShare: Number(newSpace.utilityProrationShare),
+      monthlyRentalPrice: Number(newSpace.monthlyRentalPrice),
+    };
+    return { success: true, space: serializableSpace };
   } catch (error: any) {
     console.error("Error creating space:", error);
     return { success: false, error: error.message || "Failed to create space." };
@@ -21,7 +28,14 @@ export async function updateSpaceAction(id: string, data: Prisma.SpaceUpdateInpu
   try {
     const updatedSpace = await databaseService.updateSpace(id, data);
     revalidatePath('/admin/spaces');
-    return { success: true, space: updatedSpace };
+    // Convert Decimal fields to numbers before returning to the client
+    const serializableSpace = {
+      ...updatedSpace,
+      area: Number(updatedSpace.area),
+      utilityProrationShare: Number(updatedSpace.utilityProrationShare),
+      monthlyRentalPrice: Number(updatedSpace.monthlyRentalPrice),
+    };
+    return { success: true, space: serializableSpace };
   } catch (error: any) {
     console.error("Error updating space:", error);
      if (error instanceof Prisma.PrismaClientKnownRequestError) {
