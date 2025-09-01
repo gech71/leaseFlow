@@ -45,7 +45,6 @@ export function TinyMceEditor({
           "media",
           "table",
           "help",
-          "textcolor",
         ],
         toolbar:
           "undo redo | blocks | " +
