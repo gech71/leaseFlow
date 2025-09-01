@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -23,7 +24,8 @@ interface UIPenaltyRule {
   dbId?: string; 
   fromDay?: number;
   toDay?: number;
-  penaltyType: 'Fixed' | 'Percentage' | 'DailyPercentage';
+  penaltyType: 'Fixed' | 'Percentage';
+  frequency: 'OneTime' | 'Daily';
   feeValue?: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string;
@@ -84,7 +86,8 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
           fromDay: tier.fromDay,
           toDay: tier.toDay ?? undefined,
           penaltyType: tier.penaltyType as UIPenaltyRule['penaltyType'],
-          feeValue: tier.feeValue,
+          frequency: tier.frequency as UIPenaltyRule['frequency'],
+          feeValue: Number(tier.feeValue),
           scope: tier.scope as UIPenaltyRule['scope'],
           applicableFloor: tier.applicableFloor || undefined,
           applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || undefined,
@@ -129,6 +132,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       scope: 'Building',
       penaltyType: 'Fixed',
+      frequency: 'OneTime',
       feeValue: undefined,
       fromDay: undefined,
       toDay: undefined,
@@ -198,9 +202,9 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         );
 
         for (const uiRule of configuredRules) {
-             if (!uiRule.penaltyType) {
-                toast({ title: "Validation Error", description: `A rule is missing a 'Penalty Type'.`, variant: "destructive" });
-                throw new Error("Incomplete UI rule: missing penalty type.");
+             if (!uiRule.penaltyType || !uiRule.frequency) {
+                toast({ title: "Validation Error", description: `A rule is missing 'Penalty Type' or 'Frequency'.`, variant: "destructive" });
+                throw new Error("Incomplete UI rule.");
             }
             if (uiRule.toDay !== undefined && uiRule.fromDay !== undefined && uiRule.toDay < uiRule.fromDay) {
                  toast({ title: "Validation Error", description: `Rule error: 'To Day' cannot be less than 'From Day'.`, variant: "destructive" });
@@ -218,6 +222,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                 fromDay: uiRule.fromDay!,
                 toDay: uiRule.toDay,
                 penaltyType: uiRule.penaltyType,
+                frequency: uiRule.frequency,
                 feeValue: Number(uiRule.feeValue!), 
                 scope: uiRule.scope,
                 applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
@@ -435,11 +440,22 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                                   <SelectTrigger id={`rulePenaltyType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue placeholder="Select penalty type" /></SelectTrigger>
                                   <SelectContent>
                                       <SelectItem value="Fixed">Fixed Amount</SelectItem>
-                                      <SelectItem value="Percentage">Percentage (One-time)</SelectItem>
-                                      <SelectItem value="DailyPercentage">Daily Percentage</SelectItem>
+                                      <SelectItem value="Percentage">Percentage</SelectItem>
                                   </SelectContent>
                               </Select>
                           </div>
+                           <div>
+                              <Label htmlFor={`frequency-${uiRule.id}`} className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>Frequency<span className="text-destructive ml-1">*</span></Label>
+                              <Select value={uiRule.frequency} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'frequency', value as UIPenaltyRule['frequency'])} disabled={isSaving || !canManageThisForm}>
+                                  <SelectTrigger id={`frequency-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="OneTime">One-time</SelectItem>
+                                      <SelectItem value="Daily">Daily</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                      </div>
+                       <div className="grid grid-cols-1">
                           <div>
                               <Label htmlFor={`ruleFeeValue-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Fee Value<span className="text-destructive ml-1">*</span></Label>
                               <Input id={`ruleFeeValue-${uiRule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5"

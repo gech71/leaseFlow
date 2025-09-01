@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -111,7 +112,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
             ...(ag.space.building as BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }),
             createdAt: ag.space.building.createdAt ? ag.space.building.createdAt.toISOString() : EPOCH_ISO_STRING,
             updatedAt: ag.space.building.updatedAt ? ag.space.building.updatedAt.toISOString() : (ag.space.building.createdAt ? ag.space.building.createdAt.toISOString() : EPOCH_ISO_STRING),
-            penaltyPolicyTiers: (ag.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
+            penaltyPolicyTiers: (ag.space.building.penaltyPolicyTiers || []).map(pt => ({...pt, feeValue: Number(pt.feeValue)})),
             spaces: (ag.space.building.spaces || []).map(s => ({
                 ...s,
                 area: Number(s.area),
@@ -135,7 +136,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
         ...(s.building as BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }),
         createdAt: s.building.createdAt ? s.building.createdAt.toISOString() : EPOCH_ISO_STRING,
         updatedAt: s.building.updatedAt ? s.building.updatedAt.toISOString() : (s.building.createdAt ? s.building.createdAt.toISOString() : EPOCH_ISO_STRING),
-        penaltyPolicyTiers: (s.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
+        penaltyPolicyTiers: (s.building.penaltyPolicyTiers || []).map(pt => ({...pt, feeValue: Number(pt.feeValue)})),
           spaces: (s.building.spaces || []).map(sp => ({
             ...sp,
             area: Number(sp.area),
@@ -151,7 +152,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
     ...(b as BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }),
     createdAt: b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING,
     updatedAt: b.updatedAt ? b.updatedAt.toISOString() : (b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING),
-    penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(pt => ({...pt})),
+    penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(pt => ({...pt, feeValue: Number(pt.feeValue)})),
     spaces: (b.spaces || []).map(s => ({
         ...s,
         area: Number(s.area),
@@ -231,7 +232,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
                     ...(agreementForBill.space.building),
                     createdAt: agreementForBill.space.building.createdAt ? agreementForBill.space.building.createdAt.toISOString() : EPOCH_ISO_STRING,
                     updatedAt: agreementForBill.space.building.updatedAt ? agreementForBill.space.building.updatedAt.toISOString() : (agreementForBill.space.building.createdAt ? agreementForBill.space.building.createdAt.toISOString() : EPOCH_ISO_STRING),
-                    penaltyPolicyTiers: (agreementForBill.space.building.penaltyPolicyTiers || []).map(pt => ({...pt})),
+                    penaltyPolicyTiers: (agreementForBill.space.building.penaltyPolicyTiers || []).map(pt => ({...pt, feeValue: Number(pt.feeValue)})),
                     spaces: (agreementForBill.space.building.spaces || []).map(s => ({
                       ...s,
                       area: Number(s.area),
@@ -295,12 +296,18 @@ function calculateIndividualPenalty(
 
   for (const tier of sortedTiers) {
     if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
+      let fee = 0;
+      const feeValue = Number(tier.feeValue);
       if (tier.penaltyType === 'Fixed') {
-        calculatedPenalty = tier.feeValue;
+        fee = feeValue;
       } else if (tier.penaltyType === 'Percentage') {
-        calculatedPenalty = billAmount * (tier.feeValue / 100);
-      } else if (tier.penaltyType === 'DailyPercentage') {
-        calculatedPenalty = (billAmount * (tier.feeValue / 100)) * daysOverdue;
+        fee = billAmount * (feeValue / 100);
+      }
+      
+      if (tier.frequency === 'Daily') {
+        calculatedPenalty = fee * daysOverdue;
+      } else { // OneTime
+        calculatedPenalty = fee;
       }
       break; 
     }

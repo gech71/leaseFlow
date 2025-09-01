@@ -53,6 +53,7 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
         createdAt: buildingToEdit.createdAt.toISOString(),
         penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map((tier) => ({
           ...tier,
+          feeValue: Number(tier.feeValue)
         })),
         managers: buildingToEdit.managers.map((m) => ({ id: m.id })),
       };

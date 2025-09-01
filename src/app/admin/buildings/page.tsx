@@ -1,4 +1,5 @@
 
+
 export const dynamic = 'force-dynamic';
 
 import { databaseService } from '@/lib/services/databaseService';
@@ -27,6 +28,7 @@ export default async function BuildingsPage() {
     createdAt: building.createdAt.toISOString(),
     penaltyPolicyTiers: building.penaltyPolicyTiers.map(tier => ({
         ...tier,
+        feeValue: Number(tier.feeValue),
     })),
   }));
 
