@@ -7,8 +7,8 @@ import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Wrench, Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, Space as SpacePrismaType } from '@prisma/client';
-import { BuildingUtilitiesClientPage } from './client-page'; // Import the new client component
+import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, Space as SpacePrismaType, Prisma } from '@prisma/client';
+import { BuildingUtilitiesClientPage, type ClientBuildingMonthlyUtilitiesPrismaType } from './client-page'; // Import the new client component
 import { getAllBuildingUtilitiesForListAction, getRegisteredBuildingsAction } from './actions';
 import { parseISO } from 'date-fns';
 
@@ -65,7 +65,7 @@ async function BuildingUtilitiesDataFetcher() {
     }))
   }));
 
-  const serializableInitialRecords = initialRecordsRaw.map(r => ({
+  const serializableInitialRecords: ClientBuildingMonthlyUtilitiesPrismaType[] = initialRecordsRaw.map(r => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(), // Safe serialization

@@ -33,7 +33,7 @@ interface ClientSpaceForBuilding extends Omit<SpacePrismaOriginal, 'createdAt' |
   monthlyRentalPrice: number;
 }
 
-interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers' | 'spaces' | 'buildingMonthlyUtilities'> {
+export interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers' | 'spaces' | 'buildingMonthlyUtilities'> {
   createdAt: string;
   updatedAt: string;
   penaltyPolicyTiers: ClientPenaltyTier[];
@@ -59,7 +59,7 @@ interface ClientTenant extends Omit<TenantPrismaOriginal, 'createdAt' | 'updated
 }
 
 
-interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space' | 'bills' | 'tenantId' | 'spaceId' | 'monthlyRentalPrice' | 'initialPaymentAmount'> {
+export interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space' | 'bills' | 'tenantId' | 'spaceId' | 'monthlyRentalPrice' | 'initialPaymentAmount'> {
   createdAt: string;
   updatedAt: string;
   startDate: string;
@@ -75,7 +75,7 @@ interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'updatedAt
 }
 
 
-interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId' | 'rentAmount' | 'penaltyAmount' | 'totalAmount'> {
+export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId' | 'rentAmount' | 'penaltyAmount' | 'totalAmount'> {
   createdAt: string;
   updatedAt: string;
   billDate: string;
@@ -90,11 +90,10 @@ interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' 
   totalAmount: number;
 }
 
-interface ClientBuildingMonthlyUtilities extends Omit<BuildingMonthlyUtilitiesPrisma, 'createdAt' | 'updatedAt' | 'utilities' | 'buildingId' | 'building'> {
+interface ClientBuildingMonthlyUtilities extends Omit<Prisma.BuildingMonthlyUtilitiesGetPayload<{include: { utilities: true}}>, 'createdAt' | 'updatedAt' | 'building' > {
     createdAt: string;
     updatedAt: string;
     utilities: (Prisma.BuildingUtilityItemGetPayload<{}> & { totalCost: number })[];
-    buildingId: string;
 }
 
 export interface SerializedBillingPageData {

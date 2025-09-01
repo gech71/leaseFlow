@@ -54,7 +54,7 @@ const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWit
       billDate: bill.billDate?.toISOString() || EPOCH_ISO_STRING,
       dueDate: bill.dueDate?.toISOString() || EPOCH_ISO_STRING,
       paymentDate: bill.paymentDate?.toISOString() || null,
-      utilityBreakdown: (bill.utilityBreakdown || []).map(ub => ({ ...ub })), 
+      utilityBreakdown: (bill.utilityBreakdown || []).map(ub => ({ ...ub, amount: Number(ub.amount) })),
     })),
   };
 };

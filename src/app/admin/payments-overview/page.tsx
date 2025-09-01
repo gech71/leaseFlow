@@ -59,7 +59,7 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
         } : ({} as ClientBuilding), // Default empty object
       } : ({} as ClientSpaceForAgreement), // Default empty object
     } : ({} as ClientAgreementForBill), // Default empty object
-    utilityBreakdown: bill.utilityBreakdown?.map(ub => ({ ...ub })) || [],
+    utilityBreakdown: bill.utilityBreakdown?.map(ub => ({ ...ub, amount: Number(ub.amount) })) || [],
   };
 };
 
