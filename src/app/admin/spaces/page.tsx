@@ -47,6 +47,11 @@ export default async function SpacesPage() {
       updatedAt: space.updatedAt?.toISOString() || new Date().toISOString(), 
       buildingName: space.building.name,
       availabilityDate,
+      agreements: space.agreements.map(ag => ({
+        ...ag,
+        monthlyRentalPrice: Number(ag.monthlyRentalPrice),
+        initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
+      }))
     };
   });
 
