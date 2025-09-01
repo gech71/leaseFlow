@@ -4,7 +4,7 @@
 
 import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, User, Role } from '@prisma/client';
-import { addMonths, isAfter } from 'date-fns';
+import { addMonths, isAfter, format } from 'date-fns';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
@@ -184,46 +184,85 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
   }
 }
 
-export async function submitPaymentProofAction(
-  billId: string,
-  data: {
-    paymentMethod: string;
-    paymentReference: string;
-    paymentProofUrl: string; // Placeholder for now
-    notes?: string;
+export async function initiateArifpayPaymentAction(
+  billId: string, 
+  billAmount: number,
+  billDate: string
+): Promise<{ success: boolean; error?: string; paymentUrl?: string }> {
+  const ARIFPAY_API_URL = process.env.ARIFPAY_API_URL;
+  const ARIFPAY_API_KEY = process.env.ARIFPAY_API_KEY;
+
+  if (!ARIFPAY_API_URL || !ARIFPAY_API_KEY) {
+    console.error("ArifPay API URL or Key is not configured.");
+    return { success: false, error: "Payment service is not configured correctly." };
   }
-) {
+
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return { success: false, error: "Authentication required." };
+    if (!currentUser?.phoneNumber || !currentUser?.email) {
+      return { success: false, error: "Your user profile is missing a phone number or email address." };
     }
 
-    const bill = await databaseService.getBillById(billId, {
-      agreement: { include: { tenant: { include: { user: true } } } }
+    const bill = await prisma.bill.findUnique({
+      where: { id: billId },
+      include: { agreement: { include: { space: { include: { building: true } } } } }
     });
 
     if (!bill) {
       return { success: false, error: "Bill not found." };
     }
+    if (!bill.agreement?.space?.building?.accountNumber) {
+      return { success: false, error: "Building account number is not configured for this bill." };
+    }
 
-    if (bill.agreement?.tenant?.userId !== currentUser.id) {
-       return { success: false, error: "Unauthorized. You can only submit payment for your own bills." };
+    const requestBody = {
+      phone: currentUser.phoneNumber,
+      cbs: bill.agreement.space.building.accountNumber,
+      email: currentUser.email,
+      items: [
+        {
+          name: `Bill: ${format(new Date(billDate), 'yyyy-MM-dd')}`,
+          quantity: 1,
+          price: billAmount,
+          description: `Bill payment for date: ${format(new Date(billDate), 'yyyy-MM-dd')}`
+        }
+      ]
+    };
+
+    const response = await fetch(ARIFPAY_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Api-Key': ARIFPAY_API_KEY,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const responseData = await response.json();
+
+    if (responseData.ResponseCode !== "0") {
+      console.error("ArifPay Error:", responseData);
+      return { success: false, error: `Payment gateway error: ${responseData.ResponseDescription}` };
     }
     
-    await databaseService.updateBill(billId, {
-      status: 'PendingVerification',
-      paymentMethod: data.paymentMethod,
-      paymentReference: data.paymentReference,
-      paymentProofUrl: data.paymentProofUrl,
-      tenantPaymentNotes: data.notes,
+    if (!responseData.Data?.URL) {
+      return { success: false, error: "Payment gateway did not return a valid payment URL." };
+    }
+
+    // Optional: Update bill status or log the session ID
+    await prisma.bill.update({
+      where: { id: billId },
+      data: {
+        status: 'PendingVerification',
+        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${responseData.Data.NA}`
+      }
     });
-    
-    return { success: true };
-    
+
+    return { success: true, paymentUrl: responseData.Data.URL };
+
   } catch (error: any) {
-    console.error("Error submitting payment proof:", error);
-    return { success: false, error: `Failed to submit proof: ${(error as Error).message}` };
+    console.error("Error in initiateArifpayPaymentAction:", error);
+    return { success: false, error: "An unexpected error occurred while initiating payment." };
   }
 }
 
@@ -265,10 +304,8 @@ export async function sendContactEmailAction(formData: { subject: string; body: 
       <p>${formData.body.replace(/\n/g, '<br>')}</p>
     `;
 
-    // The `to` field can be a comma-separated string of emails
-    // The `from` field is now customized for this action
     const result = await sendEmail({
-      from: `"${tenant.name}" <${tenant.email}>`, // Use tenant's name and email as the sender
+      from: `"${tenant.name}" <${tenant.email}>`,
       to: managerEmails.join(', '),
       subject: `[Tenant Portal] ${formData.subject}`,
       html: emailHtml

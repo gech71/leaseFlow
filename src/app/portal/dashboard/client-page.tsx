@@ -39,7 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { submitPaymentProofAction, sendContactEmailAction } from './actions';
+import { initiateArifpayPaymentAction, sendContactEmailAction } from './actions';
 import { Loader2 } from 'lucide-react';
 
 
@@ -47,14 +47,6 @@ import { Loader2 } from 'lucide-react';
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
 };
-
-const paymentProofSchema = z.object({
-  paymentMethod: z.string().min(1, { message: "Please select a payment method." }),
-  paymentReference: z.string().min(2, { message: "A payment reference is required (e.g., transaction ID)." }),
-  notes: z.string().optional(),
-  paymentSlip: z.instanceof(File).optional(),
-});
-type PaymentProofFormValues = z.infer<typeof paymentProofSchema>;
 
 const contactFormSchema = z.object({
   subject: z.string().min(3, { message: "Subject must be at least 3 characters." }).max(100, { message: "Subject cannot exceed 100 characters." }),
@@ -68,9 +60,8 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeBillForPayment, setActiveBillForPayment] = useState<ClientBill | null>(null);
   const [isContactFormOpen, setIsContactFormOpen] = useState(false);
-
+  const [payingBillId, setPayingBillId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -86,49 +77,28 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
 
   const agreement = initialData?.agreement;
 
-  const paymentProofForm = useForm<PaymentProofFormValues>({
-    resolver: zodResolver(paymentProofSchema),
-    defaultValues: { paymentMethod: "", paymentReference: "", notes: "", paymentSlip: undefined },
-  });
-
   const contactForm = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
     defaultValues: { subject: "", body: "" },
   });
+  
+  const handlePayNow = async (bill: ClientBill) => {
+    setPayingBillId(bill.id);
+    const result = await initiateArifpayPaymentAction(bill.id, bill.calculatedTotal, bill.billDate);
+    setPayingBillId(null);
 
-  const handleOpenPaymentDialog = (bill: ClientBill) => {
-    paymentProofForm.reset();
-    setActiveBillForPayment(bill);
-  };
-
-  const handleClosePaymentDialog = () => {
-    setActiveBillForPayment(null);
-    paymentProofForm.reset();
-  };
-
-  const handlePaymentProofSubmit = async (values: PaymentProofFormValues) => {
-    if (!activeBillForPayment) return;
-    setIsSubmitting(true);
-    
-    // Simulate file upload by just using its name.
-    const paymentProofUrl = values.paymentSlip ? `simulated_slip_${values.paymentSlip.name}` : "";
-
-    const result = await submitPaymentProofAction(activeBillForPayment.id, {
-        paymentMethod: values.paymentMethod,
-        paymentReference: values.paymentReference,
-        paymentProofUrl: paymentProofUrl,
-        notes: values.notes,
-    });
-
-    setIsSubmitting(false);
-    if (result.success) {
-      toast({ title: "Payment Proof Submitted", description: "Your payment is now pending verification by administration." });
-      handleClosePaymentDialog();
-      // We need a way to refresh the data from the server action here.
-      // For now, a page refresh is the simplest way.
-      window.location.reload();
+    if (result.success && result.paymentUrl) {
+      toast({
+        title: "Redirecting to Payment...",
+        description: "You will be redirected to complete your payment.",
+      });
+      window.location.href = result.paymentUrl;
     } else {
-      toast({ title: "Submission Failed", description: result.error, variant: "destructive" });
+      toast({
+        title: "Payment Initiation Failed",
+        description: result.error || "An unknown error occurred.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -153,18 +123,20 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
     }
 
     const doc = new jsPDF();
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
     
-    const textLines = doc.splitTextToSize(agreement.agreementText, 180);
-    doc.text(textLines, 15, 15);
-
-    const tenantName = agreement.tenant?.name || 'UnknownTenant';
-    const safeTenantName = sanitizeFilename(tenantName);
-
-    doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
-    
-    toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
+    // Add HTML content to jsPDF
+    doc.html(agreement.agreementText, {
+      callback: function (doc) {
+        const tenantName = agreement.tenant?.name || 'UnknownTenant';
+        const safeTenantName = sanitizeFilename(tenantName);
+        doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+        toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
+      },
+      x: 15,
+      y: 15,
+      width: 170, // A4 width in mm minus margins
+      windowWidth: 650 // An arbitrary number that works well for scaling
+    });
   };
 
   const calculatePenaltyForTenant = useCallback((bill: ClientBill, penaltyTiers: ClientPenaltyTier[]): number => {
@@ -372,7 +344,10 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
                           </TableCell>
                           <TableCell className="p-2 text-right">
                               {(bill.currentStatus === 'Pending' || bill.currentStatus === 'Overdue') && (
-                                <Button size="sm" onClick={() => handleOpenPaymentDialog(bill)}>Pay</Button>
+                                <Button size="sm" onClick={() => handlePayNow(bill)} disabled={payingBillId !== null}>
+                                  {payingBillId === bill.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                  Pay Now
+                                </Button>
                               )}
                           </TableCell>
                         </TableRow>
@@ -386,86 +361,6 @@ export function CustomerDashboardClientPage({ initialData }: { initialData: Seri
         </div>
       </div>
     </div>
-
-     <Dialog open={!!activeBillForPayment} onOpenChange={handleClosePaymentDialog}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle className="font-headline text-xl">Submit Payment Proof</DialogTitle>
-                <DialogDescription>
-                  For bill due on {activeBillForPayment ? format(parseISO(activeBillForPayment.dueDate), 'PP') : ''}, totaling {activeBillForPayment?.calculatedTotal.toFixed(2)} Birr.
-                </DialogDescription>
-            </DialogHeader>
-            <Form {...paymentProofForm}>
-                <form onSubmit={paymentProofForm.handleSubmit(handlePaymentProofSubmit)} className="space-y-4 py-2">
-                    <FormField
-                      control={paymentProofForm.control}
-                      name="paymentMethod"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center"><CreditCard className="mr-2 h-4 w-4 text-primary"/>Payment Method<span className="text-destructive ml-1">*</span></FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select payment method" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                              <SelectItem value="Bank Transfer"><Landmark className="mr-2 h-4 w-4 inline-block"/>Bank Transfer</SelectItem>
-                              <SelectItem value="Wallet"><Wallet className="mr-2 h-4 w-4 inline-block"/>Digital Wallet</SelectItem>
-                              <SelectItem value="Cash"><HelpCircle className="mr-2 h-4 w-4 inline-block"/>Cash</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                        control={paymentProofForm.control}
-                        name="paymentReference"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center"><FileText className="mr-2 h-4 w-4 text-primary"/>Payment Reference<span className="text-destructive ml-1">*</span></FormLabel>
-                                <FormControl><Input placeholder="Payment Reference" {...field} disabled={isSubmitting}/></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={paymentProofForm.control}
-                        name="paymentSlip"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center"><Paperclip className="mr-2 h-4 w-4 text-primary"/>Attach Payment Slip (Optional)</FormLabel>
-                                <FormControl>
-                                    <Input 
-                                      type="file" 
-                                      onChange={(e) => field.onChange(e.target.files ? e.target.files[0] : null)}
-                                      disabled={isSubmitting}
-                                      className="file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                     <FormField
-                        control={paymentProofForm.control}
-                        name="notes"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center"><MessageSquare className="mr-2 h-4 w-4 text-primary"/>Notes (Optional)</FormLabel>
-                                <FormControl><Textarea placeholder="Notes for the admin..." {...field} disabled={isSubmitting}/></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <DialogFooter className="pt-4">
-                        <DialogClose asChild><Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button></DialogClose>
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                            Submit for Verification
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </Form>
-        </DialogContent>
-      </Dialog>
       
       <Dialog open={isContactFormOpen} onOpenChange={setIsContactFormOpen}>
         <DialogContent>
