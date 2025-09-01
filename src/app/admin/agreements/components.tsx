@@ -1,19 +1,61 @@
+"use client";
 
-"use client"; 
-
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/custom/PageHeader';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, PlusCircle, Eye, Download, Search, AlertTriangle, RefreshCw, Trash2, Loader2, EyeOff, Coins, CreditCard, HelpCircle, Landmark, Wallet, Sigma, CalendarDays, CalendarClock, Info } from 'lucide-react';
-import type { Agreement as AgreementPrisma, Tenant, Space } from '@prisma/client';
-import { Input } from '@/components/ui/input';
-import { addMonths, format, isBefore, startOfDay, subDays, isAfter, parseISO } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { deleteAgreementAction, updateAgreementAction, type RenewAgreementData } from './actions';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/custom/PageHeader";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  FileText,
+  PlusCircle,
+  Eye,
+  Download,
+  Search,
+  AlertTriangle,
+  RefreshCw,
+  Trash2,
+  Loader2,
+  EyeOff,
+  Coins,
+  CreditCard,
+  HelpCircle,
+  Landmark,
+  Wallet,
+  Sigma,
+  CalendarDays,
+  CalendarClock,
+  Info,
+} from "lucide-react";
+import type {
+  Agreement as AgreementPrisma,
+  Tenant,
+  Space,
+} from "@prisma/client";
+import { Input } from "@/components/ui/input";
+import {
+  addMonths,
+  format,
+  isBefore,
+  startOfDay,
+  subDays,
+  isAfter,
+  parseISO,
+} from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import {
+  deleteAgreementAction,
+  updateAgreementAction,
+  type RenewAgreementData,
+} from "./actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,35 +66,76 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogHeader, DialogTrigger, DialogContent, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { usePermissions } from '@/contexts/PermissionContext';
-import { PaginationControls } from '@/components/custom/PaginationControls';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogHeader,
+  DialogTrigger,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { PaginationControls } from "@/components/custom/PaginationControls";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Popover, PopoverContent } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
-  return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
+  return name.replace(/[^a-z0-9_.-]/gi, "_").replace(/_{2,}/g, "_");
 };
 
-const renewalFormSchema = z.object({
-  startDate: z.date({ required_error: "New start date is required."}),
-  paymentTermMonths: z.coerce.number().int().positive({ message: "Term must be a positive number." }).min(1, "Term must be at least 1 month."),
-  monthlyRentalPrice: z.coerce.number().positive({ message: "Monthly rent must be a positive number." }),
-  initialPaymentMonths: z.coerce.number().int().gte(0, "Initial payment cannot be negative."),
-}).refine(data => data.initialPaymentMonths <= data.paymentTermMonths, {
-  message: "Initial payment months cannot exceed total term months.",
-  path: ["initialPaymentMonths"],
-});
+const renewalFormSchema = z
+  .object({
+    startDate: z.date({ required_error: "New start date is required." }),
+    paymentTermMonths: z.coerce
+      .number()
+      .int()
+      .positive({ message: "Term must be a positive number." })
+      .min(1, "Term must be at least 1 month."),
+    monthlyRentalPrice: z.coerce
+      .number()
+      .positive({ message: "Monthly rent must be a positive number." }),
+    initialPaymentMonths: z.coerce
+      .number()
+      .int()
+      .gte(0, "Initial payment cannot be negative."),
+  })
+  .refine((data) => data.initialPaymentMonths <= data.paymentTermMonths, {
+    message: "Initial payment months cannot exceed total term months.",
+    path: ["initialPaymentMonths"],
+  });
 
 type RenewalFormValues = z.infer<typeof renewalFormSchema>;
 
@@ -69,27 +152,37 @@ interface AgreementsListClientPageProps {
   initialAgreements: AgreementWithRelations[];
 }
 
-export function AgreementsListClientPage({ initialAgreements }: AgreementsListClientPageProps) {
-  const [agreements, setAgreements] = useState<AgreementWithRelations[]>(initialAgreements);
-  const [searchTerm, setSearchTerm] = useState('');
+export function AgreementsListClientPage({
+  initialAgreements,
+}: AgreementsListClientPageProps) {
+  const [agreements, setAgreements] =
+    useState<AgreementWithRelations[]>(initialAgreements);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
   const { toast } = useToast();
   const router = useRouter();
   const renewalWindowDays = 30;
 
-  const [agreementToDelete, setAgreementToDelete] = useState<AgreementWithRelations | null>(null);
-  const [agreementToRenew, setAgreementToRenew] = useState<AgreementWithRelations | null>(null);
+  const [agreementToDelete, setAgreementToDelete] =
+    useState<AgreementWithRelations | null>(null);
+  const [agreementToRenew, setAgreementToRenew] =
+    useState<AgreementWithRelations | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
-  const canCreateAgreements = isSuperAdmin || hasPermission('agreement:create');
-  const canEditAgreements = isSuperAdmin || hasPermission('agreement:edit'); // For Renew
-  const canDeleteAgreements = isSuperAdmin || hasPermission('agreement:delete');
-  const canViewAgreements = isSuperAdmin || hasPermission('agreement:view') || canCreateAgreements || canEditAgreements || canDeleteAgreements;
+  const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
+  const canEditAgreements = isSuperAdmin || hasPermission("agreement:edit"); // For Renew
+  const canDeleteAgreements = isSuperAdmin || hasPermission("agreement:delete");
+  const canViewAgreements =
+    isSuperAdmin ||
+    hasPermission("agreement:view") ||
+    canCreateAgreements ||
+    canEditAgreements ||
+    canDeleteAgreements;
 
   const renewalForm = useForm<RenewalFormValues>({
     resolver: zodResolver(renewalFormSchema),
@@ -102,26 +195,38 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
 
   useEffect(() => {
     setIsMounted(true);
-    setAgreements(initialAgreements.map(ag => ({ ...ag })));
-    setToday(startOfDay(new Date())); 
+    setAgreements(initialAgreements.map((ag) => ({ ...ag })));
+    setToday(startOfDay(new Date()));
   }, [initialAgreements]);
-  
-  const filteredAgreements = agreements.filter(agreement =>
-    agreement.tenant?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    agreement.space?.spaceIdName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    agreement.space?.buildingName.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a,b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime());
+
+  const filteredAgreements = agreements
+    .filter(
+      (agreement) =>
+        agreement.tenant?.name
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        agreement.space?.spaceIdName
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        agreement.space?.buildingName
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()),
+    )
+    .sort(
+      (a, b) =>
+        parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime(),
+    );
 
   const totalPages = Math.ceil(filteredAgreements.length / itemsPerPage);
   const paginatedAgreements = filteredAgreements.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
-  
+
   useEffect(() => {
     const newTotalPages = Math.ceil(agreements.length / itemsPerPage);
     if (currentPage > newTotalPages && newTotalPages > 0) {
@@ -132,60 +237,90 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
   const isPaymentOverdue = (agreement: AgreementWithRelations): boolean => {
     if (!agreement.nextPaymentDueDate) return false;
     const nextPaymentDate = startOfDay(parseISO(agreement.nextPaymentDueDate));
-    const leaseEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
+    const leaseEndDate = addMonths(
+      parseISO(agreement.startDate),
+      agreement.paymentTermMonths,
+    );
     return isBefore(nextPaymentDate, today) && isBefore(today, leaseEndDate);
   };
-  
+
   const isEligibleForRenewal = (agreement: AgreementWithRelations): boolean => {
     const agreementStartDate = startOfDay(parseISO(agreement.startDate));
-    const agreementEndDate = addMonths(agreementStartDate, agreement.paymentTermMonths);
-    if (isBefore(agreementEndDate, today)) return false; 
-    const renewalEligibilityStartDate = subDays(agreementEndDate, renewalWindowDays);
-    return !isBefore(today, renewalEligibilityStartDate) || isAfter(today, agreementEndDate);
+    const agreementEndDate = addMonths(
+      agreementStartDate,
+      agreement.paymentTermMonths,
+    );
+    if (isBefore(agreementEndDate, today)) return false;
+    const renewalEligibilityStartDate = subDays(
+      agreementEndDate,
+      renewalWindowDays,
+    );
+    return (
+      !isBefore(today, renewalEligibilityStartDate) ||
+      isAfter(today, agreementEndDate)
+    );
   };
 
   const handleDownloadPdf = (agreementId: string) => {
-    const agreement = agreements.find(a => a.id === agreementId);
+    const agreement = agreements.find((a) => a.id === agreementId);
     if (!agreement) {
-        toast({ title: "Error", description: "Could not find agreement to download.", variant: "destructive" });
-        return;
+      toast({
+        title: "Error",
+        description: "Could not find agreement to download.",
+        variant: "destructive",
+      });
+      return;
     }
 
     if (!agreement.agreementText) {
-        toast({ title: "Error", description: "Agreement text is empty and cannot be downloaded.", variant: "destructive" });
-        return;
+      toast({
+        title: "Error",
+        description: "Agreement text is empty and cannot be downloaded.",
+        variant: "destructive",
+      });
+      return;
     }
-    
+
     const doc = new jsPDF();
 
     doc.html(agreement.agreementText, {
       callback: function (doc) {
-        const tenantName = agreement.tenant?.name || 'UnknownTenant';
+        const tenantName = agreement.tenant?.name || "UnknownTenant";
         const safeTenantName = sanitizeFilename(tenantName);
         doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
-        toast({ title: "Download Started", description: "The agreement PDF is downloading." });
+        toast({
+          title: "Download Started",
+          description: "The agreement PDF is downloading.",
+        });
       },
       x: 15,
       y: 15,
       width: 170,
-      windowWidth: 650
+      windowWidth: 650,
     });
   };
 
   const handleOpenRenewDialog = (agreement: AgreementWithRelations) => {
     if (!canEditAgreements) {
-      toast({ title: "Permission Denied", description: "You do not have permission to edit agreements.", variant: "destructive" });
+      toast({
+        title: "Permission Denied",
+        description: "You do not have permission to edit agreements.",
+        variant: "destructive",
+      });
       return;
     }
     setAgreementToRenew(agreement);
     renewalForm.reset({
-      startDate: addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths),
+      startDate: addMonths(
+        parseISO(agreement.startDate),
+        agreement.paymentTermMonths,
+      ),
       paymentTermMonths: agreement.paymentTermMonths,
       monthlyRentalPrice: Number(agreement.monthlyRentalPrice),
       initialPaymentMonths: 1,
     });
   };
-  
+
   const handleRenewAgreementSubmit = async (values: RenewalFormValues) => {
     if (!agreementToRenew) return;
     setIsSubmitting(true);
@@ -199,42 +334,73 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
     setIsSubmitting(false);
 
     if (result.success) {
-      toast({ title: "Agreement Updated", description: "The agreement has been successfully updated." });
+      toast({
+        title: "Agreement Updated",
+        description: "The agreement has been successfully updated.",
+      });
       setAgreementToRenew(null);
       router.refresh();
     } else {
-      toast({ title: "Error Updating Agreement", description: result.error, variant: "destructive" });
+      toast({
+        title: "Error Updating Agreement",
+        description: result.error,
+        variant: "destructive",
+      });
     }
   };
 
   const handleDeleteAgreement = async () => {
     if (!agreementToDelete) return;
     if (!canDeleteAgreements) {
-       toast({ title: "Permission Denied", description: "You do not have permission to delete agreements.", variant: "destructive" });
-       return;
+      toast({
+        title: "Permission Denied",
+        description: "You do not have permission to delete agreements.",
+        variant: "destructive",
+      });
+      return;
     }
     setIsSubmitting(true);
     const result = await deleteAgreementAction(agreementToDelete.id);
     setIsSubmitting(false);
     if (result.success) {
-        toast({title: "Agreement Deleted", description: "The agreement has been removed."});
-        setAgreements(prev => prev.filter(ag => ag.id !== agreementToDelete.id)); 
-        router.refresh(); 
+      toast({
+        title: "Agreement Deleted",
+        description: "The agreement has been removed.",
+      });
+      setAgreements((prev) =>
+        prev.filter((ag) => ag.id !== agreementToDelete.id),
+      );
+      router.refresh();
     } else {
-        toast({title: "Error Deleting Agreement", description: result.error, variant: "destructive"});
+      toast({
+        title: "Error Deleting Agreement",
+        description: result.error,
+        variant: "destructive",
+      });
     }
     setAgreementToDelete(null);
   };
 
   if (!isMounted) {
-    return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    );
   }
 
   if (!canViewAgreements && isMounted) {
     return (
       <Card className="shadow-lg text-center py-12">
-        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
-        <CardContent><p>You do not have permission to view agreements.</p></CardContent>
+        <CardHeader>
+          <CardTitle className="text-destructive flex items-center justify-center">
+            <EyeOff className="mr-2" />
+            Access Denied
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>You do not have permission to view agreements.</p>
+        </CardContent>
       </Card>
     );
   }
@@ -245,53 +411,187 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
         title="Rental Agreements"
         icon={FileText}
         description="Browse and manage all rental agreements."
-        actions={ 
+        actions={
           canCreateAgreements && (
-            <Link href="/admin/agreements/generate" passHref> 
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground"> 
-                <PlusCircle className="mr-2 h-5 w-5" /> Create New Agreement 
-              </Button> 
+            <Link href="/admin/agreements/generate" passHref>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <PlusCircle className="mr-2 h-5 w-5" /> Create New Agreement
+              </Button>
             </Link>
           )
         }
       />
-      
-      <AlertDialog open={!!agreementToDelete} onOpenChange={(open) => { if(!open) setAgreementToDelete(null); }}>
+
+      <AlertDialog
+        open={!!agreementToDelete}
+        onOpenChange={(open) => {
+          if (!open) setAgreementToDelete(null);
+        }}
+      >
         <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-5 w-5"/>Confirm Deletion</AlertDialogTitle>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <AlertTriangle className="text-destructive mr-2 h-5 w-5" />
+              Confirm Deletion
+            </AlertDialogTitle>
             <AlertDialogDescription>
-                Are you sure you want to delete the agreement for {agreementToDelete?.tenant?.name} at {agreementToDelete?.space?.spaceIdName}? This action cannot be undone. Associated bills might prevent deletion.
-            </AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter> 
-              <AlertDialogCancel onClick={() => setAgreementToDelete(null)} disabled={isSubmitting}>Cancel</AlertDialogCancel> 
-              <AlertDialogAction onClick={handleDeleteAgreement} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting || !canDeleteAgreements}> 
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Agreement 
-              </AlertDialogAction> 
-            </AlertDialogFooter>
+              Are you sure you want to delete the agreement for{" "}
+              {agreementToDelete?.tenant?.name} at{" "}
+              {agreementToDelete?.space?.spaceIdName}? This action cannot be
+              undone. Associated bills might prevent deletion.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setAgreementToDelete(null)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAgreement}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={isSubmitting || !canDeleteAgreements}
+            >
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}{" "}
+              Delete Agreement
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!agreementToRenew} onOpenChange={() => setAgreementToRenew(null)}>
+      <Dialog
+        open={!!agreementToRenew}
+        onOpenChange={() => setAgreementToRenew(null)}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Renew / Edit Agreement</DialogTitle>
             <DialogDescription>
-              Update the terms for {agreementToRenew?.tenant?.name}. A new bill will be created for any initial payment.
+              Update the terms for {agreementToRenew?.tenant?.name}. A new bill
+              will be created for any initial payment.
             </DialogDescription>
           </DialogHeader>
           <Form {...renewalForm}>
-            <form onSubmit={renewalForm.handleSubmit(handleRenewAgreementSubmit)} className="space-y-4">
-              <FormField control={renewalForm.control} name="startDate" render={({ field }) => ( <FormItem className="flex flex-col"> <FormLabel className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary"/>New Start Date<span className="text-destructive ml-1">*</span></FormLabel> <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>{field.value ? format(field.value, "PPP") : <span>Pick a new start date</span>}<CalendarDays className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+            <form
+              onSubmit={renewalForm.handleSubmit(handleRenewAgreementSubmit)}
+              className="space-y-4"
+            >
+              <FormField
+                control={renewalForm.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    {" "}
+                    <FormLabel className="flex items-center">
+                      <CalendarDays className="mr-2 h-4 w-4 text-primary" />
+                      New Start Date
+                      <span className="text-destructive ml-1">*</span>
+                    </FormLabel>{" "}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                            )}
+                            disabled={isSubmitting}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a new start date</span>
+                            )}
+                            <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={renewalForm.control} name="paymentTermMonths" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><CalendarClock className="mr-2 h-4 w-4 text-primary"/>New Term<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="Term in months" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={renewalForm.control} name="monthlyRentalPrice" render={({ field }) => (<FormItem><FormLabel>New Rent<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="Monthly rent amount" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField
+                  control={renewalForm.control}
+                  name="paymentTermMonths"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center">
+                        <CalendarClock className="mr-2 h-4 w-4 text-primary" />
+                        New Term<span className="text-destructive ml-1">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Term in months"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={renewalForm.control}
+                  name="monthlyRentalPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        New Rent<span className="text-destructive ml-1">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Monthly rent amount"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <FormField control={renewalForm.control} name="initialPaymentMonths" render={({ field }) => (<FormItem><FormLabel>Initial Payment (Months)<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} /></FormControl><FormMessage /></FormItem>)} />
-              
+              <FormField
+                control={renewalForm.control}
+                name="initialPaymentMonths"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Initial Payment (Months)
+                      <span className="text-destructive ml-1">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g., 1" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <DialogFooter>
-                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Cancel
+                  </Button>
+                </DialogClose>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Renew / Save
+                  {isSubmitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}{" "}
+                  Renew / Save
                 </Button>
               </DialogFooter>
             </form>
@@ -303,17 +603,35 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
         <CardContent className="p-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input placeholder="Search by tenant, space, or building..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <Input
+              placeholder="Search by tenant, space, or building..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
       {filteredAgreements.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
-          <CardContent> 
-            <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" /> 
-            <h3 className="text-xl font-semibold mb-2 font-headline">No Agreements Found</h3> 
-            <p className="text-muted-foreground mb-4"> {searchTerm ? "No agreements match your search." : "No agreements have been created yet."} </p> 
-            {!searchTerm && canCreateAgreements && (<Link href="/admin/agreements/generate" passHref><Button><PlusCircle className="mr-2 h-5 w-5" /> Create Agreement</Button></Link>)} 
+          <CardContent>
+            <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-xl font-semibold mb-2 font-headline">
+              No Agreements Found
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {" "}
+              {searchTerm
+                ? "No agreements match your search."
+                : "No agreements have been created yet."}{" "}
+            </p>
+            {!searchTerm && canCreateAgreements && (
+              <Link href="/admin/agreements/generate" passHref>
+                <Button>
+                  <PlusCircle className="mr-2 h-5 w-5" /> Create Agreement
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -322,67 +640,158 @@ export function AgreementsListClientPage({ initialAgreements }: AgreementsListCl
             {paginatedAgreements.map((agreement) => {
               const overdue = isPaymentOverdue(agreement);
               const eligibleForRenewal = isEligibleForRenewal(agreement);
-              const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
-              const spaceDesc = agreement.space ? `${agreement.space.spaceIdName}, ${agreement.space.buildingName}` : "N/A";
+              const agreementEndDate = addMonths(
+                parseISO(agreement.startDate),
+                agreement.paymentTermMonths,
+              );
+              const spaceDesc = agreement.space
+                ? `${agreement.space.spaceIdName}, ${agreement.space.buildingName}`
+                : "N/A";
               return (
-                <Card key={agreement.id} className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${overdue ? 'border-destructive border-2' : ''}`}>
+                <Card
+                  key={agreement.id}
+                  className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${
+                    overdue ? "border-destructive border-2" : ""
+                  }`}
+                >
                   <CardHeader>
-                    <div className="flex justify-between items-start"> <CardTitle className="font-headline text-lg">{agreement.tenant?.name || "N/A"}</CardTitle>
-                      <div className="flex flex-col items-end space-y-1"> {overdue && (<Badge variant="destructive" className="flex items-center"><AlertTriangle className="mr-1 h-3 w-3" /> Payment Overdue</Badge>)} {eligibleForRenewal && (<Badge variant="default" className="bg-accent text-accent-foreground">Renew Soon</Badge>)} </div>
-                    </div> <CardDescription>{spaceDesc}</CardDescription>
+                    <div className="flex justify-between items-start">
+                      {" "}
+                      <CardTitle className="font-headline text-lg">
+                        {agreement.tenant?.name || "N/A"}
+                      </CardTitle>
+                      <div className="flex flex-col items-end space-y-1">
+                        {" "}
+                        {overdue && (
+                          <Badge
+                            variant="destructive"
+                            className="flex items-center"
+                          >
+                            <AlertTriangle className="mr-1 h-3 w-3" /> Payment
+                            Overdue
+                          </Badge>
+                        )}{" "}
+                        {eligibleForRenewal && (
+                          <Badge
+                            variant="default"
+                            className="bg-accent text-accent-foreground"
+                          >
+                            Renew Soon
+                          </Badge>
+                        )}{" "}
+                      </div>
+                    </div>{" "}
+                    <CardDescription>{spaceDesc}</CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm space-y-1.5">
-                    <p><strong>Start Date:</strong> {format(parseISO(agreement.startDate), 'PP')}</p>
-                    <p><strong>End Date:</strong> {format(agreementEndDate, 'PP')}</p>
-                    <p><strong>Rent:</strong> {Number(agreement.monthlyRentalPrice).toLocaleString()} Birr/month</p>
-                    <p><strong>Term:</strong> {agreement.paymentTermMonths} months</p>
-                    <p className={`${overdue ? 'text-destructive font-semibold' : ''}`}> <strong>Next Lease Payment:</strong> {agreement.nextPaymentDueDate ? format(parseISO(agreement.nextPaymentDueDate), 'PP') : 'N/A'} </p>
-                    <p className="text-xs text-muted-foreground pt-1">Generated: {format(parseISO(agreement.createdAt), 'PP')}</p>
+                    <p>
+                      <strong>Start Date:</strong>{" "}
+                      {format(parseISO(agreement.startDate), "PP")}
+                    </p>
+                    <p>
+                      <strong>End Date:</strong>{" "}
+                      {format(agreementEndDate, "PP")}
+                    </p>
+                    <p>
+                      <strong>Rent:</strong>{" "}
+                      {Number(agreement.monthlyRentalPrice).toLocaleString()}{" "}
+                      Birr/month
+                    </p>
+                    <p>
+                      <strong>Term:</strong> {agreement.paymentTermMonths}{" "}
+                      months
+                    </p>
+                    <p
+                      className={`${
+                        overdue ? "text-destructive font-semibold" : ""
+                      }`}
+                    >
+                      {" "}
+                      <strong>Next Lease Payment:</strong>{" "}
+                      {agreement.nextPaymentDueDate
+                        ? format(parseISO(agreement.nextPaymentDueDate), "PP")
+                        : "N/A"}{" "}
+                    </p>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Generated: {format(parseISO(agreement.createdAt), "PP")}
+                    </p>
                   </CardContent>
                   <CardFooter className="border-t pt-4">
                     <div className="flex w-full flex-wrap items-center justify-end gap-2">
                       {canViewAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Link href={`/admin/agreements/${agreement.id}`} passHref>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Link
+                              href={`/admin/agreements/${agreement.id}`}
+                              passHref
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                              >
                                 <Eye className="h-4 w-4 text-blue-600" />
                                 <span className="sr-only">View Agreement</span>
                               </Button>
                             </Link>
                           </TooltipTrigger>
-                          <TooltipContent><p>View Agreement</p></TooltipContent>
+                          <TooltipContent>
+                            <p>View Agreement</p>
+                          </TooltipContent>
                         </Tooltip>
                       )}
                       {canEditAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRenewDialog(agreement)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleOpenRenewDialog(agreement)}
+                            >
                               <RefreshCw className="h-4 w-4 text-purple-600" />
-                              <span className="sr-only">Renew / Edit Agreement</span>
+                              <span className="sr-only">
+                                Renew / Edit Agreement
+                              </span>
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent><p>Renew / Edit</p></TooltipContent>
+                          <TooltipContent>
+                            <p>Renew / Edit</p>
+                          </TooltipContent>
                         </Tooltip>
                       )}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadPdf(agreement.id)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleDownloadPdf(agreement.id)}
+                          >
                             <Download className="h-4 w-4 text-green-600" />
                             <span className="sr-only">Download Agreement</span>
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent><p>Download Agreement</p></TooltipContent>
+                        <TooltipContent>
+                          <p>Download Agreement</p>
+                        </TooltipContent>
                       </Tooltip>
                       {canDeleteAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setAgreementToDelete(agreement)}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => setAgreementToDelete(agreement)}
+                            >
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Delete Agreement</span>
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent><p>Delete Agreement</p></TooltipContent>
+                          <TooltipContent>
+                            <p>Delete Agreement</p>
+                          </TooltipContent>
                         </Tooltip>
                       )}
                     </div>
