@@ -57,7 +57,7 @@ export default function PortalLayout({
           });
       } finally {
           // Redirect to the main login page
-          router.push('/auth/login');
+          router.push('/login');
           setIsLoggingOut(false);
       }
   };

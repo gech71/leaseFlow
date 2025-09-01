@@ -127,7 +127,7 @@ export default function SettingsPage() {
           </p>
         </CardContent>
         <CardFooter>
-          <Link href="/auth/forgot-password" passHref>
+          <Link href="/forgot-password" passHref>
             <Button>
               <KeyRound className="mr-2 h-4 w-4" /> Reset Password
             </Button>

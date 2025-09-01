@@ -110,7 +110,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         description: description,
         variant: "destructive", // Use destructive to highlight the error
       });
-      router.push('/auth/login');
+      router.push('/login');
     }
   }, [permissionsLoading, currentUser, router, toast, permissionError]);
 
@@ -151,7 +151,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
           variant: "default"
       });
     } finally {
-      router.push('/auth/login');
+      router.push('/login');
       setIsLoggingOut(false);
     }
   };

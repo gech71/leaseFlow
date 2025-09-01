@@ -62,8 +62,8 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
             toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
             form.reset();
             // Optional: force logout after password change for better security
-            await fetch('/api/Auth/portal/logout', { method: 'POST' });
-            window.location.href = '/portal/login';
+            await fetch('/api/Auth/logout', { method: 'POST' });
+            window.location.href = '/login';
         } else {
             toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
         }

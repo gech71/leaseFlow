@@ -66,7 +66,7 @@ export function ResetPasswordClientPage() {
           title: "Password Reset Successful",
           description: "Your password has been changed. You can now log in.",
         });
-        router.push('/auth/login');
+        router.push('/login');
       } else {
         const errorMessages = data.errors?.join(', ') || "Failed to reset password. Please check your details.";
         toast({
@@ -142,7 +142,7 @@ export function ResetPasswordClientPage() {
                 {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Reset Password"}
               </Button>
                <div className="text-center">
-                <Link href="/auth/login" className="text-sm text-primary hover:underline">
+                <Link href="/login" className="text-sm text-primary hover:underline">
                     Back to Login
                 </Link>
             </div>

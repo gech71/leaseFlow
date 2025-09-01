@@ -7,7 +7,7 @@ const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token'; // This will be
 
 const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
 const PORTAL_DASHBOARD_PATH = '/portal/dashboard';
-const LOGIN_PATH = '/auth/login';
+const LOGIN_PATH = '/login';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 
@@ -105,8 +105,8 @@ export async function middleware(request: NextRequest) {
   // --- Public Unprotected Routes ---
   const publicPaths = [
     LOGIN_PATH, 
-    '/auth/forgot-password',
-    '/auth/reset-password',
+    '/forgot-password',
+    '/reset-password',
     '/portal/connect', // NIB App entry point remains public
     '/portal/billing'  // NIB App billing page remains public
   ];
@@ -118,6 +118,7 @@ export async function middleware(request: NextRequest) {
     '/api/Auth/change-password',
     '/api/portal/validate-token',
     '/api/portal/payment-callback',
+    '/api/portal/Arifcallback',
     '/api/Auth/register',
   ];
 

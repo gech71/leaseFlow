@@ -56,7 +56,7 @@ export function AdminProfileClientPage() {
             toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
             form.reset();
             await fetch('/api/Auth/logout', { method: 'POST' });
-            window.location.href = '/auth/login';
+            window.location.href = '/login';
         } else {
             toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
         }

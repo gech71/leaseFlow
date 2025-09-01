@@ -139,7 +139,7 @@ export default function ForgotPasswordPage() {
                     Next
                   </Button>
                   <div className="text-center">
-                    <Link href="/auth/login" className="text-sm text-primary hover:underline">
+                    <Link href="/login" className="text-sm text-primary hover:underline">
                         Back to Login
                     </Link>
                   </div>
@@ -192,7 +192,7 @@ export default function ForgotPasswordPage() {
                 </div>
             </CardHeader>
             <CardContent className="px-4 sm:px-6 pb-6 text-center">
-                <Button onClick={() => router.push('/auth/login')} className="w-full">
+                <Button onClick={() => router.push('/login')} className="w-full">
                     Proceed to Login
                 </Button>
             </CardContent>
