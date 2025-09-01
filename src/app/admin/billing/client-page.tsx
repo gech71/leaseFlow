@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, {
@@ -196,10 +197,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<ClientBill | null>(null);
-  const [isVerificationDialogOpen, setIsVerificationDialogOpen] =
-    useState(false);
-  const [billForVerification, setBillForVerification] =
-    useState<ClientBill | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [billForEdit, setBillForEdit] = useState<ClientBill | null>(null);
   const [billToDelete, setBillToDelete] = useState<ClientBill | null>(null);
@@ -524,23 +521,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       if (adminProofFileInputRef.current)
         adminProofFileInputRef.current.value = "";
     }
-    if (isVerificationDialogOpen && billForVerification) {
-      const processedBill = processedClientBills.find(
-        (pb) => pb.id === billForVerification.id,
-      );
-      paymentForm.reset({
-        paymentDate: processedBill?.paymentDate
-          ? parseISO(processedBill.paymentDate)
-          : new Date(),
-        paymentMethod: processedBill?.paymentMethod || "",
-        paymentReference: processedBill?.paymentReference || "",
-        bankOrWalletName: processedBill?.bankOrWalletName || "",
-        adminVerificationNotes: processedBill?.adminVerificationNotes || "",
-      });
-      setAdminSelectedProofFile(null);
-      if (adminProofFileInputRef.current)
-        adminProofFileInputRef.current.value = "";
-    }
     if (isEditDialogOpen && billForEdit) {
       editForm.reset({
         paymentReference: billForEdit.paymentReference || "",
@@ -553,8 +533,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   }, [
     isPaymentDialogOpen,
     billForPayment,
-    isVerificationDialogOpen,
-    billForVerification,
     isEditDialogOpen,
     billForEdit,
     paymentForm,
@@ -703,10 +681,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setBillForPayment(bill);
     setIsPaymentDialogOpen(true);
   };
-  const handleOpenVerificationDialog = (bill: ClientBill) => {
-    setBillForVerification(bill);
-    setIsVerificationDialogOpen(true);
-  };
   const handleOpenEditDialog = (bill: ClientBill) => {
     setBillForEdit(bill);
     setIsEditDialogOpen(true);
@@ -753,60 +727,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     } else {
       toast({
         title: "Error Recording Payment",
-        description: result.error,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleVerificationSubmit = async (
-    values: PaymentFormValues,
-    action: "confirmVerification" | "rejectVerification",
-  ) => {
-    if (!billForVerification || !billForVerification.agreement) return;
-    if (!canManagePayments) {
-      toast({
-        title: "Permission Denied",
-        description: "You do not have permission to manage payments.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsLoading(true);
-    const adminProofUrl = adminSelectedProofFile
-      ? `${adminSelectedProofFile.name}`
-      : billForVerification.paymentProofUrl;
-
-    const result = await recordPaymentOrVerificationAction(
-      billForVerification.id,
-      {
-        ...values,
-        paymentDate: values.paymentDate.toISOString(),
-        adminProofUrl: adminProofUrl,
-      },
-      action,
-    );
-    setIsLoading(false);
-
-    if (result.success) {
-      toast({
-        title: `Payment ${
-          action === "confirmVerification" ? "Verified" : "Rejected"
-        }`,
-        description: `Action for bill ${billForVerification.id} processed.`,
-      });
-      setIsVerificationDialogOpen(false);
-      setBillForVerification(null);
-      paymentForm.reset();
-      setAdminSelectedProofFile(null);
-      if (adminProofFileInputRef.current)
-        adminProofFileInputRef.current.value = "";
-      await refreshBillingData();
-    } else {
-      toast({
-        title: `Error ${
-          action === "confirmVerification" ? "Verifying" : "Rejecting"
-        } Payment`,
         description: result.error,
         variant: "destructive",
       });
@@ -1352,304 +1272,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       </Dialog>
 
       <Dialog
-        open={isVerificationDialogOpen}
-        onOpenChange={(isOpen) => {
-          setIsVerificationDialogOpen(isOpen);
-          if (!isOpen) {
-            setBillForVerification(null);
-            paymentForm.reset();
-            setAdminSelectedProofFile(null);
-            if (adminProofFileInputRef.current)
-              adminProofFileInputRef.current.value = "";
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="font-headline text-xl">
-              Verify Tenant Payment
-            </DialogTitle>
-            {billForVerification && (
-              <DialogDescription>
-                Bill for{" "}
-                {
-                  processedClientBills.find(
-                    (pb) => pb.id === billForVerification.id,
-                  )?.tenantName
-                }{" "}
-                - Amount:{" "}
-                {processedClientBills
-                  .find((pb) => pb.id === billForVerification.id)
-                  ?.totalAmount?.toFixed(2)}{" "}
-                Birr
-              </DialogDescription>
-            )}
-          </DialogHeader>
-          <div className="flex-shrink-0 border-b pb-4">
-            {billForVerification && (
-              <div className="text-sm space-y-2 py-2">
-                {" "}
-                <p>
-                  <strong>Tenant Notes:</strong>{" "}
-                  {billForVerification.tenantPaymentNotes || (
-                    <span className="italic text-muted-foreground">
-                      No notes provided.
-                    </span>
-                  )}
-                </p>{" "}
-                <p>
-                  <strong>Submitted Proof:</strong>{" "}
-                  {billForVerification.paymentProofUrl ? (
-                    <Button
-                      asChild
-                      variant="link"
-                      size="sm"
-                      className="p-0 h-auto"
-                    >
-                      <a
-                        href={billForVerification.paymentProofUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {billForVerification.paymentProofUrl}
-                      </a>
-                    </Button>
-                  ) : (
-                    <span className="italic text-muted-foreground">
-                      No proof URL found.
-                    </span>
-                  )}{" "}
-                </p>{" "}
-              </div>
-            )}
-          </div>
-
-          <div className="flex-grow overflow-y-auto pr-4 py-2">
-            <Form {...paymentForm}>
-              <form className="space-y-4">
-                <FormField
-                  control={paymentForm.control}
-                  name="paymentDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>
-                        Actual Payment Date
-                        <span className="text-destructive ml-1">*</span>
-                      </FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={`w-full pl-3 text-left font-normal ${
-                                !field.value && "text-muted-foreground"
-                              }`}
-                              disabled={isLoading || !canManagePayments}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick payment date</span>
-                              )}
-                              <CalendarLucideIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) =>
-                              date > new Date() || date < new Date("1900-01-01")
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={paymentForm.control}
-                  name="paymentMethod"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Actual Payment Method
-                        <span className="text-destructive ml-1">*</span>
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={isLoading || !canManagePayments}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select payment method" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Card">Card</SelectItem>
-                          <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="Bank Transfer">
-                            Bank Transfer
-                          </SelectItem>
-                          <SelectItem value="Wallet">Wallet</SelectItem>
-                          <SelectItem value="Check">Check</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {(paymentMethodWatcher === "Bank Transfer" ||
-                  paymentMethodWatcher === "Wallet") && (
-                  <FormField
-                    control={paymentForm.control}
-                    name="bankOrWalletName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {paymentMethodWatcher === "Bank Transfer"
-                            ? "Bank Name"
-                            : "Wallet Name"}
-                          <span className="text-destructive ml-1">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={`Enter ${
-                              paymentMethodWatcher === "Bank Transfer"
-                                ? "bank name"
-                                : "wallet name"
-                            }`}
-                            {...field}
-                            disabled={isLoading || !canManagePayments}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                <FormField
-                  control={paymentForm.control}
-                  name="paymentReference"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Actual Payment Reference</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Transaction ID, Check No., etc."
-                          {...field}
-                          disabled={isLoading || !canManagePayments}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {canManagePayments && (
-                  <div className="space-y-2">
-                    {" "}
-                    <Label
-                      htmlFor="adminVerificationProofFile"
-                      className="flex items-center text-sm font-medium"
-                    >
-                      {" "}
-                      <Paperclip className="mr-2 h-4 w-4 text-primary" />{" "}
-                      Replace/Add Payment Slip{" "}
-                    </Label>{" "}
-                    <Input
-                      id="adminVerificationProofFile"
-                      type="file"
-                      ref={adminProofFileInputRef}
-                      onChange={handleAdminFileSelect}
-                      className="text-sm file:mr-2 file:py-1.5 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-                      disabled={isLoading}
-                    />{" "}
-                    {adminSelectedProofFile && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        New file selected: {adminSelectedProofFile.name}
-                      </p>
-                    )}{" "}
-                  </div>
-                )}
-                <FormField
-                  control={paymentForm.control}
-                  name="adminVerificationNotes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Admin Notes (Optional)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Verification notes..."
-                          {...field}
-                          rows={2}
-                          disabled={isLoading || !canManagePayments}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </form>
-            </Form>
-          </div>
-
-          <DialogFooter className="pt-4 mt-auto border-t flex-col sm:flex-row gap-2">
-            {canManagePayments && (
-              <Button
-                type="button"
-                variant="destructive"
-                className="w-full sm:w-auto"
-                onClick={() =>
-                  paymentForm.handleSubmit((data) =>
-                    handleVerificationSubmit(data, "rejectVerification"),
-                  )()
-                }
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldX className="mr-2 h-4 w-4" />
-                )}
-                Reject Payment
-              </Button>
-            )}
-            <div className="flex-grow"></div>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isLoading}>
-                Cancel
-              </Button>
-            </DialogClose>
-            {canManagePayments && (
-              <Button
-                type="button"
-                onClick={() =>
-                  paymentForm.handleSubmit((data) =>
-                    handleVerificationSubmit(data, "confirmVerification"),
-                  )()
-                }
-                className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                )}
-                Confirm Payment
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
         open={isEditDialogOpen}
         onOpenChange={(isOpen) => {
           setIsEditDialogOpen(isOpen);
@@ -2041,33 +1663,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                       </TooltipTrigger>
                                       <TooltipContent>
                                         <p>Edit Details</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </>
-                              ) : bill.currentStatus ===
-                                "PendingVerification" ? (
-                                <>
-                                  {canManagePayments && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() =>
-                                            handleOpenVerificationDialog(bill)
-                                          }
-                                          className="h-8 w-8 text-blue-600"
-                                          disabled={isLoading}
-                                        >
-                                          <ShieldCheck className="h-4 w-4" />
-                                          <span className="sr-only">
-                                            Verify Payment
-                                          </span>
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Verify Payment</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   )}
