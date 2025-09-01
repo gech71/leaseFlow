@@ -85,7 +85,19 @@ interface AgreementTemplateClientPageProps {
   initialTemplates: AgreementTemplate[];
   error?: string;
 }
+function EditorWrapper({
+  value,
+  onEditorChange,
+  isDialogOpen,
+}: {
+  value: string;
+  onEditorChange: (content: string) => void;
+  isDialogOpen: boolean;
+}) {
+  if (!isDialogOpen) return null;
 
+  return <TinyMceEditor value={value} onEditorChange={onEditorChange} />;
+}
 export function AgreementTemplateClientPage({
   initialTemplates,
   error,
@@ -330,7 +342,7 @@ export function AgreementTemplateClientPage({
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col overflow-visible">
           <DialogHeader>
             <DialogTitle className="text-xl font-headline">
               {formMode === "add" ? "Add New" : "Edit"} Agreement Template
@@ -369,11 +381,11 @@ export function AgreementTemplateClientPage({
                       <FormItem>
                         <FormLabel>Template Content</FormLabel>
                         <FormControl>
-                          <TinyMceEditor
+                          <EditorWrapper
+                            key={isFormOpen ? "open" : "closed"}
                             value={field.value || ""}
-                            onEditorChange={(content) =>
-                              field.onChange(content)
-                            }
+                            onEditorChange={field.onChange}
+                            isDialogOpen={isFormOpen}
                           />
                         </FormControl>
                         <FormMessage />

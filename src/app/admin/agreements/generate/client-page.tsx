@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -8,7 +7,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -31,11 +29,6 @@ import {
   Eye,
   CalendarClock,
   Sigma,
-  CreditCard,
-  Landmark,
-  Wallet,
-  Coins,
-  HelpCircle,
   Info,
   CalendarDays,
   EyeOff,
@@ -66,7 +59,7 @@ import {
 } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Link from "next/link";
-import { addMonths, format, parseISO, isValid } from "date-fns";
+import { addMonths, format } from "date-fns";
 import {
   Popover,
   PopoverContent,
@@ -77,7 +70,6 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { jsPDF } from "jspdf";
-import { TinyMceEditor } from "@/components/custom/TinyMceEditor";
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -675,9 +667,10 @@ export function GenerateAgreementClientPage({
                   <FormItem>
                     <FormLabel>Additional Terms</FormLabel>
                     <FormControl>
-                      <TinyMceEditor
-                        value={field.value || ""}
-                        onEditorChange={(content) => field.onChange(content)}
+                      <Textarea
+                        rows={6} // adjust height as needed
+                        placeholder="Enter additional terms..."
+                        {...field}
                         disabled={
                           !canCreateAgreements || isSavingToDb || isPreviewing
                         }
@@ -691,6 +684,7 @@ export function GenerateAgreementClientPage({
                   </FormItem>
                 )}
               />
+
               <Button
                 type="submit"
                 disabled={
