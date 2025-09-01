@@ -1,41 +1,40 @@
-
 // src/app/portal/dashboard/actions.ts
 "use server";
 
-import { databaseService } from '@/lib/services/databaseService';
-import type { Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma, PenaltyTier as PenaltyTierPrisma, User, Role } from '@prisma/client';
-import { addMonths, isAfter, format } from 'date-fns';
-import { cookies } from 'next/headers';
-import { prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/services/emailService';
-import crypto from 'crypto';
+import { databaseService } from "@/lib/services/databaseService";
+import type {
+  Agreement as AgreementPrisma,
+  Bill as BillPrisma,
+  Space as SpacePrisma,
+  Building as BuildingPrisma,
+  Tenant as TenantPrisma,
+  PenaltyTier as PenaltyTierPrisma,
+  User,
+  Role,
+} from "@prisma/client";
+import { addMonths, isAfter, format } from "date-fns";
+import { cookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
+import { sendEmail } from "@/lib/services/emailService";
+import crypto from "crypto";
 
 // --- Normalization Helper ---
 const toCamelCase = (s: string) => {
-  if (typeof s !== 'string' || s.length === 0) {
-    return s;
-  }
-  // This handles PascalCase, camelCase, snake_case, and kebab-case
-  const camel = s.replace(/([-_][a-z])/ig, ($1) => {
-    return $1.toUpperCase()
-      .replace('-', '')
-      .replace('_', '');
+  return s.replace(/([-_][a-z])/gi, ($1) => {
+    return $1.toUpperCase().replace("-", "").replace("_", "");
   });
-  return camel.charAt(0).toLowerCase() + camel.slice(1);
 };
 
-
 const isObject = function (o: any) {
-  return o === Object(o) && !Array.isArray(o) && typeof o !== 'function';
+  return o === Object(o) && !Array.isArray(o) && typeof o !== "function";
 };
 
 const normalizeKeys = (obj: any): any => {
   if (isObject(obj)) {
     const n: { [key: string]: any } = {};
-    Object.keys(obj)
-      .forEach((k) => {
-        n[toCamelCase(k)] = normalizeKeys(obj[k]);
-      });
+    Object.keys(obj).forEach((k) => {
+      n[toCamelCase(k)] = normalizeKeys(obj[k]);
+    });
     return n;
   } else if (Array.isArray(obj)) {
     return obj.map((i) => {
@@ -54,7 +53,7 @@ interface ParsedUtilityItemForAction {
 }
 
 // Types that match the structure of data fetched with Prisma, including relations
-export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
+export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
   space: SpacePrisma & {
     building: BuildingPrisma & {
       penaltyPolicyTiers: PenaltyTierPrisma[];
@@ -62,9 +61,10 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, 'bills'> & {
     };
   };
   tenant: TenantPrisma;
-  bills: (Omit<BillPrisma, 'utilityBreakdown'> & { utilityBreakdown: ParsedUtilityItemForAction[] })[];
+  bills: (Omit<BillPrisma, "utilityBreakdown"> & {
+    utilityBreakdown: ParsedUtilityItemForAction[];
+  })[];
 };
-
 
 export interface TenantPortalData {
   agreement: PortalAgreementWithRelations | null;
@@ -72,71 +72,91 @@ export interface TenantPortalData {
 }
 
 // --- User Authentication Helpers ---
-const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ACCESS_TOKEN_KEY = "leaseflow_admin_access_token";
 
 // Insecure JWT payload decoder
 async function decodeJwtPayload(token: string): Promise<any | null> {
   try {
-    const base64Url = token.split('.')[1];
+    const base64Url = token.split(".")[1];
     if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const jsonPayload = decodeURIComponent(
       atob(base64)
-        .split('')
+        .split("")
         .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
         })
-        .join('')
+        .join(""),
     );
     return JSON.parse(jsonPayload);
   } catch (e) {
-    console.error('Portal Auth Error: Failed to decode JWT payload:', e);
+    console.error("Portal Auth Error: Failed to decode JWT payload:", e);
     return null;
   }
 }
 
 // Gets current user from the session cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value; // Use the unified token key
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value; // Use the unified token key
 
-    if (!accessToken) {
-        console.error("Portal Auth Error: No session access token found in cookie.");
-        return null;
-    }
+  if (!accessToken) {
+    console.error(
+      "Portal Auth Error: No session access token found in cookie.",
+    );
+    return null;
+  }
 
-    const tokenPayload = await decodeJwtPayload(accessToken);
-    if (!tokenPayload || !tokenPayload.sub) {
-        console.error(`Portal Auth Error: Failed to decode session token or 'sub' claim is missing.`);
-        return null;
-    }
+  const tokenPayload = await decodeJwtPayload(accessToken);
+  if (!tokenPayload || !tokenPayload.sub) {
+    console.error(
+      `Portal Auth Error: Failed to decode session token or 'sub' claim is missing.`,
+    );
+    return null;
+  }
 
-    const user = await databaseService.getUserByExternalId(tokenPayload.sub, { roles: true });
+  const user = await databaseService.getUserByExternalId(tokenPayload.sub, {
+    roles: true,
+  });
 
-    if (!user) {
-        console.error(`Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local system.`);
-    }
+  if (!user) {
+    console.error(
+      `Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local system.`,
+    );
+  }
 
-    return user;
+  return user;
 }
-
 
 export async function getTenantPortalDashboardDataAction(): Promise<TenantPortalData> {
   try {
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return { agreement: null, error: "Your session is invalid or has expired. Please re-enter from the Mini App or login page." };
+      return {
+        agreement: null,
+        error:
+          "Your session is invalid or has expired. Please re-enter from the Mini App or login page.",
+      };
     }
 
     // Find the tenant record associated with the logged-in user's email or phone number
-    const associatedTenant = await databaseService.findTenantByEmailOrPhone(currentUser.email, currentUser.phoneNumber);
-    
+    const associatedTenant = await databaseService.findTenantByEmailOrPhone(
+      currentUser.email,
+      currentUser.phoneNumber,
+    );
+
     if (!associatedTenant) {
-        console.error(`Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`);
-        return { agreement: null, error: "Your user account is not associated with any tenant profile. Please contact property management." };
+      console.error(
+        `Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`,
+      );
+      return {
+        agreement: null,
+        error:
+          "Your user account is not associated with any tenant profile. Please contact property management.",
+      };
     }
-    
+
     const allAgreementsRaw = await databaseService.getAllAgreements({
       where: { tenantId: associatedTenant.id },
       include: {
@@ -144,7 +164,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         space: {
           include: {
             building: {
-              include: { 
+              include: {
                 penaltyPolicyTiers: true,
                 managers: true, // Fetch managers
               },
@@ -152,104 +172,132 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
           },
         },
         bills: {
-          orderBy: { billDate: 'desc' },
+          orderBy: { billDate: "desc" },
         },
       },
-      orderBy: { createdAt: 'asc' } 
+      orderBy: { createdAt: "asc" },
     });
-    
-    const processedAgreements = allAgreementsRaw.map(ag => {
-      const processedBills = ag.bills.map(rawBill => {
+
+    const processedAgreements = allAgreementsRaw.map((ag) => {
+      const processedBills = ag.bills.map((rawBill) => {
         let parsedItems: ParsedUtilityItemForAction[] = [];
         const rawUtilityData = (rawBill as any).utilityBreakdown;
 
-        if (typeof rawUtilityData === 'string') {
+        if (typeof rawUtilityData === "string") {
           try {
             const jsonData = JSON.parse(rawUtilityData);
             if (Array.isArray(jsonData)) {
               parsedItems = jsonData
-                .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
-                .map(item => ({
+                .filter(
+                  (item) =>
+                    typeof item.name === "string" &&
+                    typeof item.amount === "number",
+                )
+                .map((item) => ({
                   name: item.name,
                   amount: item.amount,
-                  id: typeof item.id === 'string' ? item.id : undefined,
+                  id: typeof item.id === "string" ? item.id : undefined,
                 }));
             }
           } catch (e) {
-            console.error(`Portal Action: Failed to parse utilityBreakdown JSON for bill ${rawBill.id}:`, e);
+            console.error(
+              `Portal Action: Failed to parse utilityBreakdown JSON for bill ${rawBill.id}:`,
+              e,
+            );
           }
-        } else if (Array.isArray(rawUtilityData)) { 
-            parsedItems = rawUtilityData
-                .filter(item => typeof item.name === 'string' && typeof item.amount === 'number')
-                .map(item => ({
-                  name: item.name,
-                  amount: item.amount,
-                  id: typeof item.id === 'string' ? item.id : undefined,
-                }));
+        } else if (Array.isArray(rawUtilityData)) {
+          parsedItems = rawUtilityData
+            .filter(
+              (item) =>
+                typeof item.name === "string" &&
+                typeof item.amount === "number",
+            )
+            .map((item) => ({
+              name: item.name,
+              amount: item.amount,
+              id: typeof item.id === "string" ? item.id : undefined,
+            }));
         }
-        
-        const { utilityBreakdown: _originalScalarUtilityData, ...billData } = rawBill;
+
+        const { utilityBreakdown: _originalScalarUtilityData, ...billData } =
+          rawBill;
         return { ...billData, utilityBreakdown: parsedItems };
       });
       return { ...ag, bills: processedBills };
     });
 
     let targetAgreement: PortalAgreementWithRelations | null = null;
-    for (const ag of processedAgreements) { 
-        const agreementEndDate = addMonths(new Date(ag.startDate), ag.paymentTermMonths);
-        if (isAfter(agreementEndDate, new Date())) {
-            targetAgreement = ag as PortalAgreementWithRelations;
-            break;
-        }
+    for (const ag of processedAgreements) {
+      const agreementEndDate = addMonths(
+        new Date(ag.startDate),
+        ag.paymentTermMonths,
+      );
+      if (isAfter(agreementEndDate, new Date())) {
+        targetAgreement = ag as PortalAgreementWithRelations;
+        break;
+      }
     }
-    
+
     if (!targetAgreement) {
-      targetAgreement = processedAgreements[processedAgreements.length - 1] as PortalAgreementWithRelations || null;
+      targetAgreement =
+        (processedAgreements[
+          processedAgreements.length - 1
+        ] as PortalAgreementWithRelations) || null;
     }
-    
+
     return {
       agreement: targetAgreement,
       error: undefined,
     };
-
   } catch (error: any) {
     console.error("Error fetching tenant portal data:", error);
-    return { 
-        agreement: null, 
-        error: `Failed to fetch portal data: ${(error as Error).message}` 
+    return {
+      agreement: null,
+      error: `Failed to fetch portal data: ${(error as Error).message}`,
     };
   }
 }
 
 export async function initiateArifpayPaymentAction(
-  billId: string, 
+  billId: string,
   billAmount: number,
-  billDate: string
+  billDate: string,
 ): Promise<{ success: boolean; error?: string; paymentUrl?: string }> {
   const ARIFPAY_API_URL = process.env.ARIFPAY_API_URL;
   const ARIFPAY_API_KEY = process.env.ARIFPAY_API_KEY;
 
   if (!ARIFPAY_API_URL || !ARIFPAY_API_KEY) {
     console.error("ArifPay environment variables are not configured.");
-    return { success: false, error: "Payment service is not configured correctly." };
+    return {
+      success: false,
+      error: "Payment service is not configured correctly.",
+    };
   }
 
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser?.phoneNumber || !currentUser?.email) {
-      return { success: false, error: "Your user profile is missing a phone number or email address." };
+      return {
+        success: false,
+        error: "Your user profile is missing a phone number or email address.",
+      };
     }
 
     const bill = await prisma.bill.findUnique({
       where: { id: billId },
-      include: { agreement: { include: { space: { include: { building: true } } } } }
+      include: {
+        agreement: { include: { space: { include: { building: true } } } },
+      },
     });
 
     if (!bill) {
       return { success: false, error: "Bill not found." };
     }
     if (!bill.agreement?.space?.building?.accountNumber) {
-      return { success: false, error: "Building account number is not configured for this bill." };
+      return {
+        success: false,
+        error: "Building account number is not configured for this bill.",
+      };
     }
 
     const requestBody = {
@@ -258,107 +306,155 @@ export async function initiateArifpayPaymentAction(
       email: currentUser.email,
       items: [
         {
-          name: `Bill: ${format(new Date(billDate), 'yyyy-MM-dd')}`,
+          name: `Bill payment for ${format(new Date(billDate), "yyyy-MM-dd")}`,
           quantity: 1,
           price: billAmount,
-          description: `Bill payment for date: ${billDate}`
-        }
+          description: `Bill payment for date: ${billDate}`,
+        },
       ],
     };
 
-    const response = await fetch(ARIFPAY_API_URL, {
-      method: 'POST',
+    console.log("ArifPay Request Body:", requestBody);
+
+    const response = await fetch(`${ARIFPAY_API_URL}/createsession`, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'x-arifpay-key': ARIFPAY_API_KEY,
+        "Content-Type": "application/json",
+        "API-Key": ARIFPAY_API_KEY,
       },
       body: JSON.stringify(requestBody),
     });
 
+    console.log("ArifPay Response Status:", response);
+
     const responseText = await response.text();
     if (!responseText) {
-        console.error("ArifPay API Error: Received an empty response from the server.");
-        return { success: false, error: "Payment gateway returned an empty response." };
+      console.error(
+        "ArifPay API Error: Received an empty response from the server.",
+      );
+      return {
+        success: false,
+        error: "Payment gateway returned an empty response.",
+      };
     }
+
+    console.log("ArifPay Response Body:", responseText);
 
     let rawResponseData;
     try {
-        rawResponseData = JSON.parse(responseText);
+      rawResponseData = JSON.parse(responseText);
     } catch (e) {
-        console.error("ArifPay API Error: Failed to parse JSON response. Body:", responseText);
-        return { success: false, error: "Payment gateway returned an invalid response." };
+      console.error(
+        "ArifPay API Error: Failed to parse JSON response. Body:",
+        responseText,
+      );
+      return {
+        success: false,
+        error: "Payment gateway returned an invalid response.",
+      };
     }
-    
-    console.log("ArifPay API Response:", rawResponseData);
+
     const responseData = normalizeKeys(rawResponseData); // Normalize the response
-    
+
     if (responseData.responseCode && responseData.responseCode !== "0") {
       console.error("ArifPay API Error:", responseData);
-      return { success: false, error: `Payment gateway error: ${responseData.responseDescription || "An unknown error occurred."}` };
+      return {
+        success: false,
+        error: `Payment gateway error: ${
+          responseData.responseDescription || "An unknown error occurred."
+        }`,
+      };
     }
-    
+
     const sessionId = responseData?.data?.na;
     if (!responseData.data?.url || !sessionId) {
-       console.error("ArifPay API Error - No URL or Session ID:", responseData);
-      return { success: false, error: "Payment gateway did not return a valid payment URL or session ID." };
+      console.error("ArifPay API Error - No URL or Session ID:", responseData);
+      return {
+        success: false,
+        error:
+          "Payment gateway did not return a valid payment URL or session ID.",
+      };
     }
 
     await prisma.$transaction(async (tx) => {
-        // Create the ArifPayment record
-        await tx.arifPayment.create({
-            data: {
-                sessionId: sessionId,
-                status: 'Pending',
-                amount: billAmount,
-                paymentUrl: responseData.data.url,
-                bill: { connect: { id: billId } }
-            }
-        });
+      // Create the ArifPayment record
+      await tx.arifPayment.create({
+        data: {
+          sessionId: sessionId,
+          status: "Pending",
+          amount: billAmount,
+          paymentUrl: responseData.data.url,
+          bill: { connect: { id: billId } },
+        },
+      });
 
-        // Update the bill status
-        await tx.bill.update({
-            where: { id: billId },
-            data: { status: 'PendingVerification' }
-        });
+      // Update the bill status
+      await tx.bill.update({
+        where: { id: billId },
+        data: { status: "PendingVerification" },
+      });
     });
 
     return { success: true, paymentUrl: responseData.data.url };
-
   } catch (error: any) {
     console.error("Error in initiateArifpayPaymentAction:", error);
-    return { success: false, error: "An unexpected error occurred while initiating payment." };
+    return {
+      success: false,
+      error: "An unexpected error occurred while initiating payment.",
+    };
   }
 }
 
-
-export async function sendContactEmailAction(formData: { subject: string; body: string }): Promise<{ success: boolean; error?: string }> {
+export async function sendContactEmailAction(formData: {
+  subject: string;
+  body: string;
+}): Promise<{ success: boolean; error?: string }> {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
       return { success: false, error: "Authentication required." };
     }
 
-    const tenant = await databaseService.findTenantByEmailOrPhone(currentUser.email, currentUser.phoneNumber);
+    const tenant = await databaseService.findTenantByEmailOrPhone(
+      currentUser.email,
+      currentUser.phoneNumber,
+    );
     if (!tenant) {
-      return { success: false, error: "No tenant profile associated with your user account." };
+      return {
+        success: false,
+        error: "No tenant profile associated with your user account.",
+      };
     }
-    
+
     const agreement = await prisma.agreement.findFirst({
       where: { tenantId: tenant.id },
-      include: { space: { include: { building: { include: { managers: true } } } } },
-      orderBy: { startDate: 'desc' }
+      include: {
+        space: { include: { building: { include: { managers: true } } } },
+      },
+      orderBy: { startDate: "desc" },
     });
-    
-    if (!agreement?.space?.building?.managers || agreement.space.building.managers.length === 0) {
-      return { success: false, error: "No manager is assigned to your building. Cannot send email." };
+
+    if (
+      !agreement?.space?.building?.managers ||
+      agreement.space.building.managers.length === 0
+    ) {
+      return {
+        success: false,
+        error: "No manager is assigned to your building. Cannot send email.",
+      };
     }
 
-    const managerEmails = agreement.space.building.managers.map(m => m.email).filter((email): email is string => !!email);
+    const managerEmails = agreement.space.building.managers
+      .map((m) => m.email)
+      .filter((email): email is string => !!email);
 
     if (managerEmails.length === 0) {
-      return { success: false, error: "Building manager(s) do not have an email address configured." };
+      return {
+        success: false,
+        error: "Building manager(s) do not have an email address configured.",
+      };
     }
-    
+
     const emailHtml = `
       <h1>Contact Form Submission from Tenant Portal</h1>
       <p><strong>From Tenant:</strong> ${tenant.name} (${tenant.email})</p>
@@ -366,14 +462,14 @@ export async function sendContactEmailAction(formData: { subject: string; body: 
       <p><strong>Space:</strong> ${agreement.space.spaceIdName}</p>
       <hr>
       <h2>Subject: ${formData.subject}</h2>
-      <p>${formData.body.replace(/\n/g, '<br>')}</p>
+      <p>${formData.body.replace(/\n/g, "<br>")}</p>
     `;
 
     const result = await sendEmail({
       from: `"${tenant.name}" <${tenant.email}>`,
-      to: managerEmails.join(', '),
+      to: managerEmails.join(", "),
       subject: `[Tenant Portal] ${formData.subject}`,
-      html: emailHtml
+      html: emailHtml,
     });
 
     if (!result.success) {
@@ -381,9 +477,11 @@ export async function sendContactEmailAction(formData: { subject: string; body: 
     }
 
     return { success: true };
-
   } catch (error: any) {
     console.error("Error in sendContactEmailAction:", error);
-    return { success: false, error: `Failed to send message: ${error.message}` };
+    return {
+      success: false,
+      error: `Failed to send message: ${error.message}`,
+    };
   }
 }
