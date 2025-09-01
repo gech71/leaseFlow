@@ -130,7 +130,6 @@ export async function deleteAgreementAction(agreementId: string) {
         }
 
         // Check if there are any monthly bills (not the initial payment record).
-        // A monthly bill is any bill whose date is not the same as the agreement's start date.
         const hasSubsequentBills = agreement.bills.some(
             bill => !isSameDay(bill.billDate, agreement.startDate)
         );
@@ -148,7 +147,7 @@ export async function deleteAgreementAction(agreementId: string) {
 
             // 2. Vacate the space if this agreement made it occupied.
             if (agreement.space && agreement.space.tenantId === agreement.tenantId) {
-                // Check if there are other agreements for this space and tenant before vacating.
+                // To be safe, ensure this is the only agreement for this tenant/space combo.
                 const otherAgreements = await tx.agreement.findMany({
                     where: {
                         spaceId: agreement.spaceId,
@@ -156,18 +155,20 @@ export async function deleteAgreementAction(agreementId: string) {
                         id: { not: agreementId },
                     }
                 });
+
+                // Only vacate if no other agreements exist for this tenant-space pair.
                 if (otherAgreements.length === 0) {
                     await tx.space.update({
                         where: { id: agreement.spaceId },
                         data: {
                             isOccupied: false,
-                            tenant: { disconnect: true }
+                            tenantId: null // Disconnect by setting foreign key to null
                         }
                     });
                     await tx.tenant.update({
                         where: { id: agreement.tenantId },
                         data: {
-                            rentedSpace: { disconnect: true }
+                            rentedSpaceId: null // Disconnect by setting foreign key to null
                         }
                     });
                 }
