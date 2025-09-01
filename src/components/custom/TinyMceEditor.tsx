@@ -27,7 +27,7 @@ export function TinyMceEditor({
       init={{
         height: 350,
         menubar: false,
-        z_index: 1500, // This is the definitive fix.
+        z_index: 1500,
         plugins: [
           "advlist",
           "autolink",
@@ -46,7 +46,6 @@ export function TinyMceEditor({
           "table",
           "help",
           "textcolor",
-          "colorpicker",
         ],
         toolbar:
           "undo redo | blocks | " +
