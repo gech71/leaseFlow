@@ -219,8 +219,8 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
             const initialPaymentMonths = data.initialPaymentMonths ?? 0;
             const monthlyRent = data.monthlyRentalPrice ?? Number(agreement.monthlyRentalPrice);
 
-            // Set the next due date to the new start date to make it billable.
-            const nextPaymentDueDate = startDateObj;
+            // Set the next due date to one month after the new start date to schedule the next monthly bill.
+            const nextPaymentDueDate = addMonths(startDateObj, 1);
 
             // Update the agreement itself
             const renewedAgreement = await tx.agreement.update({
@@ -234,7 +234,8 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
                 },
             });
             
-            // DO NOT create a bill here. Let the user generate it from the billing page.
+            // DO NOT create a bill here. The user will generate the first bill of the new term.
+            // This allows them to include any upfront rent and utilities in one bill.
 
             return renewedAgreement;
         });
