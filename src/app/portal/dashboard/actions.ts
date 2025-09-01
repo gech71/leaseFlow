@@ -8,6 +8,7 @@ import { addMonths, isAfter, format } from 'date-fns';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
+import crypto from 'crypto';
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -191,10 +192,9 @@ export async function initiateArifpayPaymentAction(
 ): Promise<{ success: boolean; error?: string; paymentUrl?: string }> {
   const ARIFPAY_API_URL = process.env.ARIFPAY_API_URL;
   const ARIFPAY_API_KEY = process.env.ARIFPAY_API_KEY;
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
-  if (!ARIFPAY_API_URL || !ARIFPAY_API_KEY || !BASE_URL) {
-    console.error("ArifPay or Base URL environment variables are not configured.");
+  if (!ARIFPAY_API_URL || !ARIFPAY_API_KEY) {
+    console.error("ArifPay environment variables are not configured.");
     return { success: false, error: "Payment service is not configured correctly." };
   }
 
@@ -216,54 +216,37 @@ export async function initiateArifpayPaymentAction(
       return { success: false, error: "Building account number is not configured for this bill." };
     }
 
-    const nonce = crypto.randomBytes(16).toString('hex');
-    const transactionId = `${billId}__${nonce}`; // Make transactionId unique per attempt
-
     const requestBody = {
-      nonce: nonce,
-      successRedirectUrl: `${BASE_URL}/portal/success`,
-      errorRedirectUrl: `${BASE_URL}/portal/error`,
-      cancelRedirectUrl: `${BASE_URL}/portal/cancel`,
-      notifyUrl: `${BASE_URL}/api/portal/Arifcallback`,
-      paymentMethods: ["CARD", "TELEBIRR", "CBE_BIRR", "AWASH_BIRR"],
-      expireDate: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes from now
       phone: currentUser.phoneNumber,
+      cbs: bill.agreement.space.building.accountNumber,
       email: currentUser.email,
       items: [
         {
           name: `Bill: ${format(new Date(billDate), 'yyyy-MM-dd')}`,
           quantity: 1,
           price: billAmount,
-          description: `Bill payment for space ${bill.agreement.space.spaceIdName}`
+          description: `Bill payment for date: ${billDate}`
         }
-      ],
-      beneficiaries: [
-        {
-            accountNumber: bill.agreement.space.building.accountNumber,
-            bank: "NIB",
-            amount: billAmount
-        }
-      ],
-      transactionId: transactionId
+      ]
     };
 
     const response = await fetch(ARIFPAY_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-arifpay-key': ARIFPAY_API_KEY,
+        'Api-Key': ARIFPAY_API_KEY,
       },
       body: JSON.stringify(requestBody),
     });
 
     const responseData = await response.json();
     
-    if (responseData.code && responseData.code !== 200) {
+    if (responseData.ResponseCode && responseData.ResponseCode !== "0") {
       console.error("ArifPay API Error:", responseData);
-      return { success: false, error: `Payment gateway error: ${responseData.message || "An unknown error occurred."}` };
+      return { success: false, error: `Payment gateway error: ${responseData.ResponseDescription || "An unknown error occurred."}` };
     }
     
-    if (!responseData.data?.paymentUrl) {
+    if (!responseData.Data?.URL) {
        console.error("ArifPay API Error - No URL:", responseData);
       return { success: false, error: "Payment gateway did not return a valid payment URL." };
     }
@@ -272,11 +255,11 @@ export async function initiateArifpayPaymentAction(
       where: { id: billId },
       data: {
         status: 'PendingVerification',
-        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${responseData.data.sessionId}`
+        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${responseData.Data.NA}`
       }
     });
 
-    return { success: true, paymentUrl: responseData.data.paymentUrl };
+    return { success: true, paymentUrl: responseData.Data.URL };
 
   } catch (error: any) {
     console.error("Error in initiateArifpayPaymentAction:", error);
