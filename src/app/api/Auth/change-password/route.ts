@@ -6,6 +6,7 @@ import { databaseService } from '@/lib/services/databaseService';
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
+// Insecure JWT payload decoder
 function decodeJwtPayload(token: string): any | null {
   try {
     const base64Url = token.split('.')[1];
@@ -26,13 +27,8 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-// Simplified helper to get the access token from cookies or header.
-async function getAccessToken(request: NextRequest): Promise<string | null> {
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        return authHeader.substring(7);
-    }
-    const cookieStore = await cookies();
+async function getAccessToken(): Promise<string | null> {
+    const cookieStore = cookies();
     const token = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
     return token || null;
 }
@@ -50,13 +46,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["Invalid request format."] }, { status: 400 });
     }
 
-    const { currentPassword, newPassword, phoneNumber: phoneNumberFromRequest } = requestBody;
+    const { currentPassword, newPassword } = requestBody;
 
     if (!currentPassword || !newPassword) {
         return NextResponse.json({ isSuccess: false, errors: ["Current and new passwords are required."] }, { status: 400 });
     }
 
-    const accessToken = await getAccessToken(request);
+    const accessToken = await getAccessToken();
     if (!accessToken) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
     }
@@ -67,20 +63,11 @@ export async function POST(request: NextRequest) {
     }
 
     const userIdForDbUpdate = tokenPayload.sub;
-    let effectivePhoneNumber: string | undefined = phoneNumberFromRequest;
+    const localUser = await databaseService.getUserByExternalId(userIdForDbUpdate);
 
-    // If phone number is not in the request (e.g., changing from profile), fetch it from local DB
-    if (!effectivePhoneNumber) {
-        const localUser = await databaseService.getUserByExternalId(userIdForDbUpdate);
-        if (localUser && localUser.phoneNumber) {
-            effectivePhoneNumber = localUser.phoneNumber;
-        }
-    }
-    
-    if (!effectivePhoneNumber) {
+    if (!localUser || !localUser.phoneNumber) {
         return NextResponse.json({ isSuccess: false, errors: ["User phone number could not be determined."] }, { status: 400 });
     }
-
 
     try {
         const externalApiResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-password`, {
@@ -90,7 +77,7 @@ export async function POST(request: NextRequest) {
                 'Authorization': `Bearer ${accessToken}`,
             },
             body: JSON.stringify({ 
-                phoneNumber: effectivePhoneNumber,
+                phoneNumber: localUser.phoneNumber,
                 currentPassword: currentPassword, 
                 newPassword: newPassword 
             }),
@@ -103,9 +90,7 @@ export async function POST(request: NextRequest) {
             responseData = responseText ? JSON.parse(responseText) : {};
         } catch(e) {
              if (externalApiResponse.ok && !responseText) {
-                 if (userIdForDbUpdate) {
-                    await databaseService.updateUserByExternalId(userIdForDbUpdate, { tempPassword: null });
-                 }
+                 await databaseService.updateUserByExternalId(userIdForDbUpdate, { tempPassword: null });
                  return NextResponse.json({ isSuccess: true, message: "Password changed successfully." });
              }
              return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
@@ -116,9 +101,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status });
         }
         
-        if (userIdForDbUpdate) {
-            await databaseService.updateUserByExternalId(userIdForDbUpdate, { tempPassword: null });
-        }
+        await databaseService.updateUserByExternalId(userIdForDbUpdate, { tempPassword: null });
 
         return NextResponse.json({ isSuccess: true, ...responseData });
 
