@@ -187,9 +187,6 @@ export default function AdminLoginPage() {
                 <Label htmlFor="password" className="flex items-center">
                   <Lock className="mr-2 h-4 w-4 text-primary" /> Password
                 </Label>
-                <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </Link>
               </div>
               <div className="relative">
                 <Input 
