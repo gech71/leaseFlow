@@ -211,8 +211,8 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
             const initialPaymentMonths = data.initialPaymentMonths ?? 0;
             const monthlyRent = data.monthlyRentalPrice ?? Number(agreement.monthlyRentalPrice);
 
-            // When renewing, the next monthly bill is due one month after the new start date.
-            const nextPaymentDueDate = addMonths(startDateObj, 1);
+            // Set the next due date to the new start date to make it billable.
+            const nextPaymentDueDate = startDateObj;
 
             // Update the agreement itself
             const renewedAgreement = await tx.agreement.update({
@@ -225,30 +225,8 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
                     nextPaymentDueDate: nextPaymentDueDate,
                 },
             });
-
-            // If there's an initial payment for the renewal, create a new bill for it
-            if (initialPaymentMonths > 0) {
-                const initialPaymentAmount = monthlyRent * initialPaymentMonths;
-                await tx.bill.create({
-                    data: {
-                        agreementId: agreementId,
-                        tenantId: agreement.tenantId,
-                        billDate: startDateObj,
-                        dueDate: startDateObj,
-                        rentAmount: initialPaymentAmount,
-                        utilityBreakdown: Prisma.JsonNull,
-                        penaltyAmount: 0,
-                        totalAmount: initialPaymentAmount,
-                        status: 'Pending', // Let it be marked as pending to be verified
-                        paymentDate: null, 
-                        paymentMethod: null,
-                        paymentReference: null,
-                        bankOrWalletName: null,
-                        adminVerifiedPayment: false,
-                        tenantPaymentNotes: "Initial payment record for agreement renewal."
-                    }
-                });
-            }
+            
+            // DO NOT create a bill here. Let the user generate it from the billing page.
 
             return renewedAgreement;
         });
