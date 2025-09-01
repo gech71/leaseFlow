@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -40,10 +41,12 @@ export function TinyMceEditor({
           "media",
           "table",
           "help",
+          "textcolor",
+          "colorpicker",
         ],
         toolbar:
           "undo redo | blocks | " +
-          "bold italic | forecolor backcolor | alignleft aligncenter " +
+          "bold italic forecolor backcolor | alignleft aligncenter " +
           "alignright alignjustify | bullist numlist outdent indent | " +
           "removeformat | help",
         content_style: "body { font-family:Inter,sans-serif; font-size:14px }",
@@ -59,7 +62,7 @@ export function TinyMceEditor({
             : "default",
         branding: false,
         inline: false,
-        zindex: 2000,
+        z_index: 10000,
         fixed_toolbar_container: "body",
       }}
     />
