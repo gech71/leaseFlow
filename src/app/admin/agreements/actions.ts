@@ -210,14 +210,14 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
             const initialPaymentMonths = data.initialPaymentMonths ?? 0;
             const monthlyRent = data.monthlyRentalPrice ?? agreement.monthlyRentalPrice;
 
-            // Corrected: The next monthly bill is due one month after the new start date.
+            // When renewing, the next monthly bill is due one month after the new start date.
             const nextPaymentDueDate = addMonths(startDateObj, 1);
 
             // Update the agreement itself
             const renewedAgreement = await tx.agreement.update({
                 where: { id: agreementId },
                 data: {
-                    startDate: data.startDate ? parseISO(data.startDate) : undefined,
+                    startDate: data.startDate ? startDateObj : undefined,
                     paymentTermMonths: data.paymentTermMonths,
                     monthlyRentalPrice: data.monthlyRentalPrice,
                     initialPaymentMonths: data.initialPaymentMonths,
@@ -256,7 +256,13 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
         revalidatePath(`/admin/agreements/${agreementId}`);
         revalidatePath('/admin/billing');
 
-        return { success: true, agreement: updatedAgreement };
+        const serializableAgreement = {
+            ...updatedAgreement,
+            monthlyRentalPrice: Number(updatedAgreement.monthlyRentalPrice),
+            initialPaymentAmount: updatedAgreement.initialPaymentAmount ? Number(updatedAgreement.initialPaymentAmount) : null,
+        };
+
+        return { success: true, agreement: serializableAgreement };
 
     } catch (error: any) {
         console.error("Error renewing agreement:", error);
