@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. Verify requester has permission
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const adminAccessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
 
   if (!adminAccessToken) {

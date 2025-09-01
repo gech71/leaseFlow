@@ -29,7 +29,7 @@ function decodeJwtPayload(token: string): any | null {
 }
 
 export async function GET(request: NextRequest) {
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const authHeader = request.headers.get('Authorization');
   
   let accessToken: string | undefined;

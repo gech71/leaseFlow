@@ -27,12 +27,6 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-async function getAccessToken(): Promise<string | null> {
-    const cookieStore = cookies();
-    const token = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
-    return token || null;
-}
-
 export async function POST(request: NextRequest) {
     if (!AUTH_API_BASE_URL) {
         console.error("Auth API base URL is not configured.");
@@ -52,7 +46,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ isSuccess: false, errors: ["Current and new passwords are required."] }, { status: 400 });
     }
 
-    const accessToken = await getAccessToken();
+    const cookieStore = cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+
     if (!accessToken) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
     }
