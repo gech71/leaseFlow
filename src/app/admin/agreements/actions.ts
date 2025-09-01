@@ -210,8 +210,8 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
             const initialPaymentMonths = data.initialPaymentMonths ?? 0;
             const monthlyRent = data.monthlyRentalPrice ?? agreement.monthlyRentalPrice;
 
-            // Corrected: The next monthly bill should advance from the old due date.
-            const nextPaymentDueDate = addMonths(agreement.nextPaymentDueDate, 1);
+            // Corrected: The next monthly bill is due one month after the new start date.
+            const nextPaymentDueDate = addMonths(startDateObj, 1);
 
             // Update the agreement itself
             const renewedAgreement = await tx.agreement.update({
