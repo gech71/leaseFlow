@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -129,7 +128,6 @@ export async function deleteAgreementAction(agreementId: string) {
             return { success: false, error: "Agreement not found." };
         }
 
-        // Check if there are any monthly bills (not the initial payment record).
         const hasSubsequentBills = agreement.bills.some(
             bill => !isSameDay(bill.billDate, agreement.startDate)
         );
@@ -138,17 +136,16 @@ export async function deleteAgreementAction(agreementId: string) {
             return { success: false, error: "Cannot delete agreement with associated monthly bills. Please resolve or delete these bills first." };
         }
 
-        // Proceed with deletion in a transaction.
         await prisma.$transaction(async (tx) => {
-            // 1. Delete all associated bills (which at this point can only be initial payment bills).
+            // Delete all associated bills (which at this point can only be initial payment bills).
             await tx.bill.deleteMany({
                 where: { agreementId: agreement.id }
             });
 
-            // 2. Vacate the space if this agreement made it occupied.
+            // If the space is linked to this agreement's tenant, disconnect them
             if (agreement.space && agreement.space.tenantId === agreement.tenantId) {
-                // To be safe, ensure this is the only agreement for this tenant/space combo.
-                const otherAgreements = await tx.agreement.findMany({
+                // Check if this is the ONLY agreement for this tenant-space combo.
+                const otherAgreementsForPair = await tx.agreement.count({
                     where: {
                         spaceId: agreement.spaceId,
                         tenantId: agreement.tenantId,
@@ -156,8 +153,8 @@ export async function deleteAgreementAction(agreementId: string) {
                     }
                 });
 
-                // Only vacate if no other agreements exist for this tenant-space pair.
-                if (otherAgreements.length === 0) {
+                // Only vacate if no other active agreements link this tenant and space.
+                if (otherAgreementsForPair === 0) {
                     await tx.space.update({
                         where: { id: agreement.spaceId },
                         data: {
@@ -165,6 +162,7 @@ export async function deleteAgreementAction(agreementId: string) {
                             tenantId: null // Disconnect by setting foreign key to null
                         }
                     });
+                    
                     await tx.tenant.update({
                         where: { id: agreement.tenantId },
                         data: {
@@ -174,7 +172,7 @@ export async function deleteAgreementAction(agreementId: string) {
                 }
             }
             
-            // 3. Delete the agreement itself.
+            // Finally, delete the agreement itself.
             await tx.agreement.delete({
                 where: { id: agreementId }
             });
