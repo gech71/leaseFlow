@@ -8,13 +8,9 @@ const toCamelCase = (s: string) => {
   if (typeof s !== 'string' || s.length === 0) {
     return s;
   }
-  // This handles PascalCase (like ResponseCode) and snake_case
-  return s.replace(/([-_A-Z])([a-z_A-Z]+)/g, (match, first, rest, offset) => {
-    if (offset > 0) {
-      return first.toUpperCase() + rest.toLowerCase();
-    }
-    return first.toLowerCase() + rest.toLowerCase();
-  }).replace(/[-_]/g, '');
+   // Handles PascalCase (like ResponseCode) by converting the first letter to lowercase
+  const cameled = s.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+  return cameled.charAt(0).toLowerCase() + cameled.slice(1);
 };
 
 const isObject = function (o: any) {
