@@ -10,6 +10,36 @@ import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
 import crypto from 'crypto';
 
+// --- Normalization Helper ---
+const toCamelCase = (s: string) => {
+  return s.replace(/([-_][a-z])/ig, ($1) => {
+    return $1.toUpperCase()
+      .replace('-', '')
+      .replace('_', '');
+  });
+};
+
+const isObject = function (o: any) {
+  return o === Object(o) && !Array.isArray(o) && typeof o !== 'function';
+};
+
+const normalizeKeys = (obj: any): any => {
+  if (isObject(obj)) {
+    const n: { [key: string]: any } = {};
+    Object.keys(obj)
+      .forEach((k) => {
+        n[toCamelCase(k)] = normalizeKeys(obj[k]);
+      });
+    return n;
+  } else if (Array.isArray(obj)) {
+    return obj.map((i) => {
+      return normalizeKeys(i);
+    });
+  }
+  return obj;
+};
+// --- End Normalization Helper ---
+
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
   id?: string;
@@ -216,6 +246,8 @@ export async function initiateArifpayPaymentAction(
       return { success: false, error: "Building account number is not configured for this bill." };
     }
 
+    const nonce = crypto.randomBytes(6).toString('hex');
+
     const requestBody = {
       phone: currentUser.phoneNumber,
       cbs: bill.agreement.space.building.accountNumber,
@@ -227,26 +259,34 @@ export async function initiateArifpayPaymentAction(
           price: billAmount,
           description: `Bill payment for date: ${billDate}`
         }
-      ]
+      ],
+      // Adding required callback fields to the request
+      successURL: `${process.env.NEXT_PUBLIC_BASE_URL}/portal/success`,
+      errorURL: `${process.env.NEXT_PUBLIC_BASE_URL}/portal/error`,
+      cancelURL: `${process.env.NEXT_PUBLIC_BASE_URL}/portal/cancel`,
+      notifyURL: `${process.env.NEXT_PUBLIC_BASE_URL}/api/portal/Arifcallback`,
+      // Use billId as part of the transactionId for easy lookup on callback
+      transactionId: `${billId}__${nonce}`
     };
 
     const response = await fetch(ARIFPAY_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Api-Key': ARIFPAY_API_KEY,
+        'x-arifpay-key': ARIFPAY_API_KEY,
       },
       body: JSON.stringify(requestBody),
     });
 
-    const responseData = await response.json();
+    const rawResponseData = await response.json();
+    const responseData = normalizeKeys(rawResponseData); // Normalize the response
     
-    if (responseData.ResponseCode && responseData.ResponseCode !== "0") {
+    if (responseData.responseCode && responseData.responseCode !== "0") {
       console.error("ArifPay API Error:", responseData);
-      return { success: false, error: `Payment gateway error: ${responseData.ResponseDescription || "An unknown error occurred."}` };
+      return { success: false, error: `Payment gateway error: ${responseData.responseDescription || "An unknown error occurred."}` };
     }
     
-    if (!responseData.Data?.URL) {
+    if (!responseData.data?.url) {
        console.error("ArifPay API Error - No URL:", responseData);
       return { success: false, error: "Payment gateway did not return a valid payment URL." };
     }
@@ -255,11 +295,11 @@ export async function initiateArifpayPaymentAction(
       where: { id: billId },
       data: {
         status: 'PendingVerification',
-        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${responseData.Data.NA}`
+        tenantPaymentNotes: `Payment initiated via ArifPay. Session ID: ${responseData.data.na}`
       }
     });
 
-    return { success: true, paymentUrl: responseData.Data.URL };
+    return { success: true, paymentUrl: responseData.data.url };
 
   } catch (error: any) {
     console.error("Error in initiateArifpayPaymentAction:", error);

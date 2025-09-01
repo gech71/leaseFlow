@@ -3,6 +3,37 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { databaseService } from '@/lib/services/databaseService';
 
+// --- Normalization Helper ---
+const toCamelCase = (s: string) => {
+  return s.replace(/([-_][a-z])/ig, ($1) => {
+    return $1.toUpperCase()
+      .replace('-', '')
+      .replace('_', '');
+  });
+};
+
+const isObject = function (o: any) {
+  return o === Object(o) && !Array.isArray(o) && typeof o !== 'function';
+};
+
+const normalizeKeys = (obj: any): any => {
+  if (isObject(obj)) {
+    const n: { [key: string]: any } = {};
+    Object.keys(obj)
+      .forEach((k) => {
+        n[toCamelCase(k)] = normalizeKeys(obj[k]);
+      });
+    return n;
+  } else if (Array.isArray(obj)) {
+    return obj.map((i) => {
+      return normalizeKeys(i);
+    });
+  }
+  return obj;
+};
+// --- End Normalization Helper ---
+
+
 // This is a simplified handler. Production environments might add more checks.
 export async function POST(request: NextRequest) {
   const ARIFPAY_API_KEY = process.env.ARIFPAY_API_KEY;
@@ -23,8 +54,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const payload = await request.json();
-    console.log("Received ArifPay callback payload:", payload);
+    const rawPayload = await request.json();
+    const payload = normalizeKeys(rawPayload); // Normalize the incoming payload
+    console.log("Received and normalized ArifPay callback payload:", payload);
 
     const { transactionId: arifTransactionId, status, sessionId } = payload;
     if (!arifTransactionId || !status || !sessionId) {
