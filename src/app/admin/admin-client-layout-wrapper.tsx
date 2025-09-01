@@ -85,7 +85,6 @@ const allNavItems: NavItem[] = [
       'settings:role_management:manage',
     ] 
   },
-  { href: '/portal/dashboard', label: 'Tenant Portal (View)', icon: ExternalLink, isPortal: true, requiredPermissions: ['portal:view'] }, 
 ];
 
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
