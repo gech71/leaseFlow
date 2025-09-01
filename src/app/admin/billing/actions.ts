@@ -5,7 +5,7 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal, type User, type Role } from '@prisma/client';
-import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths, isSameDay, isAfter } from 'date-fns';
+import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths, isSameDay, isAfter, differenceInCalendarMonths } from 'date-fns';
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 import { cookies } from 'next/headers';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
@@ -359,18 +359,19 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         return { success: false, error: `A bill for ${format(targetBillDate, 'PP')} for ${agreement.tenant.name} already exists (Status: ${existingBill[0].status}).`};
     }
 
-    // Determine if rent should be charged based on upfront payment
-    const agreementStartDate = agreement.startDate;
-    // Calculate the date when the first chargeable rent is due.
-    const firstChargeableRentDueDate = addMonths(agreementStartDate, agreement.initialPaymentMonths);
+    // --- Corrected Rent Calculation Logic ---
+    let rentAmount = agreement.monthlyRentalPrice; // Assume full rent by default
+    
+    // Calculate how many months have passed from the agreement start date to the current bill's date.
+    // This correctly handles cases across year boundaries.
+    const monthsPassed = differenceInCalendarMonths(targetBillDate, agreement.startDate);
 
-    let rentAmount = agreement.monthlyRentalPrice;
-
-    // Check if the current bill date is before the first chargeable due date.
-    if (agreement.initialPaymentMonths > 0 && !isAfter(targetBillDate, firstChargeableRentDueDate) && !isSameDay(targetBillDate, firstChargeableRentDueDate)) {
-        // This bill falls within the prepaid period, so rent is 0.
+    // If the number of months passed is less than the number of months paid upfront, rent is zero.
+    // The first bill is for month 0, second for month 1, etc.
+    if (agreement.initialPaymentMonths > 0 && monthsPassed < agreement.initialPaymentMonths) {
         rentAmount = new Prisma.Decimal(0);
     }
+    // --- End Corrected Logic ---
     
     // Calculate Utility Costs
     const utilityItemsForJson: {name: string; amount: number}[] = []; 
@@ -711,3 +712,5 @@ export async function deleteBillAction(billId: string) {
         return { success: false, error: error.message || "Failed to delete bill." };
     }
 }
+
+    
