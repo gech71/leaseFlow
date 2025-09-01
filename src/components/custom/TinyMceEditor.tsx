@@ -22,8 +22,7 @@ export function TinyMceEditor({ value, onEditorChange, disabled }: TinyMceEditor
         plugins: [
           'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
           'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-          'insertdatetime', 'media', 'table', 'help', 'wordcount', 
-          'textcolor', 'colorpicker'
+          'insertdatetime', 'media', 'table', 'help', 'wordcount', 'textcolor', 'colorpicker'
         ],
         toolbar: 'undo redo | blocks | ' +
           'bold italic forecolor backcolor | alignleft aligncenter ' +
