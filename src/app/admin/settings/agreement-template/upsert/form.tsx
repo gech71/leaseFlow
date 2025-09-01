@@ -178,7 +178,7 @@ export function UpsertTemplateForm({ initialData }: UpsertTemplateFormProps) {
                             <FormItem>
                                 <FormLabel>Template Name</FormLabel>
                                 <FormControl>
-                                <Input placeholder="e.g., Standard Residential Lease" {...field} />
+                                <Input placeholder="Template Name" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
