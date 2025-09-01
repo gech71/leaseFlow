@@ -1,5 +1,3 @@
-
-
 // src/app/portal/dashboard/actions.ts
 "use server";
 
@@ -270,7 +268,20 @@ export async function initiateArifpayPaymentAction(
       body: JSON.stringify(requestBody),
     });
 
-    const rawResponseData = await response.json();
+    const responseText = await response.text();
+    if (!responseText) {
+        console.error("ArifPay API Error: Received an empty response from the server.");
+        return { success: false, error: "Payment gateway returned an empty response." };
+    }
+
+    let rawResponseData;
+    try {
+        rawResponseData = JSON.parse(responseText);
+    } catch (e) {
+        console.error("ArifPay API Error: Failed to parse JSON response. Body:", responseText);
+        return { success: false, error: "Payment gateway returned an invalid response." };
+    }
+
     const responseData = normalizeKeys(rawResponseData); // Normalize the response
     
     if (responseData.responseCode && responseData.responseCode !== "0") {
