@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -192,7 +193,7 @@ export interface RenewAgreementData {
     initialPaymentMonths: number;
     
     // Initial Payment details from form
-    initialPaymentMethod: string;
+    initialPaymentMethod?: string | null;
     initialPaymentReference?: string | null;
     initialPaymentBankOrWalletName?: string | null;
 }
@@ -208,7 +209,7 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
             const startDateObj = data.startDate ? parseISO(data.startDate) : agreement.startDate;
             const termMonths = data.paymentTermMonths ?? agreement.paymentTermMonths;
             const initialPaymentMonths = data.initialPaymentMonths ?? 0;
-            const monthlyRent = data.monthlyRentalPrice ?? agreement.monthlyRentalPrice;
+            const monthlyRent = data.monthlyRentalPrice ?? Number(agreement.monthlyRentalPrice);
 
             // When renewing, the next monthly bill is due one month after the new start date.
             const nextPaymentDueDate = addMonths(startDateObj, 1);
@@ -226,7 +227,7 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
             });
 
             // If there's an initial payment for the renewal, create a new bill for it
-            if (initialPaymentMonths > 0 && data.initialPaymentMethod) {
+            if (initialPaymentMonths > 0) {
                 const initialPaymentAmount = monthlyRent * initialPaymentMonths;
                 await tx.bill.create({
                     data: {
@@ -238,13 +239,13 @@ export async function updateAgreementAction(agreementId: string, data: Partial<R
                         utilityBreakdown: Prisma.JsonNull,
                         penaltyAmount: 0,
                         totalAmount: initialPaymentAmount,
-                        status: 'Paid',
-                        paymentDate: startDateObj, // Assume payment is made on the renewal start date
-                        paymentMethod: data.initialPaymentMethod,
-                        paymentReference: data.initialPaymentReference,
-                        bankOrWalletName: (data.initialPaymentMethod === "Bank Transfer" || data.initialPaymentMethod === "Wallet") ? data.initialPaymentBankOrWalletName : null,
-                        adminVerifiedPayment: true,
-                        tenantPaymentNotes: "Initial payment for agreement renewal."
+                        status: 'Pending', // Let it be marked as pending to be verified
+                        paymentDate: null, 
+                        paymentMethod: null,
+                        paymentReference: null,
+                        bankOrWalletName: null,
+                        adminVerifiedPayment: false,
+                        tenantPaymentNotes: "Initial payment record for agreement renewal."
                     }
                 });
             }
