@@ -5,7 +5,7 @@ const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 const ADMIN_REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
 const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token'; // This will be phased out but we clear it for safety
 
-const ADMIN_DASHBOARD_PATH = '/admin/dashboard';
+const ADMIN_DEFAULT_PATH = '/admin/profile'; // Changed from dashboard
 const PORTAL_DASHBOARD_PATH = '/portal/dashboard';
 const LOGIN_PATH = '/login';
 
@@ -144,8 +144,8 @@ export async function middleware(request: NextRequest) {
   // --- Root Path Redirect ---
   if (pathname === '/') {
     if (hasSessionToken) {
-      // Redirect to admin dashboard by default; user-specific redirect will be handled by the dashboard page itself if needed.
-      return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
+      // Redirect to a safe default page. The client-side layout will then redirect to the correct dashboard if applicable.
+      return NextResponse.redirect(new URL(ADMIN_DEFAULT_PATH, request.url));
     }
     return NextResponse.redirect(new URL(LOGIN_PATH, request.url));
   }
