@@ -44,13 +44,11 @@ interface ImportClientPageProps {
 
 interface ImportSummary {
   createdCount: {
-    buildings: number;
     spaces: number;
     tenants: number;
     agreements: number;
   };
   skippedCount: {
-    buildings: number;
     spaces: number;
     tenants: number;
     agreements: number;
@@ -115,7 +113,15 @@ export function ImportClientPage({
         "representativeName (Optional)",
         "representativePhone (Optional)",
       ],
-      ["Abebe Kebede", "abebe.k@example.com", "912345678", "", "123456789012", "", ""],
+      [
+        "Abebe Kebede",
+        "abebe.k@example.com",
+        "912345678",
+        "",
+        "123456789012",
+        "",
+        "",
+      ],
     ];
     const agreementsData = [
       [
@@ -186,12 +192,18 @@ export function ImportClientPage({
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
 
-        const spaces = XLSX.utils.sheet_to_json(workbook.Sheets["Spaces"]);
-        const tenants = XLSX.utils.sheet_to_json(workbook.Sheets["Tenants"]);
-        const agreements = XLSX.utils.sheet_to_json(
+        const spacesRaw = XLSX.utils.sheet_to_json(workbook.Sheets["Spaces"]);
+        const tenantsRaw = XLSX.utils.sheet_to_json(workbook.Sheets["Tenants"]);
+        const agreementsRaw = XLSX.utils.sheet_to_json(
           workbook.Sheets["Agreements"],
           { raw: false, dateNF: "yyyy-mm-dd" },
         );
+        
+        // This is the fix: ensure data is plain objects before sending to server action
+        const spaces = JSON.parse(JSON.stringify(spacesRaw));
+        const tenants = JSON.parse(JSON.stringify(tenantsRaw));
+        const agreements = JSON.parse(JSON.stringify(agreementsRaw));
+
 
         const result = await processImportAction({
           spaces,
@@ -216,8 +228,8 @@ export function ImportClientPage({
         }
       } catch (error: any) {
         setImportSummary({
-          createdCount: { buildings: 0, spaces: 0, tenants: 0, agreements: 0 },
-          skippedCount: { buildings: 0, spaces: 0, tenants: 0, agreements: 0 },
+          createdCount: { spaces: 0, tenants: 0, agreements: 0 },
+          skippedCount: { spaces: 0, tenants: 0, agreements: 0 },
           errors: [
             "Failed to read or process the Excel file. Ensure it is not corrupted and matches the template format.",
           ],
