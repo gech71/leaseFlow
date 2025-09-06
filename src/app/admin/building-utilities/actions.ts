@@ -148,11 +148,23 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMo
     }
     const whereClause = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
 
-    return await databaseService.getAllBuildingMonthlyUtilities({
+    const records = await databaseService.getAllBuildingMonthlyUtilities({
       where: whereClause,
       include: { utilities: true, building: { select: { name: true }} },
       orderBy: { createdAt: 'desc' },
     });
+    
+    // Correctly serialize the Decimal values to numbers before returning
+    const serializedRecords = records.map(record => ({
+      ...record,
+      utilities: record.utilities.map(util => ({
+        ...util,
+        totalCost: Number(util.totalCost)
+      }))
+    }));
+    
+    return serializedRecords as unknown as BuildingMonthlyUtilities[];
+
   } catch (error: any) {
     console.error("Error fetching all building utilities:", error);
     return [];
