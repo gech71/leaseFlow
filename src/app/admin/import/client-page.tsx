@@ -47,18 +47,15 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
   });
 
   const handleDownloadTemplate = () => {
-    const buildingsData = [['name', 'address', 'accountNumber']];
     const spacesData = [['buildingName', 'spaceIdName', 'floor', 'area', 'monthlyRentalPrice', 'prorationShare']];
     const tenantsData = [['name', 'email', 'phone', 'alternativePhone', 'nationalId', 'representativeName', 'representativePhone']];
     const agreementsData = [['tenantEmail', 'buildingName', 'spaceIdName', 'startDate', 'termMonths', 'initialPaymentMonths', 'additionalTerms']];
 
     const wb = XLSX.utils.book_new();
-    const wsBuildings = XLSX.utils.aoa_to_sheet(buildingsData);
     const wsSpaces = XLSX.utils.aoa_to_sheet(spacesData);
     const wsTenants = XLSX.utils.aoa_to_sheet(tenantsData);
     const wsAgreements = XLSX.utils.aoa_to_sheet(agreementsData);
 
-    XLSX.utils.book_append_sheet(wb, wsBuildings, 'Buildings');
     XLSX.utils.book_append_sheet(wb, wsSpaces, 'Spaces');
     XLSX.utils.book_append_sheet(wb, wsTenants, 'Tenants');
     XLSX.utils.book_append_sheet(wb, wsAgreements, 'Agreements');
@@ -85,12 +82,11 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        const buildings = XLSX.utils.sheet_to_json(workbook.Sheets['Buildings']);
         const spaces = XLSX.utils.sheet_to_json(workbook.Sheets['Spaces']);
         const tenants = XLSX.utils.sheet_to_json(workbook.Sheets['Tenants']);
         const agreements = XLSX.utils.sheet_to_json(workbook.Sheets['Agreements'], { raw: false, dateNF:'yyyy-mm-dd' });
 
-        const result = await processImportAction({ buildings, spaces, tenants, agreements, agreementTemplateId });
+        const result = await processImportAction({ buildings: [], spaces, tenants, agreements, agreementTemplateId });
         setImportSummary(result);
         
         if (result.success) {
@@ -135,7 +131,7 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
             <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">
                 <Download className="mr-2 h-4 w-4" /> Download Template
             </Button>
-            <p className="text-xs text-muted-foreground mt-4">The template has four sheets: Buildings, Spaces, Tenants, and Agreements. Please fill them in order.</p>
+            <p className="text-xs text-muted-foreground mt-4">The template has three sheets: Spaces, Tenants, and Agreements. Please ensure buildings exist before importing spaces.</p>
         </CardContent>
         <CardHeader>
             <CardTitle>2. Select Agreement Template</CardTitle>
@@ -219,7 +215,6 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
                          <Card className="bg-secondary/50">
                              <CardHeader className="p-3"><CardTitle className="text-sm">Created</CardTitle></CardHeader>
                              <CardContent className="p-3 text-sm space-y-1">
-                                <p>Buildings: {importSummary.createdCount.buildings}</p>
                                 <p>Spaces: {importSummary.createdCount.spaces}</p>
                                 <p>Tenants: {importSummary.createdCount.tenants}</p>
                                 <p>Agreements: {importSummary.createdCount.agreements}</p>
@@ -228,7 +223,6 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
                          <Card className="bg-secondary/50">
                              <CardHeader className="p-3"><CardTitle className="text-sm">Skipped (Already Exist)</CardTitle></CardHeader>
                              <CardContent className="p-3 text-sm space-y-1">
-                                <p>Buildings: {importSummary.skippedCount.buildings}</p>
                                 <p>Spaces: {importSummary.skippedCount.spaces}</p>
                                 <p>Tenants: {importSummary.skippedCount.tenants}</p>
                                 <p>Agreements: {importSummary.skippedCount.agreements}</p>

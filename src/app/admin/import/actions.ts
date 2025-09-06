@@ -32,26 +32,7 @@ export async function processImportAction(data: ImportData) {
         return { success: false, createdCount, skippedCount, errors };
     }
 
-    // --- 1. Process Buildings ---
-    for (const building of data.buildings) {
-        try {
-            const existingBuilding = await databaseService.getAllBuildings({ where: { name: building.name }, take: 1 });
-            if (existingBuilding.length === 0) {
-                await databaseService.createBuilding({
-                    name: building.name,
-                    address: building.address,
-                    accountNumber: building.accountNumber,
-                });
-                createdCount.buildings++;
-            } else {
-                skippedCount.buildings++;
-            }
-        } catch (e: any) {
-            errors.push(`Building "${building.name}": ${e.message}`);
-        }
-    }
-
-    // --- 2. Process Spaces ---
+    // --- 1. Process Spaces ---
     for (const space of data.spaces) {
         try {
             const buildingForSpace = await databaseService.getAllBuildings({ where: { name: space.buildingName }, take: 1 });
@@ -79,7 +60,7 @@ export async function processImportAction(data: ImportData) {
         }
     }
     
-    // --- 3. Process Tenants ---
+    // --- 2. Process Tenants ---
     for (const tenant of data.tenants) {
         try {
             const existingTenant = await databaseService.findTenantByEmailOrPhone(tenant.email, tenant.phone);
@@ -99,7 +80,7 @@ export async function processImportAction(data: ImportData) {
         }
     }
     
-    // --- 4. Process Agreements ---
+    // --- 3. Process Agreements ---
     for (const agreement of data.agreements) {
         try {
             const tenantRecord = await databaseService.findTenantByEmailOrPhone(agreement.tenantEmail, null);
