@@ -86,7 +86,6 @@ async function main() {
         "billing:view",
         "billing:generate",
         "billing:manage_payments",
-        "billing:delete",
         "payment_overview:view",
         "settings:user_registration:manage",
         "settings:user_management:view",

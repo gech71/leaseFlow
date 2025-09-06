@@ -125,7 +125,6 @@ import {
   getBillingPageDataAction,
   generateBillAndUpdateAgreementAction,
   recordPaymentOrVerificationAction,
-  deleteBillAction,
   updateBillAdminDetailsAction,
 } from "./actions";
 import type {
@@ -200,7 +199,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [billForPayment, setBillForPayment] = useState<ClientBill | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [billForEdit, setBillForEdit] = useState<ClientBill | null>(null);
-  const [billToDelete, setBillToDelete] = useState<ClientBill | null>(null);
 
   const [adminSelectedProofFile, setAdminSelectedProofFile] =
     useState<File | null>(null);
@@ -229,13 +227,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const canGenerateBills = isSuperAdmin || hasPermission("billing:generate");
   const canManagePayments =
     isSuperAdmin || hasPermission("billing:manage_payments");
-  const canDeleteBills = isSuperAdmin || hasPermission("billing:delete");
   const canViewBilling =
     isSuperAdmin ||
     hasPermission("billing:view") ||
     canGenerateBills ||
-    canManagePayments ||
-    canDeleteBills;
+    canManagePayments;
 
   const paymentForm = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -806,35 +802,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     }
   };
 
-  const handleDeleteBill = async () => {
-    if (!billToDelete) return;
-    if (!canDeleteBills) {
-      toast({
-        title: "Permission Denied",
-        description: "You do not have permission to delete bills.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsLoading(true);
-    const result = await deleteBillAction(billToDelete.id);
-    setIsLoading(false);
-    if (result.success) {
-      toast({
-        title: "Bill Deleted",
-        description: "The bill has been removed.",
-      });
-      await refreshBillingData();
-    } else {
-      toast({
-        title: "Error Deleting Bill",
-        description: result.error,
-        variant: "destructive",
-      });
-    }
-    setBillToDelete(null);
-  };
-
   const handleAdminFileSelect = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -1380,43 +1347,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
-        open={!!billToDelete}
-        onOpenChange={(open) => !open && setBillToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-6 w-6 text-destructive" />
-              Confirm Deletion
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this bill for{" "}
-              {billToDelete?.tenantName}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => setBillToDelete(null)}
-              disabled={isLoading}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteBill}
-              disabled={isLoading}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {isLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <div className="space-y-4 mt-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="text-2xl font-headline font-semibold">
@@ -1531,9 +1461,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                         <TableHead className="w-[15%] text-center">
                           Status
                         </TableHead>
-                        <TableHead className="w-[25%] text-right">
-                          Actions
-                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1600,83 +1527,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                               </span>
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:justify-end sm:gap-0">
-                              {bill.currentStatus === "Paid" ? (
-                                <>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                          handleOpenPaymentDialog(bill)
-                                        }
-                                        className="h-8 w-8"
-                                        disabled={isLoading}
-                                      >
-                                        <Eye className="h-4 w-4 text-blue-600" />
-                                        <span className="sr-only">
-                                          View Details
-                                        </span>
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>View Details</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  {canManagePayments && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() =>
-                                            handleOpenEditDialog(bill)
-                                          }
-                                          className="h-8 w-8"
-                                          disabled={isLoading}
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                          <span className="sr-only">
-                                            Edit Details
-                                          </span>
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Edit Details</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </>
-                              ) : (
-                                // Pending or Overdue
-                                <></>
-                              )}
-                              {canDeleteBills &&
-                                bill.currentStatus !== "Paid" && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                        onClick={() => setBillToDelete(bill)}
-                                        disabled={isLoading}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                        <span className="sr-only">
-                                          Delete Bill
-                                        </span>
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Delete Bill</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                            </div>
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1698,3 +1548,4 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     </div>
   );
 }
+

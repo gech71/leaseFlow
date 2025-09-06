@@ -684,33 +684,5 @@ export async function updateBillAdminDetailsAction(
     return { success: false, error: error.message || "Failed to update bill details." };
   }
 }
-
-export async function deleteBillAction(billId: string) {
-    try {
-        const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
-
-        const bill = await databaseService.getBillById(billId, {
-            agreement: { include: { space: true } },
-        });
-
-        if (!bill) {
-            return { success: false, error: "Bill not found." };
-        }
-
-        if (!isSuperAdmin && (!bill.agreement?.space?.buildingId || !managedBuildingIds?.includes(bill.agreement.space.buildingId))) {
-            return { success: false, error: "Permission denied." };
-        }
-
-        await databaseService.deleteBill(billId);
-        revalidatePath('/admin/billing');
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error deleting bill:", error);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-            return { success: false, error: "Bill not found." };
-        }
-        return { success: false, error: error.message || "Failed to delete bill." };
-    }
-}
-
     
+

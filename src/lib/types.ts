@@ -238,7 +238,6 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: 'billing:view', label: 'View' },
       { id: 'billing:generate', label: 'Generate' },
       { id: 'billing:manage_payments', label: 'Manage Payments' },
-      { id: 'billing:delete', label: 'Delete' },
     ],
   },
   {
