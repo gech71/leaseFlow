@@ -14,6 +14,7 @@ export interface PenaltyTier {
   applicableSpaceIdNames?: string[] | null;
   buildingId?: string;
   frequency: 'OneTime' | 'Daily';
+  feeType: 'Fixed' | 'Percentage';
 }
 
 export interface Building {
@@ -275,6 +276,21 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: 'Settings: Agreement Templates',
     permissions: [
       { id: 'settings:agreement_templates:manage', label: 'Manage' },
+    ],
+  },
+   {
+    resourceId: 'settings:email_configuration',
+    resourceLabel: 'Settings: Email Configuration',
+    permissions: [
+        { id: 'settings:email_configuration:view', label: 'View' },
+        { id: 'settings:email_configuration:manage', label: 'Manage' },
+    ],
+  },
+  {
+    resourceId: 'settings:forgot_password',
+    resourceLabel: 'Settings: Forgot Password',
+    permissions: [
+        { id: 'settings:forgot_password:send_reset', label: 'Send Reset' },
     ],
   },
    {

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -109,6 +110,27 @@ export default function SettingsPage() {
           <Link href="/admin/settings/email-configuration" passHref>
             <Button>
               <Mail className="mr-2 h-4 w-4" /> View Configuration
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
+
+       <Card className="flex flex-col">
+        <CardHeader>
+          <CardTitle className="font-headline">Forgot Password</CardTitle>
+          <CardDescription>
+            Help a user who has forgotten their password.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow">
+          <p className="text-sm text-muted-foreground mb-4">
+            Initiate the password reset process for a user by sending a reset link to their registered phone number.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Link href="/admin/settings/forgot-password" passHref>
+            <Button>
+              <KeyRound className="mr-2 h-4 w-4" /> Go to Forgot Password
             </Button>
           </Link>
         </CardFooter>
