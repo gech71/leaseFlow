@@ -35,6 +35,7 @@ import {
   EyeOff,
   Eye,
   LayoutGrid,
+  UploadCloud,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -72,6 +73,7 @@ const allNavItems: NavItem[] = [
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: ['building_utility:view', 'building_utility:save'] },
   { href: '/admin/billing', label: 'Billing', icon: Banknote, requiredPermissions: ['billing:view', 'billing:generate', 'billing:manage_payments', 'billing:delete'] },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['payment_overview:view'] },
+  { href: '/admin/import', label: 'Import Data', icon: UploadCloud, requiredPermissions: ['building:create', 'space:create', 'tenant:create', 'agreement:create'] },
   { 
     href: '/admin/settings', 
     label: 'Settings', 
@@ -85,6 +87,7 @@ const allNavItems: NavItem[] = [
       'settings:agreement_templates:manage',
       'settings:email_configuration:view',
       'settings:email_configuration:manage',
+      'settings:forgot_password:send_reset',
     ]
   },
 ];
