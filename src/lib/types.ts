@@ -1,4 +1,5 @@
 
+
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
@@ -6,7 +7,8 @@ export interface PenaltyTier {
   id?: string;
   fromDay: number;
   toDay?: number | null;
-  feeType: 'Fixed' | 'Percentage';
+  penaltyType: 'Fixed' | 'Percentage';
+  frequency: 'OneTime' | 'Daily';
   feeValue: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string | null;
@@ -246,21 +248,33 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     ],
   },
   {
-    resourceId: 'settings',
-    resourceLabel: 'Settings', 
+    resourceId: 'settings:user_registration',
+    resourceLabel: 'Settings: User Registration',
     permissions: [
       { id: 'settings:user_registration:manage', label: 'Manage User Registration' },
+    ],
+  },
+  {
+    resourceId: 'settings:user_management',
+    resourceLabel: 'Settings: User Management',
+    permissions: [
       { id: 'settings:user_management:view', label: 'View User Assignments' },
       { id: 'settings:user_management:assign', label: 'Assign Roles/Buildings' },
+    ],
+  },
+  {
+    resourceId: 'settings:role_management',
+    resourceLabel: 'Settings: Role Management',
+    permissions: [
       { id: 'settings:role_management:view', label: 'View Roles' },
       { id: 'settings:role_management:manage', label: 'Manage Roles' },
     ],
   },
   {
-    resourceId: 'portal',
-    resourceLabel: 'Tenant Portal (Link)',
+    resourceId: 'settings:agreement_templates',
+    resourceLabel: 'Settings: Agreement Templates',
     permissions: [
-      { id: 'portal:view', label: 'View Link' },
+      { id: 'settings:agreement_templates:manage', label: 'Manage Templates' },
     ],
   },
 ];
