@@ -118,8 +118,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!permissionsLoading && currentUser?.effectivePermissions) {
-      const permissions = currentUser.effectivePermissions;
-      if (permissions.length === 1 && permissions[0] === 'portal:view') {
+      if (currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
         router.push('/portal/dashboard');
       }
     }

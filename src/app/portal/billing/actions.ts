@@ -91,7 +91,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
     }
 
     const cookieStore = await cookies();
-    const token = cookieStore.get('leaseflow_admin_access_token')?.value;
+    const token = cookieStore.get('nibrental_admin_access_token')?.value;
 
     if (!token) {
         return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };

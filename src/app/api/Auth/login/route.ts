@@ -4,8 +4,8 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token'; // Unified access token
-const REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token'; // Unified refresh token
+const ACCESS_TOKEN_KEY = 'nibrental_admin_access_token'; // Unified access token
+const REFRESH_TOKEN_KEY = 'nibrental_admin_refresh_token'; // Unified refresh token
 
 // Insecure JWT payload decoder for prototype purposes. Not for production.
 function decodeJwtPayload(token: string): any | null {

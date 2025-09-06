@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token';
+const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_portal_access_token';
 const PORTAL_ACCESS_TOKEN_MAX_AGE = 60 * 60; // 1 hour
 
 function decodeJwtPayload(token: string): any | null {

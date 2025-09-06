@@ -1,8 +1,8 @@
 
 
-# LeaseFlow: Building Management Solution
+# nibrental: Building Management Solution
 
-LeaseFlow is a comprehensive, modern web application designed to streamline property management. Built with Next.js, it provides a robust platform for managing buildings, spaces, tenants, and the entire billing lifecycle.
+nibrental is a comprehensive, modern web application designed to streamline property management. Built with Next.js, it provides a robust platform for managing buildings, spaces, tenants, and the entire billing lifecycle.
 
 This document provides an overview of the project setup, key features, and a detailed guide to the NIB Bank Mini App payment integration.
 
@@ -108,7 +108,7 @@ SMTP_FROM="Your Company Name <your-email@gmail.com>"
 1.  Clone the repository:
     ```bash
     git clone <your-repository-url>
-    cd leaseflow
+    cd nibrental
     ```
 
 2.  Install dependencies:
@@ -153,23 +153,23 @@ The flow is designed to be secure and robust, ensuring that payment requests are
 ```mermaid
 sequenceDiagram
     participant MiniApp as NIB Super App
-    participant LeaseFlow as LeaseFlow App
+    participant App as nibrental App
     participant NIB as NIB Server
 
-    MiniApp->>+LeaseFlow: 1. Opens /portal/connect with Auth Header
-    LeaseFlow->>+NIB: 2. Validates token
-    NIB-->>-LeaseFlow: 3. Returns phone number
-    LeaseFlow-->>-MiniApp: 4. Sets session cookie & redirects to /portal/billing
-    MiniApp->>+LeaseFlow: 5. User clicks "Pay Now"
-    LeaseFlow->>LeaseFlow: 6. Generates signed payload
-    LeaseFlow->>+NIB: 7. Initiates payment with signed payload
-    NIB-->>-LeaseFlow: 8. Returns payment token
-    LeaseFlow-->>-MiniApp: 9. Sends token back to MiniApp via JS channel
+    MiniApp->>+App: 1. Opens /portal/connect with Auth Header
+    App->>+NIB: 2. Validates token
+    NIB-->>-App: 3. Returns phone number
+    App-->>-MiniApp: 4. Sets session cookie & redirects to /portal/billing
+    MiniApp->>+App: 5. User clicks "Pay Now"
+    App->>App: 6. Generates signed payload
+    App->>+NIB: 7. Initiates payment with signed payload
+    NIB-->>-App: 8. Returns payment token
+    App-->>-MiniApp: 9. Sends token back to MiniApp via JS channel
     Note over MiniApp: User completes payment
-    NIB->>+LeaseFlow: 10. Sends POST to callback URL with transaction details & signature
-    LeaseFlow->>LeaseFlow: 11. Validates signature
-    LeaseFlow->>LeaseFlow: 12. Updates bill status to "Paid"
-    LeaseFlow-->>-NIB: 13. Responds with HTTP 200 OK
+    NIB->>+App: 10. Sends POST to callback URL with transaction details & signature
+    App->>App: 11. Validates signature
+    App->>App: 12. Updates bill status to "Paid"
+    App-->>-NIB: 13. Responds with HTTP 200 OK
 ```
 
 ### Step 1: Initial Connection & Token Validation
@@ -179,7 +179,7 @@ When a user enters the Mini App, NIB opens the application at the `/portal/conne
 -   **Route**: `GET /portal/connect`
 -   **Process**:
     1.  The request must contain an `Authorization: Bearer <token>` header provided by the NIB Super App.
-    2.  The LeaseFlow server extracts this token.
+    2.  The nibrental server extracts this token.
     3.  It makes a backend `GET` request to the `NIB_VALIDATE_TOKEN_URL` to verify the token's authenticity.
     4.  If valid, the NIB server responds with the user's phone number. If invalid, an error is shown.
 -   **File**: `src/app/portal/connect/page.tsx`
@@ -191,7 +191,7 @@ To maintain the user's authenticated state for subsequent actions without contin
 -   **Process**:
     1.  Upon successful token validation in Step 1, the `/portal/connect` page renders a client component (`ConnectionSuccessPage`).
     2.  This component immediately calls a Server Action (`setPortalSessionAction`).
-    3.  The Server Action sets a secure, `HttpOnly` cookie named `leaseflow_portal_access_token` containing the validated token.
+    3.  The Server Action sets a secure, `HttpOnly` cookie named `nibrental_portal_access_token` containing the validated token.
     4.  The user is then automatically redirected to `/portal/billing`.
 -   **Files**:
     -   `src/app/portal/connect/client-page.tsx` (Calls the action)
@@ -287,4 +287,3 @@ A brief overview of the key directories:
 │   └── middleware.ts   # Edge middleware for routing and authentication
 └── ...
 ```
-    

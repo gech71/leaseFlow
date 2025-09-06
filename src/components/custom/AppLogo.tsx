@@ -14,7 +14,7 @@ export function AppLogo() {
     <Link href="/admin/dashboard" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
       <Image 
         src="https://i.imgur.com/JTzGpIH.png"
-        alt="Building Management Solution Logo" 
+        alt="nibrental Logo" 
         width={40}
         height={40}
         className={cn(
@@ -29,7 +29,7 @@ export function AppLogo() {
         <h1 className={cn(
           "font-headline text-base leading-tight font-bold text-sidebar-primary",
         )}>
-          Building Management Solution
+          nibrental
         </h1>
       </div>
     </Link>

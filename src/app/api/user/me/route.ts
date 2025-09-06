@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 import type { CurrentUser, UserRole } from '@/lib/types'; // Import shared types
 
-const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 // DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).

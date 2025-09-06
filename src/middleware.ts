@@ -1,9 +1,9 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-const ADMIN_REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
-const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token'; // This will be phased out but we clear it for safety
+const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
+const ADMIN_REFRESH_TOKEN_KEY = 'nibrental_admin_refresh_token';
+const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_portal_access_token'; // This will be phased out but we clear it for safety
 
 const ADMIN_DEFAULT_PATH = '/admin/profile'; // Changed from dashboard
 const PORTAL_DASHBOARD_PATH = '/portal/dashboard';

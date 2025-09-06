@@ -159,9 +159,9 @@ export default function AdminLoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
         <CardHeader className="text-center space-y-4 pt-6 sm:pt-8">
-          <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={200} height={50} className="mx-auto h-auto object-contain" data-ai-hint="logo" />
+          <Image src="https://i.imgur.com/JTzGpIH.png" alt="nibrental Logo" width={200} height={50} className="mx-auto h-auto object-contain" data-ai-hint="logo" />
           <div className="space-y-1 px-2">
-              <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Building Management Solution</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">nibrental</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">

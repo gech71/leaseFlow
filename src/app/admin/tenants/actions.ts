@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 function generateTempPassword(length = 12) {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -134,7 +134,7 @@ export async function createTenantAction(data: {
 
     // Send welcome email with credentials
     const emailHtml = `
-      <h1>Welcome to Building Management Solution!</h1>
+      <h1>Welcome to nibrental!</h1>
       <p>Hello ${data.name},</p>
       <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
       <p>You can access the portal here: <a href="https://nibrental.nibbank.com.et/login">https://nibrental.nibbank.com.et/login</a></p>

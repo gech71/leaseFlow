@@ -2,9 +2,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 
-const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
-const REFRESH_TOKEN_KEY = 'leaseflow_admin_refresh_token';
-const PORTAL_ACCESS_TOKEN_KEY = 'leaseflow_portal_access_token'; // Old key to remove for cleanup
+const ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
+const REFRESH_TOKEN_KEY = 'nibrental_admin_refresh_token';
+const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_portal_access_token'; // Old key to remove for cleanup
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 
 export async function POST(request: NextRequest) {

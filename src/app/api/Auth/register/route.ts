@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client'; // Import Prisma namespace for error ty
 import { sendEmail } from '@/lib/services/emailService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 // DO NOT USE IN PRODUCTION. Use a proper JWT library (e.g., jose).
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     // 6. Send welcome email
      const emailHtml = `
-      <h1>Welcome to Building Management Solution!</h1>
+      <h1>Welcome to nibrental!</h1>
       <p>Hello ${firstName},</p>
       <p>A new account has been created for you. You can use these credentials to log in.</p>
       <p><strong>Phone Number:</strong> ${phoneNumber}</p>

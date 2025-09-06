@@ -67,8 +67,8 @@ export default function PortalLayout({
       <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/portal/dashboard" className="flex items-center gap-3">
-            <Image src="https://i.imgur.com/JTzGpIH.png" alt="Building Management Solution Logo" width={100} height={28} className="h-7 w-auto object-contain" />
-            <span className="hidden sm:inline text-lg font-headline font-semibold">Building Management Solution</span>
+            <Image src="https://i.imgur.com/JTzGpIH.png" alt="nibrental Logo" width={100} height={28} className="h-7 w-auto object-contain" />
+            <span className="hidden sm:inline text-lg font-headline font-semibold">nibrental</span>
           </Link>
           
           {/* Desktop Navigation */}
@@ -114,7 +114,7 @@ export default function PortalLayout({
         {children}
       </main>
       <footer className="bg-muted text-muted-foreground py-4 text-center text-sm">
-        © {new Date().getFullYear()} Building Management Solution. All rights reserved.
+        © {new Date().getFullYear()} nibrental. All rights reserved.
       </footer>
     </div>
   );

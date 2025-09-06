@@ -60,7 +60,7 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
     XLSX.utils.book_append_sheet(wb, wsTenants, 'Tenants');
     XLSX.utils.book_append_sheet(wb, wsAgreements, 'Agreements');
 
-    XLSX.writeFile(wb, 'LeaseFlow_Import_Template.xlsx');
+    XLSX.writeFile(wb, 'nibrental_Import_Template.xlsx');
   };
 
   const handleImport = async () => {

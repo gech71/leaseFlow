@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 import type { User, Role } from '@prisma/client';
 
-const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 // Insecure JWT payload decoder for prototype purposes ONLY.
 function decodeJwtPayload(token: string): any | null {

@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -10,7 +9,7 @@ import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import { prisma } from '@/lib/prisma';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ADMIN_ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
+const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 
 export async function getUserManagementPageData() {
@@ -97,7 +96,7 @@ export async function updateUserNamesAction(
       return { success: false, error: "Permission denied." };
     }
 
-    const adminAccessToken = cookies().get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+    const adminAccessToken = (await cookies()).get(ADMIN_ACCESS_TOKEN_KEY)?.value;
     if (!adminAccessToken) {
         return { success: false, error: "Admin authentication token not found." };
     }
@@ -163,7 +162,7 @@ export async function changeUserPhoneNumberAction(
       return { success: false, error: "Permission denied." };
     }
 
-    const adminAccessToken = cookies().get(ADMIN_ACCESS_TOKEN_KEY)?.value;
+    const adminAccessToken = (await cookies()).get(ADMIN_ACCESS_TOKEN_KEY)?.value;
     if (!adminAccessToken) {
         return { success: false, error: "Admin authentication token not found." };
     }

@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
 
     const authHeader = request.headers.get('Authorization');
     const cookieStore = await cookies();
-    const adminToken = cookieStore.get('leaseflow_admin_access_token')?.value;
-    const portalToken = cookieStore.get('leaseflow_portal_access_token')?.value;
+    const adminToken = cookieStore.get('nibrental_admin_access_token')?.value;
+    const portalToken = cookieStore.get('nibrental_portal_access_token')?.value;
 
     let accessToken: string | null = null;
 
