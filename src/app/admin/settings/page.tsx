@@ -113,29 +113,6 @@ export default function SettingsPage() {
           </Link>
         </CardFooter>
       </Card>
-
-       <Card className="flex flex-col">
-        <CardHeader>
-          <CardTitle className="font-headline">Forgot Password</CardTitle>
-          <CardDescription>
-            Initiate the password reset process for an account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-grow">
-          <p className="text-sm text-muted-foreground mb-4">
-            Use this if you need to recover access to your account via the standard password reset flow.
-          </p>
-        </CardContent>
-        <CardFooter>
-          <Link href="/forgot-password" passHref>
-            <Button>
-              <KeyRound className="mr-2 h-4 w-4" /> Reset Password
-            </Button>
-          </Link>
-        </CardFooter>
-      </Card>
-
-      {/* Future settings cards can be added here */}
     </div>
   );
 }

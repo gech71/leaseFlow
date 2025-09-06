@@ -77,13 +77,16 @@ const allNavItems: NavItem[] = [
     href: '/admin/settings', 
     label: 'Settings', 
     icon: Settings, 
-    requiredPermissions: [ 
-      'settings:user_registration:manage', 
-      'settings:user_management:view', 
+    requiredPermissions: [
+      'settings:user_registration:manage',
+      'settings:user_management:view',
       'settings:user_management:assign',
       'settings:role_management:view',
       'settings:role_management:manage',
-    ] 
+      'settings:agreement_templates:manage',
+      'settings:email_configuration:view',
+      'settings:email_configuration:manage',
+    ]
   },
 ];
 
