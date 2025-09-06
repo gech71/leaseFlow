@@ -14,12 +14,22 @@ export async function getAgreementTemplatesForImportAction(): Promise<{ id: stri
 
 // A simplified interface for the data we expect from the client
 interface ImportData {
-  buildings: any[];
   spaces: any[];
   tenants: any[];
   agreements: any[];
   agreementTemplateId: string;
 }
+
+// Helper to normalize phone numbers
+const normalizePhoneNumber = (phone: any): string | undefined => {
+    if (!phone) return undefined;
+    let phoneStr = String(phone).trim();
+    if (phoneStr.length === 9 && phoneStr.startsWith('9')) {
+        return `0${phoneStr}`;
+    }
+    return phoneStr;
+};
+
 
 export async function processImportAction(data: ImportData) {
     let createdCount = { buildings: 0, spaces: 0, tenants: 0, agreements: 0 };
@@ -63,10 +73,26 @@ export async function processImportAction(data: ImportData) {
     // --- 2. Process Tenants ---
     for (const tenant of data.tenants) {
         try {
-            const existingTenant = await databaseService.findTenantByEmailOrPhone(tenant.email, tenant.phone);
+            const normalizedPhone = normalizePhoneNumber(tenant.phone);
+            if (!normalizedPhone) {
+                errors.push(`Tenant "${tenant.name}": Missing or invalid primary phone number.`);
+                continue;
+            }
+
+            const existingTenant = await databaseService.findTenantByEmailOrPhone(tenant.email, normalizedPhone);
             if (!existingTenant) {
                 // This action handles user creation, tenant creation, and sending the welcome email.
-                const result = await createTenantAction(tenant);
+                const tenantData = {
+                    name: tenant.name,
+                    email: tenant.email,
+                    phone: normalizedPhone,
+                    alternativePhone: normalizePhoneNumber(tenant['alternativePhone (Optional)']),
+                    nationalId: tenant.nationalId,
+                    representativeName: tenant['representativeName (Optional)'],
+                    representativePhone: normalizePhoneNumber(tenant['representativePhone (Optional)']),
+                };
+                
+                const result = await createTenantAction(tenantData);
                 if (result.success) {
                     createdCount.tenants++;
                 } else {
@@ -110,7 +136,7 @@ export async function processImportAction(data: ImportData) {
                             monthlyRentalPrice: parseFloat(spaceRecord[0].monthlyRentalPrice),
                             paymentTermMonths: parseInt(agreement.termMonths, 10),
                             initialPaymentMonths: parseInt(agreement.initialPaymentMonths, 10),
-                            additionalTerms: agreement.additionalTerms,
+                            additionalTerms: agreement['additionalTerms (Optional)'],
                         };
                         const result = await createFullAgreementAction(agreementData);
                         if(result.success) {

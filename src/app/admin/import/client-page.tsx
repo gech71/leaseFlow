@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
@@ -114,7 +115,7 @@ export function ImportClientPage({
         "representativeName (Optional)",
         "representativePhone (Optional)",
       ],
-      ["Abebe Kebede", "abebe.k@example.com", "", "", "", "", ""],
+      ["Abebe Kebede", "abebe.k@example.com", "912345678", "", "123456789012", "", ""],
     ];
     const agreementsData = [
       [
@@ -193,7 +194,6 @@ export function ImportClientPage({
         );
 
         const result = await processImportAction({
-          buildings: [],
           spaces,
           tenants,
           agreements,
