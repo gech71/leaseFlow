@@ -32,8 +32,8 @@ const normalizePhoneNumber = (phone: any): string | undefined => {
 
 
 export async function processImportAction(data: ImportData) {
-    let createdCount = { buildings: 0, spaces: 0, tenants: 0, agreements: 0 };
-    let skippedCount = { buildings: 0, spaces: 0, tenants: 0, agreements: 0 };
+    let createdCount = { spaces: 0, tenants: 0, agreements: 0 };
+    let skippedCount = { spaces: 0, tenants: 0, agreements: 0 };
     let errors: string[] = [];
 
     const agreementTemplate = await databaseService.getAgreementTemplateById(data.agreementTemplateId);
@@ -87,7 +87,7 @@ export async function processImportAction(data: ImportData) {
                     email: tenant.email,
                     phone: normalizedPhone,
                     alternativePhone: normalizePhoneNumber(tenant['alternativePhone (Optional)']),
-                    nationalId: tenant.nationalId,
+                    nationalId: tenant.nationalId ? String(tenant.nationalId) : undefined,
                     representativeName: tenant['representativeName (Optional)'],
                     representativePhone: normalizePhoneNumber(tenant['representativePhone (Optional)']),
                 };
