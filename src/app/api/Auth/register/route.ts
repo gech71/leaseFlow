@@ -30,27 +30,6 @@ function decodeJwtPayload(token: string): any | null {
   }
 }
 
-function generateTempPassword(length = 12) {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lower = 'abcdefghijklmnopqrstuvwxyz';
-  const numbers = '0123456789';
-  const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-
-  let password = '';
-  password += upper[Math.floor(Math.random() * upper.length)];
-  password += lower[Math.floor(Math.random() * lower.length)];
-  password += numbers[Math.floor(Math.random() * numbers.length)];
-  password += symbols[Math.floor(Math.random() * symbols.length)];
-
-  const allChars = upper + lower + numbers + symbols;
-
-  for (let i = 4; i < length; i++) {
-    password += allChars[Math.floor(Math.random() * allChars.length)];
-  }
-
-  return password.split('').sort(() => 0.5 - Math.random()).join('');
-}
-
 export async function POST(request: NextRequest) {
   if (!AUTH_API_BASE_URL) {
     console.error("Authentication service URL (NEXT_PUBLIC_AUTH_API_BASE_URL) is not configured.");
@@ -97,11 +76,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Invalid request format for new user."] }, { status: 400 });
   }
 
-  const { firstName, lastName, phoneNumber, email } = newUserRegistrationData;
-  const tempPassword = generateTempPassword();
+  const { firstName, lastName, phoneNumber, email, password } = newUserRegistrationData;
 
-  if (!firstName || !lastName || !phoneNumber || !email) {
-    return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email)."] }, { status: 400 });
+  if (!firstName || !lastName || !phoneNumber || !email || !password) {
+    return NextResponse.json({ isSuccess: false, errors: ["Missing required fields for user registration (firstName, lastName, phoneNumber, email, password)."] }, { status: 400 });
   }
 
   // 3. Call external identity server to register the user
@@ -113,7 +91,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${adminAccessToken}`
       },
-      body: JSON.stringify({ firstName, lastName, phoneNumber, email, password: tempPassword }),
+      body: JSON.stringify({ firstName, lastName, phoneNumber, email, password }),
     });
   } catch (networkError: any) {
     console.error("Network error calling external registration service:", networkError.message);
@@ -125,7 +103,6 @@ export async function POST(request: NextRequest) {
   // Handle case where success is indicated by 2xx status and an empty body
   if (externalRegisterResponse.ok && !externalResponseText) {
       // Success, but no content. We need to log the user in to get their ID.
-      // This part remains the same as before.
   } else if (!externalRegisterResponse.ok) {
     let errorMessages = [`User registration failed on the identity server. Status: ${externalRegisterResponse.status}`];
     if (externalResponseText) {
@@ -145,7 +122,7 @@ export async function POST(request: NextRequest) {
       loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumber, password: tempPassword }),
+          body: JSON.stringify({ phoneNumber, password }),
       });
   } catch (networkError: any) {
       console.error("Network error during post-registration login:", networkError.message);
@@ -178,19 +155,16 @@ export async function POST(request: NextRequest) {
       firstName: firstName,
       lastName: lastName,
       phoneNumber: phoneNumber,
-      tempPassword: tempPassword,
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
 
-    // 6. Send welcome email
+    // 6. Send welcome email (without password)
      const emailHtml = `
       <h1>Welcome to nibrental!</h1>
       <p>Hello ${firstName},</p>
-      <p>A new account has been created for you. You can use these credentials to log in.</p>
-      <p><strong>Phone Number:</strong> ${phoneNumber}</p>
-      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-      <p>For your security, you will be required to change this password upon your first login.</p>
+      <p>A new account has been created for you. You can now log in with the credentials provided by your administrator.</p>
+      <p><strong>Login Phone Number:</strong> ${phoneNumber}</p>
       <p>Thank you,</p>
       <p>The Management Team</p>
     `;
