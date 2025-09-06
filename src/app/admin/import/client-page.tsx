@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UploadCloud, File, Download, Loader2, CheckCircle, AlertCircle, ListChecks, FileText } from 'lucide-react';
+import { UploadCloud, File, Download, Loader2, CheckCircle, AlertCircle, ListChecks, FileText, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { processImportAction } from './actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { usePermissions } from '@/contexts/PermissionContext';
 
 interface ImportClientPageProps {
   agreementTemplates: { id: string; name: string }[];
@@ -30,6 +32,13 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
   const { toast } = useToast();
+  const { hasPermission, isSuperAdmin } = usePermissions();
+  const canManageImport = isSuperAdmin || hasPermission('import:manage');
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -64,6 +73,10 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
   };
 
   const handleImport = async () => {
+    if (!canManageImport) {
+        toast({ title: 'Permission Denied', description: 'You do not have permission to import data.', variant: 'destructive' });
+        return;
+    }
     if (!file) {
       toast({ title: 'No file selected', description: 'Please select an Excel file to import.', variant: 'destructive' });
       return;
@@ -104,6 +117,19 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
     reader.readAsArrayBuffer(file);
   };
   
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+  
+  if (!canManageImport) {
+     return (
+        <Card className="shadow-lg text-center py-12">
+            <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
+            <CardContent><p>You do not have permission to import data.</p></CardContent>
+        </Card>
+     );
+  }
+
   if (agreementTemplates.length === 0) {
     return (
        <Card className="shadow-lg">

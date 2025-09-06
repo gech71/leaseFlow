@@ -293,6 +293,13 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
         { id: 'settings:forgot_password:send_reset', label: 'Send Reset' },
     ],
   },
+  {
+    resourceId: 'import',
+    resourceLabel: 'Data Import',
+    permissions: [
+      { id: 'import:manage', label: 'Manage' },
+    ],
+  },
    {
     resourceId: 'portal',
     resourceLabel: 'Tenant Portal',

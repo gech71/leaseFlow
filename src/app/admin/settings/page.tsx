@@ -140,7 +140,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="font-headline">Import Data</CardTitle>
           <CardDescription>
-            Bulk import buildings, spaces, tenants, and agreements.
+            Bulk import spaces, tenants, and agreements.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-grow">

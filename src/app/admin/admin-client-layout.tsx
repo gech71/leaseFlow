@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -86,10 +87,7 @@ const allNavItems: NavItem[] = [
       'settings:email_configuration:view',
       'settings:email_configuration:manage',
       'settings:forgot_password:send_reset',
-      'building:create', 
-      'space:create', 
-      'tenant:create', 
-      'agreement:create',
+      'import:manage',
     ]
   },
 ];

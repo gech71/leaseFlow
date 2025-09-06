@@ -1,3 +1,4 @@
+
 import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -92,6 +93,11 @@ async function main() {
         "settings:user_management:assign",
         "settings:role_management:view",
         "settings:role_management:manage",
+        "settings:agreement_templates:manage",
+        "settings:email_configuration:view",
+        "settings:email_configuration:manage",
+        "settings:forgot_password:send_reset",
+        "import:manage",
         "portal:view",
       ],
     },
