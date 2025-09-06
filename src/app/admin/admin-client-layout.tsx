@@ -61,7 +61,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ElementType;
-  requiredPermissions?: PermissionId[]; 
+  requiredPermissions?: PermissionId[];
+  isSettings?: boolean;
 }
 
 const allNavItems: NavItem[] = [
@@ -71,13 +72,14 @@ const allNavItems: NavItem[] = [
   { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:view', 'tenant:create', 'tenant:edit', 'tenant:delete'] },
   { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:view', 'agreement:create', 'agreement:edit', 'agreement:delete'] },
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: ['building_utility:view', 'building_utility:save'] },
-  { href: '/admin/billing', label: 'Billing', icon: Banknote, requiredPermissions: ['billing:view', 'billing:generate', 'billing:manage_payments', 'billing:delete'] },
+  { href: '/admin/billing', label: 'Billing', icon: Banknote, requiredPermissions: ['billing:view', 'billing:generate', 'billing:manage_payments'] },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['payment_overview:view'] },
   { 
     href: '/admin/settings', 
     label: 'Settings', 
     icon: Settings, 
-    requiredPermissions: [
+    isSettings: true, // Special flag for the main settings link
+    requiredPermissions: [ // This now represents ALL possible settings permissions
       'settings:user_registration:manage',
       'settings:user_management:view',
       'settings:user_management:assign',
@@ -170,8 +172,13 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
     
     return allNavItems.filter(item => {
       if (isSuperAdmin) return true; 
+      // For the settings link, show it if the user has ANY of the required settings permissions
+      if (item.isSettings) {
+        return hasAnyPermission(item.requiredPermissions || []);
+      }
       if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true;
       
+      // For all other links, check if they have at least one of the permissions for that specific item
       return hasAnyPermission(item.requiredPermissions); 
     });
   }, [currentUser, permissionsLoading, hasAnyPermission, isSuperAdmin]);
