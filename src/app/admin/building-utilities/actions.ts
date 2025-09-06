@@ -115,7 +115,17 @@ export async function saveBuildingUtilitiesAction(
 
     revalidatePath('/admin/building-utilities');
     revalidatePath('/admin/billing'); // Billing page might depend on this data
-    return { success: true, data: result };
+    
+    // Serialize the result to convert Decimal to number before returning to the client
+    const serializableResult = {
+      ...result,
+      utilities: result.utilities.map(u => ({
+        ...u,
+        totalCost: Number(u.totalCost)
+      }))
+    };
+
+    return { success: true, data: serializableResult };
   } catch (error: any) {
     console.error("Error saving building utilities:", error);
     let errorMessage = "Failed to save utility data.";
