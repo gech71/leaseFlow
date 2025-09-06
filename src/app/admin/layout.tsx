@@ -4,7 +4,7 @@ import AdminClientLayoutWrapper from './admin-client-layout-wrapper';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Building Management Solution',
+  title: 'NIB Building Management Solution',
   description: 'A comprehensive building management solution.',
   icons: {
     icon: 'https://i.imgur.com/JTzGpIH.png',
