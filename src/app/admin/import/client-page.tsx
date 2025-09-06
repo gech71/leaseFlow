@@ -62,12 +62,12 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
         ['Kazanchis Grand Mall', 'Shop G-05', 'Ground Floor', 80, 75000, 3.5]
     ];
     const tenantsData = [
-        ['name', 'email', 'phone', 'alternativePhone', 'nationalId', 'representativeName', 'representativePhone'],
+        ['name', 'email', 'phone', 'alternativePhone (Optional)', 'nationalId', 'representativeName (Optional)', 'representativePhone (Optional)'],
         ['Abebe Kebede', 'abebe.k@example.com', '0911223344', '0911998877', '123456789012', '', ''],
         ['Selamawit Tadesse', 'selamawit.t@example.com', '0922334455', '', '987654321098', 'Dawit Assefa', '0912121212']
     ];
     const agreementsData = [
-        ['tenantEmail', 'buildingName', 'spaceIdName', 'startDate', 'termMonths', 'initialPaymentMonths', 'additionalTerms'],
+        ['tenantEmail', 'buildingName', 'spaceIdName', 'startDate', 'termMonths', 'initialPaymentMonths', 'additionalTerms (Optional)'],
         ['abebe.k@example.com', 'Bole Towers', 'Office 101', '2023-01-15', 12, 1, 'Standard terms apply.'],
         ['selamawit.t@example.com', 'Kazanchis Grand Mall', 'Shop G-05', '2023-02-01', 24, 2, 'Includes marketing fee.']
     ];
