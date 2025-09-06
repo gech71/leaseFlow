@@ -88,7 +88,7 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
       buildingId: u.buildingId,
       year: u.year,
       month: u.month,
-      totalCost: u.utilities.reduce((sum, item) => sum + Number(item.totalCost), 0),
+      totalCost: Number(u.utilities.reduce((sum, item) => sum + Number(item.totalCost), 0)),
     }));
 
     // Serialize dates for client components
