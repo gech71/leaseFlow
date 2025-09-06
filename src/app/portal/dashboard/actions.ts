@@ -1,4 +1,5 @@
 
+
 // src/app/portal/dashboard/actions.ts
 "use server";
 
@@ -406,7 +407,7 @@ export async function initiateArifpayPaymentAction(
       // Update the bill status
       await tx.bill.update({
         where: { id: billId },
-        data: { status: "PendingVerification" },
+        data: { status: "Pending" }, // Set to pending, callback will set to Paid
       });
     });
 
@@ -500,5 +501,3 @@ export async function sendContactEmailAction(formData: {
     };
   }
 }
-
-    

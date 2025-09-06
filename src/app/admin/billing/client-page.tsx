@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, {
@@ -379,8 +380,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
         const penalty =
           currentStatus === "Overdue" &&
-          bill.status !== "Paid" &&
-          bill.status !== "PendingVerification"
+          bill.status !== "Paid"
             ? calculatePenalty(bill, currentStatus)
             : bill.penaltyAmount || 0;
 
@@ -786,8 +786,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         return "default";
       case "Overdue":
         return "destructive";
-      case "PendingVerification":
-        return "outline";
       default:
         return "default";
     }
@@ -803,8 +801,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         return <InfoIcon className="mr-1 h-3 w-3 text-yellow-600" />;
       case "Overdue":
         return <AlertTriangle className="mr-1 h-3 w-3 text-red-600" />;
-      case "PendingVerification":
-        return <UploadCloud className="mr-1 h-3 w-3 text-blue-600" />;
       default:
         return <InfoIcon className="mr-1 h-3 w-3" />;
     }
@@ -1444,9 +1440,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="Paid">Paid</SelectItem>
-                  <SelectItem value="PendingVerification">
-                    Pending Verification
-                  </SelectItem>
                   <SelectItem value="Overdue">Overdue</SelectItem>
                   <SelectItem value="Pending">Pending</SelectItem>
                 </SelectContent>
@@ -1551,10 +1544,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                             bill.currentStatus === "Overdue"
                               ? "bg-destructive/5 hover:bg-destructive/10"
                               : ""
-                          } ${
-                            bill.currentStatus === "PendingVerification"
-                              ? "bg-blue-500/5 hover:bg-blue-500/10"
-                              : ""
                           }`}
                         >
                           <TableCell className="font-medium">
@@ -1603,18 +1592,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                               variant={getStatusBadgeVariant(
                                 bill.currentStatus || bill.status,
                               )}
-                              className={`capitalize text-xs w-auto justify-center ${
-                                bill.currentStatus === "PendingVerification"
-                                  ? "border-blue-400 text-blue-700 bg-blue-100"
-                                  : ""
-                              }`}
+                              className="capitalize text-xs w-auto justify-center"
                             >
                               {getStatusIcon(bill.currentStatus || bill.status)}
                               <span className="ml-1">
-                                {(bill.currentStatus || bill.status).replace(
-                                  "Verification",
-                                  " Ver.",
-                                )}
+                                {(bill.currentStatus || bill.status)}
                               </span>
                             </Badge>
                           </TableCell>
