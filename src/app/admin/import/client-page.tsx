@@ -56,9 +56,21 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
   });
 
   const handleDownloadTemplate = () => {
-    const spacesData = [['buildingName', 'spaceIdName', 'floor', 'area', 'monthlyRentalPrice', 'prorationShare']];
-    const tenantsData = [['name', 'email', 'phone', 'alternativePhone', 'nationalId', 'representativeName', 'representativePhone']];
-    const agreementsData = [['tenantEmail', 'buildingName', 'spaceIdName', 'startDate', 'termMonths', 'initialPaymentMonths', 'additionalTerms']];
+    const spacesData = [
+        ['buildingName', 'spaceIdName', 'floor', 'area', 'monthlyRentalPrice', 'prorationShare'],
+        ['Bole Towers', 'Office 101', '1st Floor', 150, 50000, 5],
+        ['Kazanchis Grand Mall', 'Shop G-05', 'Ground Floor', 80, 75000, 3.5]
+    ];
+    const tenantsData = [
+        ['name', 'email', 'phone', 'alternativePhone', 'nationalId', 'representativeName', 'representativePhone'],
+        ['Abebe Kebede', 'abebe.k@example.com', '0911223344', '0911998877', '123456789012', '', ''],
+        ['Selamawit Tadesse', 'selamawit.t@example.com', '0922334455', '', '987654321098', 'Dawit Assefa', '0912121212']
+    ];
+    const agreementsData = [
+        ['tenantEmail', 'buildingName', 'spaceIdName', 'startDate', 'termMonths', 'initialPaymentMonths', 'additionalTerms'],
+        ['abebe.k@example.com', 'Bole Towers', 'Office 101', '2023-01-15', 12, 1, 'Standard terms apply.'],
+        ['selamawit.t@example.com', 'Kazanchis Grand Mall', 'Shop G-05', '2023-02-01', 24, 2, 'Includes marketing fee.']
+    ];
 
     const wb = XLSX.utils.book_new();
     const wsSpaces = XLSX.utils.aoa_to_sheet(spacesData);
@@ -155,7 +167,7 @@ export function ImportClientPage({ agreementTemplates }: ImportClientPageProps) 
         </CardHeader>
         <CardContent className="text-center">
             <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">
-                <Download className="mr-2 h-4 w-4" /> Download Template
+                <Download className="mr-2 h-4 w-4" /> Download Template with Examples
             </Button>
             <p className="text-xs text-muted-foreground mt-4">The template has three sheets: Spaces, Tenants, and Agreements. Please ensure buildings exist before importing spaces.</p>
         </CardContent>
