@@ -4,7 +4,6 @@ import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ACCESS_TOKEN_KEY = 'leaseflow_admin_access_token';
 
 // Insecure JWT payload decoder
 function decodeJwtPayload(token: string): any | null {
@@ -47,17 +46,20 @@ export async function POST(request: NextRequest) {
     }
 
     const authHeader = request.headers.get('Authorization');
-    const cookieStore = cookies();
-    const cookieToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value;
+    const cookieStore = await cookies();
+    const adminToken = cookieStore.get('leaseflow_admin_access_token')?.value;
+    const portalToken = cookieStore.get('leaseflow_portal_access_token')?.value;
 
     let accessToken: string | null = null;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
         accessToken = authHeader.substring(7);
-    } else if (cookieToken) {
-        accessToken = cookieToken;
+    } else if (adminToken) {
+        accessToken = adminToken;
+    } else if (portalToken) {
+        accessToken = portalToken;
     }
-
+    
     if (!accessToken) {
         return NextResponse.json({ isSuccess: false, errors: ["Authentication token is missing."] }, { status: 401 });
     }

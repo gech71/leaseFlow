@@ -50,7 +50,7 @@ export async function getBillingAmountForPhoneNumberAction(phone: string): Promi
     const bill = await prisma.bill.findFirst({
       where: {
         agreementId: activeAgreement.id,
-        status: { in: ['Pending', 'Overdue', 'PendingVerification'] },
+        status: { in: ['Pending', 'Overdue'] },
       },
       orderBy: {
         dueDate: 'desc',
@@ -91,7 +91,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
     }
 
     const cookieStore = await cookies();
-    const token = cookieStore.get('leaseflow_portal_access_token')?.value;
+    const token = cookieStore.get('leaseflow_admin_access_token')?.value;
 
     if (!token) {
         return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };
@@ -144,7 +144,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         await prisma.bill.update({
             where: { id: billId },
             data: { 
-              status: 'PendingVerification', 
+              status: 'Pending', 
               tenantPaymentNotes: `Payment initiated with NIB. Transaction ID: ${payload.transactionId}`,
               paymentReference: signature
             }
