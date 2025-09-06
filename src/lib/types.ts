@@ -8,12 +8,12 @@ export interface PenaltyTier {
   fromDay: number;
   toDay?: number | null;
   penaltyType: 'Fixed' | 'Percentage';
-  frequency: 'OneTime' | 'Daily';
   feeValue: number;
   scope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
   buildingId?: string;
+  frequency: 'OneTime' | 'Daily';
 }
 
 export interface Building {
@@ -251,14 +251,14 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceId: 'settings:user_registration',
     resourceLabel: 'Settings: User Registration',
     permissions: [
-      { id: 'settings:user_registration:manage', label: 'Manage User Registration' },
+      { id: 'settings:user_registration:manage', label: 'Manage' },
     ],
   },
   {
     resourceId: 'settings:user_management',
     resourceLabel: 'Settings: User Management',
     permissions: [
-      { id: 'settings:user_management:view', label: 'View User Assignments' },
+      { id: 'settings:user_management:view', label: 'View' },
       { id: 'settings:user_management:assign', label: 'Assign Roles/Buildings' },
     ],
   },
@@ -266,16 +266,21 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceId: 'settings:role_management',
     resourceLabel: 'Settings: Role Management',
     permissions: [
-      { id: 'settings:role_management:view', label: 'View Roles' },
-      { id: 'settings:role_management:manage', label: 'Manage Roles' },
+      { id: 'settings:role_management:view', label: 'View' },
+      { id: 'settings:role_management:manage', label: 'Manage' },
     ],
   },
   {
     resourceId: 'settings:agreement_templates',
     resourceLabel: 'Settings: Agreement Templates',
     permissions: [
-      { id: 'settings:agreement_templates:manage', label: 'Manage Templates' },
+      { id: 'settings:agreement_templates:manage', label: 'Manage' },
     ],
+  },
+   {
+    resourceId: 'portal',
+    resourceLabel: 'Tenant Portal',
+    permissions: [{ id: 'portal:view', label: 'View Tenant Portal' }],
   },
 ];
 
