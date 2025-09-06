@@ -161,7 +161,7 @@ export default function AdminLoginPage() {
         <CardHeader className="text-center space-y-4 pt-6 sm:pt-8">
           <Image src="https://i.imgur.com/JTzGpIH.png" alt="nibrental Logo" width={200} height={50} className="mx-auto h-auto object-contain" data-ai-hint="logo" />
           <div className="space-y-1 px-2">
-              <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">nibrental</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Building Management Solution</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">
