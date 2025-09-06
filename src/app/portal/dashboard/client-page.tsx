@@ -278,9 +278,9 @@ export function CustomerDashboardClientPage({
             tier.toDay === undefined ||
             daysOverdue <= tier.toDay)
         ) {
-          if (tier.feeType === "Fixed") {
+          if (tier.penaltyType === "Fixed") {
             calculatedPenalty = tier.feeValue;
-          } else if (tier.feeType === "Percentage") {
+          } else if (tier.penaltyType === "Percentage") {
             calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
           }
           break;
@@ -305,8 +305,7 @@ export function CustomerDashboardClientPage({
 
         const penalty =
           currentStatus === "Overdue" &&
-          bill.status !== "Paid" &&
-          bill.status !== "PendingVerification"
+          bill.status !== "Paid"
             ? calculatePenaltyForTenant(
                 bill,
                 agreement.space.building.penaltyPolicyTiers,
@@ -341,8 +340,6 @@ export function CustomerDashboardClientPage({
         return "default";
       case "Overdue":
         return "destructive";
-      case "PendingVerification":
-        return "outline";
       default:
         return "default";
     }
@@ -355,8 +352,6 @@ export function CustomerDashboardClientPage({
         return <Info className="mr-1 h-3 w-3" />;
       case "Overdue":
         return <AlertTriangle className="mr-1 h-3 w-3 text-red-600" />;
-      case "PendingVerification":
-        return <UploadCloud className="mr-1 h-3 w-3 text-blue-600" />;
       default:
         return <User className="mr-1 h-3 w-3" />;
     }
@@ -522,8 +517,6 @@ export function CustomerDashboardClientPage({
                             className={`${
                               bill.currentStatus === "Overdue"
                                 ? "bg-destructive/5 hover:bg-destructive/10"
-                                : bill.currentStatus === "PendingVerification"
-                                ? "bg-blue-500/5 hover:bg-blue-500/10"
                                 : ""
                             }`}
                           >
@@ -591,20 +584,13 @@ export function CustomerDashboardClientPage({
                                 variant={getStatusBadgeVariant(
                                   bill.currentStatus || bill.status,
                                 )}
-                                className={`capitalize text-xs ${
-                                  bill.currentStatus === "PendingVerification"
-                                    ? "border-blue-400 text-blue-700 bg-blue-100"
-                                    : ""
-                                }`}
+                                className="capitalize text-xs"
                               >
                                 {getStatusIcon(
                                   bill.currentStatus || bill.status,
                                 )}
                                 <span className="ml-1">
-                                  {(bill.currentStatus || bill.status).replace(
-                                    "Verification",
-                                    " Ver.",
-                                  )}
+                                  {(bill.currentStatus || bill.status)}
                                 </span>
                               </Badge>
                             </TableCell>

@@ -356,8 +356,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
             tier.toDay === undefined ||
             daysOverdue <= tier.toDay)
         ) {
-          if (tier.feeType === "Fixed") calculatedPenalty = tier.feeValue;
-          else if (tier.feeType === "Percentage")
+          if (tier.penaltyType === "Fixed") calculatedPenalty = tier.feeValue;
+          else if (tier.penaltyType === "Percentage")
             calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
           break;
         }
