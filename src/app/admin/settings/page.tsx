@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Users, ShieldCheck, Mail, KeyRound, FileText } from 'lucide-react';
+import { UserPlus, Users, ShieldCheck, Mail, KeyRound, FileText, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
 
 // This page will act as a hub for different settings.
@@ -131,6 +131,27 @@ export default function SettingsPage() {
           <Link href="/admin/settings/forgot-password" passHref>
             <Button>
               <KeyRound className="mr-2 h-4 w-4" /> Go to Forgot Password
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
+      
+      <Card className="flex flex-col">
+        <CardHeader>
+          <CardTitle className="font-headline">Import Data</CardTitle>
+          <CardDescription>
+            Bulk import buildings, spaces, tenants, and agreements.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow">
+          <p className="text-sm text-muted-foreground mb-4">
+            Use an Excel template to quickly upload multiple records into the system at once.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Link href="/admin/import" passHref>
+            <Button>
+              <UploadCloud className="mr-2 h-4 w-4" /> Go to Import Tool
             </Button>
           </Link>
         </CardFooter>
