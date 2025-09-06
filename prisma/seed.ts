@@ -113,10 +113,10 @@ async function main() {
   const superAdminUser = await prisma.user.create({
     data: {
       userId: "4937a4cc-4df8-4161-a701-fbf0b3d21662", // <-- REPLACE THIS VALUE
-      email: "superadmin@leaseflow.com",
-      name: "Default Super Admin",
-      firstName: "Default",
-      lastName: "SuperAdmin",
+      email: "superadmin@nibrental.com",
+      name: "Super Admin",
+      firstName: "Super",
+      lastName: "Admin",
       phoneNumber: "0912345678",
       roles: { connect: { id: superAdminRole.id } },
     },
