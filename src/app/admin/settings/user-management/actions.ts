@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -52,14 +53,21 @@ export async function updateUserAssignments(
         return { success: false, error: "Permission denied." };
     }
     
+    // Construct the data payload for the update
+    const updateData: Prisma.UserUpdateInput = {
+        roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] }
+    };
+
+    // Only a super admin can change building assignments
+    if (isSuperAdmin) {
+        updateData.managedBuildings = {
+            set: selectedManagedBuildingIds.map(id => ({ id: id }))
+        };
+    }
+
     await prisma.user.update({
         where: { id: targetUserId },
-        data: {
-            roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] },
-            managedBuildings: {
-                set: selectedManagedBuildingIds.map(id => ({ id: id }))
-            }
-        }
+        data: updateData
     });
 
     revalidatePath('/admin/settings/user-management');

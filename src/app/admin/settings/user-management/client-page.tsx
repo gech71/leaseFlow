@@ -84,6 +84,7 @@ export function UserManagementClientPage({
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canManageUserAssignments = isSuperAdmin || hasPermission('settings:user_management:assign');
+  const canManageBuildings = isSuperAdmin;
   const canViewUserManagement = isSuperAdmin || hasPermission('settings:user_management:view') || canManageUserAssignments;
   
   const userDetailsForm = useForm<UserDetailsFormValues>({
@@ -393,7 +394,7 @@ export function UserManagementClientPage({
                           value={buildingSearchTerm}
                           onChange={(e) => setBuildingSearchTerm(e.target.value)}
                           className="pl-8 h-9"
-                          disabled={isSaving || !canManageUserAssignments}
+                          disabled={isSaving || !canManageBuildings}
                       />
                   </div>
                   <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-60">
@@ -404,7 +405,7 @@ export function UserManagementClientPage({
                           id={`building-${currentUserToEdit.id}-${building.id}`}
                           checked={selectedBuildingIds.has(building.id)}
                           onCheckedChange={() => handleBuildingToggle(building.id)}
-                          disabled={isSaving || !canManageUserAssignments}
+                          disabled={isSaving || !canManageBuildings}
                         />
                         <Label htmlFor={`building-${currentUserToEdit.id}-${building.id}`} className="text-sm font-normal cursor-pointer">
                           {building.name}
