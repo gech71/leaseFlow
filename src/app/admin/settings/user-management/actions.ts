@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type User, type Role } from '@prisma/client';
 import { cookies, headers } from 'next/headers';
-import { getUserAndPermissions } from '@/lib/actions/server-helpers';
+import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { prisma } from '@/lib/prisma';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
@@ -15,7 +15,24 @@ const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 export async function getUserManagementPageData() {
   try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+
+    let userWhereClause: Prisma.UserWhereInput = {};
+    if (!isSuperAdmin) {
+      if (managedBuildingIds.length === 0) {
+        // If they manage no buildings, they can see no one.
+        return { success: true, users: [], allRoles: [], allBuildings: [] };
+      }
+      userWhereClause = {
+        OR: [
+          { managedBuildings: { some: { id: { in: managedBuildingIds } } } }, // Other managers of the same buildings
+          { tenantProfile: { rentedSpace: { buildingId: { in: managedBuildingIds } } } }, // Tenants in those buildings
+        ],
+      };
+    }
+
     const users = await databaseService.getAllUsers({
+      where: userWhereClause,
       select: {
         id: true,
         userId: true,
@@ -32,8 +49,12 @@ export async function getUserManagementPageData() {
       },
       orderBy: { createdAt: 'desc' }
     });
+
     const allRoles = await databaseService.getAllRoles({ orderBy: { name: 'asc' } });
-    const allBuildings = await databaseService.getAllBuildings({ orderBy: { name: 'asc' } });
+    
+    // Non-super-admins should only see the buildings they can manage
+    const buildingWhereClause: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds } } : {};
+    const allBuildings = await databaseService.getAllBuildings({ where: buildingWhereClause, orderBy: { name: 'asc' } });
     
     return { success: true, users, allRoles, allBuildings };
   } catch (error: any) {
