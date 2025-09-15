@@ -45,7 +45,13 @@ export async function getUserManagementPageData() {
       orderBy: { createdAt: 'desc' }
     });
 
-    const allRoles = await databaseService.getAllRoles({ orderBy: { name: 'asc' } });
+    // Apply role filtering logic
+    let roleWhereClause: Prisma.RoleWhereInput = {};
+    if (!isSuperAdmin) {
+        // Normal users can only assign roles they have created.
+        roleWhereClause = { createdById: currentUser.id };
+    }
+    const allRoles = await databaseService.getAllRoles({ where: roleWhereClause, orderBy: { name: 'asc' } });
     
     // Non-super-admins should only see the buildings they can manage to assign
     const buildingWhereClause: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds } } : {};
