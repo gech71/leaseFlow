@@ -6,10 +6,11 @@ import { createTenantAction } from '../tenants/actions';
 import { createFullAgreementAction } from '../agreements/actions';
 
 export async function getAgreementTemplatesForImportAction(): Promise<{ id: string; name: string }[]> {
-  return databaseService.getAllAgreementTemplates({
+  const templates = await databaseService.getAllAgreementTemplates({
     select: { id: true, name: true },
     orderBy: { name: 'asc' },
   });
+  return templates.map(t => ({ id: t.id, name: t.name }));
 }
 
 // A simplified interface for the data we expect from the client
@@ -24,7 +25,7 @@ interface ImportData {
 const normalizePhoneNumber = (phone: any): string | undefined => {
     if (!phone) return undefined;
     let phoneStr = String(phone).trim();
-    if (phoneStr.length === 9 && phoneStr.startsWith('9')) {
+    if (phoneStr.length === 9 && !phoneStr.startsWith('0')) {
         return `0${phoneStr}`;
     }
     return phoneStr;
@@ -133,7 +134,7 @@ export async function processImportAction(data: ImportData) {
                             spaceId: spaceRecord[0].id,
                             agreementText,
                             startDate: new Date(agreement.startDate).toISOString(),
-                            monthlyRentalPrice: parseFloat(spaceRecord[0].monthlyRentalPrice),
+                            monthlyRentalPrice: parseFloat(spaceRecord[0].monthlyRentalPrice.toString()),
                             paymentTermMonths: parseInt(agreement.termMonths, 10),
                             initialPaymentMonths: parseInt(agreement.initialPaymentMonths, 10),
                             additionalTerms: agreement['additionalTerms (Optional)'],

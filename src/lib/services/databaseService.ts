@@ -308,6 +308,14 @@ export class DatabaseService {
     });
   }
 
+  async findUserByEmailOrPhone(email: string | null, phone: string | null): Promise<User | null> {
+    if (!email && !phone) return null;
+    const whereClauses: Prisma.UserWhereInput[] = [];
+    if (email) whereClauses.push({ email: { equals: email, mode: 'insensitive' } });
+    if (phone) whereClauses.push({ phoneNumber: phone });
+    return prisma.user.findFirst({ where: { OR: whereClauses } });
+  }
+
 
   async getAllUsers(params?: {
     skip?: number;
@@ -410,6 +418,7 @@ export class DatabaseService {
   async getAllAgreementTemplates(params?: {
     where?: Prisma.AgreementTemplateWhereInput;
     orderBy?: Prisma.AgreementTemplateOrderByWithRelationInput | Prisma.AgreementTemplateOrderByWithRelationInput[];
+    select?: Prisma.AgreementTemplateSelect;
   }): Promise<AgreementTemplate[]> {
     return prisma.agreementTemplate.findMany(params);
   }

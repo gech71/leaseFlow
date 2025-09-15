@@ -45,82 +45,89 @@ export async function createTenantAction(data: {
   representativePhone?: string;
 }) {
   try {
-    const tempPassword = generateTempPassword();
-    
-    const requestHeaders = await headers();
-    
-    const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Cookie': requestHeaders.get('Cookie') || "",
-        },
-        body: JSON.stringify({
+    // --- Step 1: Check for an existing User in the local database ---
+    const existingUser = await databaseService.findUserByEmailOrPhone(data.email, data.phone);
+
+    let userForTenant: PrismaUser;
+    let tempPassword: string | undefined = undefined;
+
+    if (existingUser) {
+        // --- Step 2a: User exists, so we'll re-use them ---
+        userForTenant = existingUser;
+
+    } else {
+        // --- Step 2b: User does not exist, create a new one ---
+        tempPassword = generateTempPassword();
+        
+        // Register user in the external identity provider
+        const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cookie': (await headers()).get('Cookie') || "",
+            },
+            body: JSON.stringify({
+                firstName: data.name.split(' ')[0] || data.name,
+                lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
+                phoneNumber: data.phone,
+                email: data.email,
+                password: tempPassword,
+            }),
+        });
+        
+        const responseText = await registrationResponse.text();
+        if (!registrationResponse.ok) {
+            let errorMessages = ["Failed to register user account."];
+             try { if (responseText) { const errorJson = JSON.parse(responseText); errorMessages = errorJson.errors || [errorJson.message] || errorMessages; } } catch (e) { if(responseText && responseText.length < 500) { errorMessages = [responseText]; } }
+            console.error("Failed to register tenant user:", errorMessages);
+            return { success: false, error: `Failed to create user account: ${errorMessages.join(', ')}` };
+        }
+
+        // Get the new user's ID by logging them in temporarily
+        const loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phoneNumber: data.phone, password: tempPassword }),
+        });
+        if (!loginResponse.ok) return { success: false, error: "User registered, but failed to retrieve user ID." };
+        
+        const loginData = await loginResponse.json();
+        const tokenPayload = decodeJwtPayload(loginData.accessToken);
+        const newUserId = tokenPayload?.sub;
+        if (!newUserId) return { success: false, error: "User was created, but the new User ID was not returned." };
+        
+        // Find the TENANT role
+        const tenantRole = await databaseService.getRoleByName('TENANT');
+        if (!tenantRole) return { success: false, error: "The default 'TENANT' role was not found." };
+        
+        // Create the local User record
+        userForTenant = await databaseService.createUser({
+            userId: newUserId,
+            email: data.email,
+            name: data.name,
             firstName: data.name.split(' ')[0] || data.name,
             lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
             phoneNumber: data.phone,
-            email: data.email,
-            password: tempPassword,
-        }),
-    });
-
-    const responseText = await registrationResponse.text();
-
-    if (!registrationResponse.ok) {
-        let errorMessages = ["Failed to register user account."];
-        try {
-            if (responseText) {
-                const errorJson = JSON.parse(responseText);
-                errorMessages = errorJson.errors || [errorJson.message] || errorMessages;
-            }
-        } catch (e) {
-            // Ignore if parsing fails, use the raw text if it's not too long
-            if(responseText && responseText.length < 500) {
-              errorMessages = [responseText];
-            }
-        }
-        console.error("Failed to register tenant user:", errorMessages);
-        return { success: false, error: `Failed to create user account: ${errorMessages.join(', ')}` };
-    }
-    
-    // To get the new user's ID, we have to log them in to get a token
-    const loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: data.phone, password: tempPassword }),
-    });
-
-    if (!loginResponse.ok) {
-        return { success: false, error: "User registered, but failed to retrieve user ID for local setup." };
+            tempPassword: tempPassword,
+            roles: { connect: { id: tenantRole.id } }
+        });
+        
+        // Send welcome email with credentials
+        const emailHtml = `
+          <h1>Welcome to Building Management Solution!</h1>
+          <p>Hello ${data.name},</p>
+          <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
+          <p>You can access the portal here: <a href="https://nibrental.nibbank.com.et/login">https://nibrental.nibbank.com.et/login</a></p>
+          <p><strong>Phone Number:</strong> ${data.phone}</p>
+          <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+          <p>For your security, you will be required to change this password upon your first login.</p>
+          <p>Thank you,</p>
+          <p>The Management Team</p>
+        `;
+        await sendEmail({ to: data.email, subject: 'Your New Tenant Portal Account Credentials', html: emailHtml });
     }
 
-    const loginData = await loginResponse.json();
-    const tokenPayload = decodeJwtPayload(loginData.accessToken);
-    const newUserId = tokenPayload?.sub;
-    
-    if (!newUserId) {
-      return { success: false, error: "User was created, but the new User ID was not returned." };
-    }
-
-    // Now that the user is created, find the TENANT role and assign it.
-    const tenantRole = await databaseService.getRoleByName('TENANT');
-    if (!tenantRole) {
-      return { success: false, error: "The default 'TENANT' role was not found. Please seed the application."};
-    }
-
-    // Create the local User record first
-     const newUser = await databaseService.createUser({
-        userId: newUserId,
-        email: data.email,
-        name: data.name,
-        firstName: data.name.split(' ')[0] || data.name,
-        lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
-        phoneNumber: data.phone,
-        tempPassword: tempPassword, // Save the temporary password
-        roles: { connect: { id: tenantRole.id } }
-    });
-    
-    // Now create the tenant profile linked to the new user
+    // --- Step 3: Create the Tenant profile and link it to the user ---
     const newTenant = await databaseService.createTenant({
       name: data.name,
       email: data.email,
@@ -129,28 +136,8 @@ export async function createTenantAction(data: {
       nationalId: data.nationalId,
       representativeName: data.representativeName,
       representativePhone: data.representativePhone,
-      user: { connect: { id: newUser.id } }
+      user: { connect: { id: userForTenant.id } } // Link to existing or new user
     });
-
-    // Send welcome email with credentials
-    const emailHtml = `
-      <h1>Welcome to nibrental!</h1>
-      <p>Hello ${data.name},</p>
-      <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
-      <p>You can access the portal here: <a href="https://nibrental.nibbank.com.et/login">https://nibrental.nibbank.com.et/login</a></p>
-      <p><strong>Phone Number:</strong> ${data.phone}</p>
-      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-      <p>For your security, you will be required to change this password upon your first login.</p>
-      <p>Thank you,</p>
-      <p>The Management Team</p>
-    `;
-
-    await sendEmail({
-      to: data.email,
-      subject: 'Your New Tenant Portal Account Credentials',
-      html: emailHtml
-    });
-
 
     revalidatePath('/admin/tenants');
     return { success: true, tenant: newTenant, tempPassword: tempPassword };
@@ -286,7 +273,16 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
     }
     
-    if (tenant.phone) {
+    // Check if the associated User has other Tenant profiles
+    const otherTenantProfiles = await prisma.tenant.count({
+        where: { 
+            userId: tenant.userId,
+            id: { not: tenantId }
+        }
+    });
+
+    // Only delete the identity server user if this is their ONLY tenant profile
+    if (tenant.phone && otherTenantProfiles === 0) {
       const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
       if (!identityDeletionResult.success) {
         return { success: false, error: `Failed to delete from identity server: ${identityDeletionResult.error}. Local data not deleted.` };
@@ -307,13 +303,15 @@ export async function deleteTenantAction(tenantId: string) {
         });
       }
 
+      // Delete just this tenant profile
       await tx.tenant.delete({
         where: { id: tenantId }
       });
       
-      if (tenant.user?.userId) {
+      // Only delete the User record if there are no other tenant profiles associated with it
+      if (tenant.user?.id && otherTenantProfiles === 0) {
         await tx.user.delete({
-          where: { userId: tenant.user.userId }
+          where: { id: tenant.user.id }
         });
       }
     });
