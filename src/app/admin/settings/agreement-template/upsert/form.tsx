@@ -52,7 +52,8 @@ interface UpsertTemplateFormProps {
 
 export function UpsertTemplateForm({ initialData }: UpsertTemplateFormProps) {
   const { toast } = useToast();
-  const { isSuperAdmin } = usePermissions();
+  const { hasPermission } = usePermissions();
+  const canManageTemplates = hasPermission('settings:agreement_templates:manage');
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<TemplateFormValues>({
@@ -149,7 +150,7 @@ export function UpsertTemplateForm({ initialData }: UpsertTemplateFormProps) {
     }
   };
   
-  if (!isSuperAdmin) {
+  if (!canManageTemplates) {
     return (
       <Card className="shadow-lg">
         <CardHeader>

@@ -39,9 +39,9 @@ export async function upsertAgreementTemplateAction(
     data: { id?: string; name: string; content: string }
 ): Promise<{ success: boolean; template?: AgreementTemplate; error?: string }> {
     try {
-        const { isSuperAdmin } = await getUserAndPermissions();
-        if (!isSuperAdmin) {
-            return { success: false, error: "Permission denied. Only Super Admins can manage agreement templates." };
+        const { permissions } = await getUserAndPermissions();
+        if (!permissions.has('settings:agreement_templates:manage')) {
+            return { success: false, error: "Permission denied. You do not have permission to manage agreement templates." };
         }
 
         if (data.id) { // Update
@@ -71,9 +71,9 @@ export async function upsertAgreementTemplateAction(
 
 export async function deleteAgreementTemplateAction(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-        const { isSuperAdmin } = await getUserAndPermissions();
-        if (!isSuperAdmin) {
-            return { success: false, error: "Permission denied. Only Super Admins can delete agreement templates." };
+        const { permissions } = await getUserAndPermissions();
+        if (!permissions.has('settings:agreement_templates:manage')) {
+            return { success: false, error: "Permission denied. You do not have permission to delete agreement templates." };
         }
         await databaseService.deleteAgreementTemplate(id);
         revalidatePath('/admin/agreements/generate');

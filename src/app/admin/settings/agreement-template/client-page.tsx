@@ -58,7 +58,9 @@ export function AgreementTemplateClientPage({
 }: AgreementTemplateClientPageProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { isSuperAdmin } = usePermissions();
+  const { hasPermission } = usePermissions();
+  const canManageTemplates = hasPermission('settings:agreement_templates:manage');
+
   const [templates, setTemplates] = useState(initialTemplates);
   const [isDeleting, setIsDeleting] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<AgreementTemplate | null>(null);
@@ -103,7 +105,7 @@ export function AgreementTemplateClientPage({
     );
   }
 
-  if (!isSuperAdmin) {
+  if (!canManageTemplates) {
     return (
       <Card className="shadow-lg">
         <CardHeader>
@@ -184,7 +186,7 @@ export function AgreementTemplateClientPage({
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!templateToDelete} onOpenChange={setTemplateToDelete}>
+      <AlertDialog open={!!templateToDelete} onOpenChange={(open) => { if (!open) setTemplateToDelete(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
