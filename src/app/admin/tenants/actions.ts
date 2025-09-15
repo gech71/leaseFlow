@@ -45,18 +45,31 @@ export async function createTenantAction(data: {
   representativePhone?: string;
 }) {
   try {
-    // --- Step 1: Check for an existing User in the local database ---
+    // --- Step 1: Check if a Tenant profile already exists ---
+    const existingTenantProfile = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
+
+    if (existingTenantProfile) {
+      // If the tenant profile exists, we don't need to do anything else.
+      // The user can now proceed to the "Agreements" page to create a new lease for this tenant.
+      return { 
+        success: true, 
+        tenant: existingTenantProfile, 
+        message: "Tenant already exists. You can now create a new agreement for them." 
+      };
+    }
+
+    // --- Step 2: Check for an existing User account ---
     const existingUser = await databaseService.findUserByEmailOrPhone(data.email, data.phone);
 
     let userForTenant: PrismaUser;
     let tempPassword: string | undefined = undefined;
 
     if (existingUser) {
-        // --- Step 2a: User exists, so we'll re-use them ---
+        // --- Step 3a: User exists, so we'll re-use them for the new tenant profile ---
         userForTenant = existingUser;
 
     } else {
-        // --- Step 2b: User does not exist, create a new one ---
+        // --- Step 3b: User does not exist, create a new one ---
         tempPassword = generateTempPassword();
         
         // Register user in the external identity provider
@@ -127,30 +140,7 @@ export async function createTenantAction(data: {
         await sendEmail({ to: data.email, subject: 'Your New Tenant Portal Account Credentials', html: emailHtml });
     }
 
-    // --- Step 3: Create the Tenant profile and link it to the user ---
-    const existingTenantProfile = await prisma.tenant.findFirst({
-        where: {
-            OR: [
-                { email: { equals: data.email, mode: 'insensitive' } },
-                { phone: data.phone }
-            ]
-        }
-    });
-
-    if (existingTenantProfile) {
-        // This case is now less likely with the UI search, but as a safeguard:
-        // A tenant profile with this email/phone already exists.
-        // We can't create another one due to unique constraints.
-        // This might happen if they are being added to a new building. The logic
-        // is to just link the user, so this should not be a blocker,
-        // but if the UI lets them submit a duplicate, we need to handle it.
-        // For now, let's allow multiple tenant profiles if the user is the same,
-        // but the DB schema needs to allow it. Let's assume the unique constraint is on `userId` in the `Tenant` table, or composite.
-        // The error suggests it's on email/phone.
-        // Let's create a tenant profile regardless but link to the user.
-    }
-
-
+    // --- Step 4: Create the Tenant profile and link it to the user ---
     const newTenant = await databaseService.createTenant({
       name: data.name,
       email: data.email,
