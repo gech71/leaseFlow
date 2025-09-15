@@ -39,9 +39,9 @@ export interface RoleUpsertData {
 
 export async function createRoleAction(data: RoleUpsertData): Promise<{ success: boolean, role?: Role, error?: string }> {
   try {
-    const { currentUser, isSuperAdmin } = await getUserAndPermissions();
-    if (!isSuperAdmin) {
-        return { success: false, error: "Only Super Admins can create roles." };
+    const { currentUser, isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('settings:role_management:manage')) {
+        return { success: false, error: "You do not have permission to create roles." };
     }
 
     const existingRole = await databaseService.getRoleByName(data.name);
@@ -69,9 +69,9 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
 
 export async function updateRoleAction(id: string, data: RoleUpsertData): Promise<{ success: boolean, role?: Role, error?: string }> {
   try {
-    const isSuperAdmin = await getIsSuperAdmin();
-    if (!isSuperAdmin) {
-        return { success: false, error: "Only Super Admins can update roles." };
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('settings:role_management:manage')) {
+        return { success: false, error: "You do not have permission to update roles." };
     }
 
     // Check if new name conflicts with another existing role
@@ -101,9 +101,9 @@ export async function updateRoleAction(id: string, data: RoleUpsertData): Promis
 
 export async function deleteRoleAction(id: string): Promise<{ success: boolean, error?: string }> {
   try {
-    const isSuperAdmin = await getIsSuperAdmin();
-    if (!isSuperAdmin) {
-        return { success: false, error: "Only Super Admins can delete roles." };
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('settings:role_management:manage')) {
+        return { success: false, error: "You do not have permission to delete roles." };
     }
 
     // Check if role is in use before deleting
