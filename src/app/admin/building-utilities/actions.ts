@@ -32,7 +32,7 @@ export async function getBuildingUtilitiesAction(
   buildingId: string,
   year: number,
   month: number
-): Promise<BuildingMonthlyUtilities | null> {
+): Promise<(BuildingMonthlyUtilities & { utilities: { totalCost: number }[] }) | null> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
@@ -40,9 +40,23 @@ export async function getBuildingUtilitiesAction(
         return null; // Don't return data user can't access
     }
 
-    return await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(buildingId, month, year, {
+    const utilities = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(buildingId, month, year, {
       utilities: true,
     });
+
+    if (!utilities) return null;
+
+    // Serialize Decimal to number
+    const serializableUtilities = {
+      ...utilities,
+      utilities: utilities.utilities.map(u => ({
+        ...u,
+        totalCost: Number(u.totalCost)
+      }))
+    };
+    
+    return serializableUtilities;
+
   } catch (error: any) {
     console.error("Error fetching building utilities:", error);
     return null; // Return null on error
@@ -139,7 +153,7 @@ export async function saveBuildingUtilitiesAction(
   }
 }
 
-export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMonthlyUtilities[]> {
+export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingMonthlyUtilities & { utilities: { totalCost: number }[] })[]> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
@@ -163,7 +177,7 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<BuildingMo
       }))
     }));
     
-    return serializedRecords as unknown as BuildingMonthlyUtilities[];
+    return serializedRecords as (BuildingMonthlyUtilities & { utilities: { totalCost: number }[] })[];
 
   } catch (error: any) {
     console.error("Error fetching all building utilities:", error);

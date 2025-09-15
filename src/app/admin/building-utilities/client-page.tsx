@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PlusCircle, Trash2, Building as BuildingIconLucide, CalendarIcon, Banknote as BanknoteIcon, Layers, HomeIcon, Loader2, EyeOff, InfoIcon, Percent, AlertTriangle, Edit, Search } from 'lucide-react';
-import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, BuildingUtilityItem as BuildingUtilityItemPrismaType, Space as SpacePrismaType } from '@prisma/client';
+import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, Space as SpacePrismaType } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { getYear, getMonth, format, setYear, setMonth, parseISO, subMonths } from 'date-fns';
 import { getBuildingUtilitiesAction, saveBuildingUtilitiesAction, getAllBuildingUtilitiesForListAction, deleteBuildingUtilitiesAction, type BuildingUtilityItemInput } from './actions';
@@ -37,9 +37,12 @@ import { PaginationControls } from '@/components/custom/PaginationControls';
 
 
 // Client-safe types passed as props
-interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt'> {
+interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice' > {
   createdAt: string;
   updatedAt: string;
+  area: number;
+  utilityProrationShare: number;
+  monthlyRentalPrice: number;
 }
 interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt' | 'spaces'> {
   createdAt: string;
@@ -49,7 +52,15 @@ interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updated
 export interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingMonthlyUtilitiesPrismaType, 'createdAt' | 'updatedAt' | 'utilities'> {
   createdAt: string;
   updatedAt: string;
-  utilities: BuildingUtilityItemPrismaType[]; 
+  utilities: {
+    id: string;
+    name: string;
+    totalCost: number;
+    appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
+    applicableFloor: string | null;
+    applicableSpaceIdNames: string[];
+    monthlyUtilitiesId: string;
+  }[]; 
 }
 
 // Internal state type for a "logical" utility item in the UI
@@ -168,7 +179,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
         if (existingEntry && existingEntry.utilities && selectedBuilding) {
-            const logicalGroups: { [key: string]: BuildingUtilityItemPrismaType[] } = {};
+            const logicalGroups: { [key: string]: typeof existingEntry.utilities } = {};
 
             // Group DB items by a logical key (e.g., "Building_Water", "Floor_5th Floor_Electricity")
             for (const item of existingEntry.utilities) {
