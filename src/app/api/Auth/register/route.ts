@@ -1,4 +1,5 @@
 
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { databaseService } from '@/lib/services/databaseService';
@@ -55,7 +56,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: ["Admin user not found in local system."] }, { status: 403 });
   }
   
-  // Refactored Permission Check
   const isSuperAdmin = adminUser.roles.some(r => r.name === 'SUPER_ADMIN');
   const effectivePermissions = new Set<string>();
   adminUser.roles.forEach(role => {
@@ -100,7 +100,6 @@ export async function POST(request: NextRequest) {
 
   const externalResponseText = await externalRegisterResponse.text();
   
-  // Handle case where success is indicated by 2xx status and an empty body
   if (externalRegisterResponse.ok && !externalResponseText) {
       // Success, but no content. We need to log the user in to get their ID.
   } else if (!externalRegisterResponse.ok) {
@@ -116,7 +115,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status });
   }
   
-  // Registration was successful, now get the user's ID
   let loginResponse: Response;
   try {
       loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
@@ -146,7 +144,6 @@ export async function POST(request: NextRequest) {
   }
   const newUserId = newUserPayload.sub;
   
-  // 5. Store new user in local Prisma database.
   try {
     const userCreateInput: Prisma.UserCreateInput = {
       userId: newUserId,
@@ -155,11 +152,13 @@ export async function POST(request: NextRequest) {
       firstName: firstName,
       lastName: lastName,
       phoneNumber: phoneNumber,
+      createdBy: {
+        connect: { id: adminUser.id }
+      }
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
 
-    // 6. Send welcome email (without password)
      const emailHtml = `
       <h1>Welcome to nibrental!</h1>
       <p>Hello ${firstName},</p>

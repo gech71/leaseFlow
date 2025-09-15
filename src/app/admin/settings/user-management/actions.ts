@@ -15,19 +15,13 @@ const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 export async function getUserManagementPageData() {
   try {
-    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
     let userWhereClause: Prisma.UserWhereInput = {};
     if (!isSuperAdmin) {
-      if (managedBuildingIds.length === 0) {
-        // If they manage no buildings, they can see no one.
-        return { success: true, users: [], allRoles: [], allBuildings: [] };
-      }
+      // Non-super-admins only see users they have created.
       userWhereClause = {
-        OR: [
-          { managedBuildings: { some: { id: { in: managedBuildingIds } } } }, // Other managers of the same buildings
-          { tenantProfile: { rentedSpace: { buildingId: { in: managedBuildingIds } } } }, // Tenants in those buildings
-        ],
+        createdById: currentUser.id
       };
     }
 
@@ -52,7 +46,7 @@ export async function getUserManagementPageData() {
 
     const allRoles = await databaseService.getAllRoles({ orderBy: { name: 'asc' } });
     
-    // Non-super-admins should only see the buildings they can manage
+    // Non-super-admins should only see the buildings they can manage to assign
     const buildingWhereClause: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds } } : {};
     const allBuildings = await databaseService.getAllBuildings({ where: buildingWhereClause, orderBy: { name: 'asc' } });
     
@@ -74,12 +68,10 @@ export async function updateUserAssignments(
         return { success: false, error: "Permission denied." };
     }
     
-    // Construct the data payload for the update
     const updateData: Prisma.UserUpdateInput = {
         roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] }
     };
 
-    // Only a super admin can change building assignments
     if (isSuperAdmin) {
         updateData.managedBuildings = {
             set: selectedManagedBuildingIds.map(id => ({ id: id }))
@@ -135,7 +127,6 @@ export async function updateUserNamesAction(
         return { success: false, error: "User not found." };
     }
     
-    // Step 1: Update the external identity provider for names
     const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/update-user`, {
         method: 'POST',
         headers: {
@@ -144,7 +135,7 @@ export async function updateUserNamesAction(
         },
         body: JSON.stringify({
             currentPhoneNumber: localUserToUpdate.phoneNumber, 
-            newPhoneNumber: localUserToUpdate.phoneNumber,   // Keep phone number the same
+            newPhoneNumber: localUserToUpdate.phoneNumber,
             firstName: data.firstName,
             lastName: data.lastName,
         }),
@@ -155,7 +146,6 @@ export async function updateUserNamesAction(
         return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred on the identity server.' };
     }
     
-    // Step 2: Update local DB
     await databaseService.updateUser(userId, {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -201,7 +191,6 @@ export async function changeUserPhoneNumberAction(
         return { success: false, error: "User not found or current phone number is missing." };
     }
 
-    // Step 1: Call external service to change the phone number
     const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-phone-number`, {
       method: 'POST',
       headers: {
@@ -219,7 +208,6 @@ export async function changeUserPhoneNumberAction(
       return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred.' };
     }
     
-    // Step 2: Update the local database
     await databaseService.updateUser(userId, {
       phoneNumber: newPhoneNumber,
     });

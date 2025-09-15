@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -8,6 +9,7 @@ import { addMonths, isAfter } from 'date-fns';
 import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
+import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
@@ -45,12 +47,15 @@ export async function createTenantAction(data: {
   representativePhone?: string;
 }) {
   try {
+    const { currentUser: adminUser } = await getUserAndPermissions();
+    if (!adminUser) {
+        return { success: false, error: "Admin session not found."};
+    }
+    
     // --- Step 1: Check if a Tenant profile already exists ---
     const existingTenantProfile = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
 
     if (existingTenantProfile) {
-      // If the tenant profile exists, we don't need to do anything else.
-      // The user can now proceed to the "Agreements" page to create a new lease for this tenant.
       return { 
         success: true, 
         tenant: existingTenantProfile, 
@@ -65,14 +70,11 @@ export async function createTenantAction(data: {
     let tempPassword: string | undefined = undefined;
 
     if (existingUser) {
-        // --- Step 3a: User exists, so we'll re-use them for the new tenant profile ---
         userForTenant = existingUser;
 
     } else {
-        // --- Step 3b: User does not exist, create a new one ---
         tempPassword = generateTempPassword();
         
-        // Register user in the external identity provider
         const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
             method: 'POST',
             headers: {
@@ -96,7 +98,6 @@ export async function createTenantAction(data: {
             return { success: false, error: `Failed to create user account: ${errorMessages.join(', ')}` };
         }
 
-        // Get the new user's ID by logging them in temporarily
         const loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -109,11 +110,9 @@ export async function createTenantAction(data: {
         const newUserId = tokenPayload?.sub;
         if (!newUserId) return { success: false, error: "User was created, but the new User ID was not returned." };
         
-        // Find the TENANT role
         const tenantRole = await databaseService.getRoleByName('TENANT');
         if (!tenantRole) return { success: false, error: "The default 'TENANT' role was not found." };
         
-        // Create the local User record
         userForTenant = await databaseService.createUser({
             userId: newUserId,
             email: data.email,
@@ -122,10 +121,10 @@ export async function createTenantAction(data: {
             lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
             phoneNumber: data.phone,
             tempPassword: tempPassword,
-            roles: { connect: { id: tenantRole.id } }
+            roles: { connect: { id: tenantRole.id } },
+            createdBy: { connect: { id: adminUser.id } } // Track creator
         });
         
-        // Send welcome email with credentials
         const emailHtml = `
           <h1>Welcome to Building Management Solution!</h1>
           <p>Hello ${data.name},</p>
@@ -140,7 +139,6 @@ export async function createTenantAction(data: {
         await sendEmail({ to: data.email, subject: 'Your New Tenant Portal Account Credentials', html: emailHtml });
     }
 
-    // --- Step 4: Create the Tenant profile and link it to the user ---
     const newTenant = await databaseService.createTenant({
       name: data.name,
       email: data.email,
@@ -149,7 +147,7 @@ export async function createTenantAction(data: {
       nationalId: data.nationalId,
       representativeName: data.representativeName,
       representativePhone: data.representativePhone,
-      user: { connect: { id: userForTenant.id } } // Link to existing or new user
+      user: { connect: { id: userForTenant.id } }
     });
 
     revalidatePath('/admin/tenants');
@@ -286,7 +284,6 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
     }
     
-    // Check if the associated User has other Tenant profiles
     const otherTenantProfiles = await prisma.tenant.count({
         where: { 
             userId: tenant.userId,
@@ -294,7 +291,6 @@ export async function deleteTenantAction(tenantId: string) {
         }
     });
 
-    // Only delete the identity server user if this is their ONLY tenant profile
     if (tenant.phone && otherTenantProfiles === 0) {
       const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
       if (!identityDeletionResult.success) {
@@ -303,7 +299,6 @@ export async function deleteTenantAction(tenantId: string) {
     }
     
     await prisma.$transaction(async (tx) => {
-      // Unlink the tenant from their space to make it vacant
       if (tenant.rentedSpace) {
         await tx.space.update({
           where: { id: tenant.rentedSpace.id },
@@ -316,12 +311,10 @@ export async function deleteTenantAction(tenantId: string) {
         });
       }
 
-      // Delete just this tenant profile
       await tx.tenant.delete({
         where: { id: tenantId }
       });
       
-      // Only delete the User record if there are no other tenant profiles associated with it
       if (tenant.user?.id && otherTenantProfiles === 0) {
         await tx.user.delete({
           where: { id: tenant.user.id }
@@ -361,6 +354,3 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
-    
-
-    
