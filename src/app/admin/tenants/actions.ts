@@ -342,8 +342,7 @@ export async function deleteTenantAction(tenantId: string) {
     revalidatePath('/admin/tenants');
     revalidatePath('/admin/spaces'); 
     return { success: true };
-  } catch (error: any)
-   {
+  } catch (error: any) {
     console.error("Error deleting tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') { 
         console.warn(`Prisma P2025 error during tenant deletion, likely a race condition or unexpected cascade. Considering it a success. Error: ${error.message}`);
@@ -353,7 +352,6 @@ export async function deleteTenantAction(tenantId: string) {
       if (error.code === 'P2003') {
         return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills or other non-active agreements). Please ensure all dependencies are cleared or consider archiving." };
       }
-    }
     return { success: false, error: error.message || "Failed to delete tenant." };
   }
 }
