@@ -360,8 +360,21 @@ export class DatabaseService {
     return prisma.role.findUnique({ where: { id }});
   }
   
-  async getRoleByNameAndCreator(name: string, createdById: string): Promise<Role | null> {
-    return prisma.role.findFirst({ where: { name, createdById } });
+  async getRoleByName(name: string): Promise<Role | null> {
+    return prisma.role.findFirst({ where: { name } });
+  }
+
+  async getRoleByNameAndCreator(name: string, createdById?: string | null): Promise<Role | null> {
+    const where: Prisma.RoleWhereInput = { name };
+    // If createdById is explicitly null, it's a system role check.
+    // If undefined, we don't filter by creator (might not be desired).
+    // If a string, it's a user-created role check.
+    if (createdById === null) {
+      where.createdById = null;
+    } else if (createdById) {
+      where.createdById = createdById;
+    }
+    return prisma.role.findFirst({ where });
   }
 
   async getAllRoles(params?: {
