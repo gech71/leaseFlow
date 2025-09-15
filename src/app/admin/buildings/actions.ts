@@ -39,7 +39,7 @@ export async function updateBuildingAction(
 
     const updatedBuilding = await databaseService.updateBuilding(id, data);
     revalidatePath('/admin/buildings');
-    revalidatePath(`/admin/buildings/upsert?id=${id}`);
+    revalidatePath(`/admin/buildings/add-building?id=${id}`);
     revalidatePath('/admin/settings/user-management');
     return { success: true, building: updatedBuilding };
   } catch (error: any) {

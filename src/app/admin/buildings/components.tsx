@@ -99,7 +99,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
         {canEdit ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href={`/admin/buildings/upsert?id=${building.id}`} passHref>
+              <Link href={`/admin/buildings/add-building?id=${building.id}`} passHref>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                   <Edit3 className="h-4 w-4 text-blue-600" />
                   <span className="sr-only">Edit Building</span>
@@ -111,7 +111,7 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
         ) : canViewDetails ? (
            <Tooltip>
             <TooltipTrigger asChild>
-              <Link href={`/admin/buildings/upsert?id=${building.id}&view=true`} passHref>
+              <Link href={`/admin/buildings/add-building?id=${building.id}&view=true`} passHref>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                   <Eye className="h-4 w-4 text-blue-600" />
                   <span className="sr-only">View Building</span>
@@ -220,7 +220,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
         description="Add, view, and edit buildings and their late fee penalty policies."
         actions={
           canCreateBuildings && (
-            <Link href="/admin/buildings/upsert" passHref>
+            <Link href="/admin/buildings/add-building" passHref>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 <PlusCircle className="mr-2 h-5 w-5" /> Add New Building
               </Button>
@@ -268,7 +268,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
             <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm ? 'No Buildings Found' : 'No Buildings Yet'}</h3>
             <p className="text-muted-foreground mb-4">{searchTerm ? 'No buildings match your search.' : 'Get started by adding your first building.'}</p>
             {!searchTerm && canCreateBuildings && (
-              <Link href="/admin/buildings/upsert" passHref>
+              <Link href="/admin/buildings/add-building" passHref>
                   <Button>
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Building
                   </Button>
