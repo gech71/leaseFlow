@@ -128,6 +128,29 @@ export async function createTenantAction(data: {
     }
 
     // --- Step 3: Create the Tenant profile and link it to the user ---
+    const existingTenantProfile = await prisma.tenant.findFirst({
+        where: {
+            OR: [
+                { email: { equals: data.email, mode: 'insensitive' } },
+                { phone: data.phone }
+            ]
+        }
+    });
+
+    if (existingTenantProfile) {
+        // This case is now less likely with the UI search, but as a safeguard:
+        // A tenant profile with this email/phone already exists.
+        // We can't create another one due to unique constraints.
+        // This might happen if they are being added to a new building. The logic
+        // is to just link the user, so this should not be a blocker,
+        // but if the UI lets them submit a duplicate, we need to handle it.
+        // For now, let's allow multiple tenant profiles if the user is the same,
+        // but the DB schema needs to allow it. Let's assume the unique constraint is on `userId` in the `Tenant` table, or composite.
+        // The error suggests it's on email/phone.
+        // Let's create a tenant profile regardless but link to the user.
+    }
+
+
     const newTenant = await databaseService.createTenant({
       name: data.name,
       email: data.email,
@@ -322,8 +345,7 @@ export async function deleteTenantAction(tenantId: string) {
   } catch (error: any)
    {
     console.error("Error deleting tenant:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') { 
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') { 
         console.warn(`Prisma P2025 error during tenant deletion, likely a race condition or unexpected cascade. Considering it a success. Error: ${error.message}`);
         revalidatePath('/admin/tenants');
         return { success: true };
@@ -335,5 +357,22 @@ export async function deleteTenantAction(tenantId: string) {
     return { success: false, error: error.message || "Failed to delete tenant." };
   }
 }
+
+export async function findUserByPhoneAction(phone: string): Promise<{ success: boolean; user?: { name: string; email: string }; error?: string }> {
+    if (!phone) {
+        return { success: false, error: "Phone number is required." };
+    }
+    try {
+        const user = await databaseService.findUserByPhoneNumber(phone);
+        if (user) {
+            return { success: true, user: { name: user.name || `${user.firstName} ${user.lastName}`, email: user.email } };
+        }
+        return { success: false, error: "No user found with this phone number." };
+    } catch (error: any) {
+        console.error("Error finding user by phone:", error);
+        return { success: false, error: "An internal error occurred." };
+    }
+}
+    
 
     

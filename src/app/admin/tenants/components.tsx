@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle } from 'lucide-react';
+import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle, SearchCheck } from 'lucide-react';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -36,7 +36,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createTenantAction, updateTenantAction, deleteTenantAction } from './actions';
+import { createTenantAction, updateTenantAction, deleteTenantAction, findUserByPhoneAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
@@ -114,6 +114,8 @@ export function TenantsClientPage({
   const [tenantToDelete, setTenantToDelete] = useState<TenantWithRelations | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [searchPhone, setSearchPhone] = useState('');
+  const [isUserFound, setIsUserFound] = useState(false);
 
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -183,6 +185,8 @@ export function TenantsClientPage({
     setFormMode('add');
     setCurrentTenantForForm(null); 
     setGeneratedPassword(null);
+    setSearchPhone('');
+    setIsUserFound(false);
     form.reset({ 
         name: "", email: "", phone: "", alternativePhone: "", nationalId: "", 
         representativeName: "", representativePhone: "",
@@ -198,6 +202,7 @@ export function TenantsClientPage({
     setFormMode('edit');
     setGeneratedPassword(null);
     setCurrentTenantForForm(tenant);
+    setIsUserFound(false);
     form.reset({
       name: tenant.name,
       email: tenant.email,
@@ -254,15 +259,21 @@ export function TenantsClientPage({
 
     setIsSaving(false);
     if (result.success) {
-      // For adding, we don't close the form immediately, we show the password.
-      if (formMode === 'add') {
-        toast({ title: "Tenant and User Account Created", description: `Please provide the temporary password to ${result.tenant?.name}.` });
-      } else {
+      // For adding, we don't close the form immediately if a password was generated.
+      if (formMode === 'add' && !result.tempPassword) {
+        toast({ title: "Tenant Added", description: `${result.tenant?.name} has been added.` });
+        setIsFormOpen(false);
+      } else if (formMode === 'edit') {
         toast({ title: "Tenant Updated", description: `${result.tenant?.name}'s details have been saved.` });
         setIsFormOpen(false); // Close form on successful edit
+      } else if (formMode === 'add' && result.tempPassword) {
+         toast({ title: "Tenant and User Account Created", description: `Please provide the temporary password to ${result.tenant?.name}.` });
       }
-      setCurrentTenantForForm(null);
-      form.reset({ name: "", email: "", phone: "" });
+      
+      if (formMode !== 'add' || !result.tempPassword) {
+        setCurrentTenantForForm(null);
+        form.reset({ name: "", email: "", phone: "" });
+      }
       router.refresh(); 
     } else {
       toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Tenant`, description: result.error, variant: "destructive" });
@@ -302,6 +313,29 @@ export function TenantsClientPage({
     toast({ title: "Copied!", description: "Password copied to clipboard." });
   };
 
+  const handleFindUser = async () => {
+    if (!searchPhone) return;
+    setIsSaving(true);
+    const result = await findUserByPhoneAction(searchPhone);
+    setIsSaving(false);
+
+    if (result.success && result.user) {
+        toast({ title: "User Found", description: "Tenant details have been auto-filled."});
+        form.reset({
+            name: result.user.name,
+            email: result.user.email,
+            phone: searchPhone,
+            alternativePhone: "",
+            nationalId: "",
+            representativeName: "",
+            representativePhone: "",
+        });
+        setIsUserFound(true);
+    } else {
+        toast({ title: "Not Found", description: result.error, variant: "destructive" });
+        setIsUserFound(false);
+    }
+  };
 
   if (!isMounted) {
      return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
@@ -338,6 +372,7 @@ export function TenantsClientPage({
             form.reset({ name: "", email: "", phone: "" });
             setCurrentTenantForForm(null);
             setGeneratedPassword(null);
+            setIsUserFound(false);
           }
       }}>
         <DialogContent className="sm:max-w-lg">
@@ -371,14 +406,33 @@ export function TenantsClientPage({
           ) : (
              <Form {...form}>
               <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-2">
-                <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><UserSquare className="mr-2 h-4 w-4 text-primary" />Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Full Name" {...field} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" />Email<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="Email Address" {...field} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-                <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
+                 {formMode === 'add' && (
+                    <div className="space-y-2 p-3 bg-secondary/30 border rounded-md">
+                        <Label htmlFor="search-phone" className="font-medium">Find Existing Tenant</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                id="search-phone"
+                                placeholder="Enter phone number to find user..."
+                                value={searchPhone}
+                                onChange={(e) => setSearchPhone(e.target.value)}
+                                disabled={isSaving}
+                            />
+                            <Button type="button" onClick={handleFindUser} disabled={isSaving || !searchPhone}>
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                    </div>
+                 )}
+
+
+                <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><UserSquare className="mr-2 h-4 w-4 text-primary" />Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Full Name" {...field} disabled={isSaving || isUserFound || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" />Email<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="Email Address" {...field} disabled={isSaving || isUserFound || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || isUserFound || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
                 
-                <FormField control={form.control} name="alternativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><PhoneIncoming className="mr-2 h-4 w-4 text-primary" />Alternative Phone</FormLabel> <FormControl><Input type="tel" placeholder="Alternative Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-                <FormField control={form.control} name="nationalId" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="National ID Number" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-                <FormField control={form.control} name="representativeName" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" />Representative Name</FormLabel> <FormControl><Input placeholder="Representative Name" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
-                <FormField control={form.control} name="representativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Representative Phone</FormLabel> <FormControl><Input type="tel" placeholder="Representative Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || !canEditTenants && formMode ==='edit'}/></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="alternativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><PhoneIncoming className="mr-2 h-4 w-4 text-primary" />Alternative Phone</FormLabel> <FormControl><Input type="tel" placeholder="Alternative Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="nationalId" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="National ID Number" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="representativeName" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" />Representative Name</FormLabel> <FormControl><Input placeholder="Representative Name" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="representativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Representative Phone</FormLabel> <FormControl><Input type="tel" placeholder="Representative Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
                 
                 <DialogFooter className="pt-4">
                   <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
@@ -551,3 +605,5 @@ export function TenantsClientPage({
     </div>
   );
 }
+
+    
