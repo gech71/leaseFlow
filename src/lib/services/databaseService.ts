@@ -1,5 +1,4 @@
 
-
 import { prisma } from '@/lib/prisma';
 import type { 
   Prisma, 
@@ -231,10 +230,6 @@ export class DatabaseService {
     return prisma.buildingMonthlyUtilities.findMany(params);
   }
 
-  async updateBuildingMonthlyUtilities(id: string, data: Prisma.BuildingMonthlyUtilitiesUpdateInput): Promise<BuildingMonthlyUtilities> {
-    return prisma.buildingMonthlyUtilities.update({ where: { id }, data });
-  }
-
   async upsertBuildingMonthlyUtilities(
     where: Prisma.BuildingMonthlyUtilitiesWhereUniqueInput, 
     create: Prisma.BuildingMonthlyUtilitiesCreateInput,
@@ -446,3 +441,5 @@ export class DatabaseService {
 }
 
 export const databaseService = new DatabaseService();
+
+    
