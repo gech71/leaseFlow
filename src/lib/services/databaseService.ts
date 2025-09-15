@@ -428,7 +428,7 @@ export class DatabaseService {
     orderBy?: Prisma.AgreementTemplateOrderByWithRelationInput | Prisma.AgreementTemplateOrderByWithRelationInput[];
     select?: Prisma.AgreementTemplateSelect;
   }): Promise<AgreementTemplate[]> {
-    return prisma.agreementTemplate.findMany(params);
+    return prisma.agreementTemplate.findMany(params as any);
   }
 
   async updateAgreementTemplate(id: string, data: Prisma.AgreementTemplateUpdateInput): Promise<AgreementTemplate> {

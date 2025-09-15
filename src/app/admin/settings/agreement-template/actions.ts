@@ -13,7 +13,13 @@ export async function getAllAgreementTemplatesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const templates = await databaseService.getAllAgreementTemplates({ orderBy: { name: 'asc' }});
+    const { currentUser, isSuperAdmin } = await getUserAndPermissions();
+    const where: Prisma.AgreementTemplateWhereInput = !isSuperAdmin ? { createdById: currentUser.id } : {};
+    
+    const templates = await databaseService.getAllAgreementTemplates({ 
+      where,
+      orderBy: { name: 'asc' }
+    });
     return { success: true, templates };
   } catch (error: any) {
     console.error("Error fetching agreement templates:", error);
@@ -39,21 +45,28 @@ export async function upsertAgreementTemplateAction(
     data: { id?: string; name: string; content: string }
 ): Promise<{ success: boolean; template?: AgreementTemplate; error?: string }> {
     try {
-        const { permissions } = await getUserAndPermissions();
+        const { currentUser, permissions } = await getUserAndPermissions();
         if (!permissions.has('settings:agreement_templates:manage')) {
             return { success: false, error: "Permission denied. You do not have permission to manage agreement templates." };
         }
 
+        const createOrUpdateData = {
+          name: data.name,
+          content: data.content,
+          createdBy: data.id ? undefined : { connect: { id: currentUser.id } } // Only connect on create
+        };
+
         if (data.id) { // Update
-            const updatedTemplate = await databaseService.updateAgreementTemplate(data.id, {
+            await databaseService.updateAgreementTemplate(data.id, {
                 name: data.name,
                 content: data.content,
             });
             revalidatePath('/admin/settings/agreement-template');
         } else { // Create
-            const newTemplate = await databaseService.createAgreementTemplate({
+            await databaseService.createAgreementTemplate({
                 name: data.name,
                 content: data.content,
+                createdBy: { connect: { id: currentUser.id } }
             });
             revalidatePath('/admin/settings/agreement-template');
         }
