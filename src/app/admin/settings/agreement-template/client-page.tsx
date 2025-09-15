@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
 import Link from 'next/link';
+import { PaginationControls } from "@/components/custom/PaginationControls";
 
 interface AgreementTemplateClientPageProps {
   initialTemplates: AgreementTemplate[];
@@ -64,6 +65,20 @@ export function AgreementTemplateClientPage({
   const [templates, setTemplates] = useState(initialTemplates);
   const [isDeleting, setIsDeleting] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<AgreementTemplate | null>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  const totalPages = Math.ceil(templates.length / itemsPerPage);
+  const paginatedTemplates = templates.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1);
+  };
 
   const handleDeleteTemplate = async () => {
     if (!templateToDelete) return;
@@ -89,6 +104,14 @@ export function AgreementTemplateClientPage({
   useEffect(() => {
     setTemplates(initialTemplates);
   }, [initialTemplates]);
+  
+  useEffect(() => {
+    const newTotalPages = Math.ceil(templates.length / itemsPerPage);
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+  }, [templates.length, itemsPerPage, currentPage]);
+
 
   if (error) {
     return (
@@ -142,46 +165,56 @@ export function AgreementTemplateClientPage({
               <p>No agreement templates found.</p>
             </div>
           ) : (
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">
-                      Last Updated
-                    </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {templates.map((template) => (
-                    <TableRow key={template.id}>
-                      <TableCell className="font-medium">
-                        {template.name}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                        {format(new Date(template.updatedAt), "PPp")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/admin/settings/agreement-template/upsert?id=${template.id}`} passHref>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <Edit className="h-4 w-4 text-blue-600" />
-                            </Button>
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setTemplateToDelete(template)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+            <>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">
+                        Last Updated
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedTemplates.map((template) => (
+                      <TableRow key={template.id}>
+                        <TableCell className="font-medium">
+                          {template.name}
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                          {format(new Date(template.updatedAt), "PPp")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/admin/settings/agreement-template/upsert?id=${template.id}`} passHref>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <Edit className="h-4 w-4 text-blue-600" />
+                              </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setTemplateToDelete(template)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                onItemsPerPageChange={handleItemsPerPageChange}
+                className="mt-4"
+              />
+            </>
           )}
         </CardContent>
       </Card>
