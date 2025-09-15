@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -187,10 +186,17 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       return;
     }
     
-    if (!currentBuildingForm.accountNumber?.trim()) {
+    const accountNumber = currentBuildingForm.accountNumber?.trim();
+    if (!accountNumber) {
       toast({ title: "Validation Error", description: "Account number is required.", variant: "destructive" });
       setIsSaving(false);
       return;
+    }
+
+    if (!/^[7]\d{12}$/.test(accountNumber)) {
+        toast({ title: "Validation Error", description: "Account number must start with '7' and be exactly 13 digits long.", variant: "destructive" });
+        setIsSaving(false);
+        return;
     }
 
 
@@ -331,7 +337,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                     id="buildingAccountNumber"
                     value={currentBuildingForm.accountNumber || ''}
                     onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, accountNumber: e.target.value }))}
-                    placeholder="Building Account Number"
+                    placeholder="7************"
                     className="mt-1"
                     required
                     disabled={isSaving || !canManageThisForm}
