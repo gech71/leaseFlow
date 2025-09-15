@@ -360,8 +360,8 @@ export class DatabaseService {
     return prisma.role.findUnique({ where: { id }});
   }
   
-  async getRoleByName(name: string): Promise<Role | null> {
-    return prisma.role.findUnique({ where: { name } });
+  async getRoleByNameAndCreator(name: string, createdById: string): Promise<Role | null> {
+    return prisma.role.findFirst({ where: { name, createdById } });
   }
 
   async getAllRoles(params?: {
@@ -441,5 +441,3 @@ export class DatabaseService {
 }
 
 export const databaseService = new DatabaseService();
-
-    

@@ -19,8 +19,15 @@ export async function getAllRolesAction(): Promise<{ success: boolean, roles?: R
     const { isSuperAdmin, currentUser } = await getUserAndPermissions();
     
     let whereClause: Prisma.RoleWhereInput = {};
+    // SuperAdmins can see all roles, others see their own created roles.
     if (!isSuperAdmin) {
-      whereClause = { createdById: currentUser.id };
+      whereClause = {
+        OR: [
+          { createdById: currentUser.id },
+          // Include system-default roles that are not created by any user
+          { createdById: null } 
+        ]
+      };
     }
     
     const roles = await databaseService.getAllRoles({ where: whereClause, orderBy: { name: 'asc' } });
@@ -44,9 +51,9 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
         return { success: false, error: "You do not have permission to create roles." };
     }
 
-    const existingRole = await databaseService.getRoleByName(data.name);
+    const existingRole = await databaseService.getRoleByNameAndCreator(data.name, currentUser.id);
     if (existingRole) {
-        return { success: false, error: `Role with name "${data.name}" already exists.`};
+        return { success: false, error: `You have already created a role named "${data.name}".`};
     }
     
     const roleCreateInput: Prisma.RoleCreateInput = {
@@ -61,7 +68,7 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
   } catch (error: any) {
     console.error("Error creating role:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return { success: false, error: `Role with name "${data.name}" already exists.` };
+      return { success: false, error: `A role with the name "${data.name}" might already exist system-wide.` };
     }
     return { success: false, error: error.message || "Failed to create role." };
   }
@@ -69,16 +76,16 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
 
 export async function updateRoleAction(id: string, data: RoleUpsertData): Promise<{ success: boolean, role?: Role, error?: string }> {
   try {
-    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    const { currentUser, isSuperAdmin, permissions } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('settings:role_management:manage')) {
         return { success: false, error: "You do not have permission to update roles." };
     }
 
-    // Check if new name conflicts with another existing role
+    // Check if new name conflicts with another existing role BY THE SAME USER
     if (data.name) {
-        const roleWithNewName = await databaseService.getRoleByName(data.name);
+        const roleWithNewName = await databaseService.getRoleByNameAndCreator(data.name, currentUser.id);
         if (roleWithNewName && roleWithNewName.id !== id) {
-            return { success: false, error: `Another role with name "${data.name}" already exists.`};
+            return { success: false, error: `You already have another role named "${data.name}".`};
         }
     }
     const updatedRole = await databaseService.updateRole(id, data);
