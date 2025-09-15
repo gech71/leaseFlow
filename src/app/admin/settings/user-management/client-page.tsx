@@ -441,7 +441,7 @@ export function UserManagementClientPage({
                         </div>
                         <FormField control={userDetailsForm.control} name="phoneNumber" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                         <div className="space-y-1">
-                            <Label>Email (Read-only)</Label>
+                            <Label>Email</Label>
                             <Input value={currentUserToEdit.email} readOnly disabled />
                         </div>
                         <DialogFooter className="pt-4">
