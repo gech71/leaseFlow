@@ -162,7 +162,7 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingM
     }
     const whereClause = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
 
-    const records = await databaseService.getAllBuildingUtilities({
+    const records = await databaseService.getAllBuildingMonthlyUtilities({
       where: whereClause,
       include: { utilities: true, building: { select: { name: true }} },
       orderBy: { createdAt: 'desc' },
