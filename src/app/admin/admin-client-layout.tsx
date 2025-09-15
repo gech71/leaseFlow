@@ -317,7 +317,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AdminClientLayoutWrapper({ children }: { children: React.ReactNode }) {
+export default function AdminClientLayout({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
