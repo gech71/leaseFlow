@@ -36,7 +36,7 @@ export function PaginationControls({
   onItemsPerPageChange,
   className 
 }: PaginationControlsProps) {
-  // Return null only if there are no pages at all and no per-page changer.
+  // Return null only if there's only one page AND no per-page changer.
   if (totalPages <= 1 && !onItemsPerPageChange) {
     return null;
   }
@@ -88,7 +88,7 @@ export function PaginationControls({
                 <SelectValue placeholder={String(itemsPerPage)} />
               </SelectTrigger>
               <SelectContent>
-                {[3, 6, 9, 15, 20, 25, 50].filter((v, i, a) => a.indexOf(v) === i).sort((a,b) => a-b).map(size => (
+                {[3, 5, 10, 15, 20, 25, 50].filter((v, i, a) => a.indexOf(v) === i).sort((a,b) => a-b).map(size => (
                   <SelectItem key={size} value={String(size)}>{size}</SelectItem>
                 ))}
               </SelectContent>
