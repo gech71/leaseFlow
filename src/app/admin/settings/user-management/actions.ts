@@ -39,6 +39,8 @@ export async function getUserManagementPageData() {
         updatedAt: true,
         roles: true, 
         managedBuildings: true,
+        createdBy: true, // Include createdBy to show who created the user
+        createdUsers: true,
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -133,8 +135,7 @@ export async function updateUserNamesAction(
             'Authorization': `Bearer ${adminAccessToken}`,
         },
         body: JSON.stringify({
-            currentPhoneNumber: localUserToUpdate.phoneNumber, 
-            newPhoneNumber: localUserToUpdate.phoneNumber,
+            phoneNumber: localUserToUpdate.phoneNumber,
             firstName: data.firstName,
             lastName: data.lastName,
         }),
