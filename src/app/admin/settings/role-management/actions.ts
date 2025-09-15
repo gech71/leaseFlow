@@ -6,6 +6,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type User, type Role } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
+import { prisma } from '@/lib/prisma';
 
 // Helper to get user and check for super admin status
 async function getIsSuperAdmin() {
@@ -15,7 +16,14 @@ async function getIsSuperAdmin() {
 
 export async function getAllRolesAction(): Promise<{ success: boolean, roles?: Role[], error?: string }> {
   try {
-    const roles = await databaseService.getAllRoles({ orderBy: { name: 'asc' } });
+    const { isSuperAdmin, currentUser } = await getUserAndPermissions();
+    
+    let whereClause: Prisma.RoleWhereInput = {};
+    if (!isSuperAdmin) {
+      whereClause = { createdById: currentUser.id };
+    }
+    
+    const roles = await databaseService.getAllRoles({ where: whereClause, orderBy: { name: 'asc' } });
     return { success: true, roles };
   } catch (error: any) {
     console.error("Error fetching roles:", error);
@@ -31,7 +39,7 @@ export interface RoleUpsertData {
 
 export async function createRoleAction(data: RoleUpsertData): Promise<{ success: boolean, role?: Role, error?: string }> {
   try {
-    const isSuperAdmin = await getIsSuperAdmin();
+    const { currentUser, isSuperAdmin } = await getUserAndPermissions();
     if (!isSuperAdmin) {
         return { success: false, error: "Only Super Admins can create roles." };
     }
@@ -40,7 +48,13 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
     if (existingRole) {
         return { success: false, error: `Role with name "${data.name}" already exists.`};
     }
-    const newRole = await databaseService.createRole(data);
+    
+    const roleCreateInput: Prisma.RoleCreateInput = {
+      ...data,
+      createdBy: { connect: { id: currentUser.id } }
+    };
+    
+    const newRole = await databaseService.createRole(roleCreateInput);
     revalidatePath('/admin/settings/role-management');
     revalidatePath('/admin/settings/user-management'); // Roles list might be used there
     return { success: true, role: newRole };
