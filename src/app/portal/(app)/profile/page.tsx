@@ -10,8 +10,11 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 
 async function TenantProfileDataFetcher() {
+  // We fetch all agreements to find the tenant info.
+  // The action will return all agreements for the user. We just need one.
   const portalData = await getTenantPortalDashboardDataAction();
-  return <TenantProfileClientPage initialTenant={portalData.agreement?.tenant || null} error={portalData.error} />;
+  const tenant = portalData.agreements.length > 0 ? portalData.agreements[0].tenant : null;
+  return <TenantProfileClientPage initialTenant={tenant} error={portalData.error} />;
 }
 
 

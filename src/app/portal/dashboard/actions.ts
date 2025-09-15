@@ -75,12 +75,12 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
 };
 
 export interface TenantPortalData {
-  agreement: PortalAgreementWithRelations | null;
+  agreements: PortalAgreementWithRelations[]; // Changed to an array
   error?: string;
 }
 
 // --- User Authentication Helpers ---
-const ACCESS_TOKEN_KEY = "leaseflow_admin_access_token";
+const ACCESS_TOKEN_KEY = "nibrental_admin_access_token";
 
 // Insecure JWT payload decoder
 async function decodeJwtPayload(token: string): Promise<any | null> {
@@ -106,7 +106,7 @@ async function decodeJwtPayload(token: string): Promise<any | null> {
 // Gets current user from the session cookie
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value; // Use the unified token key
+  const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value; 
 
   if (!accessToken) {
     console.error(
@@ -142,7 +142,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
     if (!currentUser) {
       return {
-        agreement: null,
+        agreements: [],
         error:
           "Your session is invalid or has expired. Please re-enter from the Mini App or login page.",
       };
@@ -159,7 +159,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         `Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`,
       );
       return {
-        agreement: null,
+        agreements: [],
         error:
           "Your user account is not associated with any tenant profile. Please contact property management.",
       };
@@ -234,33 +234,27 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       return { ...ag, bills: processedBills };
     });
 
-    let targetAgreement: PortalAgreementWithRelations | null = null;
-    for (const ag of processedAgreements) {
-      const agreementEndDate = addMonths(
-        new Date(ag.startDate),
-        ag.paymentTermMonths,
-      );
-      if (isAfter(agreementEndDate, new Date())) {
-        targetAgreement = ag as PortalAgreementWithRelations;
-        break;
-      }
+    const activeAgreements = processedAgreements.filter(ag => {
+        const agreementEndDate = addMonths(new Date(ag.startDate), ag.paymentTermMonths);
+        return isAfter(agreementEndDate, new Date());
+    });
+
+    if (activeAgreements.length === 0) {
+        return {
+            agreements: [],
+            error: "You do not have any active agreements."
+        }
     }
 
-    if (!targetAgreement) {
-      targetAgreement =
-        (processedAgreements[
-          processedAgreements.length - 1
-        ] as PortalAgreementWithRelations) || null;
-    }
 
     return {
-      agreement: targetAgreement,
+      agreements: activeAgreements as PortalAgreementWithRelations[],
       error: undefined,
     };
   } catch (error: any) {
     console.error("Error fetching tenant portal data:", error);
     return {
-      agreement: null,
+      agreements: [],
       error: `Failed to fetch portal data: ${(error as Error).message}`,
     };
   }

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -141,7 +142,7 @@ export function CustomerDashboardClientPage({
     }
   }, [initialData, toast]);
 
-  const agreement = initialData?.agreement;
+  const agreement = initialData?.selectedAgreement;
 
   const contactForm = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),

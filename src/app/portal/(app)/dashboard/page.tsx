@@ -60,19 +60,31 @@ const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWit
 };
 
 
-async function TenantPortalDataFetcher() {
+async function TenantPortalDataFetcher({ agreementId }: { agreementId?: string }) {
   const portalData = await getTenantPortalDashboardDataAction();
   
   let serializedData: SerializedTenantPortalData | null = null;
+  let selectedAgreement: ClientAgreement | null = null;
 
-  if (portalData.agreement) {
+  if (portalData.agreements.length > 0) {
+    const allSerializedAgreements = portalData.agreements.map(serializeAgreementData);
+
+    if (agreementId) {
+      selectedAgreement = allSerializedAgreements.find(ag => ag.id === agreementId) || allSerializedAgreements[0];
+    } else {
+      selectedAgreement = allSerializedAgreements[0];
+    }
+    
     serializedData = {
-      agreement: serializeAgreementData(portalData.agreement),
+      agreements: allSerializedAgreements,
+      selectedAgreement: selectedAgreement,
       error: portalData.error,
     };
+
   } else { 
     serializedData = {
-        agreement: null,
+        agreements: [],
+        selectedAgreement: null,
         error: portalData.error || "No active agreement found or failed to load data.",
     };
   }
@@ -80,10 +92,16 @@ async function TenantPortalDataFetcher() {
   return <CustomerDashboardClientPage initialData={serializedData} />;
 }
 
-export default function CustomerDashboardServerPage() {
+export default function CustomerDashboardServerPage({
+  searchParams,
+}: {
+  searchParams?: { agreementId?: string };
+}) {
+  const agreementId = searchParams?.agreementId;
+
   return (
     <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-      <TenantPortalDataFetcher />
+      <TenantPortalDataFetcher agreementId={agreementId} />
     </Suspense>
   );
 }
