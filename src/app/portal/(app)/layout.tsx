@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { UserCircle, LogOut, Menu, Loader2, Building } from 'lucide-react';
+import { UserCircle, LogOut, Menu, Loader2, Building, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,

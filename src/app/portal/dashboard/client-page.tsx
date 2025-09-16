@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -24,6 +23,7 @@ import {
   Paperclip,
   MessageSquare,
   Mail,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,6 +100,8 @@ import {
   sendContactEmailAction,
 } from "./actions";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -124,6 +126,7 @@ export function CustomerDashboardClientPage({
   initialData: SerializedTenantPortalData | null;
 }) {
   const { toast } = useToast();
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -143,6 +146,7 @@ export function CustomerDashboardClientPage({
   }, [initialData, toast]);
 
   const agreement = initialData?.selectedAgreement;
+  const allAgreements = initialData?.agreements || [];
 
   const contactForm = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -409,16 +413,39 @@ export function CustomerDashboardClientPage({
   return (
     <>
       <div className="animate-fadeIn">
-        <PageHeader
-          title={`Welcome, ${agreement.tenant.name}!`}
-          icon={User}
-          description="View your lease details and billing history."
-          actions={
-            <Button onClick={() => setIsContactFormOpen(true)}>
-              <Mail className="mr-2 h-4 w-4" /> Contact Manager
-            </Button>
-          }
-        />
+        <div className="mb-6 md:mb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                <User className="h-8 w-8 text-primary" />
+                <div>
+                    <h1 className="text-3xl font-headline font-bold text-foreground">{`Welcome, ${agreement.tenant.name}!`}</h1>
+                    <p className="text-muted-foreground mt-1">View your lease details and billing history.</p>
+                </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    {allAgreements.length > 1 && (
+                        <Select 
+                            value={agreement.id} 
+                            onValueChange={(id) => router.push(`/portal/dashboard?agreementId=${id}`)}
+                        >
+                            <SelectTrigger className="w-full sm:w-[250px]">
+                                <SelectValue placeholder="Select a property..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {allAgreements.map(ag => (
+                                    <SelectItem key={ag.id} value={ag.id}>
+                                        {ag.space.spaceIdName}, {ag.space.building.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                    <Button onClick={() => setIsContactFormOpen(true)}>
+                        <Mail className="mr-2 h-4 w-4" /> Contact Manager
+                    </Button>
+                </div>
+            </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-3 space-y-6">
