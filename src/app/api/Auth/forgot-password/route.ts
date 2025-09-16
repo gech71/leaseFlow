@@ -109,7 +109,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const message = responseData.message;
+      const message = responseData.message;
+      
     if (typeof message === "string" && message.trim()) {
       return NextResponse.json({ isSuccess: true, token: message.trim() });
     }
