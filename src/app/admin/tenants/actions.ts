@@ -147,7 +147,8 @@ export async function createTenantAction(data: {
       nationalId: data.nationalId,
       representativeName: data.representativeName,
       representativePhone: data.representativePhone,
-      user: { connect: { id: userForTenant.id } }
+      user: { connect: { id: userForTenant.id } },
+      createdBy: { connect: { id: adminUser.id } }, // Associate tenant with creator
     });
 
     revalidatePath('/admin/tenants');
