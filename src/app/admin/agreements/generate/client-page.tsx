@@ -787,9 +787,6 @@ export function GenerateAgreementClientPage({
                 <CheckCircle className="h-5 w-5 mr-2" />
                 <p className="font-medium">Agreement successfully saved!</p>
               </div>
-              <h3 className="text-lg font-semibold font-headline">
-                Agreement ID: {finalizedAgreement.id}
-              </h3>
               <p className="text-sm font-medium">
                 Tenant:{" "}
                 <span className="font-normal">
