@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -9,7 +8,7 @@ import { addMonths, isAfter } from 'date-fns';
 import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
-import { getUserAndPermissions } from '@/lib/actions/server-helpers';
+import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
@@ -52,9 +51,10 @@ export async function createTenantAction(data: {
         return { success: false, error: "Admin session not found."};
     }
     
-    // --- Step 1: Check if a Tenant profile already exists for this user.
-    const existingTenantProfile = await prisma.tenant.findFirst({
+    // --- Step 1: Check if a Tenant profile already exists for this user, created by the current admin.
+    const existingTenantByThisAdmin = await prisma.tenant.findFirst({
         where: {
+            createdById: adminUser.id,
             OR: [
                 { email: { equals: data.email, mode: 'insensitive' } },
                 { phone: data.phone }
@@ -62,11 +62,11 @@ export async function createTenantAction(data: {
         }
     });
 
-    if (existingTenantProfile) {
+    if (existingTenantByThisAdmin) {
       return { 
         success: true, 
-        tenant: existingTenantProfile, 
-        message: "A tenant profile already exists for this user. You can now create an agreement for them." 
+        tenant: existingTenantByThisAdmin, 
+        message: "You have already created a tenant profile for this user. It is available in the list." 
       };
     }
 
@@ -275,8 +275,10 @@ async function deleteIdentityServerUser(phoneNumber: string) {
 
 export async function deleteTenantAction(tenantId: string) {
   try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+
     const tenant = await databaseService.getTenantById(tenantId, {
-      agreements: true,
+      agreements: { include: { space: true } }, // Include space in agreements
       user: true, 
       rentedSpace: true,
     });
@@ -285,11 +287,20 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Tenant not found." };
     }
     
-    const hasActiveAgreements = tenant.agreements.some(agreement =>
-      isAfter(addMonths(agreement.startDate, agreement.paymentTermMonths), new Date())
-    );
-    if (hasActiveAgreements) {
-      return { success: false, error: "Cannot delete tenant with active or future agreements. Please resolve these first." };
+    // Check for active agreements ONLY within the admin's managed buildings
+    const hasActiveAgreementsInManagedBuildings = tenant.agreements.some(agreement => {
+        const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
+        const isActive = isAfter(agreementEndDate, new Date());
+        
+        // If super admin, any active agreement is a blocker.
+        // If not super admin, only active agreements in their managed buildings are blockers.
+        const isInManagedBuilding = isSuperAdmin || (agreement.space && managedBuildingIds?.includes(agreement.space.buildingId));
+
+        return isActive && isInManagedBuilding;
+    });
+
+    if (hasActiveAgreementsInManagedBuildings) {
+      return { success: false, error: "Cannot delete tenant with active or future agreements in your managed buildings. Please resolve these first." };
     }
     
     const otherTenantProfiles = await prisma.tenant.count({
@@ -299,6 +310,7 @@ export async function deleteTenantAction(tenantId: string) {
         }
     });
 
+    // Only attempt to delete the identity server user if this is the last tenant profile for that user.
     if (tenant.phone && otherTenantProfiles === 0) {
       const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
       if (!identityDeletionResult.success) {
@@ -307,22 +319,28 @@ export async function deleteTenantAction(tenantId: string) {
     }
     
     await prisma.$transaction(async (tx) => {
+      // Disconnect the tenant from any space they are directly linked to, but only if it's in a managed building.
       if (tenant.rentedSpace) {
-        await tx.space.update({
-          where: { id: tenant.rentedSpace.id },
-          data: {
-            isOccupied: false,
-            tenant: {
-              disconnect: true
-            }
-          }
-        });
+        const canManageRentedSpace = isSuperAdmin || (managedBuildingIds?.includes(tenant.rentedSpace.buildingId));
+        if (canManageRentedSpace) {
+            await tx.space.update({
+                where: { id: tenant.rentedSpace.id },
+                data: {
+                    isOccupied: false,
+                    tenant: {
+                    disconnect: true
+                    }
+                }
+            });
+        }
       }
 
+      // Delete the tenant profile itself.
       await tx.tenant.delete({
         where: { id: tenantId }
       });
       
+      // If this was the last tenant profile, also delete the user record.
       if (tenant.user?.id && otherTenantProfiles === 0) {
         await tx.user.delete({
           where: { id: tenant.user.id }
@@ -333,7 +351,8 @@ export async function deleteTenantAction(tenantId: string) {
     revalidatePath('/admin/tenants');
     revalidatePath('/admin/spaces'); 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: any)
+   {
     console.error("Error deleting tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') { 
         console.warn(`Prisma P2025 error during tenant deletion, likely a race condition or unexpected cascade. Considering it a success. Error: ${error.message}`);
@@ -375,3 +394,5 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
+
+    
