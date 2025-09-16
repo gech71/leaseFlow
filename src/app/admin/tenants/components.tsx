@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -323,7 +324,7 @@ export function TenantsClientPage({
             email: result.user.email,
             phone: searchPhone,
             alternativePhone: "",
-            nationalId: "",
+            nationalId: result.user.nationalId || "",
             representativeName: "",
             representativePhone: "",
         });
@@ -406,7 +407,7 @@ export function TenantsClientPage({
               <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || isUserFound || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
               
               <FormField control={form.control} name="alternativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><PhoneIncoming className="mr-2 h-4 w-4 text-primary" />Alternative Phone</FormLabel> <FormControl><Input type="tel" placeholder="Alternative Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="nationalId" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="National ID Number" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="nationalId" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" />National ID Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="National ID Number" {...field} value={field.value ?? ""} disabled={isSaving || isUserFound || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="representativeName" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" />Representative Name</FormLabel> <FormControl><Input placeholder="Representative Name" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={form.control} name="representativePhone" render={({ field }) => ( <FormItem> <FormLabel className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" />Representative Phone</FormLabel> <FormControl><Input type="tel" placeholder="Representative Phone Number" {...field} value={field.value ?? ""} disabled={isSaving || (!canEditTenants && formMode ==='edit')}/></FormControl> <FormMessage /> </FormItem> )}/>
               
