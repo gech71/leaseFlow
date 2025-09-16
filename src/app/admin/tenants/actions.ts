@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -303,21 +304,6 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Cannot delete tenant with active or future agreements in your managed buildings. Please resolve these first." };
     }
     
-    const otherTenantProfiles = await prisma.tenant.count({
-        where: { 
-            userId: tenant.userId,
-            id: { not: tenantId }
-        }
-    });
-
-    // Only attempt to delete the identity server user if this is the last tenant profile for that user.
-    if (tenant.phone && otherTenantProfiles === 0) {
-      const identityDeletionResult = await deleteIdentityServerUser(tenant.phone);
-      if (!identityDeletionResult.success) {
-        return { success: false, error: `Failed to delete from identity server: ${identityDeletionResult.error}. Local data not deleted.` };
-      }
-    }
-    
     await prisma.$transaction(async (tx) => {
       // Disconnect the tenant from any space they are directly linked to, but only if it's in a managed building.
       if (tenant.rentedSpace) {
@@ -340,12 +326,6 @@ export async function deleteTenantAction(tenantId: string) {
         where: { id: tenantId }
       });
       
-      // If this was the last tenant profile, also delete the user record.
-      if (tenant.user?.id && otherTenantProfiles === 0) {
-        await tx.user.delete({
-          where: { id: tenant.user.id }
-        });
-      }
     });
 
     revalidatePath('/admin/tenants');
