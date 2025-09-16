@@ -1,5 +1,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
+import { getUserAndPermissions } from '@/lib/actions/server-helpers';
+import { databaseService } from '@/lib/services/databaseService';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 
@@ -22,6 +24,20 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+        const { currentUser, isSuperAdmin } = await getUserAndPermissions();
+
+        const targetUser = await databaseService.findUserByPhoneNumber(phoneNumber);
+
+        if (!targetUser) {
+            return NextResponse.json({ isSuccess: false, errors: ["User with this phone number not found."] }, { status: 404 });
+        }
+
+        // Apply security rule: Super Admin can reset anyone.
+        // Other admins can only reset users they created.
+        if (!isSuperAdmin && targetUser.createdById !== currentUser.id) {
+            return NextResponse.json({ isSuccess: false, errors: ["You do not have permission to reset this user's password."] }, { status: 403 });
+        }
+        
         const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/forgot-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -51,8 +67,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ isSuccess: false, errors: ["Received an invalid response from the authentication service."] }, { status: 500 });
         }
         
-        // --- Corrected Logic ---
-        // The token is embedded in the 'message' field.
+        // The token might be embedded in a message field.
         const message = responseData.message;
         if (typeof message === 'string' && message.includes(': ')) {
             const token = message.split(': ').pop()?.trim();
@@ -61,11 +76,14 @@ export async function POST(request: NextRequest) {
             }
         }
         
-        // This will now be the error case if the token isn't found in the message.
         return NextResponse.json({ isSuccess: false, errors: ["Forgot password request was successful, but a token was not provided in the expected format."] }, { status: 500 });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Forgot password API call error:", error);
+        // Handle cases where getUserAndPermissions throws an error (e.g., no session)
+        if (error.message.includes("Authentication required")) {
+            return NextResponse.json({ isSuccess: false, errors: ["You must be logged in to perform this action."] }, { status: 401 });
+        }
         return NextResponse.json({ isSuccess: false, errors: ["Could not connect to the authentication service."] }, { status: 503 });
     }
 }
