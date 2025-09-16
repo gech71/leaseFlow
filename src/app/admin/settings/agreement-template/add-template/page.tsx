@@ -5,7 +5,7 @@ import { FileText, ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { getAgreementTemplateByIdAction } from '../actions';
-import { UpsertTemplateForm } from './form';
+import { AddTemplateForm } from './form';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +15,12 @@ async function TemplateDataFetcher({ templateId }: { templateId?: string }) {
         if (error) {
             return <p className="text-destructive">{error}</p>;
         }
-        return <UpsertTemplateForm initialData={template} />;
+        return <AddTemplateForm initialData={template} />;
     }
-    return <UpsertTemplateForm />;
+    return <AddTemplateForm />;
 }
 
-export default function UpsertAgreementTemplatePage({
+export default function AddAgreementTemplatePage({
   searchParams,
 }: {
   searchParams?: { id?: string };

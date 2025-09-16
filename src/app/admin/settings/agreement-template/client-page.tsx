@@ -153,7 +153,7 @@ export function AgreementTemplateClientPage({
               Create, edit, or delete reusable agreement templates.
             </CardDescription>
           </div>
-          <Link href="/admin/settings/agreement-template/upsert" passHref>
+          <Link href="/admin/settings/agreement-template/add-template" passHref>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Template
             </Button>
@@ -187,7 +187,7 @@ export function AgreementTemplateClientPage({
                           {format(new Date(template.updatedAt), "PPp")}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/admin/settings/agreement-template/upsert?id=${template.id}`} passHref>
+                          <Link href={`/admin/settings/agreement-template/add-template?id=${template.id}`} passHref>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
                                   <Edit className="h-4 w-4 text-blue-600" />
                               </Button>

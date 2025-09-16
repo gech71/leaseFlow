@@ -46,11 +46,11 @@ const templateFormSchema = z.object({
 
 type TemplateFormValues = z.infer<typeof templateFormSchema>;
 
-interface UpsertTemplateFormProps {
+interface AddTemplateFormProps {
   initialData?: AgreementTemplate | null;
 }
 
-export function UpsertTemplateForm({ initialData }: UpsertTemplateFormProps) {
+export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const canManageTemplates = hasPermission('settings:agreement_templates:manage');
