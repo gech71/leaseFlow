@@ -225,50 +225,52 @@ export async function deleteTenantAction(tenantId: string) {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
     const tenant = await databaseService.getTenantById(tenantId, {
-      agreements: { include: { space: true } }, // Include space in agreements
-      user: true, 
-      rentedSpace: true,
+      agreements: { include: { space: true } }, 
     });
 
     if (!tenant) {
       return { success: false, error: "Tenant not found." };
     }
     
+    // Check for active agreements only within the buildings the current admin manages.
     const hasActiveAgreementsInManagedBuildings = tenant.agreements.some(agreement => {
         const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
         const isActive = isAfter(agreementEndDate, new Date());
         
+        // Check if the agreement's space is in a building managed by the current admin.
         const isInManagedBuilding = isSuperAdmin || (agreement.space && managedBuildingIds?.includes(agreement.space.buildingId));
 
         return isActive && isInManagedBuilding;
     });
 
     if (hasActiveAgreementsInManagedBuildings) {
-      return { success: false, error: "Cannot delete tenant with active or future agreements in your managed buildings. Please resolve these first." };
+      return { success: false, error: "Cannot delete tenant with active agreements in your managed buildings. Please resolve these first." };
     }
     
+    // If the check passes, this means the tenant has no active leases in this admin's buildings.
+    // Instead of deleting the tenant, we will just disassociate them from any spaces in this admin's buildings.
+    // This is a non-destructive action.
     await prisma.$transaction(async (tx) => {
-      // Disconnect the tenant from any space they are directly linked to, but only if it's in a managed building.
-      if (tenant.rentedSpace) {
-        const canManageRentedSpace = isSuperAdmin || (managedBuildingIds?.includes(tenant.rentedSpace.buildingId));
-        if (canManageRentedSpace) {
-            await tx.space.update({
-                where: { id: tenant.rentedSpace.id },
-                data: {
-                    isOccupied: false,
-                    tenant: {
-                    disconnect: true
-                    }
-                }
-            });
+      // Find all spaces in the managed buildings that are currently occupied by this tenant.
+      const spacesToVacate = await tx.space.findMany({
+        where: {
+          tenantId: tenantId,
+          buildingId: { in: managedBuildingIds ?? [] }, // Only consider spaces in managed buildings
         }
-      }
-
-      // Delete the tenant profile itself.
-      await tx.tenant.delete({
-        where: { id: tenantId }
       });
-      
+
+      // For each of those spaces, set them to vacant.
+      for (const space of spacesToVacate) {
+        await tx.space.update({
+          where: { id: space.id },
+          data: {
+            isOccupied: false,
+            tenant: {
+              disconnect: true
+            }
+          }
+        });
+      }
     });
 
     revalidatePath('/admin/tenants');
