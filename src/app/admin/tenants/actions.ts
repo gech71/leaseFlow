@@ -348,7 +348,7 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         if (user) {
             const isTenant = user.roles.some(role => role.name === 'TENANT');
             if (!isTenant) {
-                return { success: false, error: "This user is not a tenant." };
+                return { success: false, error: "No tenant found with this phone number." };
             }
 
             const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
