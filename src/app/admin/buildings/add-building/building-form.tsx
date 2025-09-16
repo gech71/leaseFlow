@@ -359,38 +359,6 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                   />
                 </div>
               </div>
-               {formMode === 'edit' && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2"><User />Assign Managers</h3>
-                   <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                          type="text"
-                          placeholder="Search users by name or email..."
-                          value={managerSearchTerm}
-                          onChange={(e) => setManagerSearchTerm(e.target.value)}
-                          className="pl-8 h-9"
-                          disabled={isSaving || !canManageThisForm}
-                      />
-                  </div>
-                  <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 h-48">
-                    {filteredManagers.length > 0 ? filteredManagers.map(user => (
-                      <div key={user.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox
-                          id={`user-${user.id}`}
-                          checked={selectedManagerIds.has(user.id)}
-                          onCheckedChange={() => handleManagerToggle(user.id)}
-                          disabled={isSaving || !canManageThisForm}
-                        />
-                        <Label htmlFor={`user-${user.id}`} className="text-sm font-normal cursor-pointer flex flex-col">
-                          <span>{user.name || `${user.firstName} ${user.lastName}`}</span>
-                          <span className="text-xs text-muted-foreground">{user.email}</span>
-                        </Label>
-                      </div>
-                    )) : <p className="text-sm text-center text-muted-foreground p-2">No users found.</p>}
-                  </ScrollArea>
-                </div>
-              )}
             </div>
 
             <div className="space-y-4">
