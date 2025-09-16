@@ -37,14 +37,16 @@ export default function GenerateAgreementPage() {
 
 // This is an async Server Component responsible for fetching data
 async function GenerateAgreementDataFetcher() {
-  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+  const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
-  // A user can see unassigned tenants, and tenants assigned to buildings they manage.
+  // A user can see:
+  // 1. Tenants they created.
+  // 2. Tenants who have an agreement in a building they manage.
   const tenantWhereClause: Prisma.TenantWhereInput = !isSuperAdmin
     ? {
         OR: [
-          { rentedSpace: null },
-          { rentedSpace: { buildingId: { in: managedBuildingIds! } } }
+          { createdById: currentUser.id },
+          { agreements: { some: { space: { buildingId: { in: managedBuildingIds! } } } } }
         ]
       }
     : {};
