@@ -54,10 +54,15 @@ export async function createTenantAction(data: {
     const existingTenant = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
 
     if (existingTenant) {
+      // Even if tenant profile exists, ensure it's linked to the current admin if they are creating it.
+      // This handles the case where Admin B "finds" a tenant created by Admin A.
+      await databaseService.updateTenant(existingTenant.id, {
+        createdBy: { connect: { id: adminUser.id } }
+      });
       return { 
         success: true, 
         tenant: existingTenant, 
-        message: "A tenant profile for this user already exists. You can now create an agreement for them." 
+        message: "An existing tenant profile was found and is now visible in your list." 
       };
     }
 
@@ -291,11 +296,7 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
     try {
         const user = await databaseService.findUserByPhoneNumber(phone, { roles: true });
         if (user) {
-            const isTenant = user.roles.some(role => role.name === 'TENANT');
-            if (!isTenant) {
-                return { success: false, error: "No tenant found with this phone number." };
-            }
-
+            // No need to check for tenant role here. Any user can become a tenant.
             const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
             return { 
                 success: true, 
@@ -306,7 +307,7 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
                 } 
             };
         }
-        return { success: false, error: "No tenant found with this phone number." };
+        return { success: false, error: "No user found with this phone number. Please register them first." };
     } catch (error: any) {
         console.error("Error finding user by phone:", error);
         return { success: false, error: "An internal error occurred." };
