@@ -225,69 +225,87 @@ export async function deleteTenantAction(tenantId: string) {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
     const tenant = await databaseService.getTenantById(tenantId, {
-      agreements: { include: { space: true } }, 
+      include: { 
+        agreements: { 
+          include: { space: true } 
+        }, 
+      },
     });
-
+    
     if (!tenant) {
       return { success: false, error: "Tenant not found." };
     }
-    
-    // Check for active agreements only within the buildings the current admin manages.
-    const hasActiveAgreementsInManagedBuildings = tenant.agreements.some(agreement => {
-        const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
-        const isActive = isAfter(agreementEndDate, new Date());
-        
-        // Check if the agreement's space is in a building managed by the current admin.
-        const isInManagedBuilding = isSuperAdmin || (agreement.space && managedBuildingIds?.includes(agreement.space.buildingId));
 
-        return isActive && isInManagedBuilding;
+    const hasActiveAgreementsInManagedBuildings = tenant.agreements.some(agreement => {
+      const agreementEndDate = addMonths(new Date(agreement.startDate), agreement.paymentTermMonths);
+      const isActive = isAfter(agreementEndDate, new Date());
+      const isInManagedBuilding = isSuperAdmin || (agreement.space && managedBuildingIds?.includes(agreement.space.buildingId));
+      return isActive && isInManagedBuilding;
     });
 
     if (hasActiveAgreementsInManagedBuildings) {
-      return { success: false, error: "Cannot delete tenant with active agreements in your managed buildings. Please resolve these first." };
+      return { success: false, error: "Cannot remove tenant with active agreements in your managed buildings. Please resolve these first." };
     }
     
-    // If the check passes, this means the tenant has no active leases in this admin's buildings.
-    // Instead of deleting the tenant, we will just disassociate them from any spaces in this admin's buildings.
-    // This is a non-destructive action.
     await prisma.$transaction(async (tx) => {
-      // Find all spaces in the managed buildings that are currently occupied by this tenant.
-      const spacesToVacate = await tx.space.findMany({
-        where: {
-          tenantId: tenantId,
-          buildingId: { in: managedBuildingIds ?? [] }, // Only consider spaces in managed buildings
-        }
-      });
-
-      // For each of those spaces, set them to vacant.
-      for (const space of spacesToVacate) {
-        await tx.space.update({
-          where: { id: space.id },
-          data: {
-            isOccupied: false,
-            tenant: {
-              disconnect: true
+        // Find spaces occupied by this tenant in the admin's managed buildings
+        const spacesToVacate = await tx.space.findMany({
+            where: {
+                tenantId: tenant.id,
+                buildingId: { in: managedBuildingIds ?? [] },
             }
-          }
         });
-      }
+
+        // Disconnect tenant from those spaces
+        for (const space of spacesToVacate) {
+            await tx.space.update({
+                where: { id: space.id },
+                data: {
+                    isOccupied: false,
+                    tenantId: null
+                }
+            });
+        }
+        
+        // If the admin is the one who created the tenant profile, delete it.
+        // Otherwise, do nothing to the tenant record itself.
+        if (tenant.createdById === (await getUserAndManagedIds()).currentUser.id || isSuperAdmin) {
+            // Before deleting the tenant, delete related non-active agreements created by this admin
+            const agreementsToDelete = await tx.agreement.findMany({
+                where: {
+                    tenantId: tenant.id,
+                    space: {
+                        buildingId: { in: managedBuildingIds ?? [] }
+                    }
+                }
+            });
+
+            for (const agreement of agreementsToDelete) {
+                // Delete bills for this agreement first
+                 await tx.bill.deleteMany({
+                    where: { agreementId: agreement.id }
+                });
+                await tx.agreement.delete({
+                    where: { id: agreement.id }
+                });
+            }
+
+            await tx.tenant.delete({
+                where: { id: tenant.id },
+            });
+        }
     });
 
     revalidatePath('/admin/tenants');
-    revalidatePath('/admin/spaces'); 
+    revalidatePath('/admin/spaces');
     return { success: true };
-  } catch (error: any)
-   {
-    console.error("Error deleting tenant:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') { 
-        console.warn(`Prisma P2025 error during tenant deletion, likely a race condition or unexpected cascade. Considering it a success. Error: ${error.message}`);
-        revalidatePath('/admin/tenants');
-        return { success: true };
-      }
-      if (error.code === 'P2003') {
-        return { success: false, error: "Cannot delete this tenant as they are referenced by other records (e.g., historical bills or other non-active agreements). Please ensure all dependencies are cleared or consider archiving." };
-      }
-    return { success: false, error: error.message || "Failed to delete tenant." };
+  } catch (error: any) {
+    console.error("Error in deleteTenantAction:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      revalidatePath('/admin/tenants');
+      return { success: true, message: "Tenant record was already removed." };
+    }
+    return { success: false, error: "An unexpected error occurred while trying to remove the tenant." };
   }
 }
 
@@ -315,5 +333,3 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
-
-    
