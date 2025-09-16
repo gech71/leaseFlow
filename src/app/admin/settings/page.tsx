@@ -147,7 +147,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="flex-grow">
           <p className="text-sm text-muted-foreground mb-4">
-            Initiate the password reset process for a user by sending a reset link to their registered phone number.
+            Change user password
           </p>
         </CardContent>
         <CardFooter>
