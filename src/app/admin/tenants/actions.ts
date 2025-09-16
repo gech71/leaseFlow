@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -52,22 +51,13 @@ export async function createTenantAction(data: {
         return { success: false, error: "Admin session not found."};
     }
     
-    // --- Step 1: Check if a Tenant profile already exists for this user, created by the current admin.
-    const existingTenantByThisAdmin = await prisma.tenant.findFirst({
-        where: {
-            createdById: adminUser.id,
-            OR: [
-                { email: { equals: data.email, mode: 'insensitive' } },
-                { phone: data.phone }
-            ]
-        }
-    });
+    const existingTenant = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
 
-    if (existingTenantByThisAdmin) {
+    if (existingTenant) {
       return { 
         success: true, 
-        tenant: existingTenantByThisAdmin, 
-        message: "You have already created a tenant profile for this user. It is available in the list." 
+        tenant: existingTenant, 
+        message: "A tenant profile for this user already exists. You can now create an agreement for them." 
       };
     }
 
@@ -79,7 +69,6 @@ export async function createTenantAction(data: {
 
     if (existingUser) {
         userForTenant = existingUser;
-
     } else {
         tempPassword = generateTempPassword();
         
@@ -226,54 +215,6 @@ export async function updateTenantAction(
 }
 
 
-async function deleteIdentityServerUser(phoneNumber: string) {
-    if (!AUTH_API_BASE_URL) {
-        console.error("Auth API base URL is not set. Cannot delete identity server user.");
-        return { success: false, error: "Identity service is not configured." };
-    }
-
-    try {
-        const cookieStore = await cookies();
-        const adminAccessToken = cookieStore.get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-
-        if (!adminAccessToken) {
-            return { success: false, error: "Admin authentication token not found." };
-        }
-        
-        const response = await fetch(`${AUTH_API_BASE_URL}/api/Auth/delete-users`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${adminAccessToken}`,
-            },
-            body: JSON.stringify({ phoneNumbers: [phoneNumber] }),
-        });
-        
-        if (response.ok) {
-            return { success: true };
-        }
-        
-        const errorText = await response.text();
-        let errorMessage = `Failed with status ${response.status}`;
-        if (errorText) {
-            try {
-                const errorData = JSON.parse(errorText);
-                errorMessage = errorData?.errors?.join(', ') || errorData?.message || errorText;
-            } catch (e) {
-                errorMessage = errorText.substring(0, 150);
-            }
-        }
-        
-        console.error("Failed to delete user from identity server:", errorMessage);
-        return { success: false, error: errorMessage };
-
-    } catch (error: any) {
-        console.error("Error calling delete user endpoint on identity server:", error);
-        return { success: false, error: "Could not connect to the identity service to delete user." };
-    }
-}
-
-
 export async function deleteTenantAction(tenantId: string) {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
@@ -288,13 +229,10 @@ export async function deleteTenantAction(tenantId: string) {
       return { success: false, error: "Tenant not found." };
     }
     
-    // Check for active agreements ONLY within the admin's managed buildings
     const hasActiveAgreementsInManagedBuildings = tenant.agreements.some(agreement => {
         const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
         const isActive = isAfter(agreementEndDate, new Date());
         
-        // If super admin, any active agreement is a blocker.
-        // If not super admin, only active agreements in their managed buildings are blockers.
         const isInManagedBuilding = isSuperAdmin || (agreement.space && managedBuildingIds?.includes(agreement.space.buildingId));
 
         return isActive && isInManagedBuilding;
@@ -374,5 +312,3 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
-
-    
