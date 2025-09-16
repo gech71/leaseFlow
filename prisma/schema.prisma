@@ -15,7 +15,7 @@ model Building {
   id                      String                     @id @default(cuid())
   name                    String
   address                 String?
-  accountNumber           String                     @unique
+  accountNumber           String                    
   penaltyPolicyTiers      PenaltyTier[]
   spaces                  Space[]
   buildingMonthlyUtilities BuildingMonthlyUtilities[]
@@ -207,7 +207,7 @@ model Secret {
 
 model AgreementTemplate {
   id          String    @id @default(cuid())
-  name        String    @unique
+  name        String    
   content     String    @db.Text
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
