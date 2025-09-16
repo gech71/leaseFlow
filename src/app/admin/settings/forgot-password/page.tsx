@@ -81,8 +81,8 @@ export default function AdminForgotPasswordPage() {
         />
         <Card className="w-full max-w-lg mx-auto shadow-lg">
             <CardHeader>
-                <CardTitle>Send Password Reset</CardTitle>
-                <CardDescription>Enter the user's phone number to send them a password reset link.</CardDescription>
+                <CardTitle>Password Reset</CardTitle>
+                <CardDescription>Enter the user's phone number.</CardDescription>
             </CardHeader>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSendReset)}>
@@ -106,7 +106,7 @@ export default function AdminForgotPasswordPage() {
                     <CardFooter>
                          <Button type="submit" className="w-full" disabled={isLoading || !canSendReset}>
                             {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
-                            Send Reset Link
+                            Next
                         </Button>
                     </CardFooter>
                 </form>
