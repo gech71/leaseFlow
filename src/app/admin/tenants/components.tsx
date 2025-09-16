@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle, SearchCheck } from 'lucide-react';
-import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma } from '@prisma/client';
+import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle, SearchCheck, UserCheck, UserX } from 'lucide-react';
+import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, TenantStatus } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -37,11 +37,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createTenantAction, updateTenantAction, deleteTenantAction, findUserByPhoneAction } from './actions';
+import { createTenantAction, updateTenantAction, toggleTenantStatusAction, findUserByPhoneAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+
 
 // Client-side specific types ensuring dates are strings
 export interface ClientSpace extends Omit<SpaceTypePrisma, 'createdAt' | 'updatedAt' | 'tenantId'> {
@@ -112,7 +115,7 @@ export function TenantsClientPage({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [currentTenantForForm, setCurrentTenantForForm] = useState<TenantWithRelations | null>(null);
-  const [tenantToDelete, setTenantToDelete] = useState<TenantWithRelations | null>(null);
+  const [tenantToToggle, setTenantToToggle] = useState<TenantWithRelations | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [searchPhone, setSearchPhone] = useState('');
@@ -120,6 +123,7 @@ export function TenantsClientPage({
 
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<TenantStatus>('Active');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
@@ -137,11 +141,17 @@ export function TenantsClientPage({
     },
   });
 
-  const filteredTenants = tenants.filter(tenant =>
-    tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (tenant.phone && tenant.phone.includes(searchTerm))
-  );
+  const filteredTenants = tenants.filter(tenant => {
+    const statusMatch = tenant.status === filterStatus;
+    if (!statusMatch) return false;
+    
+    const searchMatch = !searchTerm ||
+      tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (tenant.phone && tenant.phone.includes(searchTerm));
+      
+    return searchMatch;
+  });
 
   const totalPages = Math.ceil(filteredTenants.length / itemsPerPage);
   
@@ -154,7 +164,7 @@ export function TenantsClientPage({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filterStatus]);
 
   useEffect(() => {
     const newTotalPages = Math.ceil(filteredTenants.length / itemsPerPage);
@@ -286,25 +296,27 @@ export function TenantsClientPage({
     });
   };
 
-  const handleDeleteTenant = async () => {
-    if (!tenantToDelete) return;
-    if (!canDeleteTenants) {
-      toast({ title: "Permission Denied", description: "You do not have permission to delete tenants.", variant: "destructive" });
+  const handleToggleStatus = async () => {
+    if (!tenantToToggle) return;
+    if (!canDeleteTenants) { // Reusing 'delete' permission for deactivation
+      toast({ title: "Permission Denied", description: "You do not have permission to change tenant status.", variant: "destructive" });
       return;
     }
     setIsSaving(true);
+    const newStatus: TenantStatus = tenantToToggle.status === 'Active' ? 'Inactive' : 'Active';
     
-    const result = await deleteTenantAction(tenantToDelete.id);
+    const result = await toggleTenantStatusAction(tenantToToggle.id, newStatus);
     
     setIsSaving(false);
     if (result.success) {
-      toast({ title: "Tenant Removed", description: `${tenantToDelete.name} has been removed.`});
-      setTenantToDelete(null); 
+      toast({ title: "Status Updated", description: `${tenantToToggle.name} is now ${newStatus}.`});
+      setTenantToToggle(null); 
       router.refresh(); 
     } else {
-      toast({ title: "Error Deleting Tenant", description: result.error, variant: "destructive" });
+      toast({ title: "Error Updating Status", description: result.error, variant: "destructive" });
     }
   };
+
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -425,29 +437,28 @@ export function TenantsClientPage({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!tenantToDelete} onOpenChange={(open) => { if(!open) setTenantToDelete(null); }}>
+      <AlertDialog open={!!tenantToToggle} onOpenChange={(open) => { if(!open) setTenantToToggle(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Confirm Status Change</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the tenant "{tenantToDelete?.name}"
-              {tenantToDelete?.rentedSpace ? ` and mark their space (${getSpaceDetails(tenantToDelete.rentedSpace)}) as vacant.` : '.'}
-              This will also delete the associated user account from the identity provider.
+              Are you sure you want to set the status of tenant "{tenantToToggle?.name}" to <span className="font-bold">{tenantToToggle?.status === 'Active' ? 'Inactive' : 'Active'}</span>?
+              {tenantToToggle?.status === 'Active' && ' This will prevent them from being assigned to new agreements.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTenantToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTenant} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isSaving || !canDeleteTenants}>
+            <AlertDialogCancel onClick={() => setTenantToToggle(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleToggleStatus} className={tenantToToggle?.status === 'Active' ? "bg-destructive hover:bg-destructive/90" : "bg-green-600 hover:bg-green-700"} disabled={isSaving || !canDeleteTenants}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Yes, delete tenant
+              Yes, Change Status
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <Card className="mb-6 shadow-sm">
-        <CardContent className="p-4">
-          <div className="relative">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-grow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Filter by name, email, or phone..."
@@ -456,6 +467,13 @@ export function TenantsClientPage({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="status-filter">Status:</Label>
+             <div className="flex items-center space-x-2">
+                <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
+                <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -463,8 +481,8 @@ export function TenantsClientPage({
          <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm ? 'No Tenants Found' : 'No Tenants Yet'}</h3>
-            <p className="text-muted-foreground mb-4">{searchTerm ? 'No tenants match your search.' : 'Add tenants by clicking the button above.'}</p>
+            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm || filterStatus === 'Inactive' ? 'No Tenants Found' : 'No Active Tenants'}</h3>
+            <p className="text-muted-foreground mb-4">{searchTerm ? 'No tenants match your search.' : (filterStatus === 'Inactive' ? 'There are no inactive tenants.' : 'Add tenants by clicking the button above.')}</p>
             {!searchTerm && canCreateTenants && (
                 <Button onClick={handleOpenAddForm} disabled={isSaving}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Add New Tenant
@@ -489,12 +507,15 @@ export function TenantsClientPage({
               return (
                 <Card key={tenant.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
                   <CardHeader>
-                    <div className="flex items-center gap-4">
-                      <Image src={`https://placehold.co/60x60.png?text=${tenant.name.charAt(0)}`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial"/>
-                      <div>
-                        <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
-                        <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <Image src={`https://placehold.co/60x60.png?text=${tenant.name.charAt(0)}`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial"/>
+                        <div>
+                          <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
+                          <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
+                        </div>
                       </div>
+                      <Badge variant={tenant.status === 'Active' ? 'secondary' : 'destructive'} className="capitalize">{tenant.status}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm flex-grow">
@@ -553,12 +574,12 @@ export function TenantsClientPage({
                         {canDeleteTenants && (
                            <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setTenantToDelete(tenant)}>
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Delete Tenant</span>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setTenantToToggle(tenant)}>
+                                {tenant.status === 'Active' ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4 text-green-600"/>}
+                                <span className="sr-only">{tenant.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Delete Tenant</p></TooltipContent>
+                            <TooltipContent><p>{tenant.status === 'Active' ? 'Deactivate Tenant' : 'Activate Tenant'}</p></TooltipContent>
                           </Tooltip>
                         )}
                       </div>

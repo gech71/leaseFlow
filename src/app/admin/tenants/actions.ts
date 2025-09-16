@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type User as PrismaUser, type Role as PrismaRole } from '@prisma/client';
+import { Prisma, type User as PrismaUser, type Role as PrismaRole, TenantStatus } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns'; 
 import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
@@ -11,7 +11,6 @@ import { sendEmail } from '@/lib/services/emailService';
 import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 function generateTempPassword(length = 12) {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -54,11 +53,11 @@ export async function createTenantAction(data: {
     const existingTenant = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
 
     if (existingTenant) {
-      // Even if tenant profile exists, ensure it's linked to the current admin if they are creating it.
-      // This handles the case where Admin B "finds" a tenant created by Admin A.
-      await databaseService.updateTenant(existingTenant.id, {
-        createdBy: { connect: { id: adminUser.id } }
-      });
+      if (existingTenant.createdById === null) {
+        await databaseService.updateTenant(existingTenant.id, {
+          createdBy: { connect: { id: adminUser.id } }
+        });
+      }
       return { 
         success: true, 
         tenant: existingTenant, 
@@ -220,80 +219,33 @@ export async function updateTenantAction(
 }
 
 
-export async function deleteTenantAction(tenantId: string) {
+export async function toggleTenantStatusAction(tenantId: string, newStatus: TenantStatus): Promise<{ success: boolean; error?: string }> {
   try {
-    const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
 
-    const tenant = await databaseService.getTenantById(tenantId, {
-      agreements: {
-        include: {
-          space: true,
-        },
-      },
-    });
+    if (!isSuperAdmin && !permissions.has('tenant:delete')) {
+        return { success: false, error: "You do not have permission to change a tenant's status." };
+    }
     
-    if (!tenant) {
+    // If deactivating, check for active agreements.
+    if (newStatus === 'Inactive') {
+        const tenant = await databaseService.getTenantById(tenantId, { agreements: true });
+        if (tenant?.agreements.some(ag => isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date()))) {
+            return { success: false, error: "Cannot deactivate a tenant with active agreements. Please end or wait for agreements to expire." };
+        }
+    }
+
+    await databaseService.updateTenant(tenantId, { status: newStatus });
+    
+    revalidatePath('/admin/tenants');
+    return { success: true };
+
+  } catch (error: any) {
+    console.error(`Error changing tenant ${tenantId} status to ${newStatus}:`, error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return { success: false, error: "Tenant not found." };
     }
-    
-    const buildingsToConsider = managedBuildingIds || (isSuperAdmin ? (await databaseService.getAllBuildings({ select: { id: true } })).map(b => b.id) : []);
-
-    const hasActiveAgreementsInManagedBuildings = tenant.agreements.some(agreement => {
-      if (!agreement.space || !buildingsToConsider.includes(agreement.space.buildingId)) {
-        return false;
-      }
-      const agreementEndDate = addMonths(new Date(agreement.startDate), agreement.paymentTermMonths);
-      return isAfter(agreementEndDate, new Date());
-    });
-    
-    if (hasActiveAgreementsInManagedBuildings) {
-      return { success: false, error: "Cannot remove tenant with active agreements in your managed buildings. Please resolve these first." };
-    }
-    
-    await prisma.$transaction(async (tx) => {
-        // Find spaces occupied by this tenant in the admin's managed buildings
-        const spacesToVacate = await tx.space.findMany({
-            where: {
-                tenantId: tenant.id,
-                buildingId: { in: buildingsToConsider },
-            }
-        });
-
-        // Disconnect tenant from those spaces
-        for (const space of spacesToVacate) {
-            await tx.space.update({
-                where: { id: space.id },
-                data: {
-                    isOccupied: false,
-                    tenantId: null
-                }
-            });
-        }
-        
-        // Disconnect tenant from their user record if they were the creator.
-        // This makes them just a regular user again, effectively removing them from the tenant list.
-        if (tenant.createdById === currentUser.id || isSuperAdmin) {
-             await tx.tenant.update({
-                where: { id: tenant.id },
-                data: {
-                    createdBy: {
-                        disconnect: true
-                    }
-                }
-            });
-        }
-    });
-
-    revalidatePath('/admin/tenants');
-    revalidatePath('/admin/spaces');
-    return { success: true };
-  } catch (error: any) {
-    console.error("Error in deleteTenantAction:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      revalidatePath('/admin/tenants');
-      return { success: true, message: "Tenant record was already removed." };
-    }
-    return { success: false, error: "An unexpected error occurred while trying to remove the tenant." };
+    return { success: false, error: `Failed to set tenant status to ${newStatus}.` };
   }
 }
 
@@ -321,5 +273,4 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
-
     
