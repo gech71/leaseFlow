@@ -47,16 +47,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 // The header is now its own component to manage its state
 function PortalHeader() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
-  // This would come from a context or props in a real app
-  // For this example, we'll assume it's passed down or fetched.
-  const agreements: ClientAgreement[] = (children as any)?.props?.childToRender?.props?.initialData?.agreements || [];
-  const selectedAgreementId = searchParams.get('agreementId') || agreements[0]?.id;
-  const selectedAgreement = agreements.find(ag => ag.id === selectedAgreementId);
-
 
   const handleLogout = async () => {
       setIsLoggingOut(true);
@@ -76,10 +68,6 @@ function PortalHeader() {
           setIsLoggingOut(false);
       }
   };
-  
-  const handleAgreementChange = (agreementId: string) => {
-    router.push(`/portal/dashboard?agreementId=${agreementId}`);
-  };
 
 
   return (
@@ -92,25 +80,9 @@ function PortalHeader() {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-2">
-                {agreements.length > 1 && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="flex items-center gap-2 text-primary-foreground hover:bg-primary/80">
-                                <Building size={18} />
-                                <span className="truncate max-w-[200px]">
-                                    {selectedAgreement?.space?.spaceIdName || 'Select Space'}
-                                </span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            {agreements.map(ag => (
-                                <DropdownMenuItem key={ag.id} onSelect={() => handleAgreementChange(ag.id)}>
-                                    {ag.space?.spaceIdName} ({ag.space?.building.name})
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                <Link href="/portal/dashboard" className="text-sm font-medium hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/80">
+                    <Building size={18} /> Dashboard
+                </Link>
                 <Link href="/portal/profile" className="text-sm font-medium hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/80">
                     <UserCircle size={18} /> My Account
                 </Link>
@@ -131,25 +103,11 @@ function PortalHeader() {
                     </SheetTrigger>
                     <SheetContent side="right" className="w-[280px] bg-primary text-primary-foreground p-4 flex flex-col">
                         <nav className="flex flex-col space-y-2 mt-8 flex-grow">
-                             {agreements.length > 1 && (
-                                <div className="space-y-2">
-                                    <h3 className="font-semibold px-2">Your Spaces</h3>
-                                    {agreements.map(ag => (
-                                        <SheetClose key={ag.id} asChild>
-                                            <Button 
-                                                variant="ghost" 
-                                                onClick={() => handleAgreementChange(ag.id)}
-                                                className={cn(
-                                                    "w-full justify-start text-left",
-                                                    ag.id === selectedAgreementId && "bg-primary/80"
-                                                )}
-                                            >
-                                                {ag.space?.spaceIdName}
-                                            </Button>
-                                        </SheetClose>
-                                    ))}
-                                </div>
-                             )}
+                             <SheetClose asChild>
+                                <Link href="/portal/dashboard" className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80">
+                                    <Building size={20} /> Dashboard
+                                </Link>
+                            </SheetClose>
                             <SheetClose asChild>
                                 <Link href="/portal/profile" className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80">
                                     <UserCircle size={20} /> My Account
