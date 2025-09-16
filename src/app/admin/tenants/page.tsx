@@ -11,14 +11,13 @@ import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
 export default async function TenantsPage() {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
   
-  // A user can see tenants who have an agreement in a building they manage,
-  // or ANY tenant who is not yet assigned to any space.
+  // A non-super-admin can see:
+  // 1. Tenants who are renting a space in a building they manage.
+  // 2. ANY tenant who is not currently assigned to a space.
   const tenantWhere: Prisma.TenantWhereInput = !isSuperAdmin
     ? {
         OR: [
-          // Tenants with agreements in managed buildings
           { agreements: { some: { space: { buildingId: { in: managedBuildingIds! } } } } },
-          // Any tenant who is unassigned (no active rented space)
           { rentedSpaceId: null }
         ]
       }
