@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -51,14 +52,22 @@ export async function createTenantAction(data: {
         return { success: false, error: "Admin session not found."};
     }
     
-    // --- Step 1: Check if a Tenant profile already exists ---
-    const existingTenantProfile = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
+    // --- Step 1: Check if a Tenant profile linked to this admin already exists ---
+    const existingTenantProfileForAdmin = await prisma.tenant.findFirst({
+        where: {
+            createdById: adminUser.id,
+            OR: [
+                { email: { equals: data.email, mode: 'insensitive' } },
+                { phone: data.phone }
+            ]
+        }
+    });
 
-    if (existingTenantProfile) {
+    if (existingTenantProfileForAdmin) {
       return { 
         success: true, 
-        tenant: existingTenantProfile, 
-        message: "Tenant already exists. You can now create a new agreement for them." 
+        tenant: existingTenantProfileForAdmin, 
+        message: "You have already created a tenant profile for this user. You can now create an agreement for them." 
       };
     }
 
