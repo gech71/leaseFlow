@@ -461,5 +461,3 @@ export function UserManagementClientPage({
     </TooltipProvider>
   );
 }
-
-    
