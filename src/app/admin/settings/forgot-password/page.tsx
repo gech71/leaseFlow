@@ -49,12 +49,11 @@ export default function AdminForgotPasswordPage() {
         body: JSON.stringify({ phoneNumber: values.phoneNumber }),
       });
       const data = await response.json();
-      if (response.ok && data.isSuccess) {
+      if (response.ok && data.isSuccess && data.token) {
         toast({
-            title: "Reset Link Sent",
-            description: "A password reset link has been sent to the user if the phone number is registered."
+            title: "Redirecting to reset password...",
         });
-        form.reset();
+        router.push(`/reset-password?phone=${values.phoneNumber}&token=${data.token}`);
       } else {
         toast({ title: "Request Failed", description: data.errors?.join(', ') || "Failed to initiate password reset.", variant: "destructive" });
       }
@@ -68,7 +67,7 @@ export default function AdminForgotPasswordPage() {
   return (
     <div className="animate-fadeIn">
         <PageHeader
-            title="Forgot Password"
+            title="Password Reset"
             icon={KeyRound}
             description="Change user password"
             actions={
