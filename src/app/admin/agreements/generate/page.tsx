@@ -41,7 +41,6 @@ async function GenerateAgreementDataFetcher() {
 
   // For generating agreements, a manager should be able to see ANY tenant,
   // so they can add an existing tenant to one of their buildings.
-  // We don't filter tenants here.
   const tenantWhereClause: Prisma.TenantWhereInput = {};
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {
@@ -49,10 +48,14 @@ async function GenerateAgreementDataFetcher() {
     ...(!isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {})
   };
 
+  const agreementTemplateWhere: Prisma.AgreementTemplateWhereInput = !isSuperAdmin
+    ? { createdById: currentUser.id }
+    : {};
+
 
   const tenants = await databaseService.getAllTenants({ where: tenantWhereClause, orderBy: { name: 'asc' }});
   const availableSpaces = await databaseService.getAllSpaces({ where: spaceWhereClause, orderBy: [{buildingName: 'asc'},{spaceIdName: 'asc'}] });
-  const agreementTemplates = await databaseService.getAllAgreementTemplates({ orderBy: { name: 'asc' } });
+  const agreementTemplates = await databaseService.getAllAgreementTemplates({ where: agreementTemplateWhere, orderBy: { name: 'asc' } });
 
   // Serialize dates before passing to client component
   const serializableTenants = tenants.map(t => ({
