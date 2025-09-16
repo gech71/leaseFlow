@@ -108,7 +108,7 @@ export function ResetPasswordClientPage() {
                 </FormItem>
               )} />
               <FormField control={form.control} name="token" render={({ field }) => (
-                <FormItem>
+                <FormItem className="hidden">
                   <FormLabel className="flex items-center"><MessageSquareText className="mr-2 h-4 w-4" /> Reset Code</FormLabel>
                   <FormControl><Input placeholder="Enter reset code" {...field} /></FormControl>
                   <FormMessage />
