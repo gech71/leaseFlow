@@ -86,8 +86,8 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
   
-  // Default to the previous month for data entry
-  const [defaultDate] = useState(() => subMonths(new Date(), 1));
+  // Default to the current month for data entry
+  const [defaultDate] = useState(() => new Date());
 
   const [selectedBuildingId, setSelectedBuildingId] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<number>(() => getYear(defaultDate));
