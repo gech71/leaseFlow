@@ -68,7 +68,7 @@ export default function AdminForgotPasswordPage() {
   return (
     <div className="animate-fadeIn">
         <PageHeader
-            title="Forgot Password Tool"
+            title="Forgot Password"
             icon={KeyRound}
             description="Send a password reset link to a user's registered phone number."
             actions={
