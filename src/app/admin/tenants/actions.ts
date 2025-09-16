@@ -222,27 +222,30 @@ export async function updateTenantAction(
 
 export async function deleteTenantAction(tenantId: string) {
   try {
-    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
     const tenant = await databaseService.getTenantById(tenantId, {
-      include: { 
-        agreements: { 
-          include: { space: true } 
-        }, 
+      agreements: {
+        include: {
+          space: true,
+        },
       },
     });
     
     if (!tenant) {
       return { success: false, error: "Tenant not found." };
     }
+    
+    const buildingsToConsider = managedBuildingIds || (isSuperAdmin ? (await databaseService.getAllBuildings({ select: { id: true } })).map(b => b.id) : []);
 
     const hasActiveAgreementsInManagedBuildings = tenant.agreements.some(agreement => {
+      if (!agreement.space || !buildingsToConsider.includes(agreement.space.buildingId)) {
+        return false;
+      }
       const agreementEndDate = addMonths(new Date(agreement.startDate), agreement.paymentTermMonths);
-      const isActive = isAfter(agreementEndDate, new Date());
-      const isInManagedBuilding = isSuperAdmin || (agreement.space && managedBuildingIds?.includes(agreement.space.buildingId));
-      return isActive && isInManagedBuilding;
+      return isAfter(agreementEndDate, new Date());
     });
-
+    
     if (hasActiveAgreementsInManagedBuildings) {
       return { success: false, error: "Cannot remove tenant with active agreements in your managed buildings. Please resolve these first." };
     }
@@ -252,7 +255,7 @@ export async function deleteTenantAction(tenantId: string) {
         const spacesToVacate = await tx.space.findMany({
             where: {
                 tenantId: tenant.id,
-                buildingId: { in: managedBuildingIds ?? [] },
+                buildingId: { in: buildingsToConsider },
             }
         });
 
@@ -267,31 +270,16 @@ export async function deleteTenantAction(tenantId: string) {
             });
         }
         
-        // If the admin is the one who created the tenant profile, delete it.
-        // Otherwise, do nothing to the tenant record itself.
-        if (tenant.createdById === (await getUserAndManagedIds()).currentUser.id || isSuperAdmin) {
-            // Before deleting the tenant, delete related non-active agreements created by this admin
-            const agreementsToDelete = await tx.agreement.findMany({
-                where: {
-                    tenantId: tenant.id,
-                    space: {
-                        buildingId: { in: managedBuildingIds ?? [] }
+        // Disconnect tenant from their user record if they were the creator.
+        // This makes them just a regular user again, effectively removing them from the tenant list.
+        if (tenant.createdById === currentUser.id || isSuperAdmin) {
+             await tx.tenant.update({
+                where: { id: tenant.id },
+                data: {
+                    createdBy: {
+                        disconnect: true
                     }
                 }
-            });
-
-            for (const agreement of agreementsToDelete) {
-                // Delete bills for this agreement first
-                 await tx.bill.deleteMany({
-                    where: { agreementId: agreement.id }
-                });
-                await tx.agreement.delete({
-                    where: { id: agreement.id }
-                });
-            }
-
-            await tx.tenant.delete({
-                where: { id: tenant.id },
             });
         }
     });
@@ -333,3 +321,5 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
+
+    
