@@ -94,7 +94,7 @@ export function ResetPasswordClientPage() {
           <KeyRound className="mx-auto h-12 w-12 text-primary" />
           <div className="space-y-1 px-2">
             <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Reset Your Password</CardTitle>
-            <CardDescription>Enter the reset code and your new password.</CardDescription>
+            <CardDescription>Enter your new password.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">
