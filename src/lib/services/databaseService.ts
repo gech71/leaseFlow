@@ -1,4 +1,5 @@
 
+
 import { prisma } from '@/lib/prisma';
 import type { 
   Prisma, 
@@ -296,10 +297,11 @@ export class DatabaseService {
     });
   }
   
-  async findUserByPhoneNumber(phoneNumber: string): Promise<User | null> {
+  async findUserByPhoneNumber(phoneNumber: string, include?: Prisma.UserInclude): Promise<User | null> {
     if (!phoneNumber) return null;
     return prisma.user.findFirst({
-        where: { phoneNumber: phoneNumber }
+        where: { phoneNumber: phoneNumber },
+        include
     });
   }
 
