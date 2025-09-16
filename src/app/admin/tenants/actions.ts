@@ -340,14 +340,22 @@ export async function deleteTenantAction(tenantId: string) {
   }
 }
 
-export async function findUserByPhoneAction(phone: string): Promise<{ success: boolean; user?: { name: string; email: string }; error?: string }> {
+export async function findUserByPhoneAction(phone: string): Promise<{ success: boolean; user?: { name: string; email: string; nationalId?: string | null; }; error?: string }> {
     if (!phone) {
         return { success: false, error: "Phone number is required." };
     }
     try {
         const user = await databaseService.findUserByPhoneNumber(phone);
         if (user) {
-            return { success: true, user: { name: user.name || `${user.firstName} ${user.lastName}`, email: user.email } };
+            const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
+            return { 
+                success: true, 
+                user: { 
+                    name: user.name || `${user.firstName} ${user.lastName}`, 
+                    email: user.email,
+                    nationalId: tenant?.nationalId
+                } 
+            };
         }
         return { success: false, error: "No user found with this phone number." };
     } catch (error: any) {
