@@ -70,7 +70,7 @@ export default function AdminForgotPasswordPage() {
         <PageHeader
             title="Forgot Password"
             icon={KeyRound}
-            description="Send a password reset link to a user's registered phone number."
+            description="Change user password"
             actions={
             <Link href="/admin/settings" passHref>
                 <Button variant="outline">
