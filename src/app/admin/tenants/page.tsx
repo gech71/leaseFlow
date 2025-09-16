@@ -22,6 +22,14 @@ export default async function TenantsPage() {
         ]
       }
     : {};
+
+  // This is the critical change: filter included agreements for non-super-admins
+  const agreementsInclude = {
+    where: !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : undefined,
+    include: {
+      space: true,
+    }
+  };
   
   const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
   const agreementWhere: Prisma.AgreementWhereInput = !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {};
@@ -30,11 +38,7 @@ export default async function TenantsPage() {
     where: tenantWhere,
     include: { 
       rentedSpace: true, 
-      agreements: {
-        include: {
-          space: true,
-        }
-      }
+      agreements: agreementsInclude
     }, 
     orderBy: { createdAt: 'desc' } 
   });
