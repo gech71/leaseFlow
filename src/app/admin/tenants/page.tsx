@@ -12,12 +12,12 @@ export default async function TenantsPage() {
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
   
   // A non-super-admin can see:
-  // 1. Tenants they created themselves.
+  // 1. Tenants who are unassigned (rentedSpaceId is null)
   // 2. Tenants who have an agreement in a building they manage.
   const tenantWhere: Prisma.TenantWhereInput = !isSuperAdmin
     ? {
         OR: [
-          { createdById: currentUser.id },
+          { rentedSpaceId: null },
           { agreements: { some: { space: { buildingId: { in: managedBuildingIds! } } } } }
         ]
       }
