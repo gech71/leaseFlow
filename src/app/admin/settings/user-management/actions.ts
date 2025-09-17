@@ -39,7 +39,6 @@ export async function getUserManagementPageData() {
         updatedAt: true,
         roles: true, 
         managedBuildings: true,
-        createdBy: true, // Include createdBy to show who created the user
         createdUsers: true,
       },
       orderBy: { createdAt: 'desc' }
@@ -233,5 +232,4 @@ export async function changeUserPhoneNumberAction(
     return { success: false, error: error.message || "Failed to change phone number." };
   }
 }
-
     
