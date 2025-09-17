@@ -1,4 +1,5 @@
 
+
 export const dynamic = 'force-dynamic';
 
 import { databaseService } from '@/lib/services/databaseService';
@@ -6,14 +7,13 @@ import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as
 import { TenantsClientPage, type TenantWithRelations, type SpaceWithTenant, type ClientAgreement } from './components';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
+import { prisma } from '@/lib/prisma';
+
 
 // This is the main Server Component for the page
 export default async function TenantsPage() {
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
   
-  // A non-super-admin can see:
-  // 1. Tenants they created.
-  // 2. Tenants who have an agreement in a building they manage.
   const tenantWhere: Prisma.TenantWhereInput = !isSuperAdmin
     ? {
         OR: [
@@ -22,12 +22,14 @@ export default async function TenantsPage() {
         ]
       }
     : {};
-
-  // When including agreements for a non-super-admin, only include those for their managed buildings.
+  
   const agreementsInclude = {
     where: !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : undefined,
     include: {
       space: true,
+      disabledAgreements: {
+          select: { disabledById: true }
+      }
     }
   };
   
@@ -87,6 +89,8 @@ export default async function TenantsPage() {
         createdAt: ag.space.createdAt?.toISOString() || fallbackDate,
         updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt?.toISOString() || fallbackDate
       } : null,
+      // Pass disabled info to client
+      disabledAgreements: (ag as any).disabledAgreements || [],
     })),
   }));
 

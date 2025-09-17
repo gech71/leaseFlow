@@ -53,7 +53,7 @@ export interface ClientSpace extends Omit<SpaceTypePrisma, 'createdAt' | 'update
   tenantId?: string | null; 
 }
 
-export interface ClientAgreement extends Omit<AgreementTypePrisma, 'startDate' | 'endDate' | 'nextPaymentDueDate' | 'createdAt' | 'updatedAt' | 'initialPaymentDate' | 'space'> {
+export interface ClientAgreement extends Omit<AgreementTypePrisma, 'startDate' | 'endDate' | 'nextPaymentDueDate' | 'createdAt' | 'updatedAt' | 'initialPaymentDate' | 'space' | 'disabledAgreements'> {
   startDate: string;
   endDate?: string | null;
   nextPaymentDueDate: string;
@@ -61,6 +61,7 @@ export interface ClientAgreement extends Omit<AgreementTypePrisma, 'startDate' |
   updatedAt: string;
   initialPaymentDate?: string | null;
   space: ClientSpace | null;
+  disabledAgreements: { disabledById: string }[];
 }
 
 export interface TenantWithRelations extends Omit<TenantTypePrisma, 'createdAt' | 'updatedAt' | 'rentedSpace' | 'agreements'> {
@@ -127,7 +128,7 @@ export function TenantsClientPage({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
-  const { hasPermission, isSuperAdmin } = usePermissions();
+  const { hasPermission, isSuperAdmin, currentUser } = usePermissions();
   const canCreateTenants = isSuperAdmin || hasPermission('tenant:create');
   const canEditTenants = isSuperAdmin || hasPermission('tenant:edit');
   const canChangeStatus = isSuperAdmin || hasPermission('tenant:status');
@@ -141,8 +142,17 @@ export function TenantsClientPage({
     },
   });
 
-  const filteredTenants = tenants.filter(tenant => {
-    const statusMatch = tenant.status === filterStatus;
+  const filteredTenants = tenants.map(tenant => {
+    // An admin can disable agreements. An agreement is disabled for an admin if there is a record for it in `disabledAgreements`
+    // with that admin's ID.
+    const isTenantActiveForCurrentUser = tenant.agreements.length === 0 || // A tenant with no agreements is always "active"
+        tenant.agreements.every(ag => {
+            // It's active if the agreement itself isn't disabled by the current user
+            return !ag.disabledAgreements.some(da => da.disabledById === currentUser?.id);
+        });
+    return { ...tenant, isTenantActiveForCurrentUser };
+  }).filter(tenant => {
+    const statusMatch = filterStatus === 'Active' ? tenant.isTenantActiveForCurrentUser : !tenant.isTenantActiveForCurrentUser;
     if (!statusMatch) return false;
     
     const searchMatch = !searchTerm ||
@@ -298,18 +308,29 @@ export function TenantsClientPage({
 
   const handleToggleStatus = async () => {
     if (!tenantToToggle) return;
-    if (!canChangeStatus) { // Reusing 'delete' permission for deactivation
+    if (!canChangeStatus) { 
       toast({ title: "Permission Denied", description: "You do not have permission to change tenant status.", variant: "destructive" });
       return;
     }
     setIsSaving(true);
-    const newStatus: TenantStatus = tenantToToggle.status === 'Active' ? 'Inactive' : 'Active';
+
+    const activeAgreements = tenantToToggle.agreements.filter(ag => {
+        const agreementEndDate = addMonths(parseISO(ag.startDate), ag.paymentTermMonths);
+        return isAfter(agreementEndDate, new Date());
+    });
+    
+    // Determine current status based on agreements relevant to the current admin
+    const isActiveForCurrentUser = activeAgreements.length === 0 || activeAgreements.every(ag => 
+        !ag.disabledAgreements.some(da => da.disabledById === currentUser?.id)
+    );
+
+    const newStatus = isActiveForCurrentUser ? 'Inactive' : 'Active';
     
     const result = await toggleTenantStatusAction(tenantToToggle.id, newStatus);
     
     setIsSaving(false);
     if (result.success) {
-      toast({ title: "Status Updated", description: `${tenantToToggle.name} is now ${newStatus}.`});
+      toast({ title: "Status Updated", description: `${tenantToToggle.name}'s agreements in your buildings are now marked as ${newStatus}.`});
       setTenantToToggle(null); 
       router.refresh(); 
     } else {
@@ -442,8 +463,8 @@ export function TenantsClientPage({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Confirm Status Change</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to set the status of tenant "{tenantToToggle?.name}" to <span className="font-bold">{tenantToToggle?.status === 'Active' ? 'Inactive' : 'Active'}</span>?
-              {tenantToToggle?.status === 'Active' && ' This will prevent them from being assigned to new agreements.'}
+              Are you sure you want to change the status for tenant "{tenantToToggle?.name}"?
+              This will either disable or enable all agreements for this tenant within your managed buildings.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -515,7 +536,7 @@ export function TenantsClientPage({
                           <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
                         </div>
                       </div>
-                      <Badge variant={tenant.status === 'Active' ? 'secondary' : 'destructive'} className="capitalize">{tenant.status}</Badge>
+                      <Badge variant={tenant.isTenantActiveForCurrentUser ? 'secondary' : 'destructive'} className="capitalize">{tenant.isTenantActiveForCurrentUser ? 'Active' : 'Inactive'}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm flex-grow">
@@ -575,11 +596,11 @@ export function TenantsClientPage({
                            <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setTenantToToggle(tenant)}>
-                                {tenant.status === 'Active' ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4 text-green-600"/>}
-                                <span className="sr-only">{tenant.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
+                                {tenant.isTenantActiveForCurrentUser ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4 text-green-600"/>}
+                                <span className="sr-only">{tenant.isTenantActiveForCurrentUser ? 'Deactivate' : 'Activate'}</span>
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>{tenant.status === 'Active' ? 'Deactivate Tenant' : 'Activate Tenant'}</p></TooltipContent>
+                            <TooltipContent><p>{tenant.isTenantActiveForCurrentUser ? 'Deactivate Tenant' : 'Activate Tenant'}</p></TooltipContent>
                           </Tooltip>
                         )}
                       </div>

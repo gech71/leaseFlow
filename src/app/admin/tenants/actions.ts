@@ -220,24 +220,50 @@ export async function updateTenantAction(
 }
 
 
-export async function toggleTenantStatusAction(tenantId: string, newStatus: TenantStatus): Promise<{ success: boolean; error?: string }> {
+export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Active' | 'Inactive'): Promise<{ success: boolean; error?: string }> {
   try {
-    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    const { currentUser, isSuperAdmin, managedBuildingIds, permissions } = await getUserAndManagedIds();
 
     if (!isSuperAdmin && !permissions.has('tenant:status')) {
         return { success: false, error: "You do not have permission to change a tenant's status." };
     }
     
-    // If deactivating, check for active agreements.
+    // Find all agreements for the tenant within the admin's managed buildings.
+    const agreements = await prisma.agreement.findMany({
+        where: {
+            tenantId: tenantId,
+            space: {
+                buildingId: { in: managedBuildingIds ?? undefined } // Super admin has no buildingId filter
+            }
+        },
+        select: { id: true }
+    });
+    
+    const agreementIds = agreements.map(a => a.id);
+
     if (newStatus === 'Inactive') {
-        const tenant = await databaseService.getTenantById(tenantId, { agreements: true });
-        if (tenant?.agreements.some(ag => isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date()))) {
-            return { success: false, error: "Cannot deactivate a tenant with active agreements. Please end or wait for agreements to expire." };
+        // Create DisabledAgreement records for all relevant agreements.
+        if (agreementIds.length > 0) {
+            await prisma.disabledAgreement.createMany({
+                data: agreementIds.map(agreementId => ({
+                    agreementId: agreementId,
+                    disabledById: currentUser.id
+                })),
+                skipDuplicates: true // Ignore if a record already exists
+            });
+        }
+    } else { // 'Active'
+        // Delete DisabledAgreement records for the relevant agreements created by this admin.
+        if (agreementIds.length > 0) {
+             await prisma.disabledAgreement.deleteMany({
+                where: {
+                    agreementId: { in: agreementIds },
+                    disabledById: currentUser.id
+                }
+            });
         }
     }
 
-    await databaseService.updateTenant(tenantId, { status: newStatus });
-    
     revalidatePath('/admin/tenants');
     return { success: true };
 
