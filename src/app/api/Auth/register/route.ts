@@ -152,9 +152,7 @@ export async function POST(request: NextRequest) {
       firstName: firstName,
       lastName: lastName,
       phoneNumber: phoneNumber,
-      createdBy: {
-        connect: { id: adminUser.id }
-      }
+      // REMOVED: createdBy field is not on the User model
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
