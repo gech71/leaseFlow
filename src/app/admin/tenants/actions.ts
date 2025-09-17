@@ -124,7 +124,6 @@ export async function createTenantAction(data: {
             phoneNumber: data.phone,
             tempPassword: tempPassword,
             roles: { connect: { id: tenantRole.id } },
-            createdBy: { connect: { id: adminUser.id } } // Track creator
         });
         
         const emailHtml = `
