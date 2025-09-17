@@ -130,8 +130,8 @@ export function TenantsClientPage({
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateTenants = isSuperAdmin || hasPermission('tenant:create');
   const canEditTenants = isSuperAdmin || hasPermission('tenant:edit');
-  const canDeleteTenants = isSuperAdmin || hasPermission('tenant:delete');
-  const canViewTenants = isSuperAdmin || hasPermission('tenant:view') || canCreateTenants || canEditTenants || canDeleteTenants;
+  const canChangeStatus = isSuperAdmin || hasPermission('tenant:status');
+  const canViewTenants = isSuperAdmin || hasPermission('tenant:view') || canCreateTenants || canEditTenants || canChangeStatus;
 
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantFormSchema),
@@ -298,7 +298,7 @@ export function TenantsClientPage({
 
   const handleToggleStatus = async () => {
     if (!tenantToToggle) return;
-    if (!canDeleteTenants) { // Reusing 'delete' permission for deactivation
+    if (!canChangeStatus) { // Reusing 'delete' permission for deactivation
       toast({ title: "Permission Denied", description: "You do not have permission to change tenant status.", variant: "destructive" });
       return;
     }
@@ -448,7 +448,7 @@ export function TenantsClientPage({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setTenantToToggle(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleToggleStatus} className={tenantToToggle?.status === 'Active' ? "bg-destructive hover:bg-destructive/90" : "bg-green-600 hover:bg-green-700"} disabled={isSaving || !canDeleteTenants}>
+            <AlertDialogAction onClick={handleToggleStatus} className={tenantToToggle?.status === 'Active' ? "bg-destructive hover:bg-destructive/90" : "bg-green-600 hover:bg-green-700"} disabled={isSaving || !canChangeStatus}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Yes, Change Status
             </AlertDialogAction>
@@ -571,7 +571,7 @@ export function TenantsClientPage({
                             <TooltipContent><p>{canEditTenants ? 'Edit Tenant' : 'View Tenant'}</p></TooltipContent>
                           </Tooltip>
                         )}
-                        {canDeleteTenants && (
+                        {canChangeStatus && (
                            <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setTenantToToggle(tenant)}>

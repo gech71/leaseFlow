@@ -76,7 +76,7 @@ async function main() {
         "tenant:view",
         "tenant:create",
         "tenant:edit",
-        "tenant:delete",
+        "tenant:status",
         "agreement:view",
         "agreement:create",
         "agreement:edit",

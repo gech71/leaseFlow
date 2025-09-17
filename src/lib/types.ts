@@ -210,7 +210,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: 'tenant:view', label: 'View' },
       { id: 'tenant:create', label: 'Create' },
       { id: 'tenant:edit', label: 'Edit' }, 
-      { id: 'tenant:delete', label: 'Delete' },
+      { id: 'tenant:status', label: 'Change Status' },
     ],
   },
   {

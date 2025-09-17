@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -223,7 +224,7 @@ export async function toggleTenantStatusAction(tenantId: string, newStatus: Tena
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
 
-    if (!isSuperAdmin && !permissions.has('tenant:delete')) {
+    if (!isSuperAdmin && !permissions.has('tenant:status')) {
         return { success: false, error: "You do not have permission to change a tenant's status." };
     }
     
