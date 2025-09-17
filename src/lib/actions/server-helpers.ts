@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { cookies } from 'next/headers';
@@ -64,5 +65,8 @@ export async function getUserAndManagedIds() {
     // For non-super admins, their managedBuildingIds are directly on the user object.
     const managedBuildingIds = isSuperAdmin ? null : currentUser.managedBuildings.map(b => b.id);
     
+    // This was the source of the error. This function should not also return permissions.
+    // Let other functions call getUserAndPermissions if they need it.
     return { currentUser, isSuperAdmin, managedBuildingIds };
 }
+

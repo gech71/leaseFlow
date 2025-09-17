@@ -222,7 +222,9 @@ export async function updateTenantAction(
 
 export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Active' | 'Inactive'): Promise<{ success: boolean; error?: string }> {
   try {
-    const { currentUser, isSuperAdmin, managedBuildingIds, permissions } = await getUserAndManagedIds();
+    // This is the corrected line. We need the full user object with permissions.
+    const { currentUser, isSuperAdmin, permissions } = await getUserAndPermissions();
+    const { managedBuildingIds } = await getUserAndManagedIds();
 
     if (!isSuperAdmin && !permissions.has('tenant:status')) {
         return { success: false, error: "You do not have permission to change a tenant's status." };
@@ -301,3 +303,4 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
     }
 }
     
+
