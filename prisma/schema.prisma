@@ -18,7 +18,7 @@ model Building {
   id                      String                    @id @default(cuid())
   name                    String                    @unique
   address                 String?
-  accountNumber           String                    @unique
+  accountNumber           String                    
   penaltyPolicyTiers      PenaltyTier[]
   spaces                  Space[]
   buildingMonthlyUtilities BuildingMonthlyUtilities[]
@@ -179,7 +179,7 @@ model User {
 
 model Role {
   id          String    @id @default(cuid())
-  name        String    @unique
+  name        String    
   description String?
   permissions String[]
   users       User[]
@@ -196,7 +196,7 @@ model Secret {
 
 model AgreementTemplate {
   id        String   @id @default(cuid())
-  name      String   @unique
+  name      String   
   content   String   @db.Text
   createdBy User     @relation("CreatedTemplates", fields: [createdById], references: [id])
   createdById String
