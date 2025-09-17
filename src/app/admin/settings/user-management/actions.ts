@@ -17,12 +17,23 @@ export async function getUserManagementPageData() {
     const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
     let userWhereClause: Prisma.UserWhereInput = {};
+
+    // For non-super-admins, we first find the tenants they created,
+    // then get the associated user IDs.
     if (!isSuperAdmin) {
-      // Non-super-admins only see users they have created.
-      userWhereClause = {
-        createdById: currentUser.id
-      };
+        const createdTenants = await prisma.tenant.findMany({
+            where: { createdById: currentUser.id },
+            select: { userId: true }
+        });
+        
+        // Filter out any null/undefined userIds and create a list of unique IDs
+        const createdTenantUserIds = [...new Set(createdTenants.map(t => t.userId).filter(Boolean) as string[])];
+
+        userWhereClause = {
+            id: { in: createdTenantUserIds }
+        };
     }
+
 
     const users = await databaseService.getAllUsers({
       where: userWhereClause,
