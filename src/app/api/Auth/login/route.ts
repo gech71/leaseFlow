@@ -89,12 +89,21 @@ export async function POST(request: NextRequest) {
         console.warn(`Login Warning: User ${userIdFromToken} authenticated successfully but is not found or provisioned in the local system.`);
         return NextResponse.json({ isSuccess: false, errors: ["Login successful, but this user is not configured for access to this system. Please contact an administrator."] }, { status: 403 });
     }
+    
+    // ** NEW: Check tenant status if user has only tenant role **
+    const isTenantOnly = localUser.roles.length === 1 && localUser.roles[0].name === 'TENANT';
+    if (isTenantOnly) {
+        const tenantProfile = await databaseService.findTenantByEmailOrPhone(localUser.email, localUser.phoneNumber);
+        if (tenantProfile && tenantProfile.status === 'Inactive') {
+            return NextResponse.json({ isSuccess: false, errors: ["Your account is inactive. Please contact property management."] }, { status: 403 });
+        }
+    }
+
 
     // Check if the user has a temporary password set
     const requiresPasswordChange = !!localUser.tempPassword;
 
     // Determine user type and redirect path
-    const isTenantOnly = localUser.roles.length === 1 && localUser.roles[0].name === 'TENANT';
     const redirectPath = isTenantOnly ? '/portal/dashboard' : '/admin/dashboard';
     
     // 4. Set cookies if password change is NOT required
