@@ -302,8 +302,7 @@ export function ImportClientPage({
             variant="outline"
             className="w-full"
           >
-            <Download className="mr-2 h-4 w-4" /> Download Template with
-            Examples
+            <Download className="mr-2 h-4 w-4" /> Download Template
           </Button>
           <p className="text-xs text-muted-foreground mt-4">
             The template has three sheets: Spaces, Tenants, and Agreements.
