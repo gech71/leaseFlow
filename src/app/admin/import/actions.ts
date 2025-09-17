@@ -4,9 +4,18 @@
 import { databaseService } from '@/lib/services/databaseService';
 import { createTenantAction } from '../tenants/actions';
 import { createFullAgreementAction } from '../agreements/actions';
+import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+import type { Prisma } from '@prisma/client';
 
 export async function getAgreementTemplatesForImportAction(): Promise<{ id: string; name: string }[]> {
+  const { isSuperAdmin, currentUser } = await getUserAndManagedIds();
+  
+  const where: Prisma.AgreementTemplateWhereInput = !isSuperAdmin 
+    ? { createdById: currentUser.id }
+    : {};
+
   const templates = await databaseService.getAllAgreementTemplates({
+    where,
     select: { id: true, name: true },
     orderBy: { name: 'asc' },
   });
