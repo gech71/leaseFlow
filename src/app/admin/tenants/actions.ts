@@ -54,8 +54,9 @@ export async function createTenantAction(data: {
     const existingTenant = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
 
     if (existingTenant) {
-      if (existingTenant.createdById === null) {
-        await databaseService.updateTenant(existingTenant.id, {
+      // If the admin who found the tenant is not already the creator, add them.
+      if (existingTenant.createdById !== adminUser.id) {
+         await databaseService.updateTenant(existingTenant.id, {
           createdBy: { connect: { id: adminUser.id } }
         });
       }
