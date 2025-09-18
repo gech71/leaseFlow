@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle, SearchCheck, UserCheck, UserX } from 'lucide-react';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, TenantStatus } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
 import {
   Dialog,
@@ -523,13 +524,18 @@ export function TenantsClientPage({
               const rentedSpaces = [...new Map(activeAgreements.map(ag => ag.space).filter(Boolean).map(space => [space!.id, space])).values()];
               
               const tenantActiveAgreement = findActiveAgreementForTenant(tenant.id);
+              
+              const nameParts = tenant.name.split(' ');
+              const initials = (nameParts[0]?.[0] || '') + (nameParts.length > 1 ? nameParts[nameParts.length - 1]?.[0] || '' : '');
 
               return (
                 <Card key={tenant.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <Image src={`https://picsum.photos/seed/${tenant.id}/60/60`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial" unoptimized/>
+                        <Avatar>
+                          <AvatarFallback>{initials.toUpperCase()}</AvatarFallback>
+                        </Avatar>
                         <div>
                           <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
                           <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
@@ -622,3 +628,4 @@ export function TenantsClientPage({
     </div>
   );
 }
+
