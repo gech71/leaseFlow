@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -124,7 +123,7 @@ export function TenantsClientPage({
 
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<TenantStatus>('Active');
+  const [filterStatus, setFilterStatus] = useState<'Active' | 'Inactive'>('Active');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
@@ -530,7 +529,7 @@ export function TenantsClientPage({
                   <CardHeader>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <Image src={`https://placehold.co/60x60.png?text=${tenant.name.charAt(0)}`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial"/>
+                        <Image src={`https://picsum.photos/seed/${tenant.id}/60/60`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial"/>
                         <div>
                           <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
                           <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
@@ -623,3 +622,5 @@ export function TenantsClientPage({
     </div>
   );
 }
+
+    

@@ -21,7 +21,7 @@ const securityHeaders = [
   // CSP can be added here, but requires careful configuration
   // {
   //   key: 'Content-Security-Policy',
-  //   value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://placehold.co; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com;",
+  //   value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://picsum.photos; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com;",
   // }
 ];
 
@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'placehold.co',
+        hostname: 'picsum.photos',
         port: '',
         pathname: '/**',
       },
@@ -67,3 +67,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+    

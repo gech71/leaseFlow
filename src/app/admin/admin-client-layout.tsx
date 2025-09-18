@@ -69,8 +69,8 @@ const allNavItems: NavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid, requiredPermissions: ['dashboard:view'] },
   { href: '/admin/buildings', label: 'Buildings', icon: Building, requiredPermissions: ['building:view', 'building:create', 'building:edit', 'building:delete'] },
   { href: '/admin/spaces', label: 'Spaces', icon: Building2, requiredPermissions: ['space:view', 'space:create', 'space:edit', 'space:delete'] },
-  { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:view', 'tenant:create', 'tenant:edit', 'tenant:delete'] },
-  { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:view', 'agreement:create', 'agreement:edit', 'agreement:delete'] },
+  { href: '/admin/tenants', label: 'Tenants', icon: Users, requiredPermissions: ['tenant:view', 'tenant:create', 'tenant:edit', 'tenant:status'] },
+  { href: '/admin/agreements', label: 'Agreements', icon: FileText, requiredPermissions: ['agreement:view', 'agreement:create', 'agreement:edit'] },
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, requiredPermissions: ['building_utility:view', 'building_utility:save'] },
   { href: '/admin/billing', label: 'Billing', icon: Banknote, requiredPermissions: ['billing:view', 'billing:generate', 'billing:manage_payments'] },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['payment_overview:view'] },
@@ -271,7 +271,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center group-data-[state=expanded]/sidebar-wrapper:justify-start group-data-[state=collapsed]/sidebar-wrapper:justify-center gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://placehold.co/100x100.png" alt={currentUser?.name || "User"} data-ai-hint="user avatar"/>
+                  <AvatarImage src={`https://picsum.photos/seed/${currentUser?.id || '1'}/100/100`} alt={currentUser?.name || "User"} data-ai-hint="user avatar"/>
                   <AvatarFallback>{currentUser?.name?.substring(0,2).toUpperCase() || 'AU'}</AvatarFallback>
                 </Avatar>
                 <div className={cn("text-left", "group-data-[state=collapsed]/sidebar-wrapper:hidden")}>
@@ -342,3 +342,5 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     </PermissionProvider>
   );
 }
+
+    
