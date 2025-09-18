@@ -219,8 +219,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     permissions: [
       { id: 'agreement:view', label: 'View' },
       { id: 'agreement:create', label: 'Create' },
-      { id: 'agreement:edit', label: 'Edit' }, 
-      { id: 'agreement:delete', label: 'Delete' },
+      { id: 'agreement:edit', label: 'Edit' },
     ],
   },
   {

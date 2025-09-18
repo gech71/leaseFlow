@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -20,18 +21,8 @@ import {
   Download,
   Search,
   AlertTriangle,
-  Trash2,
   Loader2,
   EyeOff,
-  Coins,
-  CreditCard,
-  HelpCircle,
-  Landmark,
-  Wallet,
-  Sigma,
-  CalendarDays,
-  CalendarClock,
-  Info,
 } from "lucide-react";
 import type {
   Agreement as AgreementPrisma,
@@ -50,17 +41,6 @@ import {
 } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { deleteAgreementAction } from "./actions";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { PaginationControls } from "@/components/custom/PaginationControls";
 import {
@@ -69,6 +49,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
+import { Label } from "@/components/ui/label";
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -99,23 +80,18 @@ export function AgreementsListClientPage({
   const { toast } = useToast();
   const router = useRouter();
 
-  const [agreementToDelete, setAgreementToDelete] =
-    useState<AgreementWithRelations | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
+  const [filterStatus, setFilterStatus] = useState<"Active" | "Expired">("Active");
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
   const canEditAgreements = isSuperAdmin || hasPermission("agreement:edit");
-  const canDeleteAgreements = isSuperAdmin || hasPermission("agreement:delete");
   const canViewAgreements =
     isSuperAdmin ||
     hasPermission("agreement:view") ||
     canCreateAgreements ||
-    canEditAgreements ||
-    canDeleteAgreements;
+    canEditAgreements;
 
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
@@ -129,18 +105,32 @@ export function AgreementsListClientPage({
   }, [initialAgreements]);
 
   const filteredAgreements = agreements
-    .filter(
-      (agreement) =>
-        agreement.tenant?.name
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        agreement.space?.spaceIdName
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        agreement.space?.buildingName
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()),
-    )
+    .filter((agreement) => {
+      // Status filter
+      const agreementEndDate = addMonths(
+        parseISO(agreement.startDate),
+        agreement.paymentTermMonths,
+      );
+      const isExpired = isBefore(agreementEndDate, today);
+      const statusMatch = filterStatus === 'Active' ? !isExpired : isExpired;
+      if (!statusMatch) return false;
+
+      // Search term filter
+      if (searchTerm) {
+         return (
+          agreement.tenant?.name
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          agreement.space?.spaceIdName
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          agreement.space?.buildingName
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+        );
+      }
+      return true;
+    })
     .sort(
       (a, b) =>
         parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime(),
@@ -154,7 +144,7 @@ export function AgreementsListClientPage({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filterStatus]);
 
   useEffect(() => {
     const newTotalPages = Math.ceil(agreements.length / itemsPerPage);
@@ -212,38 +202,6 @@ export function AgreementsListClientPage({
     });
   };
 
-  const handleDeleteAgreement = async () => {
-    if (!agreementToDelete) return;
-    if (!canDeleteAgreements) {
-      toast({
-        title: "Permission Denied",
-        description: "You do not have permission to delete agreements.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsSubmitting(true);
-    const result = await deleteAgreementAction(agreementToDelete.id);
-    setIsSubmitting(false);
-    if (result.success) {
-      toast({
-        title: "Agreement Deleted",
-        description: "The agreement has been removed.",
-      });
-      setAgreements((prev) =>
-        prev.filter((ag) => ag.id !== agreementToDelete.id),
-      );
-      router.refresh();
-    } else {
-      toast({
-        title: "Error Deleting Agreement",
-        description: result.error,
-        variant: "destructive",
-      });
-    }
-    setAgreementToDelete(null);
-  };
-
   if (!isMounted) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -285,73 +243,40 @@ export function AgreementsListClientPage({
         }
       />
 
-      <AlertDialog
-        open={!!agreementToDelete}
-        onOpenChange={(open) => {
-          if (!open) setAgreementToDelete(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center">
-              <AlertTriangle className="text-destructive mr-2 h-5 w-5" />
-              Confirm Deletion
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the agreement for{" "}
-              {agreementToDelete?.tenant?.name} at{" "}
-              {agreementToDelete?.space?.spaceIdName}? This action cannot be
-              undone. Associated bills might prevent deletion.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => setAgreementToDelete(null)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAgreement}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={isSubmitting || !canDeleteAgreements}
-            >
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}{" "}
-              Delete Agreement
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <Card className="mb-6 shadow-sm">
-        <CardContent className="p-4">
-          <div className="relative">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-grow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search by tenant, space, or building..."
+              placeholder="Filter by tenant, space, or building..."
               className="pl-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="status-filter">Status:</Label>
+             <div className="flex items-center space-x-2">
+                <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
+                <Button variant={filterStatus === 'Expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Expired')}>Expired</Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
       {filteredAgreements.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2 font-headline">
-              No Agreements Found
+              No {filterStatus} Agreements Found
             </h3>
             <p className="text-muted-foreground mb-4">
-              {" "}
               {searchTerm
-                ? "No agreements match your search."
-                : "No agreements have been created yet."}{" "}
+                ? `No ${filterStatus.toLowerCase()} agreements match your search.`
+                : `There are no ${filterStatus.toLowerCase()} agreements.`}
             </p>
-            {!searchTerm && canCreateAgreements && (
+            {!searchTerm && canCreateAgreements && filterStatus === "Active" && (
               <Link href="/admin/agreements/generate" passHref>
                 <Button>
                   <PlusCircle className="mr-2 h-5 w-5" /> Create Agreement
@@ -376,7 +301,7 @@ export function AgreementsListClientPage({
                 <Card
                   key={agreement.id}
                   className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${
-                    overdue ? "border-destructive border-2" : ""
+                    overdue && filterStatus === 'Active' ? "border-destructive border-2" : ""
                   }`}
                 >
                   <CardHeader>
@@ -387,7 +312,7 @@ export function AgreementsListClientPage({
                       </CardTitle>
                       <div className="flex flex-col items-end space-y-1">
                         {" "}
-                        {overdue && (
+                        {overdue && filterStatus === 'Active' && (
                           <Badge
                             variant="destructive"
                             className="flex items-center"
@@ -396,6 +321,7 @@ export function AgreementsListClientPage({
                             Overdue
                           </Badge>
                         )}{" "}
+                        <Badge variant={filterStatus === 'Active' ? 'secondary' : 'outline'}>{filterStatus}</Badge>
                       </div>
                     </div>{" "}
                     <CardDescription>{spaceDesc}</CardDescription>
@@ -418,17 +344,19 @@ export function AgreementsListClientPage({
                       <strong>Term:</strong> {agreement.paymentTermMonths}{" "}
                       months
                     </p>
-                    <p
-                      className={`${
-                        overdue ? "text-destructive font-semibold" : ""
-                      }`}
-                    >
-                      {" "}
-                      <strong>Next Lease Payment:</strong>{" "}
-                      {agreement.nextPaymentDueDate
-                        ? format(parseISO(agreement.nextPaymentDueDate), "PP")
-                        : "N/A"}{" "}
-                    </p>
+                    {filterStatus === 'Active' && (
+                      <p
+                        className={`${
+                          overdue ? "text-destructive font-semibold" : ""
+                        }`}
+                      >
+                        {" "}
+                        <strong>Next Lease Payment:</strong>{" "}
+                        {agreement.nextPaymentDueDate
+                          ? format(parseISO(agreement.nextPaymentDueDate), "PP")
+                          : "N/A"}{" "}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground pt-1">
                       Generated: {format(parseISO(agreement.createdAt), "PP")}
                     </p>
@@ -473,24 +401,6 @@ export function AgreementsListClientPage({
                           <p>Download Agreement</p>
                         </TooltipContent>
                       </Tooltip>
-                      {canDeleteAgreements && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => setAgreementToDelete(agreement)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete Agreement</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Delete Agreement</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
                     </div>
                   </CardFooter>
                 </Card>
