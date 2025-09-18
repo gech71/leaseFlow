@@ -152,7 +152,6 @@ export async function POST(request: NextRequest) {
       firstName: firstName,
       lastName: lastName,
       phoneNumber: phoneNumber,
-      // REMOVED: createdBy field is not on the User model
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
@@ -161,6 +160,7 @@ export async function POST(request: NextRequest) {
       <h1>Welcome to nibrental!</h1>
       <p>Hello ${firstName},</p>
       <p>A new account has been created for you. You can now log in with the credentials provided by your administrator.</p>
+      <p>You can access the portal here: <a href="https://nibrental.nibbank.com.et/login">https://nibrental.nibbank.com.et/login</a></p>
       <p><strong>Login Phone Number:</strong> ${phoneNumber}</p>
       <p>Thank you,</p>
       <p>The Management Team</p>
