@@ -56,6 +56,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { PermissionProvider, usePermissions } from '@/contexts/PermissionContext';
 import type { PermissionId } from '@/lib/types';
+import Image from 'next/image';
 
 interface NavItem {
   href: string;
@@ -342,5 +343,3 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     </PermissionProvider>
   );
 }
-
-    

@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { getDashboardDataAction, type DashboardData, type ClientAgreement, type ClientBill, type ClientUtility, type ClientBuilding, type ClientSpace } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
@@ -349,7 +350,7 @@ export default function AdminDashboardPage() {
                 {recentActivities.map((activity, index) => (
                     <li key={index} className="flex items-start gap-3 p-3 rounded-md hover:bg-secondary/50 transition-colors">
                     <Avatar className="h-9 w-9 mt-0.5">
-                        <AvatarImage src={`https://picsum.photos/seed/${activity.user}/40/40`} alt={activity.user} data-ai-hint="user initial" />
+                        <Image src={`https://picsum.photos/seed/${activity.user}/40/40`} alt={activity.user} width={40} height={40} data-ai-hint="user initial" unoptimized />
                         <AvatarFallback>{activity.avatar}</AvatarFallback>
                     </Avatar>
                     <div>
@@ -368,5 +369,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-    

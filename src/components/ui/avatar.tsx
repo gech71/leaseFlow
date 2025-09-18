@@ -1,7 +1,9 @@
+
 "use client"
 
 import * as React from "react"
 import * as AvatarPrimitive from "@radix-ui/react-avatar"
+import NextImage from "next/image"
 
 import { cn } from "@/lib/utils"
 
@@ -22,13 +24,22 @@ Avatar.displayName = AvatarPrimitive.Root.displayName
 
 const AvatarImage = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Image>,
-  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image> & { unoptimized?: boolean }
+>(({ className, unoptimized, ...props }, ref) => (
   <AvatarPrimitive.Image
     ref={ref}
     className={cn("aspect-square h-full w-full", className)}
+    asChild
     {...props}
-  />
+  >
+    <NextImage
+      src={props.src || ''}
+      alt={props.alt || ''}
+      width={100} 
+      height={100}
+      unoptimized={unoptimized}
+    />
+  </AvatarPrimitive.Image>
 ))
 AvatarImage.displayName = AvatarPrimitive.Image.displayName
 

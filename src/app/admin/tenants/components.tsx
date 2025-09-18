@@ -529,7 +529,7 @@ export function TenantsClientPage({
                   <CardHeader>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <Image src={`https://picsum.photos/seed/${tenant.id}/60/60`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial"/>
+                        <Image src={`https://picsum.photos/seed/${tenant.id}/60/60`} alt={tenant.name} width={60} height={60} className="rounded-full" data-ai-hint="person initial" unoptimized/>
                         <div>
                           <CardTitle className="font-headline text-xl">{tenant.name}</CardTitle>
                           <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
@@ -622,5 +622,3 @@ export function TenantsClientPage({
     </div>
   );
 }
-
-    
