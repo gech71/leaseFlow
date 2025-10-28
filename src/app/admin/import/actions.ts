@@ -1,6 +1,7 @@
 
 "use server";
 
+import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { createTenantAction } from '../tenants/actions';
 import { createFullAgreementAction } from '../agreements/actions';
@@ -169,6 +170,14 @@ export async function processImportAction(data: ImportData) {
         }
     }
 
+    // Revalidate paths after all operations are complete
+    if (createdCount.spaces > 0 || createdCount.tenants > 0 || createdCount.agreements > 0) {
+        revalidatePath('/admin/agreements');
+        revalidatePath('/admin/spaces');
+        revalidatePath('/admin/tenants');
+        revalidatePath('/admin/billing');
+        revalidatePath('/admin/dashboard');
+    }
 
     return { success: errors.length === 0, createdCount, skippedCount, errors };
 }
