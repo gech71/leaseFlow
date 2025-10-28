@@ -112,16 +112,22 @@ export async function POST(request: NextRequest) {
 
       const message = responseData.message;
       
-    if (typeof message === "string" && message.trim()) {
-      // Correctly trim quotes from the token
-      const cleanToken = message.trim().replace(/^"|"$/g, '');
-      return NextResponse.json({ isSuccess: true, token: cleanToken });
+    if (typeof message === "string" && message.includes(':')) {
+      // The token is part of a descriptive string, e.g., "Password reset token... is: [TOKEN]"
+      // Split the string at the colon and take the second part.
+      const tokenParts = message.split(':');
+      const cleanToken = tokenParts[1]?.trim();
+      
+      if (cleanToken) {
+        return NextResponse.json({ isSuccess: true, token: cleanToken });
+      }
     }
+
     return NextResponse.json(
       {
         isSuccess: false,
         errors: [
-          "Forgot password request was successful, but no token was returned.",
+          "Forgot password request was successful, but the token could not be extracted from the response.",
         ],
       },
       { status: 500 },
