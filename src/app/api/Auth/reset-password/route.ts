@@ -34,8 +34,7 @@ export async function POST(request: NextRequest) {
             let errorMessages = ["Failed to reset password."];
             if (responseText) {
                 try {
-                    const errorData = JSON.parse(responseText);
-                    errorMessages = errorData?.errors || (errorData.message ? [errorData.message] : errorMessages);
+                    const errorMessages = ["Failed to reset password. Password does not meet security requirements."];
                 } catch (e) {
                      errorMessages = [responseText.substring(0, 150)];
                 }

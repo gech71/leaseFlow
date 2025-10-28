@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!externalApiResponse.ok) {
-            const errorMessages = responseData?.errors || (responseData.message ? [responseData.message] : ["Failed to change password."]);
+            const errorMessages = ["Failed to change password. Password does not meet security requirements."];
             return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalApiResponse.status });
         }
         

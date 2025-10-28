@@ -112,6 +112,11 @@ export async function POST(request: NextRequest) {
             errorMessages = [externalResponseText.substring(0, 200)];
         }
     }
+    errorMessages = errorMessages.map(msg =>
+      msg.includes("Password must be at least 8 characters")
+          ? "Failed to Register, Password does not meet security requirements."
+          : msg
+  );
     return NextResponse.json({ isSuccess: false, errors: errorMessages }, { status: externalRegisterResponse.status });
   }
   
