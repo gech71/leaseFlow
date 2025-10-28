@@ -36,7 +36,9 @@ function ResetPasswordForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const phone = searchParams.get('phone');
-  const token = searchParams.get('token');
+  const rawToken = searchParams.get('token') || '';
+  // Recover + that may have become spaces, then decode percent-encoding
+  const token = decodeURIComponent(rawToken.replace(/ /g, '+'));
 
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
