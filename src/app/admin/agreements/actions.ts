@@ -28,7 +28,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     const nextPaymentDueDateObj = addMonths(startDateObj, 1);
     const initialPaymentAmount = input.monthlyRentalPrice * input.initialPaymentMonths;
 
-    const newAgreement = await prisma.$transaction(async (tx) => {
+    const newAgreementId = await prisma.$transaction(async (tx) => {
       // 1. Create the Agreement
       const agreement = await tx.agreement.create({
         data: {
@@ -86,8 +86,20 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
         },
       });
       
-      return agreement;
+      return agreement.id;
     });
+
+    // Re-fetch the agreement with all relations to ensure the returned object is complete
+    const completeNewAgreement = await databaseService.getAgreementById(newAgreementId, {
+        include: {
+            tenant: true,
+            space: true
+        }
+    });
+
+    if (!completeNewAgreement) {
+        throw new Error("Failed to re-fetch the newly created agreement.");
+    }
 
     revalidatePath('/admin/agreements');
     revalidatePath('/admin/spaces'); // Space occupancy changed
@@ -96,9 +108,9 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     
     // Convert Decimal fields to numbers before returning
     const serializableAgreement = {
-      ...newAgreement,
-      monthlyRentalPrice: Number(newAgreement.monthlyRentalPrice),
-      initialPaymentAmount: newAgreement.initialPaymentAmount ? Number(newAgreement.initialPaymentAmount) : null,
+      ...completeNewAgreement,
+      monthlyRentalPrice: Number(completeNewAgreement.monthlyRentalPrice),
+      initialPaymentAmount: completeNewAgreement.initialPaymentAmount ? Number(completeNewAgreement.initialPaymentAmount) : null,
     };
 
     return { success: true, agreement: serializableAgreement };
