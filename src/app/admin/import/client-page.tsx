@@ -56,6 +56,9 @@ interface ImportSummary {
   errors: string[];
 }
 
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 export function ImportClientPage({
   agreementTemplates,
 }: ImportClientPageProps) {
@@ -74,11 +77,44 @@ export function ImportClientPage({
     setIsMounted(true);
   }, []);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-    }
-  }, []);
+  const onDrop = useCallback(
+    (acceptedFiles: File[], rejectedFiles: any[]) => {
+      setFile(null); // Reset on new drop
+
+      if (rejectedFiles.length > 0) {
+        const firstError = rejectedFiles[0].errors[0];
+        if (firstError.code === "file-too-large") {
+          toast({
+            title: "File Too Large",
+            description: `The file exceeds the maximum allowed size of ${MAX_FILE_SIZE_MB}MB.`,
+            variant: "destructive",
+          });
+        } else if (firstError.code === "file-invalid-type") {
+          toast({
+            title: "Invalid File Type",
+            description: "Please upload a valid .xlsx Excel file.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "File Error",
+            description: "The selected file could not be uploaded. Please try again.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
+      if (acceptedFiles.length > 0) {
+        setFile(acceptedFiles[0]);
+        toast({
+          title: "File Selected",
+          description: `${acceptedFiles[0].name} is ready for import.`,
+        });
+      }
+    },
+    [toast],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -86,9 +122,9 @@ export function ImportClientPage({
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
         ".xlsx",
       ],
-      "application/vnd.ms-excel": [".xls"],
     },
     maxFiles: 1,
+    maxSize: MAX_FILE_SIZE_BYTES,
   });
 
   const handleDownloadTemplate = () => {
@@ -198,12 +234,11 @@ export function ImportClientPage({
           workbook.Sheets["Agreements"],
           { raw: false, dateNF: "yyyy-mm-dd" },
         );
-        
+
         // This is the fix: ensure data is plain objects before sending to server action
         const spaces = JSON.parse(JSON.stringify(spacesRaw));
         const tenants = JSON.parse(JSON.stringify(tenantsRaw));
         const agreements = JSON.parse(JSON.stringify(agreementsRaw));
-
 
         const result = await processImportAction({
           spaces,
@@ -216,7 +251,7 @@ export function ImportClientPage({
         if (result.success) {
           toast({
             title: "Import Successful",
-            description: "Your data has been imported.",
+            description: "Your data has been processed.",
           });
         } else {
           toast({
@@ -355,6 +390,9 @@ export function ImportClientPage({
             ) : (
               <p>Drag & drop your file here, or click to select</p>
             )}
+            <p className="text-xs text-muted-foreground mt-2">
+              XLSX files only, max {MAX_FILE_SIZE_MB}MB.
+            </p>
           </div>
           {file && (
             <div className="mt-4 p-3 border rounded-md flex items-center justify-between">
