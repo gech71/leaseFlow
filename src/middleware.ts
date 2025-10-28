@@ -106,10 +106,11 @@ async function handleAuthenticatedSession(request: NextRequest): Promise<NextRes
 export async function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
   
-  // The CSP is now more targeted for Next.js, including 'unsafe-eval' for development.
+  const scriptSrc = `'self' 'nonce-${nonce}' 'strict-dynamic' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""}`;
+  
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""};
+    script-src ${scriptSrc};
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' data: blob: https://picsum.photos https://i.imgur.com;
     font-src 'self' https://fonts.gstatic.com;
@@ -126,17 +127,14 @@ export async function middleware(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
-  // Important: Set the CSP on the request headers so Next.js can read it.
   requestHeaders.set('Content-Security-Policy', cspHeader);
 
-  // Default response is to pass through with the new headers
   let response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
 
-  // Apply other security headers directly to the response
   response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'SAMEORIGIN');
@@ -146,19 +144,16 @@ export async function middleware(request: NextRequest) {
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   response.headers.set('Pragma', 'no-cache');
-  // And finally, apply the CSP to the response as well.
   response.headers.set('Content-Security-Policy', cspHeader);
-
 
   const { pathname } = request.nextUrl;
   
   const hasSessionToken = request.cookies.has(ADMIN_ACCESS_TOKEN_KEY);
 
-  // --- Public Unprotected Routes ---
   const publicPaths = [
     LOGIN_PATH, 
-    '/portal/connect', // NIB App entry point remains public
-    '/portal/billing'  // NIB App billing page remains public
+    '/portal/connect',
+    '/portal/billing'
   ];
   const publicApiPaths = [
     '/api/Auth/login', 
@@ -176,21 +171,14 @@ export async function middleware(request: NextRequest) {
                        publicApiPaths.some(path => pathname.startsWith(path));
 
   if (isPublicPath) {
-    // If user is already logged in and trying to access login page, redirect them to their dashboard
     if (pathname === LOGIN_PATH && hasSessionToken) {
-        // We can't know the role here without a DB call, so we redirect to a generic home
-        // which will then redirect to the correct dashboard.
         response = NextResponse.redirect(new URL('/', request.url));
     }
-    // For all other public paths, return the already configured response
     return response;
   }
 
-  // --- Protected Routes ---
-  // All other routes under /admin and /portal require an authenticated session
   if (pathname.startsWith('/admin') || pathname.startsWith('/portal')) {
     const authResponse = await handleAuthenticatedSession(request);
-    // Important: Copy headers from the middleware's initial response to the final auth response
     response.headers.forEach((value, key) => {
       if (!authResponse.headers.has(key)) {
         authResponse.headers.set(key, value);
@@ -199,10 +187,8 @@ export async function middleware(request: NextRequest) {
     return authResponse;
   }
   
-  // --- Root Path Redirect ---
   if (pathname === '/') {
     if (hasSessionToken) {
-      // Redirect to a safe default page. The client-side layout will then redirect to the correct dashboard if applicable.
       response = NextResponse.redirect(new URL(ADMIN_DEFAULT_PATH, request.url));
     } else {
       response = NextResponse.redirect(new URL(LOGIN_PATH, request.url));
@@ -213,16 +199,8 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-// Matcher to specify which routes the middleware should run on.
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - Any other static assets like .svg, .png, .jpg, .jpeg, .gif, .webp
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
