@@ -17,7 +17,7 @@ export default async function AgreementsListPage() {
 
   const agreementsData = await databaseService.getAllAgreements({
     where: whereClause,
-    include: { tenant: true, space: true }, // Removed bills include from here
+    include: { tenant: true, space: true },
     orderBy: { createdAt: 'desc' }
   });
 
