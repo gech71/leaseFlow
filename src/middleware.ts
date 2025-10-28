@@ -105,8 +105,6 @@ export async function middleware(request: NextRequest) {
   // --- Public Unprotected Routes ---
   const publicPaths = [
     LOGIN_PATH, 
-    '/forgot-password',
-    '/reset-password',
     '/portal/connect', // NIB App entry point remains public
     '/portal/billing'  // NIB App billing page remains public
   ];
