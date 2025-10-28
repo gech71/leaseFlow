@@ -46,7 +46,13 @@ async function handleAuthenticatedSession(request: NextRequest): Promise<NextRes
 
   if (!isExpired) {
     // Token is valid, proceed
-    return NextResponse.next();
+    const response = NextResponse.next();
+    // Re-apply headers for protected routes
+    const requestHeaders = new Headers(request.headers);
+    response.headers.forEach((value, key) => {
+      requestHeaders.set(key, value);
+    });
+    return response;
   }
   
   // --- Token is expired, try to refresh it ---
@@ -99,11 +105,13 @@ async function handleAuthenticatedSession(request: NextRequest): Promise<NextRes
 
 export async function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
+  
+  // The CSP is now more targeted for Next.js, including 'unsafe-eval' for development.
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""};
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' data: https://picsum.photos https://i.imgur.com;
+    img-src 'self' data: blob: https://picsum.photos https://i.imgur.com;
     font-src 'self' https://fonts.gstatic.com;
     object-src 'none';
     base-uri 'self';
@@ -111,18 +119,34 @@ export async function middleware(request: NextRequest) {
     frame-ancestors 'none';
     block-all-mixed-content;
     upgrade-insecure-requests;
+    connect-src 'self' https://generativelanguage.googleapis.com;
+    worker-src 'self' blob:;
+    frame-src 'self' blob:;
   `.replace(/\s{2,}/g, ' ').trim();
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Important: Set the CSP on the request headers so Next.js can read it.
   requestHeaders.set('Content-Security-Policy', cspHeader);
 
-  const response = NextResponse.next({
+  // Default response is to pass through with the new headers
+  let response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
 
+  // Apply other security headers directly to the response
+  response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  // And finally, apply the CSP to the response as well.
   response.headers.set('Content-Security-Policy', cspHeader);
 
 
@@ -156,8 +180,9 @@ export async function middleware(request: NextRequest) {
     if (pathname === LOGIN_PATH && hasSessionToken) {
         // We can't know the role here without a DB call, so we redirect to a generic home
         // which will then redirect to the correct dashboard.
-        return NextResponse.redirect(new URL('/', request.url));
+        response = NextResponse.redirect(new URL('/', request.url));
     }
+    // For all other public paths, return the already configured response
     return response;
   }
 
@@ -165,8 +190,12 @@ export async function middleware(request: NextRequest) {
   // All other routes under /admin and /portal require an authenticated session
   if (pathname.startsWith('/admin') || pathname.startsWith('/portal')) {
     const authResponse = await handleAuthenticatedSession(request);
-    // Re-apply CSP headers to the response from the auth handler
-    authResponse.headers.set('Content-Security-Policy', cspHeader);
+    // Important: Copy headers from the middleware's initial response to the final auth response
+    response.headers.forEach((value, key) => {
+      if (!authResponse.headers.has(key)) {
+        authResponse.headers.set(key, value);
+      }
+    });
     return authResponse;
   }
   
@@ -174,13 +203,11 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/') {
     if (hasSessionToken) {
       // Redirect to a safe default page. The client-side layout will then redirect to the correct dashboard if applicable.
-      const redirectResponse = NextResponse.redirect(new URL(ADMIN_DEFAULT_PATH, request.url));
-      redirectResponse.headers.set('Content-Security-Policy', cspHeader);
-      return redirectResponse;
+      response = NextResponse.redirect(new URL(ADMIN_DEFAULT_PATH, request.url));
+    } else {
+      response = NextResponse.redirect(new URL(LOGIN_PATH, request.url));
     }
-    const loginRedirectResponse = NextResponse.redirect(new URL(LOGIN_PATH, request.url));
-    loginRedirectResponse.headers.set('Content-Security-Policy', cspHeader);
-    return loginRedirectResponse;
+    return response;
   }
   
   return response;
