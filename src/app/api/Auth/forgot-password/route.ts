@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from "next/server";
 import { getUserAndPermissions } from "@/lib/actions/server-helpers";
 import { databaseService } from "@/lib/services/databaseService";
@@ -112,7 +113,9 @@ export async function POST(request: NextRequest) {
       const message = responseData.message;
       
     if (typeof message === "string" && message.trim()) {
-      return NextResponse.json({ isSuccess: true, token: message.trim() });
+      // Correctly trim quotes from the token
+      const cleanToken = message.trim().replace(/^"|"$/g, '');
+      return NextResponse.json({ isSuccess: true, token: cleanToken });
     }
     return NextResponse.json(
       {
