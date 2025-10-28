@@ -53,7 +53,7 @@ export default function AdminForgotPasswordPage() {
         toast({
             title: "Redirecting to reset password...",
         });
-        router.push(`/reset-password?phone=${values.phoneNumber}&token=${data.token}`);
+        router.push(`/admin/settings/reset-password?phone=${values.phoneNumber}&token=${data.token}`);
       } else {
         toast({ title: "Request Failed", description: data.errors?.join(', ') || "Failed to initiate password reset.", variant: "destructive" });
       }
