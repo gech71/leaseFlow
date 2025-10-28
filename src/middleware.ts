@@ -98,6 +98,34 @@ async function handleAuthenticatedSession(request: NextRequest): Promise<NextRes
 }
 
 export async function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' data: https://picsum.photos https://i.imgur.com;
+    font-src 'self' https://fonts.gstatic.com;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    block-all-mixed-content;
+    upgrade-insecure-requests;
+  `.replace(/\s{2,}/g, ' ').trim();
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', cspHeader);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+
+  response.headers.set('Content-Security-Policy', cspHeader);
+
+
   const { pathname } = request.nextUrl;
   
   const hasSessionToken = request.cookies.has(ADMIN_ACCESS_TOKEN_KEY);
@@ -130,25 +158,32 @@ export async function middleware(request: NextRequest) {
         // which will then redirect to the correct dashboard.
         return NextResponse.redirect(new URL('/', request.url));
     }
-    return NextResponse.next();
+    return response;
   }
 
   // --- Protected Routes ---
   // All other routes under /admin and /portal require an authenticated session
   if (pathname.startsWith('/admin') || pathname.startsWith('/portal')) {
-    return handleAuthenticatedSession(request);
+    const authResponse = await handleAuthenticatedSession(request);
+    // Re-apply CSP headers to the response from the auth handler
+    authResponse.headers.set('Content-Security-Policy', cspHeader);
+    return authResponse;
   }
   
   // --- Root Path Redirect ---
   if (pathname === '/') {
     if (hasSessionToken) {
       // Redirect to a safe default page. The client-side layout will then redirect to the correct dashboard if applicable.
-      return NextResponse.redirect(new URL(ADMIN_DEFAULT_PATH, request.url));
+      const redirectResponse = NextResponse.redirect(new URL(ADMIN_DEFAULT_PATH, request.url));
+      redirectResponse.headers.set('Content-Security-Policy', cspHeader);
+      return redirectResponse;
     }
-    return NextResponse.redirect(new URL(LOGIN_PATH, request.url));
+    const loginRedirectResponse = NextResponse.redirect(new URL(LOGIN_PATH, request.url));
+    loginRedirectResponse.headers.set('Content-Security-Policy', cspHeader);
+    return loginRedirectResponse;
   }
   
-  return NextResponse.next();
+  return response;
 }
 
 // Matcher to specify which routes the middleware should run on.
@@ -159,7 +194,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - Any other static assets like .svg, .png, .jpg, .jpeg, .gif, .webp)$).*)',
+     * - Any other static assets like .svg, .png, .jpg, .jpeg, .gif, .webp
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
