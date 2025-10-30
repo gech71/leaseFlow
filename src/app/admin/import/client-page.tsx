@@ -33,7 +33,7 @@ import {
   FileText,
   EyeOff,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { processImportAction } from "./actions";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePermissions } from "@/contexts/PermissionContext";
