@@ -111,16 +111,16 @@ export async function middleware(request: NextRequest) {
   const cspHeader = `
     default-src 'self';
     script-src ${scriptSrc};
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tiny.cloud;
     img-src 'self' data: blob: https://picsum.photos https://i.imgur.com;
-    font-src 'self' https://fonts.gstatic.com;
+    font-src 'self' https://fonts.gstatic.com https://cdn.tiny.cloud;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
     frame-ancestors 'none';
     block-all-mixed-content;
     upgrade-insecure-requests;
-    connect-src 'self' https://generativelanguage.googleapis.com;
+    connect-src 'self' https://generativelanguage.googleapis.com https://cdn.tiny.cloud;
     worker-src 'self' blob:;
     frame-src 'self' blob:;
   `.replace(/\s{2,}/g, ' ').trim();

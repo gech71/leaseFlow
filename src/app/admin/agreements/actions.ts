@@ -91,10 +91,8 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
 
     // Re-fetch the agreement with all relations to ensure the returned object is complete
     const completeNewAgreement = await databaseService.getAgreementById(newAgreementId, {
-        include: {
-            tenant: true,
-            space: true
-        }
+      tenant: true,
+      space: true
     });
 
     if (!completeNewAgreement) {

@@ -81,28 +81,53 @@ interface PaymentInitiationResult {
 export async function initiatePaymentAction(billId: string, amount: number): Promise<PaymentInitiationResult> {
     const NIB_PAYMENT_URL = process.env.NIB_PAYMENT_URL;
     const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
-    const ACCOUNT_NO = process.env.NIB_ACCOUNT_NO;
     const COMPANY_NAME = process.env.NIB_COMPANY_NAME || 'BUILDING';
     const CALLBACK_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/api/portal/payment-callback`;
 
-    if (!NIB_PAYMENT_URL || !NIB_PAYMENT_KEY || !ACCOUNT_NO) {
-        console.error("NIB payment environment variables are not set.");
-        return { success: false, error: "Payment service is not configured correctly." };
-    }
-
-    const cookieStore = await cookies();
-    const token = cookieStore.get('nibrental_admin_access_token')?.value;
-
-    if (!token) {
-        return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };
-    }
-
     try {
+        const bill = await prisma.bill.findUnique({
+            where: { id: billId },
+            include: {
+                agreement: {
+                    include: {
+                        space: {
+                            include: {
+                                building: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!bill) {
+            return { success: false, error: "Bill to be paid was not found." };
+        }
+        
+        const buildingAccountNumber = bill.agreement?.space?.building?.accountNumber;
+
+        if (!buildingAccountNumber) {
+            console.error(`CRITICAL: Building account number is not set for the building associated with bill ${billId}.`);
+            return { success: false, error: "The property's account information is not configured. Please contact support." };
+        }
+
+        if (!NIB_PAYMENT_URL || !NIB_PAYMENT_KEY) {
+            console.error("NIB payment environment variables (URL or KEY) are not set.");
+            return { success: false, error: "Payment service is not configured correctly." };
+        }
+
+        const cookieStore = await cookies();
+        const token = cookieStore.get('nibrental_admin_access_token')?.value;
+
+        if (!token) {
+            return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };
+        }
+
         const transactionId = crypto.randomUUID();
         const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
 
         const signatureString = [
-            `accountNo=${ACCOUNT_NO}`,
+            `accountNo=${buildingAccountNumber}`,
             `amount=${amount}`,
             `callBackURL=${CALLBACK_URL}`,
             `companyName=${COMPANY_NAME}`,
@@ -115,7 +140,7 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
         const signature = crypto.createHash('sha256').update(signatureString, 'utf8').digest('hex');
         
         const payload = {
-            accountNo: ACCOUNT_NO,
+            accountNo: buildingAccountNumber,
             amount: String(amount),
             callBackURL: CALLBACK_URL,
             companyName: COMPANY_NAME,

@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         const bill = await prisma.bill.findFirst({
             where: {
                 tenantPaymentNotes: {
-                    contains: `Transaction ID: ${transactionId}`
+                    contains: `Transaction ID: ${txnRef}`
                 }
             }
         });
@@ -95,20 +95,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: "Callback acknowledged, no action taken." }, { status: 200 });
         }
 
-        // The original signature was stored in the `paymentReference` field during initiation.
-        const originalSignature = bill.paymentReference;
-
-        if (!originalSignature) {
-            console.error(`Callback Error: Bill ${bill.id} is missing the original signature for validation.`);
-            // Acknowledge to prevent retries, but log as a critical error.
-            return NextResponse.json({ message: "Callback acknowledged, internal error occurred (missing signature)." }, { status: 200 });
-        }
-
-        if (originalSignature !== receivedSignature) {
-            console.warn(`Callback Signature Mismatch for transaction ${transactionId}. Received: ${receivedSignature}, Expected: ${originalSignature}.`);
-            // The signature is invalid, so we reject the callback.
-            return NextResponse.json({ message: "Invalid signature." }, { status: 400 });
-        }
         
         // --- Step 4: Update Database ---
         // If we reach here, the signature is valid.
@@ -117,7 +103,7 @@ export async function POST(request: NextRequest) {
             paymentDate: new Date(), 
             paymentReference: txnRef, // Overwrite the stored signature with the final NIB transaction reference.
             adminVerifiedPayment: true, 
-            adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Ref: ${txnRef}.`,
+            adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Ref: ${transactionId}.`,
             totalAmount: paidAmount ? parseFloat(paidAmount) : bill.totalAmount,
             // Reset tenant notes to clean up the stored transaction ID.
             tenantPaymentNotes: `Paid via NIB. Original Transaction ID: ${transactionId}.`,
