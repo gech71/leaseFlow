@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -24,7 +25,10 @@ import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 
 // Client-side representation types, ensuring dates are strings (ISO format)
-export interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id'> { id?: string; } 
+export interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id' | 'feeValue'> { 
+  id?: string;
+  feeValue: number;
+} 
 
 export interface ClientBuilding extends Omit<BuildingPrismaTypeOriginal, 'createdAt' | 'updatedAt' | 'penaltyPolicyTiers'> {
   createdAt: string;
@@ -32,18 +36,24 @@ export interface ClientBuilding extends Omit<BuildingPrismaTypeOriginal, 'create
   penaltyPolicyTiers: ClientPenaltyTier[];
 }
 
-export interface ClientSpaceForAgreement extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant'> {
+export interface ClientSpaceForAgreement extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice' > {
   createdAt: string;
   updatedAt: string;
   building: ClientBuilding;
   tenantId?: string | null;
   buildingId: string;
+  area: number;
+  utilityProrationShare: number;
+  monthlyRentalPrice: number;
 }
-export interface ClientSpaceForPotentialRevenue extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'buildingId' | 'tenantId' | 'agreements' | 'tenant' | 'building' > {
+export interface ClientSpaceForPotentialRevenue extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'buildingId' | 'tenantId' | 'agreements' | 'tenant' | 'building' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
   createdAt: string;
   updatedAt: string;
   buildingId: string;
   tenantId?: string | null;
+  area: number;
+  utilityProrationShare: number;
+  monthlyRentalPrice: number;
 }
 
 
@@ -53,7 +63,7 @@ export interface ClientTenant extends Omit<TenantPrismaOriginal, 'createdAt' | '
   rentedSpaceId?: string | null;
 }
 
-export interface ClientAgreementForBill extends Omit<AgreementPrismaOriginal, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space'| 'bills' | 'tenantId' | 'spaceId'> {
+export interface ClientAgreementForBill extends Omit<AgreementPrismaOriginal, 'createdAt' | 'updatedAt' | 'startDate' | 'nextPaymentDueDate' | 'initialPaymentDate' | 'endDate' | 'tenant' | 'space'| 'bills' | 'tenantId' | 'spaceId' | 'monthlyRentalPrice' | 'initialPaymentAmount'> {
   createdAt: string;
   updatedAt: string;
   startDate: string;
@@ -64,11 +74,13 @@ export interface ClientAgreementForBill extends Omit<AgreementPrismaOriginal, 'c
   space: ClientSpaceForAgreement;
   tenantId: string;
   spaceId: string;
+  monthlyRentalPrice: number;
+  initialPaymentAmount: number | null;
 }
 
 export interface ClientUtilityBreakdownItem extends Omit<UtilityBreakdownItemPrismaOriginal, 'id' | 'billId'> { id?: string; billId?: string;}
 
-export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId'> {
+export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId' | 'rentAmount' | 'penaltyAmount' | 'totalAmount'> {
   createdAt: string;
   updatedAt: string;
   billDate: string;
@@ -78,7 +90,10 @@ export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'upda
   utilityBreakdown: ClientUtilityBreakdownItem[];
   tenantId: string;
   agreementId: string;
-  status: BillPrismaOriginal['status']; 
+  status: BillPrismaOriginal['status'];
+  rentAmount: number;
+  penaltyAmount: number | null;
+  totalAmount: number;
 }
 
 
@@ -162,9 +177,9 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
     let calculatedPenalty = 0;
     for (const tier of sortedTiers) {
       if (daysOverdue >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || daysOverdue <= tier.toDay)) {
-        if (tier.feeType === 'Fixed') {
+        if (tier.penaltyType === 'Fixed') {
           calculatedPenalty = tier.feeValue;
-        } else if (tier.feeType === 'Percentage') {
+        } else if (tier.penaltyType === 'Percentage') {
           calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
         }
         break; 
@@ -184,13 +199,13 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                       ? calculatePenalty(bill, currentStatus) 
                       : (bill.penaltyAmount || 0);
 
-      const baseAmount = bill.rentAmount + bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0);
+      const baseAmount = bill.rentAmount + (bill.utilityBreakdown || []).reduce((sum, util) => sum + util.amount, 0);
       const newTotalAmount = baseAmount + penalty;
 
       return {
         ...bill,
         status: currentStatus,
-        penaltyAmount: penalty > 0 ? penalty : undefined, 
+        penaltyAmount: penalty > 0 ? penalty : null, 
         totalAmount: parseFloat(newTotalAmount.toFixed(2)),
         tenantName: bill.agreement?.tenant?.name || 'N/A',
         spaceDescription: bill.agreement?.space ? `${bill.agreement.space.spaceIdName}, ${bill.agreement.space.building?.name || 'N/A'}` : 'N/A'
@@ -224,7 +239,8 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
 
   const totalUpcomingAmount = useMemo(() => upcomingAndPendingBills.reduce((sum, bill) => sum + bill.totalAmount, 0), [upcomingAndPendingBills]);
   const totalPaidSelectedPeriod = useMemo(() => paidBillsInSelectedPeriod.reduce((sum, bill) => sum + bill.totalAmount, 0), [paidBillsInSelectedPeriod]);
-  const totalPotentialRevenue = useMemo(() => initialSpaces.reduce((sum, space) => sum + space.monthlyRentalPrice, 0), [initialSpaces]);
+  const totalPotentialRevenue = useMemo(() => initialSpaces.reduce((sum, space) => sum + (space.monthlyRentalPrice || 0), 0), [initialSpaces]);
+
 
   const yearsForFilter = useMemo(() => Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i), []);
   const monthsForFilter = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
@@ -261,7 +277,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       'Bill Date': format(parseISO(bill.billDate), 'PP'),
       'Due Date': format(parseISO(bill.dueDate), 'PP'),
       'Rent Amount': bill.rentAmount,
-      'Utilities Amount': bill.utilityBreakdown.reduce((sum, util) => sum + util.amount, 0),
+      'Utilities Amount': (bill.utilityBreakdown || []).reduce((sum, util) => sum + util.amount, 0),
       'Penalty Amount': bill.penaltyAmount || 0,
       'Total Amount': bill.totalAmount,
       'Status': bill.status,
