@@ -367,7 +367,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                         <TableHead>Tenant</TableHead>
                         <TableHead className="hidden md:table-cell">Space</TableHead>
                         <TableHead>Due Date</TableHead>
-                        <TableHead className="hidden xl:table-cell text-right">Penalty</TableHead>
+                        <TableHead className="text-right">Penalty</TableHead>
                         <TableHead className="text-right">Amount Due</TableHead>
                         <TableHead className="text-center">Status</TableHead>
                       </TableRow>
@@ -380,7 +380,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                           <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
                             {format(parseISO(bill.dueDate), 'PP')}
                           </TableCell>
-                          <TableCell className="hidden xl:table-cell text-xs text-destructive text-right whitespace-nowrap">
+                          <TableCell className="text-xs text-destructive text-right whitespace-nowrap">
                             {bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : ''}
                           </TableCell>
                           <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
