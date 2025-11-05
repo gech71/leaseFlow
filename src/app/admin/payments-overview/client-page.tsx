@@ -182,6 +182,11 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
         } else if (tier.penaltyType === 'Percentage') {
           calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
         }
+        
+        if (tier.frequency === 'Daily') {
+          calculatedPenalty *= daysOverdue;
+        }
+        
         break; 
       }
     }
@@ -381,7 +386,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                     <TableHeader>
                       <TableRow>
                         <TableHead>Tenant</TableHead>
-                        <TableHead className="hidden md:table-cell">Space</TableHead>
+                        <TableHead>Space</TableHead>
                         <TableHead>Due Date</TableHead>
                         <TableHead className="text-right">Penalty</TableHead>
                         <TableHead className="text-right">Amount Due</TableHead>
@@ -392,7 +397,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                       {paginatedUpcomingBills.map(bill => (
                         <TableRow key={bill.id}>
                           <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
-                          <TableCell className="hidden md:table-cell text-xs">{bill.spaceDescription}</TableCell>
+                          <TableCell className="text-xs">{bill.spaceDescription}</TableCell>
                           <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
                             {format(parseISO(bill.dueDate), 'PP')}
                           </TableCell>

@@ -1,12 +1,10 @@
 
-export const dynamic = 'force-dynamic';
 
-// REMOVED "use client"; - This is now a Server Component module
+export const dynamic = 'force-dynamic';
 
 import React, { Suspense } from 'react'; // React is needed for Suspense
 import { Loader2 } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Space as SpacePrisma, Bill as BillPrisma, Agreement as AgreementPrisma, Tenant as TenantPrisma, Building as BuildingPrismaType, UtilityBreakdownItem as UtilityBreakdownItemPrisma } from '@prisma/client';
-import { format, parseISO } from 'date-fns'; // parseISO might be needed in serialization if dates are strings already
 import { getPaymentsOverviewDataAction, type PaymentsOverviewData, type PaymentsOverviewBill } from './actions';
 import { PaymentsOverviewClientPage, type ClientBill, type ClientSpaceForPotentialRevenue, type ClientPenaltyTier, type ClientBuilding, type ClientSpaceForAgreement, type ClientTenant, type ClientAgreementForBill, type ClientUtilityBreakdownItem } from './client-page'; // Import client page and its types
 

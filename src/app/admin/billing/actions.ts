@@ -264,33 +264,39 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
 }
 
 function calculateIndividualPenalty(
-  billAmount: number, 
+  billAmount: number,
   daysOverdue: number,
-  building: BuildingPrismaOriginal & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[]; spaces: SpacePrismaOriginal[] },
+  building: BuildingPrismaOriginal & { penaltyPolicyTiers: Prisma.PenaltyTierGetPayload<{}>[] },
   space: SpacePrismaOriginal
 ): number {
   if (daysOverdue <= 0 || !building.penaltyPolicyTiers || building.penaltyPolicyTiers.length === 0) {
     return 0;
   }
 
-  let applicableTiers: Prisma.PenaltyTierGetPayload<{}>[] = [];
-  const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
+  const allTiers = building.penaltyPolicyTiers;
+  
+  // Prioritize rules: Specific Space > Floor > Building
+  const spaceSpecificTiers = allTiers.filter(
     t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
   );
+
+  const floorSpecificTiers = allTiers.filter(
+    t => t.scope === 'Floor' && t.applicableFloor === space.floor
+  );
+  
+  const buildingWideTiers = allTiers.filter(t => t.scope === 'Building');
+
+  let applicableTiers: Prisma.PenaltyTierGetPayload<{}>[] = [];
   if (spaceSpecificTiers.length > 0) {
     applicableTiers = spaceSpecificTiers;
+  } else if (floorSpecificTiers.length > 0) {
+    applicableTiers = floorSpecificTiers;
   } else {
-    const floorSpecificTiers = building.penaltyPolicyTiers.filter(
-      t => t.scope === 'Floor' && t.applicableFloor === space.floor
-    );
-    if (floorSpecificTiers.length > 0) {
-      applicableTiers = floorSpecificTiers;
-    } else {
-      applicableTiers = building.penaltyPolicyTiers.filter(t => t.scope === 'Building');
-    }
+    applicableTiers = buildingWideTiers;
   }
 
   if (applicableTiers.length === 0) return 0;
+
   const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
   let calculatedPenalty = 0;
 
@@ -298,6 +304,7 @@ function calculateIndividualPenalty(
     if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
       let fee = 0;
       const feeValue = Number(tier.feeValue);
+      
       if (tier.penaltyType === 'Fixed') {
         fee = feeValue;
       } else if (tier.penaltyType === 'Percentage') {
@@ -306,12 +313,13 @@ function calculateIndividualPenalty(
       
       if (tier.frequency === 'Daily') {
         calculatedPenalty = fee * daysOverdue;
-      } else { // OneTime
+      } else { // 'OneTime'
         calculatedPenalty = fee;
       }
       break; 
     }
   }
+  
   return parseFloat(calculatedPenalty.toFixed(2));
 }
 
@@ -685,5 +693,6 @@ export async function updateBillAdminDetailsAction(
   }
 }
     
+
 
 
