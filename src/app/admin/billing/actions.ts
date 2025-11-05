@@ -103,7 +103,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
 
   // Serialization logic moved here
   const serializedAgreements = agreementsData.map(ag => ({
-    ...(ag as AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } } }),
+    ...(ag as AgreementPrismaOriginal & { tenant: TenantPrismaOriginal | null; space: (SpacePrismaOriginal & { building: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }) | null }) | null }),
     monthlyRentalPrice: Number(ag.monthlyRentalPrice),
     initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
     createdAt: ag.createdAt ? ag.createdAt.toISOString() : EPOCH_ISO_STRING,
@@ -118,7 +118,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
       updatedAt: ag.tenant.updatedAt ? ag.tenant.updatedAt.toISOString() : (ag.tenant.createdAt ? ag.tenant.createdAt.toISOString() : EPOCH_ISO_STRING)
     } : null,
     space: ag.space ? {
-        ...(ag.space as SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } }),
+        ...(ag.space as SpacePrismaOriginal & { building: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }) | null }),
         area: Number(ag.space.area),
         utilityProrationShare: Number(ag.space.utilityProrationShare),
         monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
@@ -143,7 +143,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
   })) as SerializedBillingPageData['agreements']; // Cast to ensure type match
 
   const serializedSpaces = spacesData.map(s => ({
-    ...(s as SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } }),
+    ...(s as SpacePrismaOriginal & { building: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }) | null }),
     area: Number(s.area),
     utilityProrationShare: Number(s.utilityProrationShare),
     monthlyRentalPrice: Number(s.monthlyRentalPrice),
@@ -167,6 +167,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
 
   const serializedBuildings = buildingsData.map(b => ({
     ...(b as BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }),
+    status: b.status || 'Active',
     createdAt: b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING,
     updatedAt: b.updatedAt ? b.updatedAt.toISOString() : (b.createdAt ? b.createdAt.toISOString() : EPOCH_ISO_STRING),
     penaltyPolicyTiers: (b.penaltyPolicyTiers || []).map(pt => ({...pt, feeValue: Number(pt.feeValue)})),
@@ -210,7 +211,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
     
     const billCreatedAt = billRaw.createdAt ? billRaw.createdAt.toISOString() : EPOCH_ISO_STRING;
     const billUpdatedAt = billRaw.updatedAt ? billRaw.updatedAt.toISOString() : billCreatedAt;
-    const agreementForBill = billRaw.agreement as (AgreementPrismaOriginal & { tenant: TenantPrismaOriginal; space: SpacePrismaOriginal & { building: BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] } } });
+    const agreementForBill = billRaw.agreement as (AgreementPrismaOriginal & { tenant: TenantPrismaOriginal | null; space: (SpacePrismaOriginal & { building: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }) | null }) | null });
 
     return {
       ...(billRaw as BillPrismaOriginal),
@@ -247,6 +248,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
               updatedAt: agreementForBill.space.updatedAt ? agreementForBill.space.updatedAt.toISOString() : (agreementForBill.space.createdAt ? agreementForBill.space.createdAt.toISOString() : EPOCH_ISO_STRING),
               building: agreementForBill.space.building ? {
                     ...(agreementForBill.space.building),
+                    status: agreementForBill.space.building.status || 'Active',
                     createdAt: agreementForBill.space.building.createdAt ? agreementForBill.space.building.createdAt.toISOString() : EPOCH_ISO_STRING,
                     updatedAt: agreementForBill.space.building.updatedAt ? agreementForBill.space.building.updatedAt.toISOString() : (agreementForBill.space.building.createdAt ? agreementForBill.space.building.createdAt.toISOString() : EPOCH_ISO_STRING),
                     penaltyPolicyTiers: (agreementForBill.space.building.penaltyPolicyTiers || []).map(pt => ({...pt, feeValue: Number(pt.feeValue)})),
@@ -382,7 +384,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     });
 
     if (existingBill.length > 0) {
-        return { success: false, error: `A bill for ${format(targetBillDate, 'PP')} for ${agreement.tenant.name} already exists (Status: ${existingBill[0].status}).`};
+        return { success: false, error: `A bill for ${format(targetBillDate, 'PP')} for ${agreement.tenant?.name || 'this tenant'} already exists (Status: ${existingBill[0].status}).`};
     }
 
     // --- Corrected Rent Calculation Logic ---
@@ -554,12 +556,14 @@ export async function recordPaymentOrVerificationAction(
 
     const today = startOfDay(new Date());
     let newStatus: Prisma.BillStatus = bill.status;
-    let finalPaymentDate = paymentData.paymentDate ? parseISO(paymentData.paymentDate) : new Date();
+    const finalPaymentDate = paymentData.paymentDate ? parseISO(paymentData.paymentDate) : new Date();
 
     let currentPenalty = bill.penaltyAmount ? Number(bill.penaltyAmount) : 0;
+    
     if ( (isBefore(parseISO(bill.dueDate.toISOString()), finalPaymentDate) || bill.status === 'Overdue') && actionType !== 'rejectVerification') {
         const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString()));
         if (daysOverdue > 0) {
+             // Recalculate penalty on payment date
              currentPenalty = calculateIndividualPenalty(Number(bill.rentAmount), daysOverdue, bill.agreement.space.building, bill.agreement.space);
         } else { 
             currentPenalty = 0;
@@ -711,6 +715,7 @@ export async function updateBillAdminDetailsAction(
   }
 }
     
+
 
 
 
