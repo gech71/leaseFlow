@@ -186,6 +186,12 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       setIsSaving(false);
       return;
     }
+
+    if (!currentBuildingForm.address?.trim()) {
+      toast({ title: "Validation Error", description: "Address is required.", variant: "destructive" });
+      setIsSaving(false);
+      return;
+    }
     
     const accountNumber = currentBuildingForm.accountNumber?.trim();
     if (!accountNumber) {
@@ -251,7 +257,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       }
       const buildingCreateInput: Prisma.BuildingCreateInput = {
         name: currentBuildingForm.name!.trim(),
-        address: currentBuildingForm.address?.trim() || undefined,
+        address: currentBuildingForm.address!.trim(),
         accountNumber: currentBuildingForm.accountNumber!.trim(),
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
@@ -264,7 +270,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
     } else {
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: currentBuildingForm.name!.trim(),
-        address: currentBuildingForm.address?.trim() || undefined,
+        address: currentBuildingForm.address!.trim(),
         accountNumber: currentBuildingForm.accountNumber!.trim(),
         penaltyPolicyTiers: {
           deleteMany: {}, 
@@ -346,7 +352,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                 </div>
                 <div>
                   <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
-                    Address (Optional)
+                    Address<span className="text-destructive ml-1">*</span>
                   </Label>
                   <Textarea
                     id="buildingAddressMain"
@@ -355,6 +361,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                     placeholder="Building Address"
                     rows={2}
                     className="mt-1"
+                    required
                     disabled={isSaving || !canManageThisForm}
                   />
                 </div>
