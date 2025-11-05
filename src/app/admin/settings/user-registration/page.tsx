@@ -17,7 +17,7 @@ import { usePermissions } from '@/contexts/PermissionContext';
 
 const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
-  lastName: z.string().min(1, { message: "Last name is required." }),
+  lastName: z.string().min(1, { message: "Middle name is required." }),
   phoneNumber: z.string().min(1, { message: "Phone number is required." })
                  .regex(/^(09|07)\d{8}$/, { message: "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678)."}),
   email: z.string().email({ message: "Invalid email address." }),
@@ -137,7 +137,7 @@ export default function UserRegistrationPage() {
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem> <FormLabel>First Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="First Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Last Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Middle Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Middle Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
             </div>
             <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="Email Address" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="Phone Number" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
