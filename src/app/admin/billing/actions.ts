@@ -318,8 +318,7 @@ function calculateIndividualPenalty(
   if (applicableTiers.length === 0) return 0;
 
   const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
-  let calculatedPenalty = 0;
-
+  
   for (const tier of sortedTiers) {
     if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
       let fee = 0;
@@ -332,15 +331,14 @@ function calculateIndividualPenalty(
       }
       
       if (tier.frequency === 'Daily') {
-        calculatedPenalty = fee * daysOverdue;
+        return parseFloat((fee * daysOverdue).toFixed(2));
       } else { // 'OneTime'
-        calculatedPenalty = fee;
+        return parseFloat(fee.toFixed(2));
       }
-      break; 
     }
   }
   
-  return parseFloat(calculatedPenalty.toFixed(2));
+  return 0;
 }
 
 
@@ -715,6 +713,7 @@ export async function updateBillAdminDetailsAction(
   }
 }
     
+
 
 
 
