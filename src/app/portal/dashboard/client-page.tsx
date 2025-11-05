@@ -154,27 +154,10 @@ export function CustomerDashboardClientPage({
   });
 
   const handlePayNow = async (bill: ClientBill) => {
-    setPayingBillId(bill.id);
-    const result = await initiateArifpayPaymentAction(
-      bill.id,
-      bill.calculatedTotal,
-      bill.billDate,
-    );
-    setPayingBillId(null);
-
-    if (result.success && result.paymentUrl) {
-      toast({
-        title: "Redirecting to Payment...",
-        description: "You will be redirected to complete your payment.",
-      });
-      window.location.href = result.paymentUrl;
-    } else {
-      toast({
-        title: "Payment Initiation Failed",
-        description: result.error || "An unknown error occurred.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Action Required",
+      description: "Please use your NIB SuperApp to complete the payment.",
+    });
   };
 
   const handleContactFormSubmit = async (values: ContactFormValues) => {
