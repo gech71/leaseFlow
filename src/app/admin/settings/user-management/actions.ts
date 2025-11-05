@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -19,7 +20,7 @@ export async function getUserManagementPageData() {
     let userWhereClause: Prisma.UserWhereInput = {};
 
     // For non-super-admins, we first find the tenants they created,
-    // then get the associated user IDs.
+    // then get the associated user IDs. This enforces data isolation.
     if (!isSuperAdmin) {
         const createdTenants = await prisma.tenant.findMany({
             where: { createdById: currentUser.id },
@@ -29,6 +30,7 @@ export async function getUserManagementPageData() {
         // Filter out any null/undefined userIds and create a list of unique IDs
         const createdTenantUserIds = [...new Set(createdTenants.map(t => t.userId).filter(Boolean) as string[])];
 
+        // The user must be one of those they created via the tenant screen.
         userWhereClause = {
             id: { in: createdTenantUserIds }
         };

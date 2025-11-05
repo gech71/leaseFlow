@@ -14,13 +14,9 @@ import { prisma } from '@/lib/prisma';
 export default async function TenantsPage() {
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
   
+  // Non-super-admins can ONLY see tenants they have created.
   const tenantWhere: Prisma.TenantWhereInput = !isSuperAdmin
-    ? {
-        OR: [
-          { createdById: currentUser.id },
-          { agreements: { some: { space: { buildingId: { in: managedBuildingIds! } } } } }
-        ]
-      }
+    ? { createdById: currentUser.id }
     : {};
   
   const agreementsInclude = {
