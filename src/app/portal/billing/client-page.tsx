@@ -81,7 +81,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
       
       
       if (result.success && result.data?.token) {
-          toast({ title: "Action Required", description: "Please complete the payment in the NIB app." });
+          toast({ title: "Action Required", description: "Please use your NIB SuperApp to complete the payment." });
           if (typeof window !== 'undefined' && window.myJsChannel?.postMessage) {
             window.myJsChannel.postMessage({ token: result.data.token });
             startPolling(billingInfo.billId);
