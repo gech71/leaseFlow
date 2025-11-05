@@ -13,7 +13,7 @@ import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
 export async function getBillingPageDataAction(): Promise<SerializedBillingPageData> {
-  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+  const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
   if (!isSuperAdmin && managedBuildingIds?.length === 0) {
       // Return empty data if user manages no buildings
@@ -21,10 +21,24 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
   }
 
   // Define where clauses
-  const agreementWhere: Prisma.AgreementWhereInput = !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {};
+  const agreementWhere: Prisma.AgreementWhereInput = {
+    ...(!isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {}),
+    disabledAgreements: {
+        none: { disabledById: currentUser.id }
+    }
+  };
+
   const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
   const buildingWhere: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds! } } : {};
-  const billWhere: Prisma.BillWhereInput = !isSuperAdmin ? { agreement: { space: { buildingId: { in: managedBuildingIds! } } } } : {};
+  
+  const billWhere: Prisma.BillWhereInput = {
+    ...(!isSuperAdmin ? { agreement: { space: { buildingId: { in: managedBuildingIds! } } } } : {}),
+    agreement: {
+        disabledAgreements: {
+            none: { disabledById: currentUser.id }
+        }
+    }
+  };
   
   const today = new Date();
   const currentMonth = getMonth(today);
@@ -52,7 +66,8 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
           include: {
             building: { include: { penaltyPolicyTiers: true, spaces: true } } 
           }
-        }
+        },
+        disabledAgreements: true
       },
       orderBy: { tenant: { name: 'asc' } }
     }),
@@ -73,7 +88,8 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
               include: {
                 building: { include: { penaltyPolicyTiers: true, spaces: true } } 
               }
-            }
+            },
+            disabledAgreements: true
           }
         }
       },
@@ -123,6 +139,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
             }))
         } : null
     } : null,
+    disabledAgreements: (ag.disabledAgreements || []).map(da => ({disabledById: da.disabledById}))
   })) as SerializedBillingPageData['agreements']; // Cast to ensure type match
 
   const serializedSpaces = spacesData.map(s => ({
@@ -243,6 +260,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
                   }))
               } : null
           } : null,
+          disabledAgreements: (agreementForBill as any).disabledAgreements?.map((da: any) => ({disabledById: da.disabledById})) || []
       } : null,
     };
   }) as SerializedBillingPageData['bills'];
@@ -693,6 +711,7 @@ export async function updateBillAdminDetailsAction(
   }
 }
     
+
 
 
 

@@ -24,7 +24,8 @@ export default async function TenantsPage() {
     : {};
   
   const agreementsInclude = {
-    where: !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : undefined,
+    // No where clause here because we need all agreements to determine status,
+    // but we will filter them on the client based on managed buildings.
     include: {
       space: true,
       disabledAgreements: {
@@ -53,6 +54,7 @@ export default async function TenantsPage() {
     where: agreementWhere,
     include: {
         space: true,
+        disabledAgreements: true
     }
   });
 
@@ -127,6 +129,7 @@ export default async function TenantsPage() {
         createdAt: ag.space.createdAt?.toISOString() || fallbackDate,
         updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt?.toISOString() || fallbackDate
       } : null,
+      disabledAgreements: (ag as any).disabledAgreements || []
   }));
 
 
