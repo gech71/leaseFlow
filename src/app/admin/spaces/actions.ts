@@ -20,6 +20,9 @@ export async function createSpaceAction(data: Prisma.SpaceCreateInput) {
     return { success: true, space: serializableSpace };
   } catch (error: any) {
     console.error("Error creating space:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { success: false, error: "A space with this ID/Name already exists in the selected building. Please use a unique name." };
+    }
     return { success: false, error: error.message || "Failed to create space." };
   }
 }
@@ -38,9 +41,12 @@ export async function updateSpaceAction(id: string, data: Prisma.SpaceUpdateInpu
     return { success: true, space: serializableSpace };
   } catch (error: any) {
     console.error("Error updating space:", error);
-     if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2025') { 
         return { success: false, error: "Failed to update space. Record not found." };
+      }
+      if (error.code === 'P2002') {
+        return { success: false, error: "A space with this ID/Name already exists in the selected building. Please use a unique name." };
       }
     }
     return { success: false, error: error.message || "Failed to update space." };

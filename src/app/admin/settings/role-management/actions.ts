@@ -46,11 +46,6 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
         return { success: false, error: "You do not have permission to create roles." };
     }
 
-    const existingRole = await databaseService.getRoleByNameAndCreator(data.name, currentUser.id);
-    if (existingRole) {
-        return { success: false, error: `You have already created a role named "${data.name}".`};
-    }
-    
     const roleCreateInput: Prisma.RoleCreateInput = {
       ...data,
       createdBy: { connect: { id: currentUser.id } }
@@ -63,7 +58,7 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
   } catch (error: any) {
     console.error("Error creating role:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return { success: false, error: `A role with the name "${data.name}" might already exist system-wide.` };
+      return { success: false, error: `A role with the name "${data.name}" already exists. Please use a unique name.` };
     }
     return { success: false, error: error.message || "Failed to create role." };
   }
@@ -76,13 +71,6 @@ export async function updateRoleAction(id: string, data: RoleUpsertData): Promis
         return { success: false, error: "You do not have permission to update roles." };
     }
 
-    // Check if new name conflicts with another existing role BY THE SAME USER
-    if (data.name) {
-        const roleWithNewName = await databaseService.getRoleByNameAndCreator(data.name, currentUser.id);
-        if (roleWithNewName && roleWithNewName.id !== id) {
-            return { success: false, error: `You already have another role named "${data.name}".`};
-        }
-    }
     const updatedRole = await databaseService.updateRole(id, data);
     revalidatePath('/admin/settings/role-management');
     revalidatePath('/admin/settings/user-management');
@@ -91,7 +79,7 @@ export async function updateRoleAction(id: string, data: RoleUpsertData): Promis
     console.error("Error updating role:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-             return { success: false, error: `Role name conflict. A role with name "${data.name}" might already exist.` };
+             return { success: false, error: `A role with the name "${data.name}" already exists. Please use a unique name.` };
         }
         if (error.code === 'P2025') {
             return { success: false, error: "Role not found for update." };
@@ -125,4 +113,3 @@ export async function deleteRoleAction(id: string): Promise<{ success: boolean, 
     return { success: false, error: error.message || "Failed to delete role." };
   }
 }
-

@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -54,16 +53,9 @@ export async function createTenantAction(data: {
     const existingTenant = await databaseService.findTenantByEmailOrPhone(data.email, data.phone);
 
     if (existingTenant) {
-      // If the admin who found the tenant is not already the creator, add them.
-      if (existingTenant.createdById !== adminUser.id) {
-         await databaseService.updateTenant(existingTenant.id, {
-          createdBy: { connect: { id: adminUser.id } }
-        });
-      }
       return { 
-        success: true, 
-        tenant: existingTenant, 
-        message: "An existing tenant profile was found and is now visible in your list." 
+        success: false, 
+        error: "A tenant with this email or phone number already exists." 
       };
     }
 
@@ -158,13 +150,9 @@ export async function createTenantAction(data: {
   } catch (error: any) {
     console.error("Error creating tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      let fieldName = "email or another unique field";
-      if (error.meta && typeof error.meta.target === 'string') {
-        fieldName = error.meta.target;
-      } else if (Array.isArray(error.meta?.target)) {
-        fieldName = error.meta.target.join(', ');
-      }
-      return { success: false, error: `Failed to create tenant. A tenant with the same ${fieldName} might already exist.` };
+      const target = (error.meta?.target as string[]) || [];
+      const fieldName = target.join(', ');
+      return { success: false, error: `Failed to create tenant. A tenant with the same ${fieldName} already exists.` };
     }
     return { success: false, error: error.message || "Failed to create tenant." };
   }
@@ -203,13 +191,9 @@ export async function updateTenantAction(
     console.error("Error updating tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
-        let fieldName = "email or another unique field";
-        if (error.meta && typeof error.meta.target === 'string') {
-            fieldName = error.meta.target;
-        } else if (Array.isArray(error.meta?.target)) {
-            fieldName = error.meta.target.join(', ');
-        }
-        return { success: false, error: `Failed to update tenant. A tenant with the same ${fieldName} might already exist.` };
+        const target = (error.meta?.target as string[]) || [];
+        const fieldName = target.join(', ');
+        return { success: false, error: `Failed to update tenant. A tenant with the same ${fieldName} already exists.` };
       }
       if (error.code === 'P2025') { 
         return { success: false, error: "Failed to update tenant. Record not found." };
@@ -302,5 +286,3 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
-    
-
