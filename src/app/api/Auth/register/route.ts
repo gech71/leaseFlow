@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
       firstName: firstName,
       lastName: lastName,
       phoneNumber: phoneNumber,
+      createdBy: { connect: { id: adminUser.id } }, // ** FIX: Link the creator **
     };
 
     const localUser = await databaseService.createUser(userCreateInput);
