@@ -14,13 +14,13 @@ export interface PenaltyTier {
   applicableSpaceIdNames?: string[] | null;
   buildingId?: string;
   frequency: 'OneTime' | 'Daily';
-  feeType: 'Fixed' | 'Percentage';
 }
 
 export interface Building {
   id: string;
   name: string;
   address?: string | null;
+  status: 'Active' | 'Inactive'; // Added status
   penaltyPolicyTiers: PenaltyTier[];
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String

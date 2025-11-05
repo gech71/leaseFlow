@@ -8,8 +8,8 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search, Hash } from 'lucide-react';
-import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma } from '@prisma/client';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search, Hash, UserX, UserCheck } from 'lucide-react';
+import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, BuildingStatus } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -22,11 +22,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
-import { deleteBuildingAction } from './actions';
+import { toggleBuildingStatusAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext'; 
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
@@ -35,13 +38,12 @@ export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
 
 interface BuildingCardProps {
   building: BuildingWithPenaltyTiers;
-  onDelete: (building: BuildingWithPenaltyTiers) => void;
+  onStatusToggle: (buildingId: string, newStatus: BuildingStatus) => void;
   canEdit: boolean;
-  canDelete: boolean;
   canViewDetails: boolean; // To determine if "View Details" or "Edit" should be shown
 }
 
-function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }: BuildingCardProps) {
+function BuildingCard({ building, onStatusToggle, canEdit, canViewDetails }: BuildingCardProps) {
   const policiesByScopeGroup: Record<string, PenaltyTierTypePrisma[]> = {};
   (building.penaltyPolicyTiers || []).forEach(tier => {
     let key = tier.scope;
@@ -52,10 +54,15 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
     policiesByScopeGroup[key].push(tier);
   });
 
+  const isActive = building.status === 'Active';
+
   return (
     <Card key={building.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
       <CardHeader>
-        <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
+        <div className="flex justify-between items-start gap-2">
+            <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
+            <Badge variant={isActive ? 'secondary' : 'destructive'} className="capitalize">{building.status}</Badge>
+        </div>
         <CardDescription className="text-sm flex flex-col gap-1">
           {building.address && <span className="flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</span>}
           {building.accountNumber && <span className="flex items-center"><Hash className="mr-1.5 h-4 w-4 text-muted-foreground" />A/C: {building.accountNumber}</span>}
@@ -95,43 +102,54 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
               <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
            )}
         </CardContent>
-      <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-end gap-2">
-        {canEdit ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link href={`/admin/buildings/add-building?id=${building.id}`} passHref>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Edit3 className="h-4 w-4 text-blue-600" />
-                  <span className="sr-only">Edit Building</span>
-                </Button>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent><p>Edit Building</p></TooltipContent>
-          </Tooltip>
-        ) : canViewDetails ? (
-           <Tooltip>
-            <TooltipTrigger asChild>
-              <Link href={`/admin/buildings/add-building?id=${building.id}&view=true`} passHref>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Eye className="h-4 w-4 text-blue-600" />
-                  <span className="sr-only">View Building</span>
-                </Button>
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent><p>View Building</p></TooltipContent>
-          </Tooltip>
-        ) : null }
-        {canDelete && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(building)}>
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Delete Building</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Delete Building</p></TooltipContent>
-          </Tooltip>
-        )}
+      <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center space-x-2">
+           {canEdit && (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id={`status-switch-${building.id}`}
+                                checked={isActive}
+                                onCheckedChange={(checked) => onStatusToggle(building.id, checked ? 'Active' : 'Inactive')}
+                                aria-label="Toggle building status"
+                            />
+                             <Label htmlFor={`status-switch-${building.id}`} className="text-xs text-muted-foreground">
+                                {isActive ? 'Active' : 'Inactive'}
+                            </Label>
+                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Toggle Active/Inactive status</p></TooltipContent>
+                </Tooltip>
+           )}
+        </div>
+        <div className="flex items-center gap-1">
+            {canEdit ? (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                <Link href={`/admin/buildings/add-building?id=${building.id}`} passHref>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Edit3 className="h-4 w-4 text-blue-600" />
+                    <span className="sr-only">Edit Building</span>
+                    </Button>
+                </Link>
+                </TooltipTrigger>
+                <TooltipContent><p>Edit Building</p></TooltipContent>
+            </Tooltip>
+            ) : canViewDetails ? (
+            <Tooltip>
+                <TooltipTrigger asChild>
+                <Link href={`/admin/buildings/add-building?id=${building.id}&view=true`} passHref>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Eye className="h-4 w-4 text-blue-600" />
+                    <span className="sr-only">View Building</span>
+                    </Button>
+                </Link>
+                </TooltipTrigger>
+                <TooltipContent><p>View Building</p></TooltipContent>
+            </Tooltip>
+            ) : null }
+        </div>
       </CardFooter>
     </Card>
   );
@@ -140,23 +158,26 @@ function BuildingCard({ building, onDelete, canEdit, canDelete, canViewDetails }
 export function BuildingsClientPage({ initialBuildings }: { initialBuildings: BuildingWithPenaltyTiers[] }) {
   const [buildings, setBuildings] = useState<BuildingWithPenaltyTiers[]>(initialBuildings);
   const { toast } = useToast();
-  const [buildingToDelete, setBuildingToDelete] = useState<BuildingWithPenaltyTiers | null>(null);
   const { hasPermission, isSuperAdmin } = usePermissions(); 
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
+  const [filterStatus, setFilterStatus] = useState<'Active' | 'Inactive' | 'All'>('All');
+
 
   const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
   const canEditBuildings = isSuperAdmin || hasPermission('building:edit');
   const canDeleteBuildings = isSuperAdmin || hasPermission('building:delete');
-  const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings; // If can do anything, can view
+  const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings;
 
-  const filteredBuildings = buildings.filter(building =>
-    building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (building.address && building.address.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredBuildings = buildings.filter(building => {
+      const statusMatch = filterStatus === 'All' || building.status === filterStatus;
+      const searchMatch = building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (building.address && building.address.toLowerCase().includes(searchTerm.toLowerCase()));
+      return statusMatch && searchMatch;
+  });
 
   const totalPages = Math.ceil(filteredBuildings.length / itemsPerPage);
   
@@ -166,7 +187,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filterStatus]);
 
   useEffect(() => {
     const newTotalPages = Math.ceil(filteredBuildings.length / itemsPerPage);
@@ -185,22 +206,19 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     setCurrentPage(1);
   };
   
-  const handleDeleteBuilding = async () => {
-    if (!buildingToDelete) return;
-    if (!canDeleteBuildings) {
-      toast({ title: "Permission Denied", description: "You do not have permission to delete buildings.", variant: "destructive" });
-      return;
-    }
-    
-    const result = await deleteBuildingAction(buildingToDelete.id);
-
-    if (result.success) {
-      toast({ title: "Building Deleted", description: `${buildingToDelete.name} has been removed.`});
-      router.refresh();
-    } else {
-      toast({ title: "Error Deleting Building", description: result.error, variant: "destructive" });
-    }
-    setBuildingToDelete(null);
+  const handleToggleStatus = async (buildingId: string, newStatus: BuildingStatus) => {
+      if (!canEditBuildings) {
+          toast({ title: "Permission Denied", description: "You do not have permission to change building status.", variant: "destructive" });
+          return;
+      }
+      
+      const result = await toggleBuildingStatusAction(buildingId, newStatus);
+      if (result.success) {
+          toast({ title: "Status Updated", description: `Building status set to ${newStatus}.` });
+          router.refresh();
+      } else {
+          toast({ title: "Update Failed", description: result.error, variant: "destructive" });
+      }
   };
 
   if (!canViewBuildings) {
@@ -230,8 +248,8 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
       />
       
       <Card className="mb-6 shadow-sm">
-        <CardContent className="p-4">
-          <div className="relative">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-grow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Filter buildings by name or address..."
@@ -240,26 +258,16 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="status-filter">Status:</Label>
+            <div className="flex items-center space-x-2">
+                <Button variant={filterStatus === 'All' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('All')}>All</Button>
+                <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
+                <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
-
-      <AlertDialog open={!!buildingToDelete} onOpenChange={(open) => { if (!open) setBuildingToDelete(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-5 w-5"/>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the building "{buildingToDelete?.name}".
-              Ensure all associated spaces are removed or reassigned first, as this might fail if spaces still reference this building.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setBuildingToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteBuilding} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={!canDeleteBuildings}>
-              Delete Building
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {filteredBuildings.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
@@ -283,9 +291,8 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
               <BuildingCard 
                 key={building.id} 
                 building={building} 
-                onDelete={setBuildingToDelete} 
+                onStatusToggle={handleToggleStatus} 
                 canEdit={canEditBuildings}
-                canDelete={canDeleteBuildings}
                 canViewDetails={canViewBuildings}
               />
             ))}
