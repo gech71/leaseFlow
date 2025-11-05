@@ -63,14 +63,17 @@ export interface AgreementWithRelations extends AgreementPrisma {
   startDate: string;
   nextPaymentDueDate: string;
   initialPaymentDate?: string;
+  disabledAgreements: { disabledById: string }[];
 }
 
 interface AgreementsListClientPageProps {
   initialAgreements: AgreementWithRelations[];
+  currentUserId: string;
 }
 
 export function AgreementsListClientPage({
   initialAgreements,
+  currentUserId,
 }: AgreementsListClientPageProps) {
   const [agreements, setAgreements] =
     useState<AgreementWithRelations[]>(initialAgreements);
@@ -82,7 +85,7 @@ export function AgreementsListClientPage({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
-  const [filterStatus, setFilterStatus] = useState<"Active" | "Expired">("Active");
+  const [filterStatus, setFilterStatus] = useState<"Active" | "Inactive">("Active");
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
@@ -106,13 +109,13 @@ export function AgreementsListClientPage({
 
   const filteredAgreements = agreements
     .filter((agreement) => {
-      // Status filter
-      const agreementEndDate = addMonths(
-        parseISO(agreement.startDate),
-        agreement.paymentTermMonths,
-      );
-      const isExpired = isBefore(agreementEndDate, today);
-      const statusMatch = filterStatus === 'Active' ? !isExpired : isExpired;
+      // Status filter logic
+      const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
+      const isChronologicallyExpired = isBefore(agreementEndDate, today);
+      const isManuallyDisabled = agreement.disabledAgreements.some(da => da.disabledById === currentUserId);
+      const isActive = !isChronologicallyExpired && !isManuallyDisabled;
+      
+      const statusMatch = filterStatus === 'Active' ? isActive : !isActive;
       if (!statusMatch) return false;
 
       // Search term filter
@@ -258,7 +261,7 @@ export function AgreementsListClientPage({
             <Label htmlFor="status-filter">Status:</Label>
              <div className="flex items-center space-x-2">
                 <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
-                <Button variant={filterStatus === 'Expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Expired')}>Expired</Button>
+                <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
             </div>
           </div>
         </CardContent>
@@ -290,10 +293,10 @@ export function AgreementsListClientPage({
           <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {paginatedAgreements.map((agreement) => {
               const overdue = isPaymentOverdue(agreement);
-              const agreementEndDate = addMonths(
-                parseISO(agreement.startDate),
-                agreement.paymentTermMonths,
-              );
+              const isChronologicallyExpired = isBefore(addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths), today);
+              const isManuallyDisabled = agreement.disabledAgreements.some(da => da.disabledById === currentUserId);
+              const isActive = !isChronologicallyExpired && !isManuallyDisabled;
+
               const spaceDesc = agreement.space
                 ? `${agreement.space.spaceIdName}, ${agreement.space.buildingName}`
                 : "N/A";
@@ -301,7 +304,7 @@ export function AgreementsListClientPage({
                 <Card
                   key={agreement.id}
                   className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${
-                    overdue && filterStatus === 'Active' ? "border-destructive border-2" : ""
+                    overdue && isActive ? "border-destructive border-2" : ""
                   }`}
                 >
                   <CardHeader>
@@ -312,7 +315,7 @@ export function AgreementsListClientPage({
                       </CardTitle>
                       <div className="flex flex-col items-end space-y-1">
                         {" "}
-                        {overdue && filterStatus === 'Active' && (
+                        {overdue && isActive && (
                           <Badge
                             variant="destructive"
                             className="flex items-center"
@@ -321,7 +324,7 @@ export function AgreementsListClientPage({
                             Overdue
                           </Badge>
                         )}{" "}
-                        <Badge variant={filterStatus === 'Active' ? 'secondary' : 'outline'}>{filterStatus}</Badge>
+                        <Badge variant={isActive ? 'secondary' : 'outline'}>{isActive ? 'Active' : 'Inactive'}</Badge>
                       </div>
                     </div>{" "}
                     <CardDescription>{spaceDesc}</CardDescription>
@@ -333,7 +336,7 @@ export function AgreementsListClientPage({
                     </p>
                     <p>
                       <strong>End Date:</strong>{" "}
-                      {format(agreementEndDate, "PP")}
+                      {format(addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths), "PP")}
                     </p>
                     <p>
                       <strong>Rent:</strong>{" "}
@@ -344,7 +347,7 @@ export function AgreementsListClientPage({
                       <strong>Term:</strong> {agreement.paymentTermMonths}{" "}
                       months
                     </p>
-                    {filterStatus === 'Active' && (
+                    {isActive && (
                       <p
                         className={`${
                           overdue ? "text-destructive font-semibold" : ""
@@ -357,7 +360,7 @@ export function AgreementsListClientPage({
                           : "N/A"}{" "}
                       </p>
                     )}
-                    <p className="text-xs text-muted-foreground pt-1">
+                     <p className="text-xs text-muted-foreground pt-1">
                       Generated: {format(parseISO(agreement.createdAt), "PP")}
                     </p>
                   </CardContent>

@@ -11,13 +11,21 @@ import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 // This is now a Server Component
 export default async function AgreementsListPage() {
-  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+  const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
   const whereClause: Prisma.AgreementWhereInput = !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {};
-
+  
   const agreementsData = await databaseService.getAllAgreements({
     where: whereClause,
-    include: { tenant: true, space: true },
+    include: { 
+      tenant: true, 
+      space: true,
+      disabledAgreements: {
+        select: {
+          disabledById: true
+        }
+      }
+    },
     orderBy: { createdAt: 'desc' }
   });
 
@@ -30,6 +38,7 @@ export default async function AgreementsListPage() {
     createdAt: ag.createdAt.toISOString(),
     updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Safe serialization
     initialPaymentDate: ag.initialPaymentDate?.toISOString() || undefined,
+    disabledAgreements: ag.disabledAgreements, // Pass this through
     tenant: ag.tenant ? { 
       ...ag.tenant, 
       createdAt: ag.tenant.createdAt.toISOString(), 
@@ -47,7 +56,10 @@ export default async function AgreementsListPage() {
 
   return (
     <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>}>
-      <AgreementsListClientPage initialAgreements={serializableAgreements} />
+      <AgreementsListClientPage 
+        initialAgreements={serializableAgreements} 
+        currentUserId={currentUser.id}
+      />
     </Suspense>
   );
 }
