@@ -268,160 +268,48 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
   }
 }
 
-export async function initiateArifpayPaymentAction(
-  billId: string,
-  billAmount: number,
-  billDate: string,
-): Promise<{ success: boolean; error?: string; paymentUrl?: string }> {
-  const ARIFPAY_API_URL = process.env.ARIFPAY_API_URL;
-  const ARIFPAY_API_KEY = process.env.ARIFPAY_API_KEY;
-
-  if (!ARIFPAY_API_URL || !ARIFPAY_API_KEY) {
-    console.error("ArifPay environment variables are not configured.");
-    return {
-      success: false,
-      error: "Payment service is not configured correctly.",
-    };
-  }
-
+export async function submitPaymentProofAction(data: {
+  billId: string;
+  paymentProofUrl: string; // The client will provide this (e.g., a filename)
+  notes?: string;
+}): Promise<{ success: boolean; error?: string }> {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser?.phoneNumber || !currentUser?.email) {
-      return {
-        success: false,
-        error: "Your user profile is missing a phone number or email address.",
-      };
+    if (!currentUser) {
+      return { success: false, error: "Authentication required." };
     }
-
+    
     const bill = await prisma.bill.findUnique({
-      where: { id: billId },
-      include: {
-        agreement: { include: { space: { include: { building: true } } } },
-      },
+      where: { id: data.billId },
+      include: { agreement: { include: { tenant: true } } }
     });
 
-    if (!bill) {
-      return { success: false, error: "Bill not found." };
-    }
-    if (!bill.agreement?.space?.building?.accountNumber) {
-      return {
-        success: false,
-        error: "Building account number is not configured for this bill.",
-      };
-    }
-
-    let arifpayPhoneNumber = currentUser.phoneNumber;
-    if (arifpayPhoneNumber.startsWith("09")) {
-      arifpayPhoneNumber = "2519" + arifpayPhoneNumber.substring(2);
-    } else if (arifpayPhoneNumber.startsWith("07")) {
-      arifpayPhoneNumber = "2517" + arifpayPhoneNumber.substring(2);
-    }
-
-    const requestBody = {
-      phone: arifpayPhoneNumber,
-      cbs: bill.agreement.space.building.accountNumber,
-      email: currentUser.email,
-      items: [
-        {
-          name: `Bill payment for ${format(new Date(billDate), "yyyy-MM-dd")}`,
-          quantity: 1,
-          price: billAmount,
-          description: `Bill payment for date: ${billDate}`,
-        },
-      ],
-    };
-
-    console.log("ArifPay Request Body:", requestBody);
-
-    const response = await fetch(`${ARIFPAY_API_URL}/createsession`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "API-Key": ARIFPAY_API_KEY,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    console.log("ArifPay Response Status:", response.status);
-
-    const responseText = await response.text();
-    if (!responseText) {
-      console.error(
-        "ArifPay API Error: Received an empty response from the server.",
-      );
-      return {
-        success: false,
-        error: "Payment gateway returned an empty response.",
-      };
-    }
-
-    console.log("ArifPay Response Body:", responseText);
-
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.error(
-        "ArifPay API Error: Failed to parse JSON response. Body:",
-        responseText,
-      );
-      return {
-        success: false,
-        error: "Payment gateway returned an invalid response.",
-      };
-    }
-
-    if (responseData.ResponseCode && responseData.ResponseCode !== "0") {
-      console.error("ArifPay API Error:", responseData);
-      return {
-        success: false,
-        error: `Payment gateway error: ${
-          responseData.ResponseDescription || "An unknown error occurred."
-        }`,
-      };
+    if (!bill || bill.agreement?.tenant?.userId !== currentUser.id) {
+      return { success: false, error: "Bill not found or you do not have permission to modify it." };
     }
     
-    // Direct access to the response data without normalization
-    const paymentUrl = responseData?.Data?.URL;
-    const sessionId = responseData?.Data?.NA;
-    
-    if (!paymentUrl || !sessionId) {
-      console.error("ArifPay API Error - No URL or Session ID:", responseData);
-      return {
-        success: false,
-        error:
-          "Payment gateway did not return a valid payment URL or session ID.",
-      };
+    if (bill.status !== 'Pending' && bill.status !== 'Overdue') {
+      return { success: false, error: `Cannot submit proof for a bill with status "${bill.status}".` };
     }
 
-    await prisma.$transaction(async (tx) => {
-      // Create the ArifPayment record
-      await tx.arifPayment.create({
-        data: {
-          sessionId: sessionId,
-          status: "Pending",
-          amount: billAmount,
-          paymentUrl: paymentUrl,
-          bill: { connect: { id: billId } },
-        },
-      });
-
-      // Update the bill status
-      await tx.bill.update({
-        where: { id: billId },
-        data: { status: "Pending" }, // Set to pending, callback will set to Paid
-      });
+    await databaseService.updateBill(data.billId, {
+      status: 'PendingVerification',
+      paymentProofUrl: data.paymentProofUrl,
+      tenantPaymentNotes: data.notes,
+      paymentDate: new Date(), // Set payment date to when proof is submitted
     });
+    
+    revalidatePath('/portal/dashboard');
+    revalidatePath('/admin/billing'); // Also revalidate admin page
 
-    return { success: true, paymentUrl: paymentUrl };
+    return { success: true };
+
   } catch (error: any) {
-    console.error("Error in initiateArifpayPaymentAction:", error);
-    return {
-      success: false,
-      error: "An unexpected error occurred while initiating payment.",
-    };
+    console.error("Error submitting payment proof:", error);
+    return { success: false, error: "Failed to submit payment proof." };
   }
 }
+
 
 export async function sendContactEmailAction(formData: {
   subject: string;
