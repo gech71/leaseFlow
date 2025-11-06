@@ -128,7 +128,7 @@ export interface Bill {
   utilityBreakdown: UtilityBreakdownItem[];
   penaltyAmount?: number | null;
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue';
+  status: 'Pending' | 'Paid' | 'Overdue' | 'PendingVerification';
   paymentDate?: string | null; // ISO Date String
   paymentMethod?: string | null;
   paymentReference?: string | null;
