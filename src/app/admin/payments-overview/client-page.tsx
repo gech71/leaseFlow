@@ -388,30 +388,37 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                         <TableHead>Tenant</TableHead>
                         <TableHead>Space</TableHead>
                         <TableHead>Due Date</TableHead>
+                        <TableHead className="text-right">Utility</TableHead>
                         <TableHead className="text-right">Penalty</TableHead>
                         <TableHead className="text-right">Amount Due</TableHead>
                         <TableHead className="text-center">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedUpcomingBills.map(bill => (
-                        <TableRow key={bill.id}>
-                          <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
-                          <TableCell className="text-xs">{bill.spaceDescription}</TableCell>
-                          <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
-                            {format(parseISO(bill.dueDate), 'PP')}
-                          </TableCell>
-                          <TableCell className="text-xs text-destructive text-right whitespace-nowrap">
-                            {bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : ''}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={getStatusBadgeVariant(bill.status)} className="capitalize">
-                              {getStatusIcon(bill.status)}<span className="ml-1">{bill.status}</span>
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {paginatedUpcomingBills.map(bill => {
+                        const utilityTotal = (bill.utilityBreakdown || []).reduce((sum, util) => sum + util.amount, 0);
+                        return (
+                          <TableRow key={bill.id}>
+                            <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
+                            <TableCell className="text-xs">{bill.spaceDescription}</TableCell>
+                            <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
+                              {format(parseISO(bill.dueDate), 'PP')}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground text-right whitespace-nowrap">
+                              {utilityTotal > 0 ? `${utilityTotal.toFixed(2)} Birr` : '-'}
+                            </TableCell>
+                            <TableCell className="text-xs text-destructive text-right whitespace-nowrap">
+                              {bill.penaltyAmount ? `${bill.penaltyAmount.toFixed(2)} Birr` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={getStatusBadgeVariant(bill.status)} className="capitalize">
+                                {getStatusIcon(bill.status)}<span className="ml-1">{bill.status}</span>
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
