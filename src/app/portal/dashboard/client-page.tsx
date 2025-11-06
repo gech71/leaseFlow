@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -247,8 +248,9 @@ export function CustomerDashboardClientPage({
         let totalPenalty = 0;
         const oneTimeFeesApplied = new Set<string>();
 
-        // Iterate day by day
+        // Iterate through each overdue day
         for (let day = 1; day <= daysOverdue; day++) {
+            // Find the tier that applies to the current day
             const tierForDay = sortedTiers.find(tier => 
                 day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
             );
@@ -707,3 +709,5 @@ export function CustomerDashboardClientPage({
     </>
   );
 }
+
+    

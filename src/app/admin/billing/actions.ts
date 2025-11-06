@@ -320,13 +320,13 @@ function calculateIndividualPenalty(
   const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
   
   let totalPenalty = 0;
-  let oneTimeFeesApplied = new Set<string>(); // Keep track of applied one-time fees to prevent re-application
+  const oneTimeFeesApplied = new Set<string>(); // Keep track of applied one-time fees to prevent re-application
 
   // Iterate through each overdue day
   for (let day = 1; day <= daysOverdue; day++) {
     // Find the tier that applies to the current day
     const tierForDay = sortedTiers.find(tier => 
-      day >= tier.fromDay && (tier.toDay === null || day <= tier.toDay)
+      day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
     );
 
     if (tierForDay) {
@@ -734,5 +734,7 @@ export async function updateBillAdminDetailsAction(
 
 
 
+
+    
 
     
