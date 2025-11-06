@@ -319,26 +319,39 @@ function calculateIndividualPenalty(
 
   const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
   
-  for (const tier of sortedTiers) {
-    if (daysOverdue >= tier.fromDay && (tier.toDay === null || daysOverdue <= tier.toDay)) {
-      let fee = 0;
-      const feeValue = Number(tier.feeValue);
+  let totalPenalty = 0;
+  let oneTimeFeesApplied = new Set<string>(); // Keep track of applied one-time fees to prevent re-application
+
+  // Iterate through each overdue day
+  for (let day = 1; day <= daysOverdue; day++) {
+    // Find the tier that applies to the current day
+    const tierForDay = sortedTiers.find(tier => 
+      day >= tier.fromDay && (tier.toDay === null || day <= tier.toDay)
+    );
+
+    if (tierForDay) {
+      const feeValue = Number(tierForDay.feeValue);
+      let dailyFee = 0;
       
-      if (tier.penaltyType === 'Fixed') {
-        fee = feeValue;
-      } else if (tier.penaltyType === 'Percentage') {
-        fee = billAmount * (feeValue / 100);
+      if (tierForDay.penaltyType === 'Fixed') {
+        dailyFee = feeValue;
+      } else if (tierForDay.penaltyType === 'Percentage') {
+        dailyFee = billAmount * (feeValue / 100);
       }
       
-      if (tier.frequency === 'Daily') {
-        return parseFloat((fee * daysOverdue).toFixed(2));
-      } else { // 'OneTime'
-        return parseFloat(fee.toFixed(2));
+      if (tierForDay.frequency === 'Daily') {
+        totalPenalty += dailyFee;
+      } else if (tierForDay.frequency === 'OneTime') {
+        // Only add the one-time fee if it hasn't been added for this tier yet
+        if (!oneTimeFeesApplied.has(tierForDay.id)) {
+          totalPenalty += dailyFee; // dailyFee here is the one-time amount
+          oneTimeFeesApplied.add(tierForDay.id);
+        }
       }
     }
   }
   
-  return 0;
+  return parseFloat(totalPenalty.toFixed(2));
 }
 
 
@@ -720,3 +733,6 @@ export async function updateBillAdminDetailsAction(
 
 
 
+
+
+    
