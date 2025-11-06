@@ -123,9 +123,20 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 
 const proofFormSchema = z.object({
   notes: z.string().optional(),
-  proofFile: z.any().refine(files => files?.length === 1, "Payment proof file is required."),
+  proofFile: z.any()
+    .refine(files => files?.length === 1, "Payment proof file is required.")
+    .refine(files => files?.[0]?.type === 'application/pdf', "Only PDF files are allowed.")
+    .refine(files => files?.[0]?.size <= 2 * 1024 * 1024, "File size must be less than 2MB."),
 });
 type ProofFormValues = z.infer<typeof proofFormSchema>;
+
+// Function to convert file to Base64 Data URI
+const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result as string);
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
+});
 
 
 export function CustomerDashboardClientPage({
@@ -176,24 +187,28 @@ export function CustomerDashboardClientPage({
     
     setIsSubmitting(true);
     
-    // In a real app, you would upload the file to a storage service (like S3, Firebase Storage)
-    // and get a URL. For this prototype, we'll just use the filename.
-    const fileName = values.proofFile[0]?.name || 'unknown_proof_file';
+    try {
+      const file = values.proofFile[0];
+      const paymentProofDataUri = await fileToDataUri(file);
 
-    const result = await submitPaymentProofAction({
-      billId: payingBill.id,
-      paymentProofUrl: fileName, // This would be the actual URL in a real app
-      notes: values.notes
-    });
-    setIsSubmitting(false);
+      const result = await submitPaymentProofAction({
+        billId: payingBill.id,
+        paymentProofDataUri: paymentProofDataUri,
+        notes: values.notes
+      });
+      setIsSubmitting(false);
 
-    if (result.success) {
-      toast({ title: "Proof Submitted", description: "Your payment proof has been submitted for verification." });
-      setPayingBill(null);
-      proofForm.reset();
-      router.refresh();
-    } else {
-      toast({ title: "Submission Failed", description: result.error, variant: "destructive" });
+      if (result.success) {
+        toast({ title: "Proof Submitted", description: "Your payment proof has been submitted for verification." });
+        setPayingBill(null);
+        proofForm.reset();
+        router.refresh();
+      } else {
+        toast({ title: "Submission Failed", description: result.error, variant: "destructive" });
+      }
+    } catch (error) {
+      setIsSubmitting(false);
+      toast({ title: "Error", description: "Failed to process the file. Please try again.", variant: "destructive" });
     }
   };
 
@@ -692,7 +707,7 @@ export function CustomerDashboardClientPage({
                                 <FormControl>
                                     <Input 
                                       type="file" 
-                                      accept=".pdf" 
+                                      accept="application/pdf"
                                       {...proofForm.register('proofFile')}
                                       disabled={isSubmitting}
                                     />

@@ -271,7 +271,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
 export async function submitPaymentProofAction(data: {
   billId: string;
-  paymentProofUrl: string; // The client will provide this (e.g., a filename)
+  paymentProofDataUri: string; // Changed from paymentProofUrl to accept data URI
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
@@ -292,10 +292,15 @@ export async function submitPaymentProofAction(data: {
     if (bill.status !== 'Pending' && bill.status !== 'Overdue') {
       return { success: false, error: `Cannot submit proof for a bill with status "${bill.status}".` };
     }
+    
+    // Check data URI size before saving
+    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) { // 2MB limit
+      return { success: false, error: "The uploaded PDF file is too large. Please upload a file smaller than 2MB." };
+    }
 
     await databaseService.updateBill(data.billId, {
       status: 'PendingVerification',
-      paymentProofUrl: data.paymentProofUrl,
+      paymentProofDataUri: data.paymentProofDataUri, // Save the data URI
       tenantPaymentNotes: data.notes,
       paymentDate: new Date(), // Set payment date to when proof is submitted
     });
