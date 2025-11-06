@@ -322,43 +322,60 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       const daysOverdue = differenceInDays(today, dueDate);
       if (daysOverdue <= 0) return 0;
 
-      let applicableTiers = [];
-      const spaceSpecificTiers = building.penaltyPolicyTiers.filter(
+      const allTiers = building.penaltyPolicyTiers;
+      const spaceSpecificTiers = allTiers.filter(
         (t) =>
           t.scope === "SpecificSpaces" &&
           t.applicableSpaceIdNames?.includes(space.spaceIdName),
       );
-      if (spaceSpecificTiers.length > 0) applicableTiers = spaceSpecificTiers;
-      else {
-        const floorSpecificTiers = building.penaltyPolicyTiers.filter(
-          (t) => t.scope === "Floor" && t.applicableFloor === space.floor,
-        );
-        if (floorSpecificTiers.length > 0) applicableTiers = floorSpecificTiers;
-        else
-          applicableTiers = building.penaltyPolicyTiers.filter(
-            (t) => t.scope === "Building",
-          );
-      }
-
-      if (applicableTiers.length === 0) return 0;
-      const sortedTiers = [...applicableTiers].sort(
-        (a, b) => a.fromDay - b.fromDay,
+      const floorSpecificTiers = allTiers.filter(
+        (t) => t.scope === "Floor" && t.applicableFloor === space.floor,
       );
-      let calculatedPenalty = 0;
-      for (const tier of sortedTiers) {
-        if (
-          daysOverdue >= tier.fromDay &&
-          (tier.toDay === null ||
-            tier.toDay === undefined ||
-            daysOverdue <= tier.toDay)
-        ) {
-          if (tier.penaltyType === "Fixed") calculatedPenalty = tier.feeValue;
-          else if (tier.penaltyType === "Percentage")
-            calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
-          break;
+      const buildingWideTiers = allTiers.filter((t) => t.scope === "Building");
+    
+      let applicableTiers: typeof allTiers = [];
+      if (spaceSpecificTiers.length > 0) {
+        applicableTiers = spaceSpecificTiers;
+      } else if (floorSpecificTiers.length > 0) {
+        applicableTiers = floorSpecificTiers;
+      } else {
+        applicableTiers = buildingWideTiers;
+      }
+    
+      if (applicableTiers.length === 0) return 0;
+    
+      const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
+      
+      let totalPenalty = 0;
+      let oneTimeFeesApplied = new Set<string>();
+
+      for (let day = 1; day <= daysOverdue; day++) {
+        const tierForDay = sortedTiers.find(tier => 
+          day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
+        );
+
+        if (tierForDay) {
+          const feeValue = Number(tierForDay.feeValue);
+          let dailyFee = 0;
+          
+          if (tierForDay.penaltyType === 'Fixed') {
+            dailyFee = feeValue;
+          } else if (tierForDay.penaltyType === 'Percentage') {
+            dailyFee = bill.rentAmount * (feeValue / 100);
+          }
+          
+          if (tierForDay.frequency === 'Daily') {
+            totalPenalty += dailyFee;
+          } else if (tierForDay.frequency === 'OneTime') {
+            if (!oneTimeFeesApplied.has(tierForDay.id!)) {
+              totalPenalty += dailyFee;
+              oneTimeFeesApplied.add(tierForDay.id!);
+            }
+          }
         }
       }
-      return parseFloat(calculatedPenalty.toFixed(2));
+      
+      return parseFloat(totalPenalty.toFixed(2));
     },
     [agreements, allBuildings, today],
   );
@@ -388,7 +405,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         return {
           ...bill,
           currentStatus: currentStatus,
-          penaltyAmount: penalty > 0 ? penalty : undefined,
+          penaltyAmount: penalty > 0 ? penalty : null,
           totalAmount: parseFloat(newTotalAmount.toFixed(2)),
           tenantName: bill.agreement?.tenant?.name || "N/A",
         };
@@ -1461,6 +1478,9 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                         <TableHead className="w-[15%] text-center">
                           Status
                         </TableHead>
+                        <TableHead className="w-[10%] text-right">
+                            Actions
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1526,6 +1546,26 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                 {(bill.currentStatus || bill.status)}
                               </span>
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                              {canManagePayments && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleOpenPaymentDialog(bill)}
+                                      >
+                                        <CreditCard className="h-4 w-4" />
+                                        <span className="sr-only">Record Payment</span>
+                                      </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Record Payment</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                           </TableCell>
                         </TableRow>
                       ))}
