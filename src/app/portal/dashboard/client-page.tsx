@@ -688,11 +688,11 @@ export function CustomerDashboardClientPage({
                         name="proofFile"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="flex items-center"><Paperclip className="mr-2 h-4 w-4"/>Payment Proof (Image/PDF)</FormLabel>
+                                <FormLabel className="flex items-center"><Paperclip className="mr-2 h-4 w-4"/>Payment Proof (PDF only)</FormLabel>
                                 <FormControl>
                                     <Input 
                                       type="file" 
-                                      accept="image/*,.pdf" 
+                                      accept=".pdf" 
                                       {...proofForm.register('proofFile')}
                                       disabled={isSubmitting}
                                       ref={proofFileInputRef}
