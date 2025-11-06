@@ -212,71 +212,72 @@ export function CustomerDashboardClientPage({
 
   const calculatePenaltyForTenant = useCallback(
     (bill: ClientBill, penaltyTiers: ClientPenaltyTier[]): number => {
-      if (
-        !agreement ||
-        !agreement.space ||
-        !agreement.space.building ||
-        !penaltyTiers ||
-        penaltyTiers.length === 0
-      ) {
-        return 0;
-      }
-      const space = agreement.space;
-      const dueDate = parseISO(bill.dueDate);
+        if (!agreement || !agreement.space || !penaltyTiers || penaltyTiers.length === 0) {
+            return 0;
+        }
 
-      if (bill.status !== "Overdue") {
-        const isCurrentlyOverdue = isBefore(dueDate, today);
-        if (!isCurrentlyOverdue) return 0;
-      }
+        const space = agreement.space;
+        const dueDate = parseISO(bill.dueDate);
+        const daysOverdue = differenceInDays(today, dueDate);
 
-      const daysOverdue = differenceInDays(today, dueDate);
-      if (daysOverdue <= 0) return 0;
-
-      let applicableTiersForScope: ClientPenaltyTier[] = [];
-      const spaceSpecificTiers = penaltyTiers.filter(
-        (t) =>
-          t.scope === "SpecificSpaces" &&
-          t.applicableSpaceIdNames?.includes(space.spaceIdName),
-      );
-      if (spaceSpecificTiers.length > 0) {
-        applicableTiersForScope = spaceSpecificTiers;
-      } else {
-        const floorSpecificTiers = penaltyTiers.filter(
-          (t) => t.scope === "Floor" && t.applicableFloor === space.floor,
+        if (daysOverdue <= 0) return 0;
+        
+        let applicableTiersForScope: ClientPenaltyTier[] = [];
+        const spaceSpecificTiers = penaltyTiers.filter(
+            t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
         );
-        if (floorSpecificTiers.length > 0) {
-          applicableTiersForScope = floorSpecificTiers;
+
+        if (spaceSpecificTiers.length > 0) {
+            applicableTiersForScope = spaceSpecificTiers;
         } else {
-          applicableTiersForScope = penaltyTiers.filter(
-            (t) => t.scope === "Building",
-          );
+            const floorSpecificTiers = penaltyTiers.filter(
+                t => t.scope === 'Floor' && t.applicableFloor === space.floor
+            );
+            if (floorSpecificTiers.length > 0) {
+                applicableTiersForScope = floorSpecificTiers;
+            } else {
+                applicableTiersForScope = penaltyTiers.filter(t => t.scope === 'Building');
+            }
         }
-      }
-      if (applicableTiersForScope.length === 0) return 0;
+        
+        if (applicableTiersForScope.length === 0) return 0;
 
-      const sortedTiers = [...applicableTiersForScope].sort(
-        (a, b) => a.fromDay - b.fromDay,
-      );
-      let calculatedPenalty = 0;
+        const sortedTiers = [...applicableTiersForScope].sort((a, b) => a.fromDay - b.fromDay);
+        
+        let totalPenalty = 0;
+        const oneTimeFeesApplied = new Set<string>();
 
-      for (const tier of sortedTiers) {
-        if (
-          daysOverdue >= tier.fromDay &&
-          (tier.toDay === null ||
-            tier.toDay === undefined ||
-            daysOverdue <= tier.toDay)
-        ) {
-          if (tier.penaltyType === "Fixed") {
-            calculatedPenalty = tier.feeValue;
-          } else if (tier.penaltyType === "Percentage") {
-            calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
-          }
-          break;
+        // Iterate day by day
+        for (let day = 1; day <= daysOverdue; day++) {
+            const tierForDay = sortedTiers.find(tier => 
+                day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
+            );
+
+            if (tierForDay) {
+                const feeValue = Number(tierForDay.feeValue);
+                let dailyFee = 0;
+
+                if (tierForDay.penaltyType === 'Fixed') {
+                    dailyFee = feeValue;
+                } else if (tierForDay.penaltyType === 'Percentage') {
+                    dailyFee = bill.rentAmount * (feeValue / 100);
+                }
+
+                if (tierForDay.frequency === 'Daily') {
+                    totalPenalty += dailyFee;
+                } else if (tierForDay.frequency === 'OneTime') {
+                    // Only add the one-time fee if it hasn't been added for this tier yet
+                    if (!oneTimeFeesApplied.has(tierForDay.id!)) {
+                        totalPenalty += dailyFee;
+                        oneTimeFeesApplied.add(tierForDay.id!);
+                    }
+                }
+            }
         }
-      }
-      return parseFloat(calculatedPenalty.toFixed(2));
+
+        return parseFloat(totalPenalty.toFixed(2));
     },
-    [agreement, today],
+    [agreement, today]
   );
 
   const processedBills = useMemo(() => {
