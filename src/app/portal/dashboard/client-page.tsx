@@ -645,7 +645,7 @@ export function CustomerDashboardClientPage({
                                   bill.currentStatus || bill.status,
                                 )}
                                 <span className="ml-1">
-                                  {(bill.currentStatus || bill.status)}
+                                  {(bill.currentStatus || bill.status).replace('PendingVerification', 'Verifying')}
                                 </span>
                               </Badge>
                             </TableCell>
@@ -695,7 +695,6 @@ export function CustomerDashboardClientPage({
                                       accept=".pdf" 
                                       {...proofForm.register('proofFile')}
                                       disabled={isSubmitting}
-                                      ref={proofFileInputRef}
                                     />
                                 </FormControl>
                                 <FormMessage/>
