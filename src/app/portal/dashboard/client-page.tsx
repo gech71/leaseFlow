@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/custom/PageHeader";
 import {
@@ -97,7 +97,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  initiateArifpayPaymentAction,
+  submitPaymentProofAction,
   sendContactEmailAction,
 } from "./actions";
 import { Loader2 } from "lucide-react";
@@ -121,6 +121,13 @@ const contactFormSchema = z.object({
 });
 type ContactFormValues = z.infer<typeof contactFormSchema>;
 
+const proofFormSchema = z.object({
+  notes: z.string().optional(),
+  proofFile: z.any().refine(files => files?.length === 1, "Payment proof file is required."),
+});
+type ProofFormValues = z.infer<typeof proofFormSchema>;
+
+
 export function CustomerDashboardClientPage({
   initialData,
 }: {
@@ -132,7 +139,9 @@ export function CustomerDashboardClientPage({
   const [today, setToday] = useState(startOfDay(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isContactFormOpen, setIsContactFormOpen] = useState(false);
-  const [payingBillId, setPayingBillId] = useState<string | null>(null);
+  const [payingBill, setPayingBill] = useState<ClientBill | null>(null);
+
+  const proofFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -154,12 +163,40 @@ export function CustomerDashboardClientPage({
     defaultValues: { subject: "", body: "" },
   });
 
-  const handlePayNow = async (bill: ClientBill) => {
-    toast({
-      title: "Action Required",
-      description: "Please use your NIB SuperApp to complete the payment.",
-    });
+  const proofForm = useForm<ProofFormValues>({
+      resolver: zodResolver(proofFormSchema)
+  });
+
+  const handleOpenProofDialog = (bill: ClientBill) => {
+    setPayingBill(bill);
   };
+  
+  const handleProofSubmit = async (values: ProofFormValues) => {
+    if (!payingBill) return;
+    
+    setIsSubmitting(true);
+    
+    // In a real app, you would upload the file to a storage service (like S3, Firebase Storage)
+    // and get a URL. For this prototype, we'll just use the filename.
+    const fileName = values.proofFile[0]?.name || 'unknown_proof_file';
+
+    const result = await submitPaymentProofAction({
+      billId: payingBill.id,
+      paymentProofUrl: fileName, // This would be the actual URL in a real app
+      notes: values.notes
+    });
+    setIsSubmitting(false);
+
+    if (result.success) {
+      toast({ title: "Proof Submitted", description: "Your payment proof has been submitted for verification." });
+      setPayingBill(null);
+      proofForm.reset();
+      router.refresh();
+    } else {
+      toast({ title: "Submission Failed", description: result.error, variant: "destructive" });
+    }
+  };
+
 
   const handleContactFormSubmit = async (values: ContactFormValues) => {
     setIsSubmitting(true);
@@ -331,6 +368,8 @@ export function CustomerDashboardClientPage({
         return "default";
       case "Overdue":
         return "destructive";
+      case 'PendingVerification':
+        return 'outline';
       default:
         return "default";
     }
@@ -343,6 +382,8 @@ export function CustomerDashboardClientPage({
         return <Info className="mr-1 h-3 w-3" />;
       case "Overdue":
         return <AlertTriangle className="mr-1 h-3 w-3 text-red-600" />;
+      case 'PendingVerification':
+        return <Clock className="mr-1 h-3 w-3 text-blue-600" />;
       default:
         return <User className="mr-1 h-3 w-3" />;
     }
@@ -613,12 +654,8 @@ export function CustomerDashboardClientPage({
                                 bill.currentStatus === "Overdue") && (
                                 <Button
                                   size="sm"
-                                  onClick={() => handlePayNow(bill)}
-                                  disabled={payingBillId !== null}
+                                  onClick={() => handleOpenProofDialog(bill)}
                                 >
-                                  {payingBillId === bill.id ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  ) : null}
                                   Pay Now
                                 </Button>
                               )}
@@ -634,6 +671,67 @@ export function CustomerDashboardClientPage({
           </div>
         </div>
       </div>
+
+      <Dialog open={!!payingBill} onOpenChange={(isOpen) => { if (!isOpen) { setPayingBill(null); proofForm.reset(); } }}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle className="font-headline">Submit Payment Proof</DialogTitle>
+                <DialogDescription>
+                    For bill due on {payingBill ? format(parseISO(payingBill.dueDate), 'PP') : ''}. 
+                    Total amount: {payingBill?.calculatedTotal?.toFixed(2)} Birr.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...proofForm}>
+                <form onSubmit={proofForm.handleSubmit(handleProofSubmit)} className="space-y-4 py-2">
+                    <FormField
+                        control={proofForm.control}
+                        name="proofFile"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center"><Paperclip className="mr-2 h-4 w-4"/>Payment Proof (Image/PDF)</FormLabel>
+                                <FormControl>
+                                    <Input 
+                                      type="file" 
+                                      accept="image/*,.pdf" 
+                                      {...proofForm.register('proofFile')}
+                                      disabled={isSubmitting}
+                                      ref={proofFileInputRef}
+                                    />
+                                </FormControl>
+                                <FormMessage/>
+                            </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={proofForm.control}
+                        name="notes"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Notes (e.g., Transaction ID)</FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="Add any relevant notes for the administrator..."
+                                        {...field}
+                                        disabled={isSubmitting}
+                                    />
+                                </FormControl>
+                                <FormMessage/>
+                            </FormItem>
+                        )}
+                    />
+                    <DialogFooter className="pt-4">
+                        <DialogClose asChild>
+                            <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <UploadCloud className="mr-2 h-4 w-4"/>}
+                            Submit for Verification
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </Form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isContactFormOpen} onOpenChange={setIsContactFormOpen}>
         <DialogContent>
@@ -709,5 +807,3 @@ export function CustomerDashboardClientPage({
     </>
   );
 }
-
-    

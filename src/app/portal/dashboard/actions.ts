@@ -19,6 +19,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
 import crypto from "crypto";
+import { revalidatePath } from 'next/cache';
 
 // --- Normalization Helper ---
 // Corrected to handle PascalCase keys like 'URL' without mangling them.
