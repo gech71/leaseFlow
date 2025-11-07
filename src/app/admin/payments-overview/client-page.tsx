@@ -293,7 +293,6 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       'Reference': bill.paymentReference || 'N/A',
       'Tenant Notes': bill.tenantPaymentNotes || 'N/A',
       'Admin Notes': bill.adminVerificationNotes || 'N/A',
-      'Proof URL': bill.paymentProofUrl || 'N/A',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(worksheetData);
