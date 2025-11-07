@@ -1,8 +1,9 @@
 import type React from 'react';
 import AdminClientLayout from './admin-client-layout';
 import type { Metadata } from 'next';
-import { auth } from '@/lib/auth';
-import { SessionProvider } from 'next-auth/react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import AuthProvider from '@/contexts/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'LeaseFlow',
@@ -13,10 +14,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   return (
-    <SessionProvider session={session}>
+    <AuthProvider session={session}>
         <AdminClientLayout>{children}</AdminClientLayout>
-    </SessionProvider>
+    </AuthProvider>
   );
 }

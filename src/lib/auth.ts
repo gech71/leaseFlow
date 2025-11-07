@@ -50,7 +50,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.password) {
-          // User not found or has no password set
+          // User not found or has no password set (e.g., created via external provider originally)
           return null;
         }
 
@@ -63,7 +63,8 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Return a simplified user object. The JWT callback will enrich it.
+        // IMPORTANT FIX: After validating password, return the full user object with relations.
+        // This ensures the `user` object passed to the `jwt` callback is complete.
         return {
           id: user.id,
           name: user.name,
@@ -72,7 +73,7 @@ export const authOptions: NextAuthOptions = {
           firstName: user.firstName,
           lastName: user.lastName,
           phoneNumber: user.phoneNumber,
-          effectivePermissions: [], // This will be populated in the JWT callback
+          effectivePermissions: Array.from(new Set(user.roles.flatMap(r => r.permissions))), // Pre-calculate permissions
         };
       },
     }),
@@ -86,10 +87,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.roles = user.roles;
-        // Calculate and add effectivePermissions here
-        token.effectivePermissions = Array.from(
-          new Set(user.roles.flatMap((r) => r.permissions))
-        );
+        token.effectivePermissions = user.effectivePermissions;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
         token.phoneNumber = user.phoneNumber;
@@ -111,7 +109,6 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
-    // error: '/auth/error', // (optional)
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
