@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
     const fixedAuthHeader = rawToken ? `Bearer ${rawToken}` : null;
     
     if (!fixedAuthHeader) {
-    throw new Error('Invalid Authorization header format.');
+      console.error('Invalid Authorization header format on callback.');
+      return NextResponse.json({ message: "Invalid auth header." }, { status: 401 });
     }
 
 
@@ -73,47 +74,50 @@ export async function POST(request: NextRequest) {
         signature: receivedSignature
     } = requestBody;
 
-    if (!transactionId || !receivedSignature) {
-        console.error("Callback Error: Missing required fields (transactionId, signature) in callback data.", requestBody);
+    if (!transactionId) {
+        console.error("Callback Error: Missing required fields (transactionId) in callback data.", requestBody);
         return NextResponse.json({ message: "Missing required fields." }, { status: 400 });
     }
 
-    // --- Step 2 & 3: Find the Bill and Compare Signatures ---
+    // --- Step 2 & 3: Find Bills and Compare Signatures ---
     try {
-        const bill = await prisma.bill.findFirst({
+        const bills = await prisma.bill.findMany({
             where: {
                 tenantPaymentNotes: {
-                    contains: `Transaction ID: ${txnRef}`
+                    contains: `Group Transaction Ref: ${transactionId}`
                 }
             }
         });
 
-        if (!bill) {
-            console.warn(`Callback Success: Received valid callback for transaction ${transactionId}, but no matching bill was found.`);
+        if (bills.length === 0) {
+            console.warn(`Callback Success: Received valid callback for transaction ${transactionId}, but no matching bills were found.`);
             // Acknowledge to NIB that we received it, even if we can't find the bill, to prevent retries.
-            return NextResponse.json({ message: "Callback acknowledged, no action taken." }, { status: 200 });
+            return NextResponse.json({ message: "Callback acknowledged, no matching bills found." }, { status: 200 });
         }
 
         
         // --- Step 4: Update Database ---
-        // If we reach here, the signature is valid.
-        await databaseService.updateBill(bill.id, {
-            status: 'Paid',
-            paymentDate: new Date(), 
-            paymentReference: txnRef, // Overwrite the stored signature with the final NIB transaction reference.
-            adminVerifiedPayment: true, 
-            adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Ref: ${transactionId}.`,
-            totalAmount: paidAmount ? parseFloat(paidAmount) : bill.totalAmount,
-            // Reset tenant notes to clean up the stored transaction ID.
-            tenantPaymentNotes: `Paid via NIB. Original Transaction ID: ${transactionId}.`,
+        // Since this is a group payment, we mark all found bills as paid.
+        await prisma.bill.updateMany({
+            where: {
+                id: { in: bills.map(b => b.id) }
+            },
+            data: {
+                status: 'Paid',
+                paymentDate: new Date(), 
+                paymentReference: txnRef, // Use the final NIB transaction reference.
+                adminVerifiedPayment: true, 
+                adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Group Ref: ${transactionId}.`,
+                tenantPaymentNotes: `Paid via NIB Super App. Group Transaction ID: ${transactionId}.`,
+            }
         });
 
         
         // --- Step 5: Respond with 200 OK ---
-        return NextResponse.json({ message: "Payment confirmed and updated." }, { status: 200 });
+        return NextResponse.json({ message: "Payment confirmed and all associated bills updated." }, { status: 200 });
 
     } catch (dbError: any) {
-        console.error("Callback DB Error: Failed to process bill after successful validation.", dbError);
+        console.error("Callback DB Error: Failed to process bills after successful validation.", dbError);
         // Important: Still return 200 OK to NIB to prevent them from retrying.
         // We will need to handle this reconciliation separately (e.g., via logging/monitoring).
         return NextResponse.json({ message: "Callback acknowledged, but an internal processing error occurred." }, { status: 200 });

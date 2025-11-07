@@ -5,12 +5,12 @@ import { prisma } from '@/lib/prisma';
 import { addMonths, isAfter, format } from 'date-fns';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
-import type { BillStatus } from '@prisma/client';
+import type { Bill, BillStatus } from '@prisma/client';
 
 interface BillingResult {
   success: boolean;
-  amount?: number | null;
-  billId?: string | null;
+  bills?: (Omit<Bill, 'utilityBreakdown'> & { utilityBreakdown: any[] })[] | null;
+  totalAmount?: number | null;
   message?: string | null;
   error?: string;
 }
@@ -39,29 +39,50 @@ export async function getBillingAmountForPhoneNumberAction(phone: string): Promi
       orderBy: { startDate: 'desc' },
     });
 
-    const activeAgreement = agreements.find(ag => 
+    const activeAgreements = agreements.filter(ag => 
       isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date())
     );
 
-    if (!activeAgreement) {
+    if (activeAgreements.length === 0) {
       return { success: false, error: 'No active rental agreement found for this tenant.' };
     }
 
-    const bill = await prisma.bill.findFirst({
+    const activeAgreementIds = activeAgreements.map(ag => ag.id);
+
+    const outstandingBills = await prisma.bill.findMany({
       where: {
-        agreementId: activeAgreement.id,
+        agreementId: { in: activeAgreementIds },
         status: { in: ['Pending', 'Overdue'] },
       },
       orderBy: {
-        dueDate: 'desc',
+        dueDate: 'asc',
       },
     });
 
-    if (!bill) {
-      return { success: true, amount: 0, billId: null, message: 'You have no outstanding payments. Thank you!' };
+    if (outstandingBills.length === 0) {
+      return { success: true, bills: [], totalAmount: 0, message: 'You have no outstanding payments. Thank you!' };
     }
 
-    return { success: true, amount: bill.totalAmount, billId: bill.id };
+    const totalAmount = outstandingBills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
+    
+    // Serialize utilityBreakdown
+    const serializedBills = outstandingBills.map(bill => {
+        let parsedUtilityBreakdown: any[] = [];
+        if(bill.utilityBreakdown && typeof bill.utilityBreakdown === 'string') {
+            try {
+                parsedUtilityBreakdown = JSON.parse(bill.utilityBreakdown);
+            } catch(e) {/* ignore */}
+        } else if (Array.isArray(bill.utilityBreakdown)) {
+            parsedUtilityBreakdown = bill.utilityBreakdown;
+        }
+
+        return {
+            ...bill,
+            utilityBreakdown: parsedUtilityBreakdown,
+        }
+    });
+
+    return { success: true, bills: serializedBills, totalAmount };
 
   } catch (error) {
     console.error("Error in getBillingAmountForPhoneNumberAction:", error);
@@ -78,15 +99,19 @@ interface PaymentInitiationResult {
     data?: any; 
 }
 
-export async function initiatePaymentAction(billId: string, amount: number): Promise<PaymentInitiationResult> {
+export async function initiatePaymentAction(billIds: string[], amount: number): Promise<PaymentInitiationResult> {
     const NIB_PAYMENT_URL = process.env.NIB_PAYMENT_URL;
     const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
     const COMPANY_NAME = process.env.NIB_COMPANY_NAME || 'BUILDING';
     const CALLBACK_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/api/portal/payment-callback`;
 
     try {
-        const bill = await prisma.bill.findUnique({
-            where: { id: billId },
+        if (billIds.length === 0) {
+          return { success: false, error: "No bills selected for payment." };
+        }
+
+        const firstBill = await prisma.bill.findUnique({
+            where: { id: billIds[0] },
             include: {
                 agreement: {
                     include: {
@@ -100,14 +125,14 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
             }
         });
 
-        if (!bill) {
+        if (!firstBill) {
             return { success: false, error: "Bill to be paid was not found." };
         }
         
-        const buildingAccountNumber = bill.agreement?.space?.building?.accountNumber;
+        const buildingAccountNumber = firstBill.agreement?.space?.building?.accountNumber;
 
         if (!buildingAccountNumber) {
-            console.error(`CRITICAL: Building account number is not set for the building associated with bill ${billId}.`);
+            console.error(`CRITICAL: Building account number is not set for the building associated with bill ${firstBill.id}.`);
             return { success: false, error: "The property's account information is not configured. Please contact support." };
         }
 
@@ -166,11 +191,11 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
             return { success: false, error: responseData.message || `Payment initiation failed with status ${response.status}.` };
         }
         
-        await prisma.bill.update({
-            where: { id: billId },
+        // Update all bills with the same transaction reference for the callback
+        await prisma.bill.updateMany({
+            where: { id: { in: billIds } },
             data: { 
-              status: 'Pending', 
-              tenantPaymentNotes: `Payment initiated with NIB. Transaction ID: ${payload.transactionId}`,
+              tenantPaymentNotes: `Payment initiated with NIB. Group Transaction Ref: ${transactionId}`,
               paymentReference: signature
             }
         });
@@ -189,10 +214,14 @@ export async function initiatePaymentAction(billId: string, amount: number): Pro
 }
 
 // --- New Bill Status Action ---
-export async function getBillStatusAction(billId: string): Promise<{ status: BillStatus | null, error?: string }> {
+export async function getBillStatusAction(billIds: string[]): Promise<{ status: BillStatus | null, error?: string }> {
   try {
+    if (billIds.length === 0) {
+      return { status: null, error: "No bill IDs provided." };
+    }
+    // Check the status of the first bill in the batch, assuming they all get updated together.
     const bill = await prisma.bill.findUnique({
-      where: { id: billId },
+      where: { id: billIds[0] },
       select: { status: true },
     });
 

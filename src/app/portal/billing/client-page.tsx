@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -13,14 +12,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { CheckCircle, Phone, Loader2, Banknote, AlertCircle, Info, RefreshCw, AlertOctagon } from 'lucide-react';
+import { CheckCircle, Phone, Loader2, Banknote, AlertCircle, Info, RefreshCw, AlertOctagon, FileText, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getBillingAmountForPhoneNumberAction, initiatePaymentAction, getBillStatusAction } from './actions';
+import type { Bill } from '@prisma/client';
+import { format, parseISO } from 'date-fns';
 
+interface BillInfo extends Omit<Bill, 'utilityBreakdown'> {
+  utilityBreakdown: any[];
+}
 interface BillingInfo {
-  amount: number | null;
+  bills: BillInfo[] | null;
+  totalAmount: number | null;
   message: string | null;
-  billId: string | null;
 }
 
 interface MyJsChannel {
@@ -41,10 +45,8 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   
-  // Use a ref to hold the interval ID to manage it across renders
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup interval on component unmount
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
@@ -57,13 +59,13 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
     setIsLoading(true);
     setBillingInfo(null);
     setError(null);
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); // Stop any previous polling
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     setIsPolling(false);
 
     const result = await getBillingAmountForPhoneNumberAction(phone);
 
     if (result.success) {
-      setBillingInfo({ amount: result.amount ?? null, message: result.message ?? null, billId: result.billId ?? null });
+      setBillingInfo({ bills: result.bills ?? null, totalAmount: result.totalAmount ?? null, message: result.message ?? null });
     } else {
       setError(result.error || 'An unknown error occurred.');
     }
@@ -72,19 +74,20 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   };
   
   const handlePayNow = async () => {
-      if (!billingInfo?.billId || billingInfo.amount === null) {
-          toast({ title: "Error", description: "No bill selected for payment.", variant: "destructive" });
+      const billIds = billingInfo?.bills?.map(b => b.id);
+      if (!billIds || billIds.length === 0 || billingInfo.totalAmount === null) {
+          toast({ title: "Error", description: "No bills selected for payment.", variant: "destructive" });
           return;
       }
       setIsLoading(true);
-      const result = await initiatePaymentAction(billingInfo.billId, billingInfo.amount);
+      const result = await initiatePaymentAction(billIds, billingInfo.totalAmount);
       
       
       if (result.success && result.data?.token) {
           toast({ title: "Action Required", description: "Please use your NIB SuperApp to complete the payment." });
           if (typeof window !== 'undefined' && window.myJsChannel?.postMessage) {
             window.myJsChannel.postMessage({ token: result.data.token });
-            startPolling(billingInfo.billId);
+            startPolling(billIds);
           } else {
             console.error("NIB Super App channel (window.myJsChannel) not found.");
             setError("Could not communicate with the payment app. Please try again.");
@@ -95,7 +98,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
       setIsLoading(false);
   };
 
-  const startPolling = (billId: string) => {
+  const startPolling = (billIds: string[]) => {
     setIsPolling(true);
     let pollCount = 0;
     const maxPolls = 60; // Poll for 5 minutes (60 polls * 5 seconds)
@@ -109,11 +112,11 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
         return;
       }
 
-      const statusResult = await getBillStatusAction(billId);
+      const statusResult = await getBillStatusAction(billIds);
       if (statusResult.status === 'Paid') {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         setIsPolling(false);
-        setBillingInfo({ amount: 0, message: "Payment was successful!", billId: null });
+        setBillingInfo({ bills: [], totalAmount: 0, message: "Payment was successful!" });
       } else if (statusResult.status === 'Pending' || statusResult.status === 'Overdue') {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         setIsPolling(false);
@@ -184,13 +187,35 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
 
           {!isPolling && billingInfo && (
             <div className="mt-6 p-4 bg-secondary/40 border rounded-lg animate-fadeIn space-y-4">
-              {billingInfo.amount !== null && billingInfo.amount > 0 ? (
+              {billingInfo.bills && billingInfo.bills.length > 0 && billingInfo.totalAmount && billingInfo.totalAmount > 0 ? (
                 <>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Outstanding Amount Due</p>
+                  <div className="space-y-3">
+                    <p className="font-semibold text-foreground">Outstanding Bills:</p>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                      {billingInfo.bills.map(bill => (
+                        <div key={bill.id} className="p-3 bg-background/50 rounded-md border text-sm">
+                          <div className="flex justify-between items-start">
+                            <div className="font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary"/> Bill for {format(parseISO(bill.billDate), 'MMM yyyy')}</div>
+                            <div className="font-bold text-lg">{Number(bill.totalAmount).toFixed(2)}</div>
+                          </div>
+                           <div className="text-xs text-muted-foreground pl-6 space-y-0.5 mt-1">
+                              <div>Rent: {Number(bill.rentAmount).toFixed(2)}</div>
+                              {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 && (
+                                <div>Utilities: {bill.utilityBreakdown.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}</div>
+                              )}
+                              {bill.penaltyAmount && Number(bill.penaltyAmount) > 0 && (
+                                <div className="text-destructive">Penalty: {Number(bill.penaltyAmount).toFixed(2)}</div>
+                              )}
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="border-t pt-4">
+                    <p className="text-sm text-muted-foreground">Total Amount Due</p>
                     <p className="text-4xl font-bold font-headline text-primary flex items-baseline gap-2">
                       <Banknote className="h-8 w-8" />
-                      {billingInfo.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {billingInfo.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       <span className="text-2xl text-muted-foreground font-medium">Birr</span>
                     </p>
                   </div>
@@ -201,7 +226,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                     style={{ backgroundColor: '#fdb913' }}
                   >
                     {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                    Pay Now
+                    Pay Total Amount
                   </Button>
                 </>
               ) : (
