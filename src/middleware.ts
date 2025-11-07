@@ -1,5 +1,4 @@
 
-import { auth } from '@/lib/auth';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const publicPaths = [
@@ -7,15 +6,37 @@ const publicPaths = [
     "/portal/connect", 
     "/api/portal/payment-callback",
     "/api/portal/Arifcallback",
-    "/api/auth",
+    "/api/auth", // Allow all /api/auth routes, including our new session check
 ];
 
-export default auth((request) => {
-  const { pathname } = request.nextUrl;
-  const isLoggedIn = !!request.auth;
+// This is a helper function to check authentication status by calling our internal API
+async function isAuthenticated(request: NextRequest): Promise<boolean> {
+  const sessionCookie = request.cookies.get('authjs.session-token');
+  
+  // If there's no session cookie, the user is definitely not logged in.
+  if (!sessionCookie) {
+    return false;
+  }
 
+  // Call the internal API to verify the session.
+  // We must forward the cookie to the API route.
+  const response = await fetch(new URL('/api/auth/session', request.url), {
+    headers: {
+      'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
+    }
+  });
+
+  // If the API returns a 200 OK status, the user is authenticated.
+  return response.ok;
+}
+
+
+export default async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  
   const isPublic = publicPaths.some(path => pathname.startsWith(path));
 
+  // --- Security Headers ---
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
     default-src 'self';
@@ -46,30 +67,37 @@ export default auth((request) => {
   responseHeaders.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   responseHeaders.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   responseHeaders.set("Pragma", "no-cache");
+  // --- End Security Headers ---
+
+  const isLoggedIn = await isAuthenticated(request);
   
   if (isPublic) {
     if (isLoggedIn && pathname.startsWith('/login')) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
+    // Always allow public paths
     return NextResponse.next({
       headers: responseHeaders,
     });
   }
 
+  // If the path is not public and user is not logged in, redirect to login
   if (!isLoggedIn) {
-    const url = new URL('/login', request.url);
-    url.searchParams.set('callbackUrl', request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
   }
   
+  // If user is logged in and at the root, redirect to the dashboard
   if (pathname === '/') {
     return NextResponse.redirect(new URL('/admin/dashboard', request.url));
   }
-
+  
+  // If everything is fine, proceed with the request
   return NextResponse.next({
     headers: responseHeaders,
   });
-});
+}
 
 export const config = {
   matcher: [
