@@ -62,25 +62,22 @@ export default function AdminLoginPage() {
     setIsLoading(false);
 
     if (result?.error) {
-        const userResponse = await fetch(`/api/user/by-phone?phone=${phoneNumber}`);
-        if(userResponse.ok) {
-            const userData = await userResponse.json();
-            if(userData.user?.tempPassword) {
-                toast({
-                    title: "Password Change Required",
-                    description: "For your security, you must change your temporary password.",
-                });
-                changePasswordForm.setValue("currentPassword", password);
-                setShowChangePasswordDialog(true);
-                return;
-            }
+        // The error from NextAuth when credentials are bad is "CredentialsSignin"
+        // We can also check the status.
+        if (result.error === 'CredentialsSignin' || result.status === 401) {
+            toast({
+                title: "Login Failed",
+                description: "Invalid credentials. Please check your phone number and password.",
+                variant: "destructive",
+            });
+        } else {
+            // Handle other potential errors, like network issues, though less common here.
+             toast({
+                title: "Login Error",
+                description: result.error,
+                variant: "destructive",
+            });
         }
-        
-        toast({
-            title: "Login Failed",
-            description: "Invalid credentials. Please check your phone number and password.",
-            variant: "destructive",
-        });
     } else if (result?.ok) {
         toast({
             title: "Login Successful",
