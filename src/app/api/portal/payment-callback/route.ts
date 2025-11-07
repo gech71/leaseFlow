@@ -19,7 +19,7 @@ async function validateNibToken(authHeader: string | null): Promise<boolean> {
     }
 
     try {
-        console.log({NIB_VALIDATE_TOKEN_URL});
+     
         const externalResponse = await fetch(NIB_VALIDATE_TOKEN_URL, {
             method: 'GET',
             headers: { 'Authorization': authHeader, 'Accept': 'application/json' },
@@ -35,7 +35,7 @@ async function validateNibToken(authHeader: string | null): Promise<boolean> {
 export async function POST(request: NextRequest) {
     // --- Step 1: Token Validation ---
     const authHeader = request.headers.get('Authorization');
-    console.log({ authHeader });
+  
 
     // Extract the token from the string like: Bearer {token: YOUR_TOKEN}
     const tokenMatch = authHeader?.match(/token:\s*(.+)\s*}/);
@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
     throw new Error('Invalid Authorization header format.');
     }
 
-    console.log({ fixedAuthHeader });
 
     const isTokenValid = await validateNibToken(fixedAuthHeader);
     if (!isTokenValid) {
@@ -109,7 +108,6 @@ export async function POST(request: NextRequest) {
             tenantPaymentNotes: `Paid via NIB. Original Transaction ID: ${transactionId}.`,
         });
 
-        console.log(`Successfully updated bill ${bill.id} to 'Paid' via NIB callback for transaction ${transactionId}.`);
         
         // --- Step 5: Respond with 200 OK ---
         return NextResponse.json({ message: "Payment confirmed and updated." }, { status: 200 });

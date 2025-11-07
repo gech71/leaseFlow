@@ -1,12 +1,17 @@
+export const dynamic = "force-dynamic";
 
-export const dynamic = 'force-dynamic';
-
-import { databaseService } from '@/lib/services/databaseService';
-import type { Space as SpaceTypePrisma, Building as BuildingTypePrisma, Prisma, User, Role } from '@prisma/client';
-import { SpacesClientPage, type SpaceWithBuildingName } from './components';
-import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
-import { addMonths, isAfter, isBefore, startOfDay } from 'date-fns';
-import { prisma } from '@/lib/prisma';
+import { databaseService } from "@/lib/services/databaseService";
+import type {
+  Space as SpaceTypePrisma,
+  Building as BuildingTypePrisma,
+  Prisma,
+  User,
+  Role,
+} from "@prisma/client";
+import { SpacesClientPage, type SpaceWithBuildingName } from "./components";
+import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
+import { addMonths, isAfter, isBefore, startOfDay } from "date-fns";
+import { prisma } from "@/lib/prisma";
 
 // This is the main Server Component for the page
 export default async function SpacesPage() {
@@ -20,21 +25,24 @@ export default async function SpacesPage() {
       space: {
         isOccupied: true,
         // Limit the check to buildings managed by the current user if not super admin
-        ...(!isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {})
-      }
+        ...(!isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {}),
+      },
     },
     select: {
       id: true,
       startDate: true,
       paymentTermMonths: true,
       spaceId: true,
-    }
+    },
   });
 
   const spaceIdsToVacate: string[] = [];
   for (const agreement of expiredAgreementsOnOccupiedSpaces) {
     if (agreement.spaceId) {
-      const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
+      const agreementEndDate = addMonths(
+        agreement.startDate,
+        agreement.paymentTermMonths,
+      );
       if (isBefore(agreementEndDate, today)) {
         spaceIdsToVacate.push(agreement.spaceId);
       }
@@ -43,69 +51,91 @@ export default async function SpacesPage() {
 
   // If we found any spaces to vacate, update them in a batch transaction.
   if (spaceIdsToVacate.length > 0) {
-    console.log(`Auto-vacating ${spaceIdsToVacate.length} spaces from expired agreements.`);
     await prisma.space.updateMany({
       where: {
-        id: { in: spaceIdsToVacate }
+        id: { in: spaceIdsToVacate },
       },
       data: {
         isOccupied: false,
-        tenantId: null // Disconnect the tenant from the space
-      }
+        tenantId: null, // Disconnect the tenant from the space
+      },
     });
   }
   // --- End Automatic Logic ---
-  
-  const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
-  const buildingWhere: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds! } } : {};
 
-  const spacesData = await databaseService.getAllSpaces({ 
+  const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin
+    ? { buildingId: { in: managedBuildingIds! } }
+    : {};
+  const buildingWhere: Prisma.BuildingWhereInput = !isSuperAdmin
+    ? { id: { in: managedBuildingIds! } }
+    : {};
+
+  const spacesData = await databaseService.getAllSpaces({
     where: spaceWhere,
-    include: { 
-        building: true,
-        agreements: true,
+    include: {
+      building: true,
+      agreements: true,
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: "desc" },
   });
-  const buildingsData = await databaseService.getAllBuildings({ where: buildingWhere, orderBy: { name: 'asc' } });
+  const buildingsData = await databaseService.getAllBuildings({
+    where: buildingWhere,
+    orderBy: { name: "asc" },
+  });
 
   // Serialize dates and structure data for the client component
-  const serializableSpaces: SpaceWithBuildingName[] = spacesData.map(space => {
-    let availabilityDate: string | null = null;
-    if (space.isOccupied && space.agreements.length > 0) {
-      const activeAgreements = space.agreements
-        .filter(ag => isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date()))
-        .sort((a,b) => b.startDate.getTime() - a.startDate.getTime());
+  const serializableSpaces: SpaceWithBuildingName[] = spacesData.map(
+    (space) => {
+      let availabilityDate: string | null = null;
+      if (space.isOccupied && space.agreements.length > 0) {
+        const activeAgreements = space.agreements
+          .filter((ag) =>
+            isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date()),
+          )
+          .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
 
-      if (activeAgreements.length > 0) {
-        const endDate = addMonths(activeAgreements[0].startDate, activeAgreements[0].paymentTermMonths);
-        availabilityDate = endDate.toISOString();
+        if (activeAgreements.length > 0) {
+          const endDate = addMonths(
+            activeAgreements[0].startDate,
+            activeAgreements[0].paymentTermMonths,
+          );
+          availabilityDate = endDate.toISOString();
+        }
       }
-    }
-    
-    return {
-      ...space,
-      area: Number(space.area),
-      utilityProrationShare: Number(space.utilityProrationShare),
-      monthlyRentalPrice: Number(space.monthlyRentalPrice),
-      createdAt: space.createdAt.toISOString(),
-      updatedAt: space.updatedAt?.toISOString() || new Date().toISOString(), 
-      buildingName: space.building.name,
-      availabilityDate,
-      agreements: space.agreements.map(ag => ({
-        ...ag,
-        monthlyRentalPrice: Number(ag.monthlyRentalPrice),
-        initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
-      }))
-    };
-  });
 
-  const serializableBuildings: BuildingTypePrisma[] = buildingsData.map(building => ({
-    ...building,
-    createdAt: building.createdAt.toISOString(),
-    updatedAt: building.updatedAt?.toISOString() || new Date().toISOString(),
-    penaltyPolicyTiers: (building as any).penaltyPolicyTiers || [],
-  }));
+      return {
+        ...space,
+        area: Number(space.area),
+        utilityProrationShare: Number(space.utilityProrationShare),
+        monthlyRentalPrice: Number(space.monthlyRentalPrice),
+        createdAt: space.createdAt.toISOString(),
+        updatedAt: space.updatedAt?.toISOString() || new Date().toISOString(),
+        buildingName: space.building.name,
+        availabilityDate,
+        agreements: space.agreements.map((ag) => ({
+          ...ag,
+          monthlyRentalPrice: Number(ag.monthlyRentalPrice),
+          initialPaymentAmount: ag.initialPaymentAmount
+            ? Number(ag.initialPaymentAmount)
+            : null,
+        })),
+      };
+    },
+  );
 
-  return <SpacesClientPage initialSpaces={serializableSpaces} initialBuildings={serializableBuildings} />;
+  const serializableBuildings: BuildingTypePrisma[] = buildingsData.map(
+    (building) => ({
+      ...building,
+      createdAt: building.createdAt.toISOString(),
+      updatedAt: building.updatedAt?.toISOString() || new Date().toISOString(),
+      penaltyPolicyTiers: (building as any).penaltyPolicyTiers || [],
+    }),
+  );
+
+  return (
+    <SpacesClientPage
+      initialSpaces={serializableSpaces}
+      initialBuildings={serializableBuildings}
+    />
+  );
 }

@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
   try {
     const rawPayload = await request.json();
     const payload = normalizeKeys(rawPayload); // Normalize the incoming payload
-    console.log("Received and normalized ArifPay callback payload:", payload);
+   
 
     const { sessionId, transaction } = payload;
     const { transactionId, transactionStatus, paymentMethod } = transaction || {};
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
           }
         });
       });
-      console.log(`Updated bill ${arifPayment.billId} to 'Paid' based on ArifPay callback.`);
+     
     } else {
       // Handle other statuses like FAILED, CANCELED, EXPIRED
        await prisma.$transaction(async (tx) => {
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           }
         });
       });
-      console.log(`Payment for bill ${arifPayment.billId} was not successful. Status: ${transactionStatus}.`);
+   
     }
 
     // Acknowledge receipt to ArifPay
