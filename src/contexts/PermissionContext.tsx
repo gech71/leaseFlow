@@ -49,58 +49,51 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
       return;
     }
 
-    try {
-      const response = await fetch('/api/user/me');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.isSuccess && data.user) {
-          setCurrentUser(data.user);
-        } else {
-          setCurrentUser(null);
-          const errorMessage = data.errors?.join(', ') || 'User data not found.';
-          setError(errorMessage);
-        }
-      } else {
-        let errorText = `Authentication failed. Status: ${response.status}`;
-        try {
-            const errorData = await response.json();
-            errorText = errorData.errors?.join(', ') || errorText;
-        } catch (e) {
-        }
-        setCurrentUser(null);
-        setError(errorText);
-      }
-    } catch (error) {
-      const errorMessage = (error as Error).message || 'A network error occurred while fetching user data.';
-      setCurrentUser(null);
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+    if (status === 'authenticated' && session?.user) {
+        // Construct CurrentUser from session data
+        const roles = session.user.roles || [];
+        const permissions = session.user.permissions || [];
+        
+        const user: CurrentUser = {
+            id: session.user.id,
+            email: session.user.email || 'No Email',
+            name: session.user.name || 'No Name',
+            roles: roles.map(roleName => ({
+                id: roleName, // Placeholder, as full role objects aren't in session
+                name: roleName,
+                permissions: permissions, 
+            })),
+            effectivePermissions: permissions
+        };
+        setCurrentUser(user);
+        setIsLoading(false);
     }
-  }, [status]);
+
+  }, [status, session]);
   
   useEffect(() => {
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
+  const isSuperAdmin = useMemo(() => {
+    return currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') || false;
+  }, [currentUser]);
+
   const hasPermission = useCallback((permission: PermissionId | PermissionId[]): boolean => {
-    if (!currentUser || !currentUser.effectivePermissions) return false;
     if (isSuperAdmin) return true;
+    if (!currentUser || !currentUser.effectivePermissions) return false;
+    
     if (Array.isArray(permission)) {
       return permission.every(p => currentUser.effectivePermissions.includes(p));
     }
     return currentUser.effectivePermissions.includes(permission);
-  }, [currentUser]);
+  }, [currentUser, isSuperAdmin]);
 
   const hasAnyPermission = useCallback((permissions: PermissionId[]): boolean => {
-    if (!currentUser || !currentUser.effectivePermissions) return false;
     if (isSuperAdmin) return true;
+    if (!currentUser || !currentUser.effectivePermissions) return false;
     return permissions.some(p => currentUser.effectivePermissions.includes(p));
-  }, [currentUser]);
-  
-  const isSuperAdmin = useMemo(() => {
-    return currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') || false;
-  }, [currentUser]);
+  }, [currentUser, isSuperAdmin]);
 
   const refetchUser = useCallback(async () => {
     setIsLoading(true);
@@ -132,3 +125,5 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     </PermissionContext.Provider>
   );
 };
+
+    

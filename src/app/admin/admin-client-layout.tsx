@@ -77,6 +77,12 @@ const allNavItems: NavItem[] = [
   { href: '/admin/billing', label: 'Billing', icon: Banknote, requiredPermissions: ['billing:view', 'billing:generate', 'billing:manage_payments'] },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, requiredPermissions: ['payment_overview:view'] },
   { 
+    href: '/admin/import',
+    label: 'Import',
+    icon: UploadCloud,
+    requiredPermissions: ['import:manage']
+  },
+  { 
     href: '/admin/settings', 
     label: 'Settings', 
     icon: Settings, 
@@ -91,7 +97,6 @@ const allNavItems: NavItem[] = [
       'settings:email_configuration:view',
       'settings:email_configuration:manage',
       'settings:forgot_password:send_reset',
-      'import:manage',
     ]
   },
 ];
@@ -117,7 +122,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       });
       signOut({ callbackUrl: '/login' });
     }
-  }, [permissionsLoading, currentUser, toast, permissionError]);
+  }, [permissionsLoading, currentUser, toast, permissionError, router]);
 
   useEffect(() => {
     if (!permissionsLoading && currentUser?.effectivePermissions) {
@@ -314,3 +319,5 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     </PermissionProvider>
   );
 }
+
+    
