@@ -37,31 +37,15 @@ export default function AdminForgotPasswordPage() {
   });
 
   const handleSendReset = async (values: ForgotPasswordValues) => {
-    if (!canSendReset) {
-        toast({ title: "Permission Denied", description: "You do not have permission to send password resets.", variant: "destructive" });
-        return;
-    }
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/Auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: values.phoneNumber }),
-      });
-      const data = await response.json();
-      if (response.ok && data.isSuccess && data.token) {
-        toast({
-            title: "Redirecting to reset password...",
-        });
-        router.push(`/admin/settings/reset-password?phone=${values.phoneNumber}&token=${data.token}`);
-      } else {
-        toast({ title: "Request Failed", description: data.errors?.join(', ') || "Failed to initiate password reset.", variant: "destructive" });
-      }
-    } catch (error) {
-      toast({ title: "Request Error", description: "Could not connect to the authentication service.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
+    // This functionality is deprecated in favor of direct admin password reset
+    // from the User Management page.
+    toast({
+      title: "Function Deprecated",
+      description: "Please use the 'Reset Password' button on the User Management page.",
+      variant: "default",
+      duration: 10000,
+    });
+    router.push('/admin/settings/user-management');
   };
 
   return (
@@ -69,7 +53,7 @@ export default function AdminForgotPasswordPage() {
         <PageHeader
             title="Password Reset"
             icon={KeyRound}
-            description="Change user password"
+            description="This page is deprecated. Use the 'Reset Password' function in User Management."
             actions={
             <Link href="/admin/settings" passHref>
                 <Button variant="outline">
@@ -81,31 +65,24 @@ export default function AdminForgotPasswordPage() {
         <Card className="w-full max-w-lg mx-auto shadow-lg">
             <CardHeader>
                 <CardTitle>Password Reset</CardTitle>
-                <CardDescription>Enter the user's phone number.</CardDescription>
+                <CardDescription>
+                  This function has been moved to the User Management page for better security and workflow.
+                </CardDescription>
             </CardHeader>
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSendReset)}>
                     <CardContent>
-                        <FormField
-                            control={form.control}
-                            name="phoneNumber"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center">
-                                <Phone className="mr-2 h-4 w-4 text-primary" /> User's Phone Number
-                                </FormLabel>
-                                <FormControl>
-                                <Input {...field} placeholder="Enter user's phone number" className="text-base" disabled={isLoading || !canSendReset} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
+                       <p className="text-sm text-muted-foreground">
+                        To reset a user's password, please go to{" "}
+                        <Link href="/admin/settings/user-management" className="text-primary underline">
+                           User Management
+                        </Link>
+                        , find the user, and use the password reset option there.
+                       </p>
                     </CardContent>
                     <CardFooter>
-                         <Button type="submit" className="w-full" disabled={isLoading || !canSendReset}>
-                            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
-                            Next
+                         <Button onClick={() => router.push('/admin/settings/user-management')} className="w-full">
+                            Go to User Management
                         </Button>
                     </CardFooter>
                 </form>

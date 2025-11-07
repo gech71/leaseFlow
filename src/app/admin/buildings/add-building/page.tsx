@@ -1,3 +1,4 @@
+
 export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
@@ -77,10 +78,15 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
 export default async function AddBuildingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ id?: string }>;
+  searchParams?: { id?: string, view?: string };
 }) {
-  const params = await searchParams;
-  const pageTitle = params?.id ? "Edit Building" : "Add New Building";
+  const id = searchParams?.id;
+  const isView = searchParams?.view === 'true';
+
+  let pageTitle = "Add New Building";
+  if (id) {
+    pageTitle = isView ? "View Building Details" : "Edit Building";
+  }
 
   return (
     <div className="animate-fadeIn">
@@ -102,7 +108,7 @@ export default async function AddBuildingPage({
           </div>
         }
       >
-        <BuildingDataFetcher buildingId={params?.id} />
+        <BuildingDataFetcher buildingId={id} />
       </Suspense>
     </div>
   );

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -15,6 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 import { changePasswordAction } from './actions';
 import { signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -30,6 +32,7 @@ type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 export function AdminProfileClientPage() {
   const { currentUser, isLoading: isUserLoading } = usePermissions();
   const { toast } = useToast();
+  const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -48,8 +51,8 @@ export function AdminProfileClientPage() {
 
     if (result.success) {
       toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
-      form.reset();
-      await signOut({ callbackUrl: '/login' });
+      // The signOut is now handled in the server action, but we redirect here.
+      router.push('/login');
     } else {
       toast({ title: "Error", description: result.error, variant: "destructive" });
     }

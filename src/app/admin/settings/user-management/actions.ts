@@ -8,9 +8,8 @@ import { Prisma, type User, type Role } from '@prisma/client';
 import { cookies, headers } from 'next/headers';
 import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { prisma } from '@/lib/prisma';
+import bcrypt from "bcrypt";
 
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
-const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 
 export async function getUserManagementPageData() {
@@ -47,7 +46,6 @@ export async function getUserManagementPageData() {
       where: userWhereClause,
       select: {
         id: true,
-        userId: true,
         email: true,
         name: true,
         firstName: true,
@@ -59,6 +57,7 @@ export async function getUserManagementPageData() {
         roles: true, 
         managedBuildings: true,
         createdUsers: true,
+        createdById: true,
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -132,42 +131,15 @@ export async function updateUserNamesAction(
     lastName: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
-    if (!AUTH_API_BASE_URL) {
-        console.error("Auth API base URL is not configured.");
-        return { success: false, error: "Authentication service is not configured." };
-    }
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
       return { success: false, error: "Permission denied." };
     }
 
-    const adminAccessToken = (await cookies()).get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-    if (!adminAccessToken) {
-        return { success: false, error: "Admin authentication token not found." };
-    }
-
-    const localUserToUpdate = await databaseService.getUserById(userId);
-    if (!localUserToUpdate) {
+    const userToUpdate = await databaseService.getUserById(userId);
+    if (!userToUpdate) {
         return { success: false, error: "User not found." };
-    }
-    
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/update-user`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${adminAccessToken}`,
-        },
-        body: JSON.stringify({
-            phoneNumber: localUserToUpdate.phoneNumber,
-            firstName: data.firstName,
-            lastName: data.lastName,
-        }),
-    });
-
-    if (!externalResponse.ok) {
-        const errorData = await externalResponse.json().catch(() => ({ errors: ["Failed to update user name on identity server."] }));
-        return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred on the identity server.' };
     }
     
     await databaseService.updateUser(userId, {
@@ -176,7 +148,7 @@ export async function updateUserNamesAction(
         name: `${data.firstName} ${data.lastName}`.trim(),
     });
     
-    const tenantProfile = await databaseService.findTenantByEmailOrPhone(localUserToUpdate.email, localUserToUpdate.phoneNumber);
+    const tenantProfile = await databaseService.findTenantByEmailOrPhone(userToUpdate.email, userToUpdate.phoneNumber);
     if (tenantProfile) {
         await databaseService.updateTenant(tenantProfile.id, { name: `${data.firstName} ${data.lastName}`.trim() });
     }
@@ -195,41 +167,15 @@ export async function changeUserPhoneNumberAction(
   userId: string,
   newPhoneNumber: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (!AUTH_API_BASE_URL) {
-        console.error("Auth API base URL is not configured.");
-        return { success: false, error: "Authentication service is not configured." };
-    }
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
       return { success: false, error: "Permission denied." };
     }
 
-    const adminAccessToken = (await cookies()).get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-    if (!adminAccessToken) {
-        return { success: false, error: "Admin authentication token not found." };
-    }
-
     const localUserToUpdate = await databaseService.getUserById(userId);
     if (!localUserToUpdate || !localUserToUpdate.phoneNumber) {
         return { success: false, error: "User not found or current phone number is missing." };
-    }
-
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-phone-number`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminAccessToken}`,
-      },
-      body: JSON.stringify({
-        currentPhoneNumber: localUserToUpdate.phoneNumber,
-        newPhoneNumber: newPhoneNumber,
-      }),
-    });
-
-    if (!externalResponse.ok) {
-      const errorData = await externalResponse.json().catch(() => ({ errors: ["Failed to change phone number on identity server."] }));
-      return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred.' };
     }
     
     await databaseService.updateUser(userId, {
@@ -250,5 +196,37 @@ export async function changeUserPhoneNumberAction(
     console.error("Error in changeUserPhoneNumberAction:", error);
     return { success: false, error: error.message || "Failed to change phone number." };
   }
+}
+
+export async function resetPasswordAction(userId: string): Promise<{ success: boolean; error?: string; tempPassword?: string }> {
+    try {
+        const { isSuperAdmin, permissions, currentUser: adminUser } = await getUserAndPermissions();
+        if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
+            return { success: false, error: "Permission denied to reset passwords." };
+        }
+        
+        const userToReset = await databaseService.getUserById(userId);
+        if (!userToReset) {
+            return { success: false, error: "User not found." };
+        }
+
+        // Security check: Admins cannot reset other super admins. Only a super admin can reset their own password via profile page.
+        if (userToReset.roles.some(r => r.name === 'SUPER_ADMIN') && userToReset.id !== adminUser.id) {
+            return { success: false, error: "Super Admin passwords can only be changed via their own profile page." };
+        }
+        
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        
+        await databaseService.updateUser(userId, {
+            password: hashedPassword,
+            tempPassword: tempPassword,
+        });
+
+        revalidatePath('/admin/settings/user-management');
+        return { success: true, tempPassword: tempPassword };
+    } catch(e: any) {
+        return { success: false, error: "Failed to reset password." };
+    }
 }
     

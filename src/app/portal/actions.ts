@@ -12,11 +12,13 @@ export async function setPortalSessionAction(token: string, phone: string): Prom
       return { success: false, error: "User not found." };
     }
     
+    // For the mini-app flow, we are not checking passwords.
+    // The trust is based on the validated NIB token.
     await signIn("credentials", {
         redirect: false,
         phoneNumber: user.phoneNumber,
-        isFromMiniApp: true, // Special flag to bypass password check in authorize
-        miniAppToken: token, // Pass the token for potential logging/auditing
+        password: `mini-app-login-${token}`, // Use a dummy password
+        isFromMiniApp: true,
     });
 
     return { success: true };

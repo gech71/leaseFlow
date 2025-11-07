@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,8 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff, InfoIcon, Clipboard, UserCog } from 'lucide-react';
-import { updateUserAssignments, updateUserNamesAction, changeUserPhoneNumberAction } from './actions';
+import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff, InfoIcon, Clipboard, UserCog, KeyRound } from 'lucide-react';
+import { updateUserAssignments, updateUserNamesAction, changeUserPhoneNumberAction, resetPasswordAction } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/contexts/PermissionContext';
@@ -23,6 +24,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 export interface ClientRole extends Omit<Role, 'createdAt' | 'updatedAt'> {
@@ -72,11 +83,14 @@ export function UserManagementClientPage({
   
   const [isAssignmentsDialogOpen, setIsAssignmentsDialogOpen] = useState(false);
   const [isUserDetailsDialogOpen, setIsUserDetailsDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   
   const [currentUserToEdit, setCurrentUserToEdit] = useState<ClientUserWithAssignments | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(new Set());
   const [buildingSearchTerm, setBuildingSearchTerm] = useState('');
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -236,6 +250,19 @@ export function UserManagementClientPage({
         toast({ title: "Update Failed", description: errors.join(' '), variant: "destructive"});
     }
   };
+  
+  const handleResetPassword = async () => {
+    if (!currentUserToEdit) return;
+    setIsSaving(true);
+    const result = await resetPasswordAction(currentUserToEdit.id);
+    setIsSaving(false);
+    if(result.success && result.tempPassword) {
+        setGeneratedPassword(result.tempPassword);
+    } else {
+        toast({ title: "Error", description: result.error, variant: "destructive"});
+        setIsResetPasswordDialogOpen(false);
+    }
+  }
 
   const copyToClipboard = (textToCopy: string) => {
     navigator.clipboard.writeText(textToCopy);
@@ -317,6 +344,14 @@ export function UserManagementClientPage({
                         {user.managedBuildings.length > 0 ? user.managedBuildings.map(b => b.name).join(', ') : <span className="italic text-muted-foreground">No buildings</span>}
                       </TableCell>
                       <TableCell className="text-right space-x-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => {setCurrentUserToEdit(user); setIsResetPasswordDialogOpen(true);}} disabled={isSaving || !canManageUserAssignments}>
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Reset Password</p></TooltipContent>
+                        </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleEditUserDetails(user)} disabled={isSaving || !canManageUserAssignments}>
@@ -436,8 +471,8 @@ export function UserManagementClientPage({
                 <Form {...userDetailsForm}>
                     <form onSubmit={userDetailsForm.handleSubmit(handleSaveUserDetails)} className="space-y-4 py-2">
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField control={userDetailsForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={userDetailsForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={userDetailsForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={userDetailsForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                         </div>
                         <FormField control={userDetailsForm.control} name="phoneNumber" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                         <div className="space-y-1">
@@ -455,6 +490,40 @@ export function UserManagementClientPage({
                 </Form>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog open={isResetPasswordDialogOpen} onOpenChange={(open) => { if (!open) { setCurrentUserToEdit(null); setGeneratedPassword(null); } setIsResetPasswordDialogOpen(open); }}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Reset Password</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {generatedPassword 
+                            ? "A new temporary password has been generated. Please copy it and provide it to the user."
+                            : `Are you sure you want to reset the password for ${currentUserToEdit?.name}? This will generate a new temporary password.`
+                        }
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                {generatedPassword ? (
+                    <div className="p-4 bg-secondary rounded-md text-center space-y-2">
+                        <p className="text-sm text-muted-foreground">New Temporary Password:</p>
+                        <div className="flex items-center justify-center gap-2">
+                            <p className="text-lg font-bold font-mono">{generatedPassword}</p>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(generatedPassword)}>
+                                <Clipboard className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => { setIsResetPasswordDialogOpen(false); setGeneratedPassword(null); }}>Close</AlertDialogCancel>
+                    {!generatedPassword && (
+                        <AlertDialogAction onClick={handleResetPassword} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                            Yes, Reset Password
+                        </AlertDialogAction>
+                    )}
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </Card>

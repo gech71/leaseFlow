@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -14,6 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 import type { Tenant as TenantPrisma } from '@prisma/client';
 import { AlertTriangle } from 'lucide-react';
+import { changePasswordAction } from '@/app/admin/profile/actions'; // Use the same robust action
+import { useRouter } from 'next/navigation';
 
 
 const changePasswordSchema = z.object({
@@ -34,6 +37,7 @@ interface TenantProfileClientPageProps {
 
 export function TenantProfileClientPage({ initialTenant, error }: TenantProfileClientPageProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -47,29 +51,14 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
 
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
-    try {
-        // The API route will get the token from the cookie
-        const { currentPassword, newPassword } = values;
-        const response = await fetch('/api/Auth/change-password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ currentPassword, newPassword }),
-        });
+    const result = await changePasswordAction(values);
+    setIsSaving(false);
 
-        const data = await response.json();
-
-        if (response.ok && data.isSuccess) {
-            toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
-            form.reset();
-            await fetch('/api/Auth/logout', { method: 'POST' });
-            window.location.href = '/login';
-        } else {
-            toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
-        }
-    } catch (error) {
-        toast({ title: "Error", description: "An unexpected error occurred while changing your password.", variant: "destructive" });
-    } finally {
-        setIsSaving(false);
+    if (result.success) {
+        toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
+        router.push('/login');
+    } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" });
     }
   };
 

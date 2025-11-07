@@ -6,6 +6,7 @@ import { addMonths, isAfter, format } from 'date-fns';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import type { Bill, BillStatus } from '@prisma/client';
+import { auth } from '@/lib/auth'; // Import next-auth helper
 
 interface BillingResult {
   success: boolean;
@@ -109,6 +110,11 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
         if (billIds.length === 0) {
           return { success: false, error: "No bills selected for payment." };
         }
+        
+        const session = await auth();
+        if (!session?.user?.id) {
+           return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };
+        }
 
         const firstBill = await prisma.bill.findUnique({
             where: { id: billIds[0] },
@@ -140,16 +146,17 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
             console.error("NIB payment environment variables (URL or KEY) are not set.");
             return { success: false, error: "Payment service is not configured correctly." };
         }
-
-        const cookieStore = await cookies();
-        const token = cookieStore.get('nibrental_admin_access_token')?.value;
-
-        if (!token) {
-            return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };
-        }
-
+        
         const transactionId = crypto.randomUUID();
         const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
+
+        // Note: The NIB flow seems to depend on a custom token, not the standard next-auth session.
+        // We assume the cookie is still being set by the custom /connect flow.
+        const token = cookies().get('mini_app_auth_token')?.value; // Using a placeholder name
+        if (!token) {
+            return { success: false, error: "Mini-app authentication token not found." };
+        }
+
 
         const signatureString = [
             `accountNo=${buildingAccountNumber}`,

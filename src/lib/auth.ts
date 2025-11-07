@@ -1,3 +1,4 @@
+
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
@@ -13,9 +14,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         phoneNumber: { label: 'Phone Number', type: 'text' },
         password: { label: 'Password', type: 'password' },
+        isFromMiniApp: { label: 'Is from Mini App', type: 'text' }, // Custom flag
       },
       async authorize(credentials) {
-        if (!credentials?.phoneNumber || !credentials.password) {
+        if (!credentials?.phoneNumber) {
           return null;
         }
 
@@ -28,8 +30,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         });
 
-        if (!user || !user.password) {
+        if (!user) {
           return null;
+        }
+
+        // If it's a login from the mini-app, we trust the upstream validation and bypass password check.
+        if (credentials.isFromMiniApp === "true") {
+           return {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                image: null,
+                roles: user.roles,
+                tempPassword: user.tempPassword,
+            };
+        }
+        
+        if (!credentials.password || !user.password) {
+            return null;
         }
         
         const passwordsMatch = await bcrypt.compare(
@@ -38,11 +56,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
 
         if (passwordsMatch) {
-            // Return a user object that is serializable
             return {
                 id: user.id,
                 name: user.name,
                 email: user.email,
+                image: null, // Ensure image is null if not present
                 phoneNumber: user.phoneNumber,
                 roles: user.roles,
                 tempPassword: user.tempPassword,
@@ -59,8 +77,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
         if (user) {
-            // On sign in, `user` object is available.
-            // Persist the data to the token.
             token.id = user.id;
             const dbUser = user as (User & { roles: Role[], tempPassword?: string | null });
             token.roles = dbUser.roles.map(role => role.name);
@@ -72,7 +88,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user && token.id) {
-        // Add custom properties to the session object
         session.user.id = token.id as string;
         session.user.roles = token.roles as string[];
         session.user.permissions = token.permissions as string[];

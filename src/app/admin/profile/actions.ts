@@ -1,6 +1,7 @@
+
 "use server";
 
-import { auth } from "@/lib/auth";
+import { auth, signOut } from '@/lib/auth';
 import { databaseService } from "@/lib/services/databaseService";
 import bcrypt from "bcrypt";
 import { z } from 'zod';
@@ -35,6 +36,9 @@ export async function changePasswordAction(values: ChangePasswordValues) {
       password: hashedNewPassword,
       tempPassword: null,
     });
+    
+    // After a successful password change, we should sign the user out for security.
+    await signOut({ redirect: false });
 
     return { success: true };
   } catch (error: any) {

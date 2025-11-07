@@ -1,4 +1,5 @@
 
+
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { databaseService } from '@/lib/services/databaseService';
@@ -25,7 +26,6 @@ export async function GET(request: Request) {
 
     const currentUserData: CurrentUser = {
       id: localUser.id,
-      userId: localUser.userId,
       email: localUser.email,
       name: localUser.name || `${localUser.firstName} ${localUser.lastName}`.trim(),
       firstName: localUser.firstName,

@@ -132,6 +132,7 @@ export interface Bill {
   paymentReference?: string | null;
   bankOrWalletName?: string | null;
   paymentProofUrl?: string | null;
+  paymentProofDataUri?: string | null; // Changed for direct storage
   adminVerifiedPayment?: boolean | null;
   tenantPaymentNotes?: string | null;
   adminVerificationNotes?: string | null;
@@ -150,7 +151,6 @@ export interface UserRole {
 
 export interface CurrentUser {
   id: string;
-  userId: string; // External ID
   email: string;
   name: string;
   firstName?: string | null;

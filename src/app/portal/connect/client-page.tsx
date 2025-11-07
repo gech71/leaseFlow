@@ -20,7 +20,6 @@ export function ConnectionSuccessPage({ token, phone }: Props) {
     async function establishSessionAndRedirect() {
       // This is a temporary solution for the portal.
       // We are essentially trusting the NIB token validation and auto-logging in the user.
-      // A more robust solution might involve creating a custom NextAuth provider.
       const result = await setPortalSessionAction(token, phone);
       if (result.success) {
         router.push(`/portal/dashboard`);
