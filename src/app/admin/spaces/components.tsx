@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; 
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,6 +59,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [isSaving, setIsSaving] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterOccupancy, setFilterOccupancy] = useState<'All' | 'Vacant' | 'Occupied'>('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
@@ -69,10 +70,17 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const canViewSpaces = isSuperAdmin || hasPermission('space:view') || canCreateSpaces || canEditSpaces || canDeleteSpaces;
 
 
-  const filteredSpaces = spaces.filter(space =>
-    space.spaceIdName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    space.buildingName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSpaces = spaces.filter(space => {
+    const searchMatch = !searchTerm ||
+      space.spaceIdName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      space.buildingName.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const occupancyMatch = filterOccupancy === 'All' ||
+      (filterOccupancy === 'Vacant' && !space.isOccupied) ||
+      (filterOccupancy === 'Occupied' && space.isOccupied);
+
+    return searchMatch && occupancyMatch;
+  });
   
   const totalPages = Math.ceil(filteredSpaces.length / itemsPerPage);
 
@@ -84,7 +92,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filterOccupancy]);
 
   useEffect(() => {
     const newTotalPages = Math.ceil(filteredSpaces.length / itemsPerPage);
@@ -388,8 +396,8 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       </AlertDialog>
 
       <Card className="mb-6 shadow-sm">
-        <CardContent className="p-4">
-          <div className="relative">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-grow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Filter by space name or building..."
@@ -398,6 +406,14 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="status-filter">Status:</Label>
+             <div className="flex items-center space-x-2">
+                <Button variant={filterOccupancy === 'All' ? 'default' : 'outline'} size="sm" onClick={() => setFilterOccupancy('All')}>All</Button>
+                <Button variant={filterOccupancy === 'Vacant' ? 'default' : 'outline'} size="sm" onClick={() => setFilterOccupancy('Vacant')}>Vacant</Button>
+                <Button variant={filterOccupancy === 'Occupied' ? 'default' : 'outline'} size="sm" onClick={() => setFilterOccupancy('Occupied')}>Occupied</Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -405,9 +421,9 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
          <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Building2 className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm ? 'No Spaces Found' : 'No Spaces Yet'}</h3>
+            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm || filterOccupancy !== 'All' ? 'No Spaces Found' : 'No Spaces Yet'}</h3>
             <p className="text-muted-foreground mb-4">
-              {searchTerm ? 'No spaces match your search.' : (buildings.length > 0 ? "Get started by adding your first rental space." : "Please add buildings first.")}
+              {searchTerm || filterOccupancy !== 'All' ? 'No spaces match your filters.' : (buildings.length > 0 ? "Get started by adding your first rental space." : "Please add buildings first.")}
             </p>
             {!searchTerm && buildings.length > 0 && canCreateSpaces && (
                 <Button onClick={openAddForm} disabled={isSaving}>
