@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { signIn } from 'next-auth/react';
+import { changePasswordAction } from '@/app/admin/profile/actions';
 
 const changePasswordSchema = z.object({
     currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -30,6 +32,7 @@ type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -41,7 +44,6 @@ export default function AdminLoginPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
-  const [changePasswordToken, setChangePasswordToken] = useState<string | null>(null);
 
   const changePasswordForm = useForm<ChangePasswordValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -52,106 +54,91 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      // Call the Next.js API route for login
-      const response = await fetch('/api/Auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phoneNumber, password }),
-      });
+    const result = await signIn('credentials', {
+        redirect: false,
+        phoneNumber,
+        password,
+    });
 
-      const data = await response.json();
+    setIsLoading(false);
 
-      if (response.ok && data.isSuccess) {
-         if (data.requiresPasswordChange) {
-            toast({
-                title: "Password Change Required",
-                description: "For your security, you must change your temporary password.",
-                variant: "default",
-                duration: 5000,
-            });
-            setChangePasswordToken(data.accessToken);
-            changePasswordForm.setValue("currentPassword", password);
-            setShowChangePasswordDialog(true);
-        } else {
-            toast({
-              title: "Login Successful",
-              description: "Redirecting...",
-            });
-            router.push(data.redirectPath || '/admin/dashboard');
+    if (result?.error) {
+        // First check if the error is due to requiring a password change
+        const userResponse = await fetch(`/api/user/by-phone?phone=${phoneNumber}`);
+        if(userResponse.ok) {
+            const userData = await userResponse.json();
+            if(userData.user?.tempPassword) {
+                toast({
+                    title: "Password Change Required",
+                    description: "For your security, you must change your temporary password.",
+                });
+                changePasswordForm.setValue("currentPassword", password);
+                setShowChangePasswordDialog(true);
+                return;
+            }
         }
-      } else {
-        const errorMessages = data.errors?.join(', ') || "Invalid credentials. Please try again.";
+        
+        // Otherwise, it's a generic login error
         toast({
-          title: "Login Failed",
-          description: errorMessages,
-          variant: "destructive",
+            title: "Login Failed",
+            description: "Invalid credentials. Please check your phone number and password.",
+            variant: "destructive",
         });
-      }
-    } catch (error) {
-      console.error("Login API call error:", error);
-      toast({
-        title: "Login Error",
-        description: "Could not connect to the authentication service. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    } else if (result?.ok) {
+        toast({
+            title: "Login Successful",
+            description: "Redirecting...",
+        });
+        const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard';
+        router.push(callbackUrl);
     }
   };
 
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsChangePasswordLoading(true);
-    try {
-        const { currentPassword, newPassword } = values;
 
-        const response = await fetch('/api/Auth/change-password', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${changePasswordToken}`
-             },
-            body: JSON.stringify({
-                currentPassword,
-                newPassword,
-            }),
-        });
+    // We can't use the next-auth session yet, so we log in with the temp password
+    // to get a temporary token for the password change action.
+    const tempSignInResult = await signIn('credentials', {
+      redirect: false,
+      phoneNumber,
+      password: values.currentPassword,
+    });
 
-        const data = await response.json();
-
-        if (response.ok && data.isSuccess) {
+    if (tempSignInResult?.ok) {
+        const changeResult = await changePasswordAction(values);
+        if (changeResult.success) {
             toast({ title: "Password Changed", description: "Your password has been updated successfully. Logging you in..." });
             setShowChangePasswordDialog(false);
+            // Now log in with the new password
             await handleLoginWithNewPassword(values.newPassword);
         } else {
-            toast({ title: "Error", description: data.errors?.join(', ') || "Failed to change password.", variant: "destructive" });
+             toast({ title: "Error", description: changeResult.error, variant: "destructive" });
         }
-    } catch (error) {
-        toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
-    } finally {
-        setIsChangePasswordLoading(false);
+    } else {
+        toast({ title: "Error", description: "Could not verify your temporary password.", variant: "destructive" });
     }
+    
+    setIsChangePasswordLoading(false);
   }
 
   const handleLoginWithNewPassword = async (newPassword: string) => {
       setIsLoading(true);
-      const response = await fetch('/api/Auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumber, password: newPassword }),
+      const result = await signIn('credentials', {
+          redirect: false,
+          phoneNumber,
+          password: newPassword,
       });
-      const data = await response.json();
-      if(response.ok && data.isSuccess) {
-          router.push(data.redirectPath || '/admin/dashboard');
+
+      setIsLoading(false);
+
+      if (result?.ok) {
+          router.push('/admin/dashboard');
       } else {
           toast({ title: "Auto Login Failed", description: "Please log in manually with your new password.", variant: "destructive"});
           setPassword('');
-          setChangePasswordToken(null);
           changePasswordForm.reset();
       }
-      setIsLoading(false);
   }
 
   return (

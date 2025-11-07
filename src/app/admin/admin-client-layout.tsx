@@ -57,6 +57,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PermissionProvider, usePermissions } from '@/contexts/PermissionContext';
 import type { PermissionId } from '@/lib/types';
 import Image from 'next/image';
+import { signOut } from 'next-auth/react';
 
 interface NavItem {
   href: string;
@@ -107,19 +108,17 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // This effect handles redirection for unauthenticated or unauthorized users.
     if (!permissionsLoading && !currentUser) {
-      // Determine the error message. If a specific error was captured (like 404 Not Found), use it.
-      // Otherwise, fall back to a generic session expiration message.
       const title = permissionError ? "Access Denied" : "Session Expired";
       const description = permissionError || "Please log in again to continue.";
 
       toast({
         title: title,
         description: description,
-        variant: "destructive", // Use destructive to highlight the error
+        variant: "destructive",
       });
-      router.push('/login');
+      signOut({ callbackUrl: '/login' });
     }
-  }, [permissionsLoading, currentUser, router, toast, permissionError]);
+  }, [permissionsLoading, currentUser, toast, permissionError]);
 
   useEffect(() => {
     if (!permissionsLoading && currentUser?.effectivePermissions) {
@@ -128,7 +127,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Redirect from profile to dashboard if the user has permission and just logged in.
         if (pathname === '/admin/profile' && hasPermission('dashboard:view')) {
             router.replace('/admin/dashboard');
         }
@@ -137,35 +135,11 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    try {
-      const response = await fetch('/api/Auth/logout', {
-        method: 'POST',
-      });
-      const data = await response.json();
-
-      if (response.ok && data.isSuccess) {
-        toast({
-            title: "Logged Out",
-            description: "You have been successfully logged out.",
-        });
-      } else {
-        toast({
-            title: "Logout Issue",
-            description: data.errors?.join(', ') || "Could not fully complete server logout. Local session cleared.",
-            variant: "default",
-        });
-      }
-    } catch (error) {
-      console.error("Logout API call error:", error);
-      toast({
-          title: "Logout Error",
-          description: "Could not connect to the logout service. Cleared local session.",
-          variant: "default"
-      });
-    } finally {
-      router.push('/login');
-      setIsLoggingOut(false);
-    }
+    await signOut({ callbackUrl: '/login' });
+    toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out.",
+    });
   };
   
   const navItems = React.useMemo(() => {
@@ -173,20 +147,16 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
     
     return allNavItems.filter(item => {
       if (isSuperAdmin) return true; 
-      // For the settings link, show it if the user has ANY of the required settings permissions
       if (item.isSettings) {
         return hasAnyPermission(item.requiredPermissions || []);
       }
       if (!item.requiredPermissions || item.requiredPermissions.length === 0) return true;
       
-      // For all other links, check if they have at least one of the permissions for that specific item
       return hasAnyPermission(item.requiredPermissions); 
     });
   }, [currentUser, permissionsLoading, hasAnyPermission, isSuperAdmin]);
 
 
-  // Show a loader while permissions are loading OR if there's no user (as we are about to redirect).
-  // This prevents a flash of a broken/unauthorized UI.
   if (permissionsLoading || !currentUser) {
      return (
       <div className="flex justify-center items-center h-screen w-screen">
@@ -206,7 +176,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         <SidebarHeader className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
             <AppLogo />
-            {/* This trigger is for mobile, and for desktop when expanded */}
             <SidebarTrigger className="md:group-data-[state=collapsed]/sidebar-wrapper:hidden" />
           </div>
         </SidebarHeader>
@@ -309,9 +278,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
       </Sidebar>
       <main className="flex flex-1 flex-col transition-[margin-left] duration-300 ease-in-out md:ml-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:ml-[var(--sidebar-width)]">
         <header className="flex h-[3.7rem] shrink-0 items-center border-b bg-background px-4 sm:px-6 lg:px-8">
-          {/* This trigger is for mobile view */}
           <SidebarTrigger className="md:hidden" />
-          {/* This trigger is for desktop only, and only when collapsed */}
           <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
         </header>
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">

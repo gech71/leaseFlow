@@ -39,9 +39,9 @@ This document provides an overview of the project setup, key features, and a det
 
 -   **Framework**: Next.js (App Router)
 -   **Language**: TypeScript
+-   **Authentication**: NextAuth.js (Auth.js) with JWT
 -   **Styling**: Tailwind CSS with ShadCN UI components
 -   **Database**: PostgreSQL with Prisma ORM
--   **Authentication**: Handled by an external identity provider, with session management via JWTs.
 -   **Email**: Nodemailer with Gmail SMTP
 
 ## Getting Started
@@ -62,10 +62,12 @@ Create a `.env` file in the project root and populate it with the necessary vari
 # Database connection string for Prisma
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 
-# Base URL for the external authentication service
-NEXT_PUBLIC_AUTH_API_BASE_URL=http://your-auth-service-url
-
-# Base URL of this application, used for constructing callback URLs
+# --- NextAuth.js Configuration ---
+# A secret used to sign and encrypt JWTs.
+# Generate one from your terminal using: openssl rand -base64 32
+AUTH_SECRET=YOUR_NEXTAUTH_SECRET
+# The canonical URL of your application.
+NEXTAUTH_URL=http://localhost:9002
 NEXT_PUBLIC_BASE_URL=http://localhost:9002
 
 # --- Security ---
@@ -132,7 +134,7 @@ SMTP_FROM="Your Company Name <your-email@gmail.com>"
     ```bash
     npm run prisma:seed
     ```
-    *Note: You may need to update the default user ID in `prisma/seed.ts` to match the `sub` claim from your authentication provider's JWT.*
+    *Note: The seed script now creates a default password for the superadmin user. Check `prisma/seed.ts` for the credentials.*
 
 4.  **Start the Development Server**:
     ```bash
@@ -145,10 +147,6 @@ SMTP_FROM="Your Company Name <your-email@gmail.com>"
 ## NIB Mini App Payment Integration
 
 This section details the end-to-end process for handling payments initiated from the NIB Bank Super App (Mini App).
-
-### Overview
-
-The flow is designed to be secure and robust, ensuring that payment requests are authentic and that transaction statuses are reliably updated.
 
 ```mermaid
 sequenceDiagram
@@ -191,11 +189,11 @@ To maintain the user's authenticated state for subsequent actions without contin
 -   **Process**:
     1.  Upon successful token validation in Step 1, the `/portal/connect` page renders a client component (`ConnectionSuccessPage`).
     2.  This component immediately calls a Server Action (`setPortalSessionAction`).
-    3.  The Server Action sets a secure, `HttpOnly` cookie named `nibrental_portal_access_token` containing the validated token.
+    3.  The Server Action sets a secure, `HttpOnly` cookie containing the validated token.
     4.  The user is then automatically redirected to `/portal/billing`.
 -   **Files**:
-    -   `src/app/portal/connect/client-page.tsx` (Calls the action)
-    -   `src/app/portal/actions.ts` (Defines `setPortalSessionAction`)
+    -   `src/app/portal/connect/client-page.tsx`
+    -   `src/app/portal/actions.ts`
 
 ### Step 3: Fetching Billing Info & Initiating Payment
 
@@ -275,7 +273,7 @@ A brief overview of the key directories:
 ├── src/
 │   ├── app/            # Next.js App Router (pages and layouts)
 │   │   ├── admin/      # Admin panel routes
-│   │   ├── api/        # API routes
+│   │   ├── api/        # API routes (including [...nextauth])
 │   │   ├── portal/     # Tenant portal routes
 │   │   └── ...
 │   ├── components/     # Reusable UI components (ShadCN and custom)

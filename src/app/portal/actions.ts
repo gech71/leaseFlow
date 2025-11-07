@@ -2,26 +2,29 @@
 'use server';
 
 import { cookies } from 'next/headers';
+import { signIn } from '@/lib/auth';
+import { databaseService } from '@/lib/services/databaseService';
 
-const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token'; // Use the unified admin token key
-const PORTAL_ACCESS_TOKEN_MAX_AGE = 60 * 60; // 1 hour
-
-export async function setPortalSessionAction(token: string): Promise<{ success: boolean }> {
-  if (!token) {
-    return { success: false };
-  }
+export async function setPortalSessionAction(token: string, phone: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const cookieStore = await cookies();
-    cookieStore.set(PORTAL_ACCESS_TOKEN_KEY, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
-      maxAge: PORTAL_ACCESS_TOKEN_MAX_AGE,
+    const user = await databaseService.findUserByPhoneNumber(phone);
+    if (!user) {
+      return { success: false, error: "User not found." };
+    }
+    
+    await signIn("credentials", {
+        redirect: false,
+        phoneNumber: user.phoneNumber,
+        isFromMiniApp: true, // Special flag to bypass password check in authorize
+        miniAppToken: token, // Pass the token for potential logging/auditing
     });
+
     return { success: true };
   } catch (error) {
-    console.error("Failed to set portal session cookie:", error);
-    return { success: false };
+    console.error("Failed to set portal session:", error);
+    if (error instanceof Error && (error as any).type === 'CredentialsSignin') {
+      return { success: false, error: 'Mini-app login failed.' };
+    }
+    return { success: false, error: 'An unexpected error occurred during session creation.' };
   }
 }
