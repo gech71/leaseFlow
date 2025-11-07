@@ -4,6 +4,9 @@ import type {NextConfig} from 'next';
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   /* config options here */
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client', 'bcrypt'],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
