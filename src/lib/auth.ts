@@ -50,7 +50,6 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.password) {
-          // User not found or has no password set (e.g., created via external provider originally)
           return null;
         }
 
@@ -62,18 +61,19 @@ export const authOptions: NextAuthOptions = {
         if (!isPasswordValid) {
           return null;
         }
+        
+        const effectivePermissions = Array.from(new Set(user.roles.flatMap(r => r.permissions)));
 
-        // IMPORTANT FIX: After validating password, return the full user object with relations.
-        // This ensures the `user` object passed to the `jwt` callback is complete.
+        // Return a plain object to ensure serializability
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          roles: user.roles, // Pass roles to be used in JWT callback
+          roles: user.roles,
+          effectivePermissions: effectivePermissions,
           firstName: user.firstName,
           lastName: user.lastName,
           phoneNumber: user.phoneNumber,
-          effectivePermissions: Array.from(new Set(user.roles.flatMap(r => r.permissions))), // Pre-calculate permissions
         };
       },
     }),
@@ -83,9 +83,11 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      // On sign in, `user` object is available from the authorize function
+      // On sign in, `user` object is the plain object from `authorize`
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
         token.roles = user.roles;
         token.effectivePermissions = user.effectivePermissions;
         token.firstName = user.firstName;
@@ -98,6 +100,8 @@ export const authOptions: NextAuthOptions = {
       // Pass info from the JWT to the session object
       if (token && session.user) {
         session.user.id = token.id;
+        session.user.name = token.name;
+        session.user.email = token.email;
         session.user.roles = token.roles;
         session.user.effectivePermissions = token.effectivePermissions;
         session.user.firstName = token.firstName;
