@@ -13,6 +13,8 @@ async function main() {
     // Clear models with relations first
     await prisma.bill.deleteMany({});
     console.log("Deleted Bills");
+    await prisma.disabledAgreement.deleteMany({});
+    console.log("Deleted DisabledAgreements");
     await prisma.agreement.deleteMany({});
     console.log("Deleted Agreements");
     await prisma.buildingUtilityItem.deleteMany({});
@@ -21,6 +23,8 @@ async function main() {
     console.log("Deleted BuildingMonthlyUtilities");
     await prisma.penaltyTier.deleteMany({});
     console.log("Deleted PenaltyTiers");
+    await prisma.agreementTemplate.deleteMany({});
+    console.log("Deleted AgreementTemplates");
 
     // Clear tenant links from Spaces before deleting tenants
     const spacesWithTenants = await prisma.space.findMany({
