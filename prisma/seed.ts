@@ -123,10 +123,12 @@ async function main() {
   
   const superAdminPassword = 'Password123!';
   const hashedPassword = await bcrypt.hash(superAdminPassword, 10);
+  const superAdminId = "4937a4cc-4df8-4161-a701-fbf0b3d21662";
 
   const superAdminUser = await prisma.user.create({
     data: {
-      id: "4937a4cc-4df8-4161-a701-fbf0b3d21662", // <-- Hardcoded ID for consistency
+      id: superAdminId,
+      userId: superAdminId,
       email: "superadmin@nibrental.com",
       name: "Super Admin",
       firstName: "Super",
