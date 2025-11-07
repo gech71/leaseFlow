@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, Banknote, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2, EyeOff, Paperclip } from 'lucide-react';
+import { ClipboardList, Banknote, CalendarDays, CheckCircle, AlertTriangle, Info, User, HomeIcon, Landmark, Download, Building as BuildingIconLucide, UploadCloud, Loader2, EyeOff, Paperclip, Clock } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Space as SpacePrismaOriginal, Bill as BillPrismaOriginal, Agreement as AgreementPrismaOriginal, Tenant as TenantPrismaOriginal, Building as BuildingPrismaTypeOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, isBefore, startOfDay, getYear, getMonth, differenceInDays } from 'date-fns';
@@ -290,7 +290,6 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       'Status': bill.status,
       'Payment Date': bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A',
       'Payment Method': bill.paymentMethod || 'N/A',
-      'Bank/Wallet': bill.bankOrWalletName || 'N/A',
       'Reference': bill.paymentReference || 'N/A',
       'Tenant Notes': bill.tenantPaymentNotes || 'N/A',
       'Admin Notes': bill.adminVerificationNotes || 'N/A',
@@ -545,5 +544,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
     </div>
   );
 }
+
+    
 
     
