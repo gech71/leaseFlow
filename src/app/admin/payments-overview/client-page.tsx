@@ -116,8 +116,8 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
 
   const [upcomingCurrentPage, setUpcomingCurrentPage] = useState(1);
   const [paidCurrentPage, setPaidCurrentPage] = useState(1);
-  const [upcomingItemsPerPage, setUpcomingItemsPerPage] = useState(3);
-  const [paidItemsPerPage, setPaidItemsPerPage] = useState(3);
+  const [upcomingItemsPerPage, setUpcomingItemsPerPage] = useState(5);
+  const [paidItemsPerPage, setPaidItemsPerPage] = useState(5);
 
   const handleUpcomingItemsPerPageChange = (newSize: number) => {
     setUpcomingItemsPerPage(newSize);
@@ -228,9 +228,9 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
     })
   }, [processedBills, selectedMonth, selectedYear]);
 
-  // Pagination for upcoming bills
-  const upcomingTotalPages = Math.ceil(upcomingAndPendingBills.length / upcomingItemsPerPage);
-  const paginatedUpcomingBills = upcomingAndPendingBills.slice(
+  // Pagination for all transactions
+  const allTransactionsTotalPages = Math.ceil(processedBills.length / upcomingItemsPerPage);
+  const paginatedAllTransactions = processedBills.slice(
     (upcomingCurrentPage - 1) * upcomingItemsPerPage,
     upcomingCurrentPage * upcomingItemsPerPage
   );
@@ -258,6 +258,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       case 'Paid': return 'secondary';
       case 'Pending': return 'default';
       case 'Overdue': return 'destructive';
+      case 'PendingVerification': return 'outline';
       default: return 'default';
     }
   };
@@ -267,6 +268,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       case 'Paid': return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'Pending': return <Info className="h-4 w-4 text-yellow-600" />;
       case 'Overdue': return <AlertTriangle className="h-4 w-4 text-red-600" />;
+      case 'PendingVerification': return <Clock className="h-4 w-4 text-blue-600" />;
       default: return <Info className="h-4 w-4 text-gray-500" />;
     }
   };
@@ -324,13 +326,13 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       <PageHeader
         title="Payments Overview"
         icon={ClipboardList}
-        description="View upcoming, pending, and paid transactions. Analyze potential and collected revenue. Penalties are applied based on building policies."
+        description="View all transactions. Analyze potential and collected revenue. Penalties are applied based on building policies."
       />
       
       <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-8">
         <Card className="shadow-sm bg-secondary/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Upcoming/Awaiting</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Unpaid</CardTitle>
             <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -362,19 +364,19 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
 
       <section className="mb-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          <h2 className="text-2xl font-headline font-semibold text-foreground">Upcoming & Overdue Payments</h2>
-          {upcomingAndPendingBills.length > 0 && canViewPage && (
-            <Button variant="outline" size="sm" onClick={() => exportToExcel(upcomingAndPendingBills, 'Upcoming_Overdue_Payments')}>
-              <Download className="mr-2 h-4 w-4" /> Export
+          <h2 className="text-2xl font-headline font-semibold text-foreground">All Transactions</h2>
+          {processedBills.length > 0 && canViewPage && (
+            <Button variant="outline" size="sm" onClick={() => exportToExcel(processedBills, 'All_Transactions')}>
+              <Download className="mr-2 h-4 w-4" /> Export All
             </Button>
           )}
         </div>
-        {upcomingAndPendingBills.length === 0 ? (
+        {processedBills.length === 0 ? (
           <Card className="text-center py-10 shadow-sm">
             <CardContent>
               <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
               <h3 className="text-lg font-semibold font-headline">All Clear!</h3>
-              <p className="text-muted-foreground">No upcoming or overdue payments.</p>
+              <p className="text-muted-foreground">No transactions found.</p>
             </CardContent>
           </Card>
         ) : (
@@ -395,10 +397,10 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedUpcomingBills.map(bill => {
+                      {paginatedAllTransactions.map(bill => {
                         const utilityTotal = (bill.utilityBreakdown || []).reduce((sum, util) => sum + util.amount, 0);
                         return (
-                          <TableRow key={bill.id}>
+                          <TableRow key={bill.id} className={bill.status === "Paid" ? "bg-green-500/5 hover:bg-green-500/10" : ""}>
                             <TableCell className="font-medium">{bill.tenantName || 'N/A'}</TableCell>
                             <TableCell className="text-xs">{bill.spaceDescription}</TableCell>
                             <TableCell className={bill.status === 'Overdue' ? 'text-destructive font-semibold' : ''}>
@@ -413,7 +415,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                             <TableCell className="text-right font-semibold text-primary whitespace-nowrap">{bill.totalAmount.toFixed(2)} Birr</TableCell>
                             <TableCell className="text-center">
                               <Badge variant={getStatusBadgeVariant(bill.status)} className="capitalize">
-                                {getStatusIcon(bill.status)}<span className="ml-1">{bill.status}</span>
+                                {getStatusIcon(bill.status)}<span className="ml-1">{bill.status.replace('PendingVerification', 'Verifying')}</span>
                               </Badge>
                             </TableCell>
                           </TableRow>
@@ -426,7 +428,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
             </Card>
             <PaginationControls
               currentPage={upcomingCurrentPage}
-              totalPages={upcomingTotalPages}
+              totalPages={allTransactionsTotalPages}
               onPageChange={setUpcomingCurrentPage}
               itemsPerPage={upcomingItemsPerPage}
               onItemsPerPageChange={handleUpcomingItemsPerPageChange}
@@ -543,3 +545,5 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
     </div>
   );
 }
+
+    
