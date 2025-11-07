@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { UserPlus, Loader2, AlertTriangle, EyeOff, Eye, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
@@ -14,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { usePermissions } from '@/contexts/PermissionContext';
+import { createUserAndAccountAction } from './actions'; // Updated action
 
 const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -21,7 +21,7 @@ const registrationFormSchema = z.object({
   phoneNumber: z.string().min(1, { message: "Phone number is required." })
                  .regex(/^(09|07)\d{8}$/, { message: "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678)."}),
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords do not match.",
@@ -62,42 +62,23 @@ export default function UserRegistrationPage() {
     setIsLoading(true);
     setApiError(null);
 
-    try {
-      const response = await fetch('/api/Auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
+    const result = await createUserAndAccountAction(values);
 
-      const data = await response.json();
-
-      if (response.ok && data.isSuccess) {
-        toast({
-          title: "User Registered Successfully",
-          description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management.`,
-        });
-        form.reset(); 
-      } else {
-        const errorMessages = data.errors?.join(', ') || "Failed to register user.";
-        setApiError(errorMessages);
-        toast({
-          title: "Registration Failed",
-          description: errorMessages,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Registration API call error:", error);
-      const errMsg = (error as Error).message || "An unexpected error occurred. Please try again.";
-      setApiError(errMsg);
+    if (result.success) {
       toast({
-        title: "Registration Error",
-        description: errMsg,
+        title: "User Registered Successfully",
+        description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management.`,
+      });
+      form.reset(); 
+    } else {
+      setApiError(result.error || "An unknown error occurred.");
+      toast({
+        title: "Registration Failed",
+        description: result.error || "An unknown error occurred.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
   
   if (!canManageUsersRegistration) {
