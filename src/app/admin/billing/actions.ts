@@ -513,11 +513,9 @@ export async function recordPaymentOrVerificationAction(
   billId: string,
   paymentData: {
     paymentDate: string; 
-    paymentMethod: string;
     paymentReference?: string | null;
-    bankOrWalletName?: string | null;
     adminVerificationNotes?: string | null;
-    adminProofUrl?: string | null;
+    paymentProofUrl?: string | null; // Renamed from adminProofUrl for clarity
   },
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
@@ -582,9 +580,7 @@ export async function recordPaymentOrVerificationAction(
     }
 
     const billUpdateData: Prisma.BillUpdateInput = {
-      paymentMethod: paymentData.paymentMethod,
       paymentReference: paymentData.paymentReference,
-      bankOrWalletName: (paymentData.paymentMethod === "Bank Transfer" || paymentData.paymentMethod === "Wallet") ? paymentData.bankOrWalletName : null,
       adminVerificationNotes: paymentData.adminVerificationNotes,
       penaltyAmount: currentPenalty > 0 ? currentPenalty : null,
     };
@@ -597,16 +593,15 @@ export async function recordPaymentOrVerificationAction(
       newStatus = 'Paid';
       billUpdateData.paymentDate = finalPaymentDate;
       billUpdateData.adminVerifiedPayment = true;
-      if (paymentData.adminProofUrl) {
-        billUpdateData.paymentProofUrl = paymentData.adminProofUrl;
+      billUpdateData.paymentMethod = actionType === 'recordPayment' ? 'Manual' : bill.paymentMethod;
+      if (paymentData.paymentProofUrl) { // Use the renamed prop
+        billUpdateData.paymentProofUrl = paymentData.paymentProofUrl;
       }
     } else if (actionType === 'rejectVerification') {
       newStatus = isBefore(parseISO(bill.dueDate.toISOString()), today) ? 'Overdue' : 'Pending';
-      billUpdateData.adminVerifiedPayment = false;
+      billUpdateData.adminVerifiedPayment = false; // Explicitly set to false
       billUpdateData.paymentDate = null; 
-      billUpdateData.paymentMethod = null;
-      billUpdateData.paymentReference = null;
-      billUpdateData.bankOrWalletName = null;
+      // Do not clear method or reference, keep them for history
       
       const rejectedBaseAmount = Number(bill.rentAmount) + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
       let rejectedPenalty = 0;
@@ -663,7 +658,7 @@ export async function updateBillAdminDetailsAction(
   billId: string,
   data: {
     paymentReference?: string | null;
-    adminProofUrl?: string | null;
+    paymentProofUrl?: string | null;
     adminVerificationNotes?: string | null;
   }
 ) {
@@ -685,8 +680,8 @@ export async function updateBillAdminDetailsAction(
     if (data.paymentReference !== undefined) {
       updateData.paymentReference = data.paymentReference;
     }
-    if (data.adminProofUrl !== undefined) {
-      updateData.paymentProofUrl = data.adminProofUrl;
+    if (data.paymentProofUrl !== undefined) {
+      updateData.paymentProofUrl = data.paymentProofUrl;
     }
     if (data.adminVerificationNotes !== undefined) {
       updateData.adminVerificationNotes = data.adminVerificationNotes;
@@ -738,4 +733,5 @@ export async function updateBillAdminDetailsAction(
     
 
     
+
 

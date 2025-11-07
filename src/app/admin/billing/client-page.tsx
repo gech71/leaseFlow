@@ -41,6 +41,7 @@ import {
   Eye,
   EyeOff,
   Search,
+  Clock
 } from "lucide-react";
 import type {
   Agreement as AgreementPrisma,
@@ -148,32 +149,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const paymentFormSchema = z
-  .object({
-    paymentDate: z.date({ required_error: "Payment date is required." }),
-    paymentMethod: z
-      .string()
-      .min(1, { message: "Payment method is required." }),
-    paymentReference: z.string().optional(),
-    bankOrWalletName: z.string().optional(),
-    adminVerificationNotes: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (
-        (data.paymentMethod === "Bank Transfer" ||
-          data.paymentMethod === "Wallet") &&
-        (!data.bankOrWalletName || data.bankOrWalletName.trim() === "")
-      ) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "Bank/Wallet name is required for this payment method.",
-      path: ["bankOrWalletName"],
-    },
-  );
+const paymentFormSchema = z.object({
+  paymentDate: z.date({ required_error: "Payment date is required." }),
+  paymentReference: z.string().optional(),
+  adminVerificationNotes: z.string().optional(),
+});
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
 const editFormSchema = z.object({
@@ -235,13 +215,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
       paymentDate: new Date(),
-      paymentMethod: "",
       paymentReference: "",
-      bankOrWalletName: "",
       adminVerificationNotes: "",
     },
   });
-  const paymentMethodWatcher = paymentForm.watch("paymentMethod");
 
   const editForm = useForm<EditFormValues>({
     resolver: zodResolver(editFormSchema),
@@ -523,9 +500,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         paymentDate: processedBill?.paymentDate
           ? parseISO(processedBill.paymentDate)
           : new Date(),
-        paymentMethod: processedBill?.paymentMethod || "",
         paymentReference: processedBill?.paymentReference || "",
-        bankOrWalletName: processedBill?.bankOrWalletName || "",
         adminVerificationNotes: processedBill?.adminVerificationNotes || "",
       });
     }
@@ -702,7 +677,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       billForPayment.id,
       {
         paymentDate: billForPayment.paymentDate || new Date().toISOString(),
-        paymentMethod: billForPayment.paymentMethod || 'Proof Submitted',
         adminVerificationNotes: paymentForm.getValues('adminVerificationNotes'),
       },
       actionType
@@ -1100,71 +1074,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={paymentForm.control}
-                  name="paymentMethod"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Payment Method
-                        <span className="text-destructive ml-1">*</span>
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={isReadOnly || isLoading || !canManagePayments}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select payment method" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Card">Card</SelectItem>
-                          <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="Bank Transfer">
-                            Bank Transfer
-                          </SelectItem>
-                          <SelectItem value="Wallet">Wallet</SelectItem>
-                          <SelectItem value="Check">Check</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {(paymentMethodWatcher === "Bank Transfer" ||
-                  paymentMethodWatcher === "Wallet") && (
-                  <FormField
-                    control={paymentForm.control}
-                    name="bankOrWalletName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {paymentMethodWatcher === "Bank Transfer"
-                            ? "Bank Name"
-                            : "Wallet Name"}
-                          <span className="text-destructive ml-1">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={`Enter ${
-                              paymentMethodWatcher === "Bank Transfer"
-                                ? "bank name"
-                                : "wallet name"
-                            }`}
-                            {...field}
-                            disabled={
-                              isReadOnly || isLoading || !canManagePayments
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
                 <FormField
                   control={paymentForm.control}
                   name="paymentReference"
