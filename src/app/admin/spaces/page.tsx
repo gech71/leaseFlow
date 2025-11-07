@@ -5,11 +5,56 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Space as SpaceTypePrisma, Building as BuildingTypePrisma, Prisma, User, Role } from '@prisma/client';
 import { SpacesClientPage, type SpaceWithBuildingName } from './components';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
-import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
+import { addMonths, isAfter, isBefore, startOfDay } from 'date-fns';
+import { prisma } from '@/lib/prisma';
 
 // This is the main Server Component for the page
 export default async function SpacesPage() {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+
+  // --- Automatic Space Vacating Logic ---
+  const today = startOfDay(new Date());
+  // Find agreements that are now expired but their spaces are still marked as occupied.
+  const expiredAgreementsOnOccupiedSpaces = await prisma.agreement.findMany({
+    where: {
+      space: {
+        isOccupied: true,
+        // Limit the check to buildings managed by the current user if not super admin
+        ...(!isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {})
+      }
+    },
+    select: {
+      id: true,
+      startDate: true,
+      paymentTermMonths: true,
+      spaceId: true,
+    }
+  });
+
+  const spaceIdsToVacate: string[] = [];
+  for (const agreement of expiredAgreementsOnOccupiedSpaces) {
+    if (agreement.spaceId) {
+      const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
+      if (isBefore(agreementEndDate, today)) {
+        spaceIdsToVacate.push(agreement.spaceId);
+      }
+    }
+  }
+
+  // If we found any spaces to vacate, update them in a batch transaction.
+  if (spaceIdsToVacate.length > 0) {
+    console.log(`Auto-vacating ${spaceIdsToVacate.length} spaces from expired agreements.`);
+    await prisma.space.updateMany({
+      where: {
+        id: { in: spaceIdsToVacate }
+      },
+      data: {
+        isOccupied: false,
+        tenantId: null // Disconnect the tenant from the space
+      }
+    });
+  }
+  // --- End Automatic Logic ---
   
   const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
   const buildingWhere: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds! } } : {};
