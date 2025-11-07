@@ -80,7 +80,7 @@ export interface ClientAgreementForBill extends Omit<AgreementPrismaOriginal, 'c
 
 export interface ClientUtilityBreakdownItem extends Omit<UtilityBreakdownItemPrismaOriginal, 'id' | 'billId'> { id?: string; billId?: string;}
 
-export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId' | 'rentAmount' | 'penaltyAmount' | 'totalAmount'> {
+export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'updatedAt' | 'billDate' | 'dueDate' | 'paymentDate' | 'agreement' | 'utilityBreakdown' | 'tenantId' | 'agreementId' | 'rentAmount' | 'penaltyAmount' | 'totalAmount' | 'paymentProofUrl'> {
   createdAt: string;
   updatedAt: string;
   billDate: string;
@@ -94,6 +94,7 @@ export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'upda
   rentAmount: number;
   penaltyAmount: number | null;
   totalAmount: number;
+  paymentProofDataUri?: string | null;
 }
 
 
@@ -291,6 +292,7 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
       'Payment Date': bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A',
       'Payment Method': bill.paymentMethod || 'N/A',
       'Reference': bill.paymentReference || 'N/A',
+      'Proof': bill.paymentProofDataUri ? 'Yes' : 'No',
       'Tenant Notes': bill.tenantPaymentNotes || 'N/A',
       'Admin Notes': bill.adminVerificationNotes || 'N/A',
     }));
@@ -506,13 +508,11 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
                           <TableCell>{bill.paymentDate ? format(parseISO(bill.paymentDate), 'PP') : 'N/A'}</TableCell>
                           <TableCell className="hidden lg:table-cell text-xs">
                             {bill.paymentMethod || 'N/A'}
-                            {bill.paymentMethod === 'Bank Transfer' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
-                            {bill.paymentMethod === 'Wallet' && bill.bankOrWalletName && ` (${bill.bankOrWalletName})`}
                           </TableCell>
                           <TableCell className="hidden xl:table-cell text-xs">
-                            {bill.paymentProofUrl ? (
+                            {bill.paymentProofDataUri ? (
                                 <Button asChild variant="link" size="sm" className="p-0 h-auto">
-                                    <a href={bill.paymentProofUrl} target="_blank" rel="noopener noreferrer">
+                                    <a href={bill.paymentProofDataUri} target="_blank" rel="noopener noreferrer">
                                         <Paperclip className="mr-1 h-3 w-3"/>
                                         View
                                     </a>
@@ -543,7 +543,3 @@ export function PaymentsOverviewClientPage({ initialBills, initialSpaces }: Paym
     </div>
   );
 }
-
-    
-
-    
