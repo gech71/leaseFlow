@@ -36,11 +36,11 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
-    if (isServer) {
-        config.externals.push({
-            '@mapbox/node-pre-gyp': 'commonjs @mapbox/node-pre-gyp',
-        });
-    }
+    // This is to solve a bug with bcrypt in Next.js.
+    // It tells Webpack to not try to bundle a specific file from a dependency.
+    config.externals.push({
+      '@mapbox/node-pre-gyp': 'commonjs @mapbox/node-pre-gyp',
+    });
     return config;
   },
 };
