@@ -1,3 +1,4 @@
+
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { databaseService } from "@/lib/services/databaseService";
@@ -62,21 +63,16 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // Calculate effective permissions
-        const effectivePermissions = Array.from(
-          new Set(user.roles.flatMap((r) => r.permissions))
-        );
-
-        // Return the user object to be encoded in the JWT
+        // Return a simplified user object. The JWT callback will enrich it.
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          roles: user.roles,
-          effectivePermissions,
+          roles: user.roles, // Pass roles to be used in JWT callback
           firstName: user.firstName,
           lastName: user.lastName,
           phoneNumber: user.phoneNumber,
+          effectivePermissions: [], // This will be populated in the JWT callback
         };
       },
     }),
@@ -86,11 +82,14 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      // On sign in, `user` object is available
+      // On sign in, `user` object is available from the authorize function
       if (user) {
         token.id = user.id;
         token.roles = user.roles;
-        token.effectivePermissions = user.effectivePermissions;
+        // Calculate and add effectivePermissions here
+        token.effectivePermissions = Array.from(
+          new Set(user.roles.flatMap((r) => r.permissions))
+        );
         token.firstName = user.firstName;
         token.lastName = user.lastName;
         token.phoneNumber = user.phoneNumber;
@@ -117,4 +116,6 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+const handler = NextAuth(authOptions);
+
+export { handler as GET, handler as POST };
