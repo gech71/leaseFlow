@@ -85,7 +85,7 @@ export function AgreementsListClientPage({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
-  const [filterStatus, setFilterStatus] = useState<"Active" | "Inactive">("Active");
+  const [filterStatus, setFilterStatus] = useState<"Active" | "Inactive" | "Expired">("Active");
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
@@ -113,10 +113,17 @@ export function AgreementsListClientPage({
       const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
       const isChronologicallyExpired = isBefore(agreementEndDate, today);
       const isManuallyDisabled = agreement.disabledAgreements.some(da => da.disabledById === currentUserId);
-      const isActive = !isChronologicallyExpired && !isManuallyDisabled;
       
-      const statusMatch = filterStatus === 'Active' ? isActive : !isActive;
-      if (!statusMatch) return false;
+      let status: 'Active' | 'Inactive' | 'Expired';
+      if (isChronologicallyExpired) {
+        status = 'Expired';
+      } else if (isManuallyDisabled) {
+        status = 'Inactive';
+      } else {
+        status = 'Active';
+      }
+
+      if (filterStatus !== status) return false;
 
       // Search term filter
       if (searchTerm) {
@@ -262,6 +269,7 @@ export function AgreementsListClientPage({
              <div className="flex items-center space-x-2">
                 <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
                 <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
+                <Button variant={filterStatus === 'Expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Expired')}>Expired</Button>
             </div>
           </div>
         </CardContent>
@@ -293,9 +301,21 @@ export function AgreementsListClientPage({
           <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {paginatedAgreements.map((agreement) => {
               const overdue = isPaymentOverdue(agreement);
-              const isChronologicallyExpired = isBefore(addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths), today);
+              const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
+              const isChronologicallyExpired = isBefore(agreementEndDate, today);
               const isManuallyDisabled = agreement.disabledAgreements.some(da => da.disabledById === currentUserId);
-              const isActive = !isChronologicallyExpired && !isManuallyDisabled;
+              
+              let status: 'Active' | 'Inactive' | 'Expired';
+              let statusBadgeVariant: 'secondary' | 'outline' | 'destructive' = 'secondary';
+              if (isChronologicallyExpired) {
+                status = 'Expired';
+                statusBadgeVariant = 'destructive';
+              } else if (isManuallyDisabled) {
+                status = 'Inactive';
+                statusBadgeVariant = 'outline';
+              } else {
+                status = 'Active';
+              }
 
               const spaceDesc = agreement.space
                 ? `${agreement.space.spaceIdName}, ${agreement.space.buildingName}`
@@ -304,7 +324,7 @@ export function AgreementsListClientPage({
                 <Card
                   key={agreement.id}
                   className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${
-                    overdue && isActive ? "border-destructive border-2" : ""
+                    overdue && status === 'Active' ? "border-destructive border-2" : ""
                   }`}
                 >
                   <CardHeader>
@@ -315,7 +335,7 @@ export function AgreementsListClientPage({
                       </CardTitle>
                       <div className="flex flex-col items-end space-y-1">
                         {" "}
-                        {overdue && isActive && (
+                        {overdue && status === 'Active' && (
                           <Badge
                             variant="destructive"
                             className="flex items-center"
@@ -324,7 +344,7 @@ export function AgreementsListClientPage({
                             Overdue
                           </Badge>
                         )}{" "}
-                        <Badge variant={isActive ? 'secondary' : 'outline'}>{isActive ? 'Active' : 'Inactive'}</Badge>
+                        <Badge variant={statusBadgeVariant} className="capitalize">{status}</Badge>
                       </div>
                     </div>{" "}
                     <CardDescription>{spaceDesc}</CardDescription>
@@ -336,7 +356,7 @@ export function AgreementsListClientPage({
                     </p>
                     <p>
                       <strong>End Date:</strong>{" "}
-                      {format(addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths), "PP")}
+                      {format(agreementEndDate, "PP")}
                     </p>
                     <p>
                       <strong>Rent:</strong>{" "}
@@ -347,7 +367,7 @@ export function AgreementsListClientPage({
                       <strong>Term:</strong> {agreement.paymentTermMonths}{" "}
                       months
                     </p>
-                    {isActive && (
+                    {status === 'Active' && (
                       <p
                         className={`${
                           overdue ? "text-destructive font-semibold" : ""
