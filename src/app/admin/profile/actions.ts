@@ -37,7 +37,6 @@ export async function changePasswordAction(values: ChangePasswordValues) {
       tempPassword: null,
     });
     
-    // After a successful password change, we should sign the user out for security.
     await signOut({ redirect: false });
 
     return { success: true };

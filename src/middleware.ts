@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth';
+
 import { auth } from '@/lib/auth';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -7,7 +7,7 @@ const publicPaths = [
     "/portal/connect", 
     "/api/portal/payment-callback",
     "/api/portal/Arifcallback",
-    "/api/auth", // Let next-auth handle its own routes
+    "/api/auth",
 ];
 
 export default auth((request) => {
@@ -16,7 +16,6 @@ export default auth((request) => {
 
   const isPublic = publicPaths.some(path => pathname.startsWith(path));
 
-  // --- CSP and Security Headers ---
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
     default-src 'self';
@@ -35,26 +34,26 @@ export default auth((request) => {
     frame-src 'self' blob:;
   `.replace(/\s{2,}/g, " ").trim();
 
-  const response = NextResponse.next();
-  response.headers.set('x-nonce', nonce);
-  response.headers.set('Content-Security-Policy', cspHeader);
-  response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "SAMEORIGIN");
-  response.headers.set("X-XSS-Protection", "1; mode=block");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-  response.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  response.headers.set("Pragma", "no-cache");
-  // --- End Security Headers ---
-
-
+  const responseHeaders = new Headers(request.headers);
+  responseHeaders.set('x-nonce', nonce);
+  responseHeaders.set('Content-Security-Policy', cspHeader);
+  responseHeaders.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  responseHeaders.set("X-Content-Type-Options", "nosniff");
+  responseHeaders.set("X-Frame-Options", "SAMEORIGIN");
+  responseHeaders.set("X-XSS-Protection", "1; mode=block");
+  responseHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  responseHeaders.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  responseHeaders.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  responseHeaders.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  responseHeaders.set("Pragma", "no-cache");
+  
   if (isPublic) {
     if (isLoggedIn && pathname.startsWith('/login')) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
-    return NextResponse.next();
+    return NextResponse.next({
+      headers: responseHeaders,
+    });
   }
 
   if (!isLoggedIn) {
@@ -67,7 +66,9 @@ export default auth((request) => {
     return NextResponse.redirect(new URL('/admin/dashboard', request.url));
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    headers: responseHeaders,
+  });
 });
 
 export const config = {

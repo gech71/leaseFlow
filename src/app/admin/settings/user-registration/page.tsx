@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { UserPlus, Loader2, AlertTriangle, EyeOff, Eye, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
@@ -14,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { usePermissions } from '@/contexts/PermissionContext';
+import { registerUserAction } from './actions';
 
 const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -62,41 +62,24 @@ export default function UserRegistrationPage() {
     setIsLoading(true);
     setApiError(null);
 
-    try {
-      const response = await fetch('/api/Auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
+    const result = await registerUserAction(values);
 
-      const data = await response.json();
+    setIsLoading(false);
 
-      if (response.ok && data.isSuccess) {
-        toast({
-          title: "User Registered Successfully",
-          description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management.`,
-        });
-        form.reset(); 
-      } else {
-        const errorMessages = data.errors?.join(', ') || "Failed to register user.";
-        setApiError(errorMessages);
-        toast({
-          title: "Registration Failed",
-          description: errorMessages,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Registration API call error:", error);
-      const errMsg = (error as Error).message || "An unexpected error occurred. Please try again.";
-      setApiError(errMsg);
+    if (result.success) {
       toast({
-        title: "Registration Error",
-        description: errMsg,
+        title: "User Registered Successfully",
+        description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management.`,
+      });
+      form.reset(); 
+      router.refresh(); // Refresh data on user management page
+    } else {
+      setApiError(result.error);
+      toast({
+        title: "Registration Failed",
+        description: result.error,
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
   

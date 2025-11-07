@@ -6,34 +6,40 @@ import { useRouter } from 'next/navigation';
 import { setPortalSessionAction } from '../actions';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { signIn } from 'next-auth/react';
 
 interface Props {
-  token: string;
   phone: string;
 }
 
-export function ConnectionSuccessPage({ token, phone }: Props) {
+export function ConnectionSuccessPage({ phone }: Props) {
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     async function establishSessionAndRedirect() {
-      // This is a temporary solution for the portal.
-      // We are essentially trusting the NIB token validation and auto-logging in the user.
-      const result = await setPortalSessionAction(token, phone);
-      if (result.success) {
+      // For the mini-app flow, we are not checking passwords.
+      // The trust is based on the validated NIB token. We use a dummy password.
+      const result = await signIn("credentials", {
+        redirect: false,
+        phoneNumber: phone,
+        password: `mini-app-login-placeholder`, // Dummy password
+        isFromMiniApp: "true",
+      });
+
+      if (result?.ok) {
         router.push(`/portal/dashboard`);
       } else {
         toast({
           title: "Session Error",
-          description: result.error || "Failed to create a secure session.",
+          description: "Failed to create a secure session.",
           variant: "destructive",
         });
         router.push(`/portal/connect/error?message=session_failed`);
       }
     }
     establishSessionAndRedirect();
-  }, [token, phone, router, toast]);
+  }, [phone, router, toast]);
 
   return (
     <div className="flex flex-col justify-center items-center h-screen w-screen text-center p-4">

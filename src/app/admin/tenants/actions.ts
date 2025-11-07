@@ -5,12 +5,10 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type User as PrismaUser, type Role as PrismaRole, TenantStatus } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns'; 
-import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
 import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
-
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+import bcrypt from 'bcrypt';
 
 function generateTempPassword(length = 12) {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -34,7 +32,7 @@ function generateTempPassword(length = 12) {
 }
 
 
-// This function now expects password and will trigger user registration
+// This function now handles local user creation and password hashing
 export async function createTenantAction(data: {
   name: string;
   email: string;
@@ -59,7 +57,6 @@ export async function createTenantAction(data: {
       };
     }
 
-    // --- Step 2: Check for an existing User account ---
     const existingUser = await databaseService.findUserByEmailOrPhone(data.email, data.phone);
 
     let userForTenant: PrismaUser;
@@ -69,62 +66,27 @@ export async function createTenantAction(data: {
         userForTenant = existingUser;
     } else {
         tempPassword = generateTempPassword();
-        
-        const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cookie': (await headers()).get('Cookie') || "",
-            },
-            body: JSON.stringify({
-                firstName: data.name.split(' ')[0] || data.name,
-                lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
-                phoneNumber: data.phone,
-                email: data.email,
-                password: tempPassword,
-            }),
-        });
-        
-        const responseText = await registrationResponse.text();
-        if (!registrationResponse.ok) {
-            let errorMessages = ["Failed to register user account."];
-             try { if (responseText) { const errorJson = JSON.parse(responseText); errorMessages = errorJson.errors || [errorJson.message] || errorMessages; } } catch (e) { if(responseText && responseText.length < 500) { errorMessages = [responseText]; } }
-            console.error("Failed to register tenant user:", errorMessages);
-            return { success: false, error: `Failed to create user account: ${errorMessages.join(', ')}` };
-        }
-
-        const loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phoneNumber: data.phone, password: tempPassword }),
-        });
-        if (!loginResponse.ok) return { success: false, error: "User registered, but failed to retrieve user ID." };
-        
-        const loginData = await loginResponse.json();
-        const tokenPayload = decodeJwtPayload(loginData.accessToken);
-        const newUserId = tokenPayload?.sub;
-        if (!newUserId) return { success: false, error: "User was created, but the new User ID was not returned." };
-        
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
         const tenantRole = await databaseService.getRoleByName('TENANT');
         if (!tenantRole) return { success: false, error: "The default 'TENANT' role was not found." };
         
         userForTenant = await databaseService.createUser({
-            userId: newUserId,
             email: data.email,
             name: data.name,
             firstName: data.name.split(' ')[0] || data.name,
             lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
             phoneNumber: data.phone,
+            password: hashedPassword,
             tempPassword: tempPassword,
             roles: { connect: { id: tenantRole.id } },
+            createdBy: { connect: { id: adminUser.id } },
         });
         
         const emailHtml = `
-          <h1>Welcome to Building Management Solution!</h1>
+          <h1>Welcome to NIB Building Management Solution!</h1>
           <p>Hello ${data.name},</p>
           <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
-          <p>You can access the portal here: <a href="https://nibrental.nibbank.com.et/login">https://nibrental.nibbank.com.et/login</a></p>
-          <p><strong>Phone Number:</strong> ${data.phone}</p>
+          <p><strong>Login Phone Number:</strong> ${data.phone}</p>
           <p><strong>Temporary Password:</strong> ${tempPassword}</p>
           <p>For your security, you will be required to change this password upon your first login.</p>
           <p>Thank you,</p>
@@ -142,7 +104,7 @@ export async function createTenantAction(data: {
       representativeName: data.representativeName,
       representativePhone: data.representativePhone,
       user: { connect: { id: userForTenant.id } },
-      createdBy: { connect: { id: adminUser.id } }, // Associate tenant with creator
+      createdBy: { connect: { id: adminUser.id } },
     });
 
     revalidatePath('/admin/tenants');
@@ -155,27 +117,6 @@ export async function createTenantAction(data: {
       return { success: false, error: `Failed to create tenant. A tenant with the same ${fieldName} already exists.` };
     }
     return { success: false, error: error.message || "Failed to create tenant." };
-  }
-}
-
-// Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
   }
 }
 
@@ -206,7 +147,6 @@ export async function updateTenantAction(
 
 export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Active' | 'Inactive'): Promise<{ success: boolean; error?: string }> {
   try {
-    // This is the corrected line. We need the full user object with permissions.
     const { currentUser, isSuperAdmin, permissions } = await getUserAndPermissions();
     const { managedBuildingIds } = await getUserAndManagedIds();
 
@@ -214,12 +154,11 @@ export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Act
         return { success: false, error: "You do not have permission to change a tenant's status." };
     }
     
-    // Find all agreements for the tenant within the admin's managed buildings.
     const agreements = await prisma.agreement.findMany({
         where: {
             tenantId: tenantId,
             space: {
-                buildingId: { in: managedBuildingIds ?? undefined } // Super admin has no buildingId filter
+                buildingId: { in: managedBuildingIds ?? undefined }
             }
         },
         select: { id: true }
@@ -228,18 +167,16 @@ export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Act
     const agreementIds = agreements.map(a => a.id);
 
     if (newStatus === 'Inactive') {
-        // Create DisabledAgreement records for all relevant agreements.
         if (agreementIds.length > 0) {
             await prisma.disabledAgreement.createMany({
                 data: agreementIds.map(agreementId => ({
                     agreementId: agreementId,
                     disabledById: currentUser.id
                 })),
-                skipDuplicates: true // Ignore if a record already exists
+                skipDuplicates: true
             });
         }
-    } else { // 'Active'
-        // Delete DisabledAgreement records for the relevant agreements created by this admin.
+    } else { 
         if (agreementIds.length > 0) {
              await prisma.disabledAgreement.deleteMany({
                 where: {
@@ -269,7 +206,6 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
     try {
         const user = await databaseService.findUserByPhoneNumber(phone, { roles: true });
         if (user) {
-            // No need to check for tenant role here. Any user can become a tenant.
             const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
             return { 
                 success: true, 

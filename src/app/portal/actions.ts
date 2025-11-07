@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { signIn } from '@/lib/auth';
 import { databaseService } from '@/lib/services/databaseService';
 
-export async function setPortalSessionAction(token: string, phone: string): Promise<{ success: boolean; error?: string }> {
+export async function setPortalSessionAction(phone: string): Promise<{ success: boolean; error?: string }> {
   try {
     const user = await databaseService.findUserByPhoneNumber(phone);
     if (!user) {
@@ -17,7 +17,7 @@ export async function setPortalSessionAction(token: string, phone: string): Prom
     await signIn("credentials", {
         redirect: false,
         phoneNumber: user.phoneNumber,
-        password: `mini-app-login-${token}`, // Use a dummy password
+        password: `mini-app-login-placeholder`, // Use a dummy password
         isFromMiniApp: true,
     });
 

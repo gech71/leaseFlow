@@ -3,23 +3,27 @@
 
 import { auth } from '@/lib/auth';
 import { databaseService } from '@/lib/services/databaseService';
-import type { User, Role } from '@prisma/client';
 
 async function getCurrentUserFromSession() {
   const session = await auth();
   if (!session?.user?.id) {
-    return null;
+    throw new Error("Authentication required. Session not found.");
   }
-  return databaseService.getUserById(session.user.id, {
+  
+  const user = await databaseService.getUserById(session.user.id, {
     roles: true,
     managedBuildings: { select: { id: true } },
   });
+
+  if (!user) {
+    throw new Error("User from session not found in database.");
+  }
+
+  return user;
 }
 
-// Helper to get user and check permissions
 export async function getUserAndPermissions() {
     const currentUser = await getCurrentUserFromSession();
-    if (!currentUser) throw new Error("Authentication required.");
 
     const isSuperAdmin = currentUser.roles.some(r => r.name === 'SUPER_ADMIN');
     
@@ -31,10 +35,8 @@ export async function getUserAndPermissions() {
     return { currentUser, isSuperAdmin, permissions };
 }
 
-// Helper to get user and their managed building IDs
 export async function getUserAndManagedIds() {
     const currentUser = await getCurrentUserFromSession();
-    if (!currentUser) throw new Error("Authentication required.");
 
     const isSuperAdmin = currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
     

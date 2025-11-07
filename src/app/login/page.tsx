@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { LogIn, Phone, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
-import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
@@ -63,7 +62,6 @@ export default function AdminLoginPage() {
     setIsLoading(false);
 
     if (result?.error) {
-        // First check if the error is due to requiring a password change
         const userResponse = await fetch(`/api/user/by-phone?phone=${phoneNumber}`);
         if(userResponse.ok) {
             const userData = await userResponse.json();
@@ -78,7 +76,6 @@ export default function AdminLoginPage() {
             }
         }
         
-        // Otherwise, it's a generic login error
         toast({
             title: "Login Failed",
             description: "Invalid credentials. Please check your phone number and password.",
@@ -97,8 +94,6 @@ export default function AdminLoginPage() {
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsChangePasswordLoading(true);
 
-    // We can't use the next-auth session yet, so we log in with the temp password
-    // to get a temporary token for the password change action.
     const tempSignInResult = await signIn('credentials', {
       redirect: false,
       phoneNumber,
@@ -110,7 +105,6 @@ export default function AdminLoginPage() {
         if (changeResult.success) {
             toast({ title: "Password Changed", description: "Your password has been updated successfully. Logging you in..." });
             setShowChangePasswordDialog(false);
-            // Now log in with the new password
             await handleLoginWithNewPassword(values.newPassword);
         } else {
              toast({ title: "Error", description: changeResult.error, variant: "destructive" });

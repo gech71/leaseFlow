@@ -11,25 +11,18 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from '@/lib/utils';
 import type { ClientAgreement } from '../dashboard/page';
+import { signOut } from 'next-auth/react';
+
 
 interface PortalLayoutProps {
   children: React.ReactNode;
   agreements: ClientAgreement[];
 }
 
-
-// This is now a simple layout that delegates to a more complex client component
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
     return (
         <div className="min-h-screen flex flex-col bg-background">
@@ -44,7 +37,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     );
 }
 
-// The header is now its own component to manage its state
 function PortalHeader() {
   const router = useRouter();
   const { toast } = useToast();
@@ -52,21 +44,8 @@ function PortalHeader() {
 
   const handleLogout = async () => {
       setIsLoggingOut(true);
-      try {
-          const response = await fetch('/api/Auth/logout', { method: 'POST' });
-          const data = await response.json();
-
-          if (response.ok && data.isSuccess) {
-              toast({ title: "Logged Out", description: "You have been successfully logged out." });
-          } else {
-              toast({ title: "Logout Issue", description: data.errors?.join(', ') || "Could not fully complete server logout.", variant: "default" });
-          }
-      } catch (error) {
-          toast({ title: "Logout Error", description: "Could not connect to the logout service.", variant: "default" });
-      } finally {
-          router.push('/login');
-          setIsLoggingOut(false);
-      }
+      await signOut({ callbackUrl: '/login' });
+      toast({ title: "Logged Out", description: "You have been successfully logged out." });
   };
 
 
@@ -78,7 +57,6 @@ function PortalHeader() {
                 <span className="hidden sm:inline text-lg font-headline font-semibold">NIB Building Management Solution</span>
             </Link>
 
-            {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-2">
                 <Link href="/portal/dashboard" className="text-sm font-medium hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/80">
                     <Building size={18} /> Dashboard
@@ -92,7 +70,6 @@ function PortalHeader() {
                 </Button>
             </nav>
 
-            {/* Mobile Navigation Trigger */}
             <div className="md:hidden">
                 <Sheet>
                     <SheetTrigger asChild>

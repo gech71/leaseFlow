@@ -4,11 +4,12 @@
 import type { CurrentUser, PermissionId } from '@/lib/types';
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useCallback, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 interface PermissionContextType {
   currentUser: CurrentUser | null;
   isLoading: boolean;
-  error: string | null; // <-- Add error state
+  error: string | null;
   hasPermission: (permission: PermissionId | PermissionId[]) => boolean;
   hasAnyPermission: (permissions: PermissionId[]) => boolean;
   isSuperAdmin: boolean;
@@ -32,10 +33,22 @@ interface PermissionProviderProps {
 export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null); // <-- Add error state
+  const [error, setError] = useState<string | null>(null);
+  const { data: session, status } = useSession();
 
   const fetchCurrentUser = useCallback(async () => {
-    setError(null); // <-- Reset error on new fetch
+    setError(null);
+    if (status === 'unauthenticated') {
+      setCurrentUser(null);
+      setIsLoading(false);
+      setError("Not authenticated.");
+      return;
+    }
+    if (status === 'loading') {
+      setIsLoading(true);
+      return;
+    }
+
     try {
       const response = await fetch('/api/user/me');
       if (response.ok) {
@@ -45,8 +58,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
         } else {
           setCurrentUser(null);
           const errorMessage = data.errors?.join(', ') || 'User data not found.';
-          setError(errorMessage); // <-- Set error
-          console.error("Failed to fetch user or user data missing:", errorMessage);
+          setError(errorMessage);
         }
       } else {
         let errorText = `Authentication failed. Status: ${response.status}`;
@@ -54,29 +66,26 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
             const errorData = await response.json();
             errorText = errorData.errors?.join(', ') || errorText;
         } catch (e) {
-            // Could not parse error JSON, stick with status code message
         }
         setCurrentUser(null);
-        setError(errorText); // <-- Set error
-        console.error(errorText);
+        setError(errorText);
       }
     } catch (error) {
       const errorMessage = (error as Error).message || 'A network error occurred while fetching user data.';
-      console.error('Error fetching current user:', error);
       setCurrentUser(null);
-      setError(errorMessage); // <-- Set error
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [status]);
   
   useEffect(() => {
-    setIsLoading(true);
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
   const hasPermission = useCallback((permission: PermissionId | PermissionId[]): boolean => {
     if (!currentUser || !currentUser.effectivePermissions) return false;
+    if (isSuperAdmin) return true;
     if (Array.isArray(permission)) {
       return permission.every(p => currentUser.effectivePermissions.includes(p));
     }
@@ -85,6 +94,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
 
   const hasAnyPermission = useCallback((permissions: PermissionId[]): boolean => {
     if (!currentUser || !currentUser.effectivePermissions) return false;
+    if (isSuperAdmin) return true;
     return permissions.some(p => currentUser.effectivePermissions.includes(p));
   }, [currentUser]);
   
@@ -108,7 +118,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   }), [currentUser, isLoading, error, hasPermission, hasAnyPermission, isSuperAdmin, refetchUser]);
 
 
-  if (isLoading && !currentUser) { // Only show full-screen loader on initial load
+  if (isLoading && !currentUser) { 
     return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />

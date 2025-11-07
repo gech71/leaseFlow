@@ -1,7 +1,9 @@
+
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { SessionProvider } from 'next-auth/react';
 
 export const metadata: Metadata = {
   title: 'NIB Building Management Solution',
@@ -12,7 +14,6 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children,
 }: { children: React.ReactNode }) {
-  // ✅ Receive nonce from middleware
   const nonce = (await headers()).get('x-nonce') || undefined;
 
   return (
@@ -38,8 +39,10 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <SessionProvider>
+          {children}
+          <Toaster />
+        </SessionProvider>
       </body>
     </html>
   );

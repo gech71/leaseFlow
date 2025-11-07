@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState } from 'react';
@@ -15,9 +14,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 import type { Tenant as TenantPrisma } from '@prisma/client';
 import { AlertTriangle } from 'lucide-react';
-import { changePasswordAction } from '@/app/admin/profile/actions'; // Use the same robust action
+import { changePasswordAction } from '@/app/admin/profile/actions';
 import { useRouter } from 'next/navigation';
-
+import { signOut } from 'next-auth/react';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -56,7 +55,7 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
 
     if (result.success) {
         toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
-        router.push('/login');
+        await signOut({ callbackUrl: '/login' });
     } else {
         toast({ title: "Error", description: result.error, variant: "destructive" });
     }

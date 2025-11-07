@@ -1,6 +1,4 @@
 
-
-// src/app/portal/dashboard/actions.ts
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -14,59 +12,23 @@ import type {
   User,
   Role,
 } from "@prisma/client";
-import { addMonths, isAfter, format } from "date-fns";
-import { cookies } from "next/headers";
+import { addMonths, isAfter } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
-import crypto from "crypto";
 import { revalidatePath } from 'next/cache';
+import { auth } from '@/lib/auth';
 
-// --- Normalization Helper ---
-// Corrected to handle PascalCase keys like 'URL' without mangling them.
-const toCamelCase = (s: string) => {
-  if (typeof s !== 'string' || s.length === 0) {
-    return s;
-  }
-  // This handles snake_case and ensures PascalCase like 'ResponseCode' becomes 'responseCode'
-  // but doesn't affect all-caps acronyms like 'URL'.
-  return s.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
-         .replace(/^[A-Z](?![A-Z]|$)/, (L) => L.toLowerCase());
-};
-
-
-const isObject = function (o: any) {
-  return o === Object(o) && !Array.isArray(o) && typeof o !== "function";
-};
-
-const normalizeKeys = (obj: any): any => {
-  if (isObject(obj)) {
-    const n: { [key: string]: any } = {};
-    Object.keys(obj).forEach((k) => {
-      n[toCamelCase(k)] = normalizeKeys(obj[k]);
-    });
-    return n;
-  } else if (Array.isArray(obj)) {
-    return obj.map((i) => {
-      return normalizeKeys(i);
-    });
-  }
-  return obj;
-};
-// --- End Normalization Helper ---
-
-// Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
   id?: string;
   name: string;
   amount: number;
 }
 
-// Types that match the structure of data fetched with Prisma, including relations
 export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
   space: SpacePrisma & {
     building: BuildingPrisma & {
       penaltyPolicyTiers: PenaltyTierPrisma[];
-      managers: User[]; // <-- Ensure managers are included
+      managers: User[];
     };
   };
   tenant: TenantPrisma;
@@ -76,65 +38,16 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
 };
 
 export interface TenantPortalData {
-  agreements: PortalAgreementWithRelations[]; // Changed to an array
+  agreements: PortalAgreementWithRelations[];
   error?: string;
 }
 
-// --- User Authentication Helpers ---
-const ACCESS_TOKEN_KEY = "nibrental_admin_access_token";
-
-// Insecure JWT payload decoder
-async function decodeJwtPayload(token: string): Promise<any | null> {
-  try {
-    const base64Url = token.split(".")[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map(function (c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join(""),
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error("Portal Auth Error: Failed to decode JWT payload:", e);
+async function getCurrentUser() {
+  const session = await auth();
+  if (!session?.user?.id) {
     return null;
   }
-}
-
-// Gets current user from the session cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value; 
-
-  if (!accessToken) {
-    console.error(
-      "Portal Auth Error: No session access token found in cookie.",
-    );
-    return null;
-  }
-
-  const tokenPayload = await decodeJwtPayload(accessToken);
-  if (!tokenPayload || !tokenPayload.sub) {
-    console.error(
-      `Portal Auth Error: Failed to decode session token or 'sub' claim is missing.`,
-    );
-    return null;
-  }
-
-  const user = await databaseService.getUserByExternalId(tokenPayload.sub, {
-    roles: true,
-  });
-
-  if (!user) {
-    console.error(
-      `Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local system.`,
-    );
-  }
-
-  return user;
+  return databaseService.getUserById(session.user.id);
 }
 
 export async function getTenantPortalDashboardDataAction(): Promise<TenantPortalData> {
@@ -149,16 +62,12 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       };
     }
 
-    // Find the tenant record associated with the logged-in user's email or phone number
     const associatedTenant = await databaseService.findTenantByEmailOrPhone(
       currentUser.email,
       currentUser.phoneNumber,
     );
 
     if (!associatedTenant) {
-      console.error(
-        `Portal Data Error: User '${currentUser.email}' is authenticated but not associated with any tenant record.`,
-      );
       return {
         agreements: [],
         error:
@@ -175,7 +84,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
             building: {
               include: {
                 penaltyPolicyTiers: true,
-                managers: true, // Fetch managers
+                managers: true,
               },
             },
           },
@@ -183,7 +92,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         bills: {
           orderBy: { billDate: "desc" },
         },
-        disabledAgreements: { // Fetch the disabled status
+        disabledAgreements: {
             select: {
                 disabledById: true
             }
@@ -192,7 +101,6 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       orderBy: { createdAt: "asc" },
     });
 
-    // Filter out disabled agreements before processing
     const enabledAgreements = allAgreementsRaw.filter(ag => ag.disabledAgreements.length === 0);
 
     const processedAgreements = enabledAgreements.map((ag) => {
@@ -271,7 +179,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
 export async function submitPaymentProofAction(data: {
   billId: string;
-  paymentProofDataUri: string; // Changed from paymentProofUrl to accept data URI
+  paymentProofDataUri: string;
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
@@ -293,20 +201,19 @@ export async function submitPaymentProofAction(data: {
       return { success: false, error: `Cannot submit proof for a bill with status "${bill.status}".` };
     }
     
-    // Check data URI size before saving
-    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) { // 2MB limit
+    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) { 
       return { success: false, error: "The uploaded PDF file is too large. Please upload a file smaller than 2MB." };
     }
 
     await databaseService.updateBill(data.billId, {
       status: 'PendingVerification',
-      paymentProofDataUri: data.paymentProofDataUri, // Save the data URI
+      paymentProofDataUri: data.paymentProofDataUri,
       tenantPaymentNotes: data.notes,
-      paymentDate: new Date(), // Set payment date to when proof is submitted
+      paymentDate: new Date(),
     });
     
     revalidatePath('/portal/dashboard');
-    revalidatePath('/admin/billing'); // Also revalidate admin page
+    revalidatePath('/admin/billing');
 
     return { success: true };
 

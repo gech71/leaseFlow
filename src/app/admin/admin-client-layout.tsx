@@ -80,8 +80,8 @@ const allNavItems: NavItem[] = [
     href: '/admin/settings', 
     label: 'Settings', 
     icon: Settings, 
-    isSettings: true, // Special flag for the main settings link
-    requiredPermissions: [ // This now represents ALL possible settings permissions
+    isSettings: true,
+    requiredPermissions: [
       'settings:user_registration:manage',
       'settings:user_management:view',
       'settings:user_management:assign',
@@ -106,7 +106,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const { currentUser, hasAnyPermission, hasPermission, isLoading: permissionsLoading, isSuperAdmin, error: permissionError } = usePermissions();
 
   useEffect(() => {
-    // This effect handles redirection for unauthenticated or unauthorized users.
     if (!permissionsLoading && !currentUser) {
       const title = permissionError ? "Access Denied" : "Session Expired";
       const description = permissionError || "Please log in again to continue.";
@@ -127,11 +126,12 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        if (pathname === '/admin/profile' && hasPermission('dashboard:view')) {
-            router.replace('/admin/dashboard');
+        // Redirect from profile page to dashboard for non-profile routes
+        if (pathname !== '/admin/profile' && pathname.startsWith('/admin/profile')) {
+            router.replace('/admin/profile');
         }
     }
-  }, [permissionsLoading, currentUser, router, pathname, hasPermission]);
+  }, [permissionsLoading, currentUser, router, pathname]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);

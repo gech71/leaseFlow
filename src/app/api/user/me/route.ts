@@ -1,5 +1,4 @@
 
-
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { databaseService } from '@/lib/services/databaseService';
