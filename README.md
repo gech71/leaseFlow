@@ -87,12 +87,6 @@ NIB_PAYMENT_URL=http://nib-pre-production.nibbank.com.et:8086/api/Authenticate/P
 # Your assigned payment key from NIB
 NIB_PAYMENT_KEY=8tq6qqyvuNsBOP5yEQU47N52suWQebaP
 
-# Your merchant account number with NIB
-NIB_ACCOUNT_NO=7000101633387
-
-# Your company name as registered with NIB
-NIB_COMPANY_NAME=BUILDING
-
 # --- Nodemailer SMTP Configuration ---
 # For Gmail, use smtp.gmail.com and port 587.
 # IMPORTANT: You must generate an "App Password" for your Google Account.
@@ -157,17 +151,19 @@ sequenceDiagram
     MiniApp->>+App: 1. Opens /portal/connect with Auth Header
     App->>+NIB: 2. Validates token
     NIB-->>-App: 3. Returns phone number
-    App-->>-MiniApp: 4. Sets session cookie & redirects to /portal/billing
-    MiniApp->>+App: 5. User clicks "Pay Now"
-    App->>App: 6. Generates signed payload
-    App->>+NIB: 7. Initiates payment with signed payload
-    NIB-->>-App: 8. Returns payment token
-    App-->>-MiniApp: 9. Sends token back to MiniApp via JS channel
+    App->>App: 4. Creates session using NextAuth
+    App-->>-MiniApp: 5. Redirects to /portal/dashboard
+    Note over MiniApp: User navigates to billing
+    MiniApp->>+App: 6. User clicks "Pay Now"
+    App->>App: 7. Generates signed payload
+    App->>+NIB: 8. Initiates payment with signed payload
+    NIB-->>-App: 9. Returns payment token
+    App-->>-MiniApp: 10. Sends token back to MiniApp via JS channel
     Note over MiniApp: User completes payment
-    NIB->>+App: 10. Sends POST to callback URL with transaction details & signature
-    App->>App: 11. Validates signature
-    App->>App: 12. Updates bill status to "Paid"
-    App-->>-NIB: 13. Responds with HTTP 200 OK
+    NIB->>+App: 11. Sends POST to callback URL with transaction details & signature
+    App->>App: 12. Validates signature
+    App->>App: 13. Updates bill status to "Paid"
+    App-->>-NIB: 14. Responds with HTTP 200 OK
 ```
 
 ### Step 1: Initial Connection & Token Validation
@@ -184,30 +180,30 @@ When a user enters the Mini App, NIB opens the application at the `/portal/conne
 
 ### Step 2: Secure Session Creation
 
-To maintain the user's authenticated state for subsequent actions without continuously passing the token, a secure session is created.
+Upon successful token validation, a secure NextAuth.js session is created for the user.
 
 -   **Process**:
-    1.  Upon successful token validation in Step 1, the `/portal/connect` page renders a client component (`ConnectionSuccessPage`).
-    2.  This component immediately calls a Server Action (`setPortalSessionAction`).
-    3.  The Server Action sets a secure, `HttpOnly` cookie containing the validated token.
-    4.  The user is then automatically redirected to `/portal/billing`.
+    1.  The `/portal/connect` page renders a client component (`ConnectionSuccessPage`).
+    2.  This component calls NextAuth's `signIn` function with the phone number and a special flag indicating it's a trusted Mini App login.
+    3.  NextAuth creates a secure, HttpOnly session cookie.
+    4.  The user is then automatically redirected to `/portal/dashboard`.
 -   **Files**:
     -   `src/app/portal/connect/client-page.tsx`
-    -   `src/app/portal/actions.ts`
+    -   `src/lib/auth.ts`
 
 ### Step 3: Fetching Billing Info & Initiating Payment
 
-The user is now on the billing page, authenticated via their session cookie.
+The user is now on their dashboard, authenticated via their NextAuth.js session cookie. They can navigate to their billing details.
 
--   **Route**: `GET /portal/billing`
+-   **Route**: `/portal/dashboard`
 -   **Process**:
-    1.  The page uses the phone number (passed as a URL query parameter from Step 1) to fetch the tenant's outstanding bill from the database via a Server Action (`getBillingAmountForPhoneNumberAction`).
+    1.  The dashboard page calls a server action (`getTenantPortalDashboardDataAction`) which uses the authenticated session to fetch the user's tenant profile and outstanding bills.
     2.  The outstanding amount is displayed to the user.
     3.  The user clicks the "Pay Now" button to proceed.
 -   **Files**:
-    -   `src/app/portal/billing/page.tsx`
-    -   `src/app/portal/billing/client-page.tsx`
-    -   `src/app/portal/billing/actions.ts`
+    -   `src/app/portal/(app)/dashboard/page.tsx`
+    -   `src/app/portal/dashboard/client-page.tsx`
+    -   `src/app/portal/dashboard/actions.ts`
 
 ### Step 4: Payment Initiation with NIB
 
@@ -215,25 +211,15 @@ This is a critical server-side step where the payment request is securely constr
 
 -   **Process**:
     1.  The "Pay Now" button triggers the `initiatePaymentAction` Server Action.
-    2.  This action reads the session token from the `HttpOnly` cookie.
-    3.  It generates a unique `transactionId` using `crypto.randomUUID()` and a `transactionTime`.
+    2.  This action validates the user's session using `auth()`.
+    3.  It generates a unique `transactionId` and a `transactionTime`.
     4.  A **signature** is generated by creating a SHA256 hash of a concatenated string of parameters in a specific, fixed order. The secret `NIB_PAYMENT_KEY` is included in this string.
         ```typescript
         // From: src/app/portal/billing/actions.ts
-        const signatureString = [
-            `accountNo=${ACCOUNT_NO}`,
-            `amount=300`,
-            `callBackURL=${CALLBACK_URL}`,
-            `companyName=${COMPANY_NAME}`,
-            `Key=${NIB_PAYMENT_KEY}`,
-            `token=${token}`,
-            `transactionId=${transactionId}`,
-            `transactionTime=${transactionTime}`
-        ].join('&');
-        
+        const signatureString = [...].join('&');
         const signature = crypto.createHash('sha256').update(signatureString, 'utf8').digest('hex');
         ```
-    5.  The bill record in the database is updated to `PendingVerification`, and the generated `transactionId` and `signature` are stored for later validation.
+    5.  The bill record(s) in the database are updated with a reference to the payment initiation.
     6.  A `POST` request containing the full payload (including the signature) is sent to the `NIB_PAYMENT_URL`.
     7.  If successful, the NIB server responds with data, including a new `token` for the payment session.
     8.  This payment token is sent back to the client, which then uses `window.myJsChannel.postMessage` to pass it back to the NIB Super App, allowing the user to complete the payment.
@@ -247,12 +233,9 @@ Once the user completes the payment, the NIB server sends a notification to our 
 -   **Process**:
     1.  **Token Validation**: The handler first validates the `Authorization` header token sent by NIB to ensure the request is legitimate.
     2.  **Payload Reception**: It parses the JSON body containing transaction details (`paidAmount`, `txnRef`, `transactionId`, `signature`, etc.).
-    3.  **Signature Verification**:
-        -   It uses the `transactionId` from the payload to find the original bill record in the database.
-        -   It retrieves the `signature` that was stored in the database during Step 4.
-        -   It compares the stored signature with the `signature` received in the callback payload. They must match exactly.
-    4.  **Database Update**: If the signatures match, the bill's status is updated to **Paid**. The final `txnRef` from NIB is saved as the payment reference.
-    5.  **Response**: The server responds with `HTTP 200 OK` to acknowledge successful receipt. If validation fails at any point, an appropriate error code (400 or 401) is returned.
+    3.  **Signature Verification**: It verifies the signature received in the callback payload.
+    4.  **Database Update**: If the signature is valid, the corresponding bill's status is updated to **Paid**.
+    5.  **Response**: The server responds with `HTTP 200 OK` to acknowledge successful receipt.
 -   **File**: `src/app/api/portal/payment-callback/route.ts`
 
 ## Database

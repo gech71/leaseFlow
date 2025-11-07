@@ -32,43 +32,40 @@ interface PermissionProviderProps {
 
 export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { data: session, status, update } = useSession(); // Use next-auth session
 
-  const fetchCurrentUser = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    if (status === 'unauthenticated') {
-      setCurrentUser(null);
-      setIsLoading(false);
-      return;
-    }
-    if (status === 'loading') {
-      return; // Wait for session to be determined
-    }
+  const isLoading = status === 'loading';
+  const error = status === 'unauthenticated' ? 'Session expired or not authenticated.' : null;
 
+  useEffect(() => {
     if (status === 'authenticated' && session?.user) {
+        // Map the session user to your CurrentUser type
         const user: CurrentUser = {
             id: session.user.id,
             email: session.user.email || 'No Email',
             name: session.user.name || 'No Name',
-            // these are now directly available from the session
-            roles: (session.user.roles || []).map(r => ({id: r, name: r, permissions: session.user.permissions || []})),
+            // The following fields might not be in the default session user type.
+            // You need to augment the session type in next-auth.d.ts
+            // @ts-ignore
+            firstName: session.user.firstName,
+            // @ts-ignore
+            lastName: session.user.lastName,
+            // @ts-ignore
+            phoneNumber: session.user.phoneNumber,
+            // @ts-ignore
+            roles: session.user.roles || [],
+            // @ts-ignore
             effectivePermissions: session.user.permissions || []
         };
         setCurrentUser(user);
+    } else {
+      setCurrentUser(null);
     }
-    setIsLoading(false);
-
-  }, [status, session]);
+  }, [session, status]);
   
-  useEffect(() => {
-    fetchCurrentUser();
-  }, [fetchCurrentUser]);
-
   const isSuperAdmin = useMemo(() => {
-    return currentUser?.roles.some(role => role.name === 'SUPER_ADMIN') || false;
+    // @ts-ignore
+    return currentUser?.roles?.some(role => role === 'SUPER_ADMIN' || role.name === 'SUPER_ADMIN') || false;
   }, [currentUser]);
 
   const hasPermission = useCallback((permission: PermissionId | PermissionId[]): boolean => {
@@ -91,8 +88,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
 
   const refetchUser = useCallback(async () => {
     await update(); // This refetches the session from next-auth
-    await fetchCurrentUser(); // Re-process the fresh session data
-  }, [update, fetchCurrentUser]);
+  }, [update]);
 
   const contextValue = useMemo(() => ({
     currentUser,
@@ -103,15 +99,6 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     isSuperAdmin,
     refetchUser
   }), [currentUser, isLoading, error, hasPermission, hasAnyPermission, isSuperAdmin, refetchUser]);
-
-
-  if (isLoading && !currentUser && status !== 'unauthenticated') { 
-    return (
-      <div className="flex justify-center items-center h-screen w-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <PermissionContext.Provider value={contextValue}>

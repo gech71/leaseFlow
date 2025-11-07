@@ -1,32 +1,3 @@
-
-'use server';
-
-import { cookies } from 'next/headers';
-import { signIn } from '@/lib/auth';
-import { databaseService } from '@/lib/services/databaseService';
-
-export async function setPortalSessionAction(phone: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const user = await databaseService.findUserByPhoneNumber(phone);
-    if (!user) {
-      return { success: false, error: "User not found." };
-    }
-    
-    // For the mini-app flow, we are not checking passwords.
-    // The trust is based on the validated NIB token.
-    await signIn("credentials", {
-        redirect: false,
-        phoneNumber: user.phoneNumber,
-        password: `mini-app-login-placeholder`, // Use a dummy password
-        isFromMiniApp: true,
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to set portal session:", error);
-    if (error instanceof Error && (error as any).type === 'CredentialsSignin') {
-      return { success: false, error: 'Mini-app login failed.' };
-    }
-    return { success: false, error: 'An unexpected error occurred during session creation.' };
-  }
-}
+// This file is no longer needed. The logic has been moved into the
+// /portal/connect/client-page.tsx component to directly use next-auth's signIn function.
+// Deleting this file.

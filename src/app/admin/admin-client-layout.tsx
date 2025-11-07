@@ -57,7 +57,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PermissionProvider, usePermissions } from '@/contexts/PermissionContext';
 import type { PermissionId } from '@/lib/types';
 import Image from 'next/image';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 
 interface NavItem {
   href: string;
@@ -108,24 +108,22 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, state: sidebarState } = useSidebar();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
-  const { currentUser, hasAnyPermission, hasPermission, isLoading: permissionsLoading, isSuperAdmin, error: permissionError } = usePermissions();
+  const { currentUser, hasAnyPermission, isLoading: permissionsLoading, isSuperAdmin } = usePermissions();
+  const { status } = useSession();
 
   useEffect(() => {
-    if (!permissionsLoading && !currentUser) {
-      const title = permissionError ? "Access Denied" : "Session Expired";
-      const description = permissionError || "Please log in again to continue.";
-
+    if (status === 'unauthenticated') {
       toast({
-        title: title,
-        description: description,
+        title: "Session Expired",
+        description: "Please log in again to continue.",
         variant: "destructive",
       });
       signOut({ callbackUrl: '/login' });
     }
-  }, [permissionsLoading, currentUser, toast, permissionError, router]);
+  }, [status, toast, router]);
 
   useEffect(() => {
-    if (!permissionsLoading && currentUser?.effectivePermissions) {
+    if (!permissionsLoading && currentUser?.roles) {
         if (currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
             router.replace('/portal/dashboard');
             return;
@@ -162,7 +160,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   }, [currentUser, permissionsLoading, hasAnyPermission, isSuperAdmin]);
 
 
-  if (permissionsLoading || !currentUser) {
+  if (permissionsLoading || status === 'loading' || !currentUser) {
      return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -319,5 +317,3 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     </PermissionProvider>
   );
 }
-
-    

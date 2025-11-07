@@ -3,7 +3,6 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { setPortalSessionAction } from '../actions';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { signIn } from 'next-auth/react';
@@ -28,6 +27,7 @@ export function ConnectionSuccessPage({ phone }: Props) {
       });
 
       if (result?.ok) {
+        // Redirect to the portal dashboard on successful session creation.
         router.push(`/portal/dashboard`);
       } else {
         toast({
@@ -35,6 +35,7 @@ export function ConnectionSuccessPage({ phone }: Props) {
           description: "Failed to create a secure session.",
           variant: "destructive",
         });
+        // Redirect to a user-friendly error page within the portal.
         router.push(`/portal/connect/error?message=session_failed`);
       }
     }
@@ -45,7 +46,7 @@ export function ConnectionSuccessPage({ phone }: Props) {
     <div className="flex flex-col justify-center items-center h-screen w-screen text-center p-4">
       <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
       <h1 className="text-xl font-semibold text-foreground">Connection successful</h1>
-      <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+      <p className="text-muted-foreground">Creating a secure session and redirecting...</p>
     </div>
   );
 }

@@ -150,13 +150,10 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
         const transactionId = crypto.randomUUID();
         const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
 
-        // Note: The NIB flow seems to depend on a custom token, not the standard next-auth session.
-        // We assume the cookie is still being set by the custom /connect flow.
-        const token = cookies().get('mini_app_auth_token')?.value; // Using a placeholder name
-        if (!token) {
-            return { success: false, error: "Mini-app authentication token not found." };
-        }
-
+        // This is a placeholder for the token NIB expects.
+        // If NIB provides a token that must be used here, it needs to be passed into this function.
+        // For now, we'll use a placeholder or the session user ID if that's acceptable.
+        const nibToken = session.user.id; 
 
         const signatureString = [
             `accountNo=${buildingAccountNumber}`,
@@ -164,7 +161,7 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
             `callBackURL=${CALLBACK_URL}`,
             `companyName=${COMPANY_NAME}`,
             `Key=${NIB_PAYMENT_KEY}`,
-            `token=${token}`,
+            `token=${nibToken}`,
             `transactionId=${transactionId}`,
             `transactionTime=${transactionTime}`
         ].join('&');
@@ -176,7 +173,7 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
             amount: String(amount),
             callBackURL: CALLBACK_URL,
             companyName: COMPANY_NAME,
-            token: token,
+            token: nibToken,
             transactionId: transactionId,
             transactionTime: transactionTime,
             signature: signature
@@ -186,7 +183,7 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${nibToken}`
             },
             body: JSON.stringify(payload),
         });

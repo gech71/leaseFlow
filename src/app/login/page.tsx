@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { changePasswordAction } from '@/app/admin/profile/actions';
 
 const changePasswordSchema = z.object({
@@ -33,6 +33,8 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { data: session, status } = useSession();
+
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +51,16 @@ export default function AdminLoginPage() {
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
   });
 
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (status === 'authenticated') {
+      const isTenantOnly = session.user?.roles?.length === 1 && session.user.roles[0] === 'TENANT';
+      const redirectPath = isTenantOnly ? '/portal/dashboard' : '/admin/dashboard';
+      router.push(redirectPath);
+    }
+  }, [status, session, router]);
+
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -62,8 +74,6 @@ export default function AdminLoginPage() {
     setIsLoading(false);
 
     if (result?.error) {
-        // The error from NextAuth when credentials are bad is "CredentialsSignin"
-        // We can also check the status.
         if (result.error === 'CredentialsSignin' || result.status === 401) {
             toast({
                 title: "Login Failed",
@@ -71,7 +81,6 @@ export default function AdminLoginPage() {
                 variant: "destructive",
             });
         } else {
-            // Handle other potential errors, like network issues, though less common here.
              toast({
                 title: "Login Error",
                 description: result.error,
@@ -79,57 +88,47 @@ export default function AdminLoginPage() {
             });
         }
     } else if (result?.ok) {
-        toast({
-            title: "Login Successful",
-            description: "Redirecting...",
-        });
-        const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard';
-        router.push(callbackUrl);
+        // Instead of redirecting immediately, we check for tempPassword
+        const tempCheckResponse = await fetch(`/api/user/by-phone?phone=${phoneNumber}`);
+        const tempCheckData = await tempCheckResponse.json();
+
+        if (tempCheckData.success && tempCheckData.user.tempPassword) {
+            changePasswordForm.reset({ currentPassword: password, newPassword: '', confirmPassword: '' });
+            setShowChangePasswordDialog(true);
+        } else {
+             toast({ title: "Login Successful", description: "Redirecting..." });
+             const callbackUrl = searchParams.get('callbackUrl');
+             // Determine redirect path based on user roles from session (refetch might be needed)
+             router.push(callbackUrl || '/admin/dashboard'); 
+        }
     }
   };
 
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsChangePasswordLoading(true);
 
-    const tempSignInResult = await signIn('credentials', {
-      redirect: false,
-      phoneNumber,
-      password: values.currentPassword,
-    });
-
-    if (tempSignInResult?.ok) {
-        const changeResult = await changePasswordAction(values);
-        if (changeResult.success) {
-            toast({ title: "Password Changed", description: "Your password has been updated successfully. Logging you in..." });
-            setShowChangePasswordDialog(false);
-            await handleLoginWithNewPassword(values.newPassword);
-        } else {
-             toast({ title: "Error", description: changeResult.error, variant: "destructive" });
-        }
+    // No need to sign in again, we are already "logged in" by the time the dialog shows.
+    // The changePasswordAction uses the active session.
+    const changeResult = await changePasswordAction(values);
+    
+    if (changeResult.success) {
+        toast({ title: "Password Changed", description: "Your password has been updated successfully. Please log in again." });
+        setShowChangePasswordDialog(false);
+        // Force a sign out and redirect to login, as the session is now invalid.
+        await signOut({ callbackUrl: '/login' }); 
     } else {
-        toast({ title: "Error", description: "Could not verify your temporary password.", variant: "destructive" });
+         toast({ title: "Error", description: changeResult.error, variant: "destructive" });
     }
     
     setIsChangePasswordLoading(false);
   }
 
-  const handleLoginWithNewPassword = async (newPassword: string) => {
-      setIsLoading(true);
-      const result = await signIn('credentials', {
-          redirect: false,
-          phoneNumber,
-          password: newPassword,
-      });
-
-      setIsLoading(false);
-
-      if (result?.ok) {
-          router.push('/admin/dashboard');
-      } else {
-          toast({ title: "Auto Login Failed", description: "Please log in manually with your new password.", variant: "destructive"});
-          setPassword('');
-          changePasswordForm.reset();
-      }
+  if (status === 'loading' || status === 'authenticated') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
@@ -220,7 +219,7 @@ export default function AdminLoginPage() {
                               <FormLabel>Temporary Password</FormLabel>
                                <div className="relative">
                                   <FormControl>
-                                      <Input type={showPassword ? "text" : "password"} {...field} disabled />
+                                      <Input type="text" {...field} disabled />
                                   </FormControl>
                               </div>
                               <FormMessage />

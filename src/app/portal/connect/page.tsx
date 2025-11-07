@@ -17,7 +17,6 @@ const VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
 interface ConnectionResult {
   status: 'success' | 'error';
   message: string;
-  token?: string | null;
   phone?: string | null;
 }
 
@@ -46,7 +45,6 @@ async function validateConnection(): Promise<ConnectionResult> {
       status: 'error',
       message:
         'Token is missing from the Authorization header after "Bearer ".',
-      token,
     };
   }
   
@@ -55,7 +53,6 @@ async function validateConnection(): Promise<ConnectionResult> {
     return {
       status: 'error',
       message: 'Token validation service is not configured on the server.',
-      token,
     };
   }
   
@@ -75,7 +72,6 @@ async function validateConnection(): Promise<ConnectionResult> {
       return {
         status: 'error',
         message: 'Token validation failed: empty response from server.',
-        token,
       };
     }
 
@@ -87,7 +83,6 @@ async function validateConnection(): Promise<ConnectionResult> {
         status: 'error',
         message:
           'Token validation failed: backend response was not valid JSON.',
-        token,
       };
     }
 
@@ -97,7 +92,6 @@ async function validateConnection(): Promise<ConnectionResult> {
         message:
           responseData?.message ||
           'The provided token is invalid or expired.',
-        token,
       };
     }
 
@@ -105,14 +99,12 @@ async function validateConnection(): Promise<ConnectionResult> {
       return {
         status: 'success',
         message: 'Token successfully validated.',
-        token,
         phone: responseData.phone,
       };
     } else {
       return {
         status: 'error',
         message: "Token validated but 'phone' was missing from the response.",
-        token,
       };
     }
   } catch (error: any) {
@@ -120,7 +112,6 @@ async function validateConnection(): Promise<ConnectionResult> {
     return {
       status: 'error',
       message: 'An internal error occurred while validating the token.',
-      token,
     };
   }
 }
@@ -128,9 +119,9 @@ async function validateConnection(): Promise<ConnectionResult> {
 export default async function MiniAppConnectionPage() {
   const result = await validateConnection();
 
-  if (result.status === 'success' && result.token && result.phone) {
+  if (result.status === 'success' && result.phone) {
     // On success, render the client component which will handle setting the cookie and redirecting.
-    return <ConnectionSuccessPage token={result.token} phone={result.phone} />;
+    return <ConnectionSuccessPage phone={result.phone} />;
   }
 
   // If validation fails, render the error page.
@@ -145,8 +136,7 @@ export default async function MiniAppConnectionPage() {
             Mini App Connection Failed
           </CardTitle>
           <CardDescription>
-            This page tests the connection by reading the Authorization header
-            and validating the token.
+            There was an issue validating your connection from the NIB Super App.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -154,21 +144,10 @@ export default async function MiniAppConnectionPage() {
             className="p-4 rounded-md bg-destructive/10 text-destructive"
           >
             <h3 className="font-semibold">
-              Result: Error
+              Error
             </h3>
             <p className="text-sm mt-1">{result.message}</p>
           </div>
-
-          {result.token && (
-            <div>
-              <h4 className="font-semibold text-foreground mb-2">
-                Received Token:
-              </h4>
-              <p className="p-4 bg-muted rounded-md text-sm break-all font-mono text-muted-foreground">
-                {result.token}
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
