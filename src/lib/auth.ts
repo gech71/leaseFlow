@@ -1,4 +1,3 @@
-
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
@@ -109,7 +108,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   pages: {
-    signIn: '/login',
+    signIn: '/',
   },
   secret: process.env.AUTH_SECRET,
 });

@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -118,27 +117,24 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         description: "Please log in again to continue.",
         variant: "destructive",
       });
-      signOut({ callbackUrl: '/login' });
+      signOut({ callbackUrl: '/' });
     }
   }, [status, toast, router]);
 
   useEffect(() => {
     if (!permissionsLoading && currentUser?.roles) {
-        if (currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
-            router.replace('/portal/dashboard');
-            return;
-        }
-
-        // Redirect from profile page to dashboard for non-profile routes
-        if (pathname !== '/admin/profile' && pathname.startsWith('/admin/profile')) {
-            router.replace('/admin/profile');
-        }
+      // @ts-ignore
+      const isTenantOnly = currentUser.roles.length === 1 && (currentUser.roles[0] === 'TENANT' || currentUser.roles[0].name === 'TENANT');
+      if (isTenantOnly) {
+          router.replace('/portal/dashboard');
+          return;
+      }
     }
   }, [permissionsLoading, currentUser, router, pathname]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    await signOut({ callbackUrl: '/login' });
+    await signOut({ callbackUrl: '/' });
     toast({
         title: "Logged Out",
         description: "You have been successfully logged out.",

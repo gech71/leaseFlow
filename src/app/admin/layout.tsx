@@ -1,4 +1,3 @@
-
 import type React from 'react';
 import AdminClientLayout from './admin-client-layout';
 import type { Metadata } from 'next';
@@ -16,7 +15,7 @@ export const metadata: Metadata = {
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session) {
-    redirect('/login');
+    redirect('/');
   }
   return (
     <AdminClientLayout>{children}</AdminClientLayout>
