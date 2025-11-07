@@ -43,6 +43,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 image: null,
                 roles: user.roles,
                 tempPassword: user.tempPassword,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                phoneNumber: user.phoneNumber,
             };
         }
         
@@ -60,10 +63,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                image: null, // Ensure image is null if not present
-                phoneNumber: user.phoneNumber,
+                image: null,
                 roles: user.roles,
                 tempPassword: user.tempPassword,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                phoneNumber: user.phoneNumber,
             };
         }
 
@@ -78,11 +83,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
         if (user) {
             token.id = user.id;
-            const dbUser = user as (User & { roles: Role[], tempPassword?: string | null });
+            // The user object from authorize contains the full user data
+            const dbUser = user as User & { roles: Role[]; tempPassword?: string | null };
             token.roles = dbUser.roles.map(role => role.name);
             const permissions = dbUser.roles.flatMap(role => role.permissions);
-            token.permissions = [...new Set(permissions)]; // Make them unique
+            token.permissions = [...new Set(permissions)];
             token.tempPassword = dbUser.tempPassword;
+            token.firstName = dbUser.firstName;
+            token.lastName = dbUser.lastName;
+            token.phoneNumber = dbUser.phoneNumber;
         }
         return token;
     },
@@ -92,6 +101,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.roles = token.roles as string[];
         session.user.permissions = token.permissions as string[];
         session.user.tempPassword = token.tempPassword as string | undefined;
+        session.user.firstName = token.firstName as string | undefined;
+        session.user.lastName = token.lastName as string | undefined;
+        session.user.phoneNumber = token.phoneNumber as string | undefined;
       }
       return session;
     },

@@ -8,6 +8,9 @@ declare module 'next-auth/jwt' {
     roles: string[];
     permissions: string[];
     tempPassword?: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    phoneNumber?: string | null;
   }
 }
 
@@ -18,6 +21,9 @@ declare module 'next-auth' {
       roles: string[];
       permissions: string[];
       tempPassword?: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      phoneNumber?: string | null;
     } & DefaultSession['user'];
   }
 
@@ -26,6 +32,9 @@ declare module 'next-auth' {
       name?: string | null;
       email?: string | null;
       image?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      phoneNumber?: string | null;
       roles: import('@prisma/client').Role[];
       tempPassword?: string | null;
    }

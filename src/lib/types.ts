@@ -1,3 +1,5 @@
+
+
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
@@ -156,10 +158,10 @@ export interface CurrentUser {
   firstName?: string | null;
   lastName?: string | null;
   phoneNumber?: string | null;
-  roles: UserRole[];
-  // Calculated effective permissions from all assigned roles
+  roles: (string | UserRole)[];
   effectivePermissions: string[];
 }
+
 
 // Defines a single permission
 export interface PermissionItem {
