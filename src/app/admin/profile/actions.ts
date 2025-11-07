@@ -1,4 +1,3 @@
-
 "use server";
 
 import { auth, signOut } from '@/lib/auth';
@@ -34,9 +33,10 @@ export async function changePasswordAction(values: ChangePasswordValues) {
     
     await databaseService.updateUser(user.id, {
       password: hashedNewPassword,
-      tempPassword: null,
+      tempPassword: null, // Clear the temporary password flag
     });
     
+    // Sign out to invalidate the old session token.
     await signOut({ redirect: false });
 
     return { success: true };

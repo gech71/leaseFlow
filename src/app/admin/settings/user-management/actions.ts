@@ -1,5 +1,3 @@
-
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -205,7 +203,7 @@ export async function resetPasswordAction(userId: string): Promise<{ success: bo
             return { success: false, error: "Permission denied to reset passwords." };
         }
         
-        const userToReset = await databaseService.getUserById(userId);
+        const userToReset = await databaseService.getUserById(userId, { roles: true });
         if (!userToReset) {
             return { success: false, error: "User not found." };
         }
@@ -229,4 +227,3 @@ export async function resetPasswordAction(userId: string): Promise<{ success: bo
         return { success: false, error: "Failed to reset password." };
     }
 }
-    

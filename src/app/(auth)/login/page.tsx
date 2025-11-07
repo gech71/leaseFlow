@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import { changePasswordAction } from '@/app/admin/profile/actions';
 
 const changePasswordSchema = z.object({
@@ -52,8 +52,8 @@ export default function AdminLoginPage() {
 
   // Redirect if user is already authenticated
   useEffect(() => {
-    if (status === 'authenticated') {
-      const isTenantOnly = session.user?.roles?.length === 1 && session.user.roles[0] === 'TENANT';
+    if (status === 'authenticated' && session?.user?.roles) {
+      const isTenantOnly = session.user.roles.length === 1 && session.user.roles[0] === 'TENANT';
       const redirectPath = isTenantOnly ? '/portal/dashboard' : '/admin/dashboard';
       router.push(redirectPath);
     }
@@ -88,26 +88,33 @@ export default function AdminLoginPage() {
         }
     } else if (result?.ok) {
         // Instead of redirecting immediately, we check for tempPassword
+        // This check is now based on the session data we get back indirectly
+        // We'll call a simple API endpoint to get this info without exposing the password.
         const tempCheckResponse = await fetch(`/api/user/by-phone?phone=${phoneNumber}`);
-        const tempCheckData = await tempCheckResponse.json();
-
-        if (tempCheckData.success && tempCheckData.user.tempPassword) {
-            changePasswordForm.reset({ currentPassword: password, newPassword: '', confirmPassword: '' });
-            setShowChangePasswordDialog(true);
+        if(tempCheckResponse.ok) {
+            const tempCheckData = await tempCheckResponse.json();
+            if (tempCheckData.user?.tempPassword) {
+                changePasswordForm.reset({ currentPassword: password, newPassword: '', confirmPassword: '' });
+                setShowChangePasswordDialog(true);
+            } else {
+                 toast({ title: "Login Successful", description: "Redirecting..." });
+                 const callbackUrl = searchParams.get('callbackUrl');
+                 // The useEffect will handle the final redirection.
+                 // Force a reload to ensure the session is picked up by the layout.
+                 window.location.href = callbackUrl || '/admin/dashboard';
+            }
         } else {
+            // Failsafe: if the check fails, just redirect.
              toast({ title: "Login Successful", description: "Redirecting..." });
              const callbackUrl = searchParams.get('callbackUrl');
-             // Determine redirect path based on user roles from session (refetch might be needed)
-             router.push(callbackUrl || '/admin/dashboard'); 
+             window.location.href = callbackUrl || '/admin/dashboard';
         }
     }
   };
 
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsChangePasswordLoading(true);
-
-    // No need to sign in again, we are already "logged in" by the time the dialog shows.
-    // The changePasswordAction uses the active session.
+    
     const changeResult = await changePasswordAction(values);
     
     if (changeResult.success) {
@@ -135,9 +142,9 @@ export default function AdminLoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/30 p-4">
       <Card className="w-full max-w-md shadow-2xl animate-fadeIn border-primary/20">
         <CardHeader className="text-center space-y-4 pt-6 sm:pt-8">
-          <Image src="https://i.imgur.com/JTzGpIH.png" alt="nibrental Logo" width={200} height={50} className="mx-auto h-auto object-contain" data-ai-hint="logo" />
+          <Image src="https://i.imgur.com/JTzGpIH.png" alt="LeaseFlow Logo" width={200} height={50} className="mx-auto h-auto object-contain" data-ai-hint="logo" />
           <div className="space-y-1 px-2">
-              <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">Building Management Solution</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold font-headline text-primary">LeaseFlow</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">

@@ -8,23 +8,23 @@ export async function GET(request: Request) {
   const phone = searchParams.get('phone');
 
   if (!phone) {
-    return NextResponse.json({ isSuccess: false, error: 'Phone number is required.' }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Phone number is required.' }, { status: 400 });
   }
 
   try {
     const user = await databaseService.findUserByPhoneNumber(phone);
     if (user) {
       return NextResponse.json({
-        isSuccess: true,
+        success: true,
         user: {
           tempPassword: !!user.tempPassword, // Return a boolean, not the password itself
         },
       });
     } else {
-      return NextResponse.json({ isSuccess: false, error: 'User not found.' }, { status: 404 });
+      return NextResponse.json({ success: false, error: 'User not found.' }, { status: 404 });
     }
   } catch (error) {
     console.error("Error in /api/user/by-phone:", error);
-    return NextResponse.json({ isSuccess: false, error: 'An internal server error occurred.' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'An internal server error occurred.' }, { status: 500 });
   }
 }
