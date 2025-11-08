@@ -42,6 +42,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.phoneNumber || !credentials.password) {
+          console.error("Login attempt with missing credentials");
           return null;
         }
 
@@ -50,6 +51,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!userWithRoles || !userWithRoles.password) {
+          console.log(`No user found for phone: ${credentials.phoneNumber}`);
           return null;
         }
 
@@ -59,13 +61,13 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isPasswordValid) {
+          console.log(`Invalid password for user: ${credentials.phoneNumber}`);
           return null;
         }
         
-        // Correctly calculate permissions and construct a plain object
         const effectivePermissions = Array.from(new Set(userWithRoles.roles.flatMap(r => r.permissions)));
 
-        // Return a plain object to ensure serializability
+        // Return a plain object to ensure serializability. DO NOT return the Prisma model directly.
         return {
           id: userWithRoles.id,
           name: userWithRoles.name,
@@ -123,6 +125,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
+    error: "/login", // Redirect to login on error
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

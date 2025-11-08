@@ -42,7 +42,9 @@ export default function AdminLoginPage() {
           title: "Login Successful",
           description: "Redirecting...",
         });
+        // Successful login, redirect to the dashboard.
         router.push('/admin/dashboard'); 
+        router.refresh(); // Ensure session is re-fetched on the server
       }
     } catch (error) {
       console.error("Login submission error:", error);
@@ -55,7 +57,6 @@ export default function AdminLoginPage() {
       setIsLoading(false);
     }
   };
-
 
   return (
     <>

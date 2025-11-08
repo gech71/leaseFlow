@@ -1,56 +1,47 @@
-import { withAuth, type NextRequestWithAuth } from "next-auth/middleware";
+
+import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
-  function middleware(request: NextRequestWithAuth) {
-    const { pathname } = request.nextUrl;
-    const token = request.nextauth.token;
+  // `withAuth` augments your `Request` with the user's token.
+  function middleware(req) {
+    const { token } = req.nextauth;
+    const { pathname } = req.nextUrl;
 
-    // Route protection logic
-    const isPublicPath = pathname === "/login";
-
-    // If user is logged in, redirect them from login page to dashboard
-    if (token && isPublicPath) {
-      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
-    }
-
-    // If user is not logged in and tries to access a protected route,
-    // the `withAuth` default behavior will redirect them to the login page.
+    const isAuthPage = pathname === "/login";
     
-    // For all other cases (logged in user on protected route), allow the request.
-    return NextResponse.next();
+    // If the user is logged in and tries to access the login page, redirect them.
+    if (isAuthPage && token) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/admin/dashboard"; // Default redirect for logged-in users
+      return NextResponse.redirect(url);
+    }
   },
   {
     callbacks: {
-      authorized: ({ req, token }) => {
+      authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
         
-        // The login page is always accessible
-        if (pathname === "/login") {
+        // Login page is always accessible, even if not logged in.
+        if (pathname === '/login') {
             return true;
         }
         
-        // For any other page, a token must exist.
+        // For any other page, a token must exist (user must be logged in).
         return !!token;
       },
     },
-    // If you have a custom login page
     pages: {
-      signIn: "/login",
+        signIn: '/login', // Redirect here if `authorized` returns false
     },
   }
 );
 
-// Define which routes are protected by the middleware
+// This config ensures the middleware runs on all paths EXCEPT for NextAuth's internal API routes and static assets.
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/auth/|login|_next/static|_next/image|favicon.ico|.*\\.png$).*)",
+    "/admin/:path*",
+    "/portal/:path*",
   ],
 };
