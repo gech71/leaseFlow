@@ -42,8 +42,6 @@ export default function AdminLoginPage() {
           title: "Login Successful",
           description: "Redirecting...",
         });
-        // Successful login, NextAuth will handle the redirect via middleware if needed,
-        // or we can push manually. It's often better to let the middleware handle it.
         router.push('/admin/dashboard'); 
       }
     } catch (error) {

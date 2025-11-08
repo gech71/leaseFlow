@@ -45,35 +45,45 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await databaseService.findUserByPhoneNumber(credentials.phoneNumber, {
+        const userWithRoles = await databaseService.findUserByPhoneNumber(credentials.phoneNumber, {
           roles: true,
         });
 
-        if (!user || !user.password) {
+        if (!userWithRoles || !userWithRoles.password) {
           return null;
         }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
-          user.password
+          userWithRoles.password
         );
 
         if (!isPasswordValid) {
           return null;
         }
         
-        const effectivePermissions = Array.from(new Set(user.roles.flatMap(r => r.permissions)));
+        // Correctly calculate permissions and construct a plain object
+        const effectivePermissions = Array.from(new Set(userWithRoles.roles.flatMap(r => r.permissions)));
 
         // Return a plain object to ensure serializability
         return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          roles: user.roles,
+          id: userWithRoles.id,
+          name: userWithRoles.name,
+          email: userWithRoles.email,
+          // Manually create a plain array of plain objects for roles
+          roles: userWithRoles.roles.map(role => ({
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            permissions: role.permissions,
+            createdById: role.createdById,
+            createdAt: role.createdAt,
+            updatedAt: role.updatedAt,
+          })),
           effectivePermissions: effectivePermissions,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phoneNumber: user.phoneNumber,
+          firstName: userWithRoles.firstName,
+          lastName: userWithRoles.lastName,
+          phoneNumber: userWithRoles.phoneNumber,
         };
       },
     }),
