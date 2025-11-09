@@ -2,7 +2,6 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';
-import { databaseService } from '@/lib/services/databaseService';
 import bcryptjs from 'bcryptjs';
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import { z } from 'zod';
@@ -22,6 +21,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       async authorize(credentials): Promise<AuthorizeUser | null> {
+        // Dynamically import here to keep prisma out of the edge runtime
+        const { databaseService } = await import('@/lib/services/databaseService');
+
         const parsedCredentials = z
           .object({ phoneNumber: z.string(), password: z.string().min(1) })
           .safeParse(credentials);
@@ -35,7 +37,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Handle temporary password login (when password is null but tempPassword is set)
           if (user.password === null && user.tempPassword) {
             if (password === user.tempPassword) {
-              // CORRECT: Return a simple object with the flag
               return { id: user.id, name: user.name, email: user.email, forceChangePass: true };
             } else {
               return null; // Incorrect temp password
@@ -46,7 +47,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (user.password) {
             const passwordsMatch = await bcryptjs.compare(password, user.password);
             if (passwordsMatch) {
-              // CORRECT: Return a standard simple user object
               return { id: user.id, name: user.name, email: user.email };
             }
           }
@@ -68,6 +68,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.forceChangePass = authUser.forceChangePass ?? false;
 
         // Now, fetch the full user details from the database to enrich the token
+        // Dynamically import here to keep prisma out of the edge runtime
+        const { databaseService } = await import('@/lib/services/databaseService');
         const fullUser = await databaseService.getUserById(authUser.id, {
           roles: true,
         });
