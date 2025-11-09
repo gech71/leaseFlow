@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -111,8 +112,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   }, [permissionsLoading, currentUser, router]);
 
   useEffect(() => {
-    if (!permissionsLoading && currentUser) {
-        if (currentUser.roles && currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
+    if (!permissionsLoading && currentUser && currentUser.roles) {
+        if (currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
             router.replace('/portal/dashboard');
             return;
         }

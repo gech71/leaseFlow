@@ -28,7 +28,7 @@ export const credentialsProvider = Credentials({
       // Handle temporary password login
       if (user.password === null && user.tempPassword) {
         if (password === user.tempPassword) {
-          // Return a simple object with the forceChangePass flag
+          // CORRECTED: Return a simple object with the forceChangePass flag
           return { id: user.id, name: user.name, email: user.email, forceChangePass: true };
         } else {
           return null; // Incorrect temp password
@@ -39,7 +39,7 @@ export const credentialsProvider = Credentials({
       if (user.password) {
         const passwordsMatch = await bcryptjs.compare(password, user.password);
         if (passwordsMatch) {
-          // Return a simple object without the flag
+          // CORRECTED: Return a simple object
           return { id: user.id, name: user.name, email: user.email };
         }
       }
