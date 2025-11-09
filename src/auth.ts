@@ -56,6 +56,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             permissions: role.permissions,
             createdAt: role.createdAt.toISOString(),
             updatedAt: role.updatedAt.toISOString(),
+            createdById: role.createdById
           }));
 
           const effectivePermissions = Array.from(
@@ -89,5 +90,3 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
-
-    

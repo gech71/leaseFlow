@@ -33,22 +33,26 @@ export default function AdminLoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        redirect: false, // This is crucial to handle the response here
+        redirect: false,
         phoneNumber: phoneNumber,
         password: password,
+        callbackUrl: '/admin/dashboard'
       });
 
       if (result?.error) {
-        const errorData = JSON.parse(result.error);
-        if (errorData.code === 'PASSWORD_CHANGE_REQUIRED') {
+        // NextAuth v5 passes the error message as a string. We need to check if it's our specific JSON error.
+        const passwordChangeErrorString = '{"code":"PASSWORD_CHANGE_REQUIRED","message":"User must change their password."}';
+        if (result.error.includes(passwordChangeErrorString)) {
             router.push('/portal/change-password');
             return;
         }
+
         toast({
           title: "Login Failed",
-          description: errorData.message || "Invalid credentials. Please try again.",
+          description: "Invalid credentials. Please try again.",
           variant: "destructive",
         });
+
       } else if (result?.ok) {
         // Successful login, NextAuth will handle the redirect via middleware logic
         // But we can initiate it here to be explicit
@@ -145,5 +149,3 @@ export default function AdminLoginPage() {
     </>
   );
 }
-
-    
