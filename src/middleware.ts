@@ -13,29 +13,48 @@ const { auth: middleware } = NextAuth(authConfig);
 export default async function (req: NextRequest) {
   // We need to wrap the middleware call to get the session and then apply custom logic.
   return middleware(async (req) => {
-    const session = (req as any).auth as Session | null; // The session is attached to the request by the middleware
+    const session = (req as any).auth as Session | null;
+    const { pathname } = req.nextUrl;
 
-    // If user is authenticated and must change their password,
-    // and they are not already on the change-password page, redirect them.
-    if (session?.user?.forceChangePass && !req.nextUrl.pathname.startsWith('/portal/change-password')) {
-      return NextResponse.redirect(new URL('/portal/change-password', req.url));
+    const isTenant = session?.user?.roles?.some((role: any) => role.name === 'TENANT') && session.user.roles?.length === 1;
+
+    // 1. User MUST change password
+    if (session?.user?.forceChangePass) {
+      // If user must change password and is NOT on the change password page, redirect them there.
+      if (!pathname.startsWith('/portal/change-password')) {
+        return NextResponse.redirect(new URL('/portal/change-password', req.url));
+      }
+      // If they are on the correct page, allow them to proceed.
+      return NextResponse.next();
     }
 
-    // If a user is logged in, redirect them from the login page to a dashboard
-    if (session && req.nextUrl.pathname === '/login') {
-       const isTenant = session.user.roles?.some((role: any) => role.name === 'TENANT') && session.user.roles?.length === 1;
+    // 2. Handle the change password page access for users who DON'T need to change password
+    if (pathname.startsWith('/portal/change-password') && !session?.user?.forceChangePass) {
+        // If a logged-in user without the flag tries to access it, send them to their dashboard.
+        if (session) {
+            const dashboardUrl = isTenant ? '/portal/dashboard' : '/admin/dashboard';
+            return NextResponse.redirect(new URL(dashboardUrl, req.url));
+        }
+        // If a non-logged-in user tries to access it, send them to login.
+        return NextResponse.redirect(new URL('/login', req.url));
+    }
+    
+    // 3. Handle login page access for already logged-in users
+    if (session && pathname.startsWith('/login')) {
        const dashboardUrl = isTenant ? '/portal/dashboard' : '/admin/dashboard';
        return NextResponse.redirect(new URL(dashboardUrl, req.url));
     }
     
-    // If no custom logic applies, just let the `authorized` callback handle it
+    // 4. Default behavior (handled by `authorized` callback in auth.config.ts)
+    // If no specific rule matches, let the default authorization logic decide.
     return NextResponse.next();
+    
   })(req as any, {} as any);
 }
 
 export const config = {
   // The matcher is used to run the Middleware on specific paths.
   // This configuration protects all admin and portal routes and handles login page redirects.
-  // It also includes the change-password page itself to ensure it's evaluated.
+  // It also includes the change-password page itself to ensure it's evaluated by the middleware.
   matcher: ['/admin/:path*', '/portal/:path*', '/login'],
 };
