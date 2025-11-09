@@ -70,8 +70,6 @@ export async function createTenantAction(data: {
         
         const tenantRole = await databaseService.getRoleByName('TENANT');
         if (!tenantRole) return { success: false, error: "The default 'TENANT' role was not found." };
-
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
         
         userForTenant = await databaseService.createUser({
             userId: `local-${crypto.randomUUID()}`,
@@ -80,7 +78,7 @@ export async function createTenantAction(data: {
             firstName: data.name.split(' ')[0] || data.name,
             lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
             phoneNumber: data.phone,
-            password: hashedPassword,
+            password: null, // Set main password to null
             tempPassword: tempPassword, // Store the plain temp password
             roles: { connect: { id: tenantRole.id } },
         });
@@ -232,5 +230,3 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
-
-    

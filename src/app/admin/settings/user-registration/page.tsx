@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -12,19 +13,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { usePermissions } from '@/contexts/PermissionContext';
-import { createUserAndAccountAction } from './actions'; // Updated action
+import { createUserAndAccountAction } from './actions'; 
 
 const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
-  lastName: z.string().min(1, { message: "Middle name is required." }),
+  lastName: z.string().min(1, { message: "Last name is required." }),
   phoneNumber: z.string().min(1, { message: "Phone number is required." })
                  .regex(/^(09|07)\d{8}$/, { message: "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678)."}),
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
-  confirmPassword: z.string()
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords do not match.",
-  path: ["confirmPassword"]
 });
 
 
@@ -35,8 +31,6 @@ export default function UserRegistrationPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canManageUsersRegistration = isSuperAdmin || hasPermission('settings:user_registration:manage');
@@ -48,8 +42,6 @@ export default function UserRegistrationPage() {
       lastName: "",
       phoneNumber: "",
       email: "",
-      password: "",
-      confirmPassword: "",
     },
   });
 
@@ -66,7 +58,7 @@ export default function UserRegistrationPage() {
     if (result.success) {
       toast({
         title: "User Registered Successfully",
-        description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management.`,
+        description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management. They will not be able to log in until a password is set for them.`,
       });
       form.reset(); 
     } else {
@@ -100,10 +92,10 @@ export default function UserRegistrationPage() {
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline text-xl flex items-center">
-          <UserPlus className="mr-2 h-6 w-6 text-primary" /> Register New User
+          <UserPlus className="mr-2 h-6 w-6 text-primary" /> Register New Staff User
         </CardTitle>
         <CardDescription>
-          Enter the details for the new user. An account will be created and a welcome email will be sent. New users are created without any roles by default.
+          Create an account for a new staff member (e.g., manager, accountant). Tenants should be created from the Tenants page.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -117,50 +109,10 @@ export default function UserRegistrationPage() {
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem> <FormLabel>First Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="First Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Middle Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Middle Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Last Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
             </div>
             <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="Email Address" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="Phone Number" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center">
-                    <Lock className="mr-2 h-4 w-4 text-primary" /> Password<span className="text-destructive ml-1">*</span>
-                  </FormLabel>
-                   <div className="relative">
-                      <FormControl>
-                          <Input type={showPassword ? 'text' : 'password'} placeholder="Enter password" {...field} />
-                      </FormControl>
-                      <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)}>
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </Button>
-                    </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center">
-                    <Lock className="mr-2 h-4 w-4 text-primary" /> Confirm Password<span className="text-destructive ml-1">*</span>
-                  </FormLabel>
-                  <div className="relative">
-                      <FormControl>
-                          <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Confirm password" {...field} />
-                      </FormControl>
-                      <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </Button>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading || !canManageUsersRegistration}>

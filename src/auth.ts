@@ -20,22 +20,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const { phoneNumber, password } = parsedCredentials.data;
           
           const user = await databaseService.findUserByPhoneNumber(phoneNumber);
-          if (!user || !user.password) return null;
+          if (!user) return null; // User not found
 
-          const passwordsMatch = await bcrypt.compare(password, user.password);
-
-          if (passwordsMatch) {
-            // Check if it's a temporary password login
-            if (user.tempPassword) {
+          // Handle temporary password login
+          if (user.password === null && user.tempPassword) {
+            if (password === user.tempPassword) {
               const error = new Error(JSON.stringify({ code: "PASSWORD_CHANGE_REQUIRED", message: "User must change their password." }));
-              // This special error is caught by the sign-in page to trigger a redirect.
               throw error;
+            } else {
+              return null; // Incorrect temp password
             }
-            return { id: user.id, name: user.name, email: user.email };
+          }
+
+          // Handle regular password login
+          if (user.password) {
+            const passwordsMatch = await bcrypt.compare(password, user.password);
+            if (passwordsMatch) {
+              return { id: user.id, name: user.name, email: user.email };
+            }
           }
         }
         
-        return null;
+        return null; // Return null if credentials are not valid for any case
       },
     }),
   ],
@@ -49,14 +55,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         if (fullUser) {
+          // This is a plain object suitable for a JWT token
           const plainRoles = fullUser.roles.map(role => ({
             id: role.id,
             name: role.name,
             description: role.description,
             permissions: role.permissions,
-            createdAt: role.createdAt.toISOString(),
-            updatedAt: role.updatedAt.toISOString(),
-            createdById: role.createdById
           }));
 
           const effectivePermissions = Array.from(
@@ -64,7 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           );
 
           token.id = fullUser.id;
-          token.roles = plainRoles;
+          token.roles = plainRoles as any; // Cast because Prisma types are complex
           token.effectivePermissions = effectivePermissions;
           token.firstName = fullUser.firstName;
           token.lastName = fullUser.lastName;
