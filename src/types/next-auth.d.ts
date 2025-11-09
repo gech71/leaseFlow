@@ -1,3 +1,4 @@
+
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import NextAuth, { type DefaultSession } from "next-auth"
 
@@ -14,6 +15,7 @@ declare module "next-auth" {
       firstName?: string | null;
       lastName?: string | null;
       phoneNumber?: string | null;
+      forceChangePass: boolean;
     } & DefaultSession["user"]
   }
 
@@ -24,6 +26,7 @@ declare module "next-auth" {
       firstName?: string | null;
       lastName?: string | null;
       phoneNumber?: string | null;
+      forceChangePass?: boolean;
   }
 }
 
@@ -36,5 +39,6 @@ declare module "next-auth/jwt" {
     firstName?: string | null;
     lastName?: string | null;
     phoneNumber?: string | null;
+    forceChangePass?: boolean;
   }
 }

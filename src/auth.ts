@@ -8,15 +8,19 @@ import bcrypt from 'bcrypt';
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import { z } from 'zod';
 
-class PasswordChangeRequired extends CredentialsSignin {
-  code = "PASSWORD_CHANGE_REQUIRED";
+// Define a custom user type for the authorize callback
+interface AuthorizeUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+  requiresPasswordChange?: boolean;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     Credentials({
-      async authorize(credentials) {
+      async authorize(credentials): Promise<AuthorizeUser | null> {
         const parsedCredentials = z
           .object({ phoneNumber: z.string(), password: z.string().min(1) })
           .safeParse(credentials);
@@ -30,8 +34,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Handle temporary password login
           if (user.password === null && user.tempPassword) {
             if (password === user.tempPassword) {
-              // Throw a specific error to be caught by the frontend
-              throw new PasswordChangeRequired("User must change their password.");
+              // Instead of throwing an error, return a user object with a flag.
+              return { 
+                id: user.id, 
+                name: user.name, 
+                email: user.email,
+                requiresPasswordChange: true // This flag will be used in the JWT callback
+              };
             } else {
               return null; // Incorrect temp password
             }
@@ -41,13 +50,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (user.password) {
             const passwordsMatch = await bcrypt.compare(password, user.password);
             if (passwordsMatch) {
-              // Return a simplified user object. The JWT callback will fetch the rest.
+              // Return a standard user object
               return { id: user.id, name: user.name, email: user.email };
             }
           }
         }
         
-        return null; // Return null if credentials are not valid for any case
+        return null; // Return null if credentials are not valid
       },
     }),
   ],
@@ -55,13 +64,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...authConfig.callbacks,
     async jwt({ token, user, trigger }) {
       // If `user` is present, it's the initial sign-in.
-      if (user && user.id) {
+      if (user) {
+        // Handle the custom flag from the authorize callback
+        const authUser = user as AuthorizeUser;
+        if (authUser.requiresPasswordChange) {
+            token.forceChangePass = true;
+        }
+
         const fullUser = await databaseService.getUserById(user.id, {
           roles: true,
         });
 
         if (fullUser) {
-          // This is a plain object suitable for a JWT token
           const plainRoles = fullUser.roles.map(role => ({
             id: role.id,
             name: role.name,
@@ -74,7 +88,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           );
 
           token.id = fullUser.id;
-          token.roles = plainRoles as any; // Cast because Prisma types are complex
+          token.roles = plainRoles as any;
           token.effectivePermissions = effectivePermissions;
           token.firstName = fullUser.firstName;
           token.lastName = fullUser.lastName;
@@ -95,6 +109,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.phoneNumber = token.phoneNumber as string | null;
         session.user.name = token.name as string | null;
         session.user.email = token.email as string | null;
+        session.user.forceChangePass = (token.forceChangePass as boolean | undefined) ?? false;
       }
       return session;
     },

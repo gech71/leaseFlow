@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  const error = searchParams.get('error');
+  const errorFromUrl = searchParams.get('error');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,32 +29,24 @@ export default function AdminLoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        redirect: false,
+        redirect: false, // Prevent NextAuth from redirecting automatically
         phoneNumber: phoneNumber,
         password: password,
-        callbackUrl: '/admin/dashboard'
       });
       
       if (result?.error) {
-        // Check if the error string contains our custom error code.
-        // This is a robust way to handle custom errors from the authorize function.
-        if (result.error.includes('PASSWORD_CHANGE_REQUIRED')) {
-            router.push('/portal/change-password');
-            return;
-        }
-
-        // For all other errors, show a generic invalid credentials message.
+        // The middleware will handle redirects for password changes.
+        // Any error reaching here is now treated as a failed login.
         toast({
           title: "Login Failed",
           description: "Invalid credentials. Please try again.",
           variant: "destructive",
         });
-
       } else if (result?.ok) {
-        // Successful login, NextAuth will handle the redirect via middleware logic
-        // But we can initiate it here to be explicit
-        router.push('/admin/dashboard'); 
-        router.refresh(); // Ensure fresh data is loaded on the dashboard
+        // Successful login. The middleware will now take over and redirect
+        // to the correct page (/admin/dashboard or /portal/change-password).
+        // We just need to refresh the page to trigger the middleware check.
+        router.refresh(); 
       }
     } catch (error) {
       console.error("Login submission error:", error);
@@ -80,10 +72,10 @@ export default function AdminLoginPage() {
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">
           <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
-             {error && (
+             {errorFromUrl && (
               <div className="p-3 bg-destructive/10 border border-destructive text-destructive text-sm rounded-md flex items-start">
                 <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-                <p>{"Invalid credentials. Please try again."}</p>
+                <p>{"Your session has expired. Please log in again."}</p>
               </div>
             )}
             <div className="space-y-2">

@@ -1,3 +1,4 @@
+
 import type { NextAuthConfig } from 'next-auth';
 import { NextResponse } from 'next/server';
 import type { User as AuthUser } from 'next-auth';
@@ -5,8 +6,8 @@ import type { User as AuthUser } from 'next-auth';
 // Extend the User type to include our custom properties
 interface AppUser extends AuthUser {
   roles?: { name: string }[];
+  forceChangePass?: boolean;
 }
-
 
 export const authConfig = {
   pages: {
@@ -26,6 +27,11 @@ export const authConfig = {
           return false;
         }
 
+        // If user is logged in, check if they need to change their password
+        if (user?.forceChangePass && nextUrl.pathname !== '/portal/change-password') {
+            return NextResponse.redirect(new URL('/portal/change-password', nextUrl));
+        }
+
         // If user is logged in, check their role for admin routes.
         if (isOnAdminRoute) {
           const isTenantOnly = user?.roles?.some(role => role.name === 'TENANT') && user.roles.length === 1;
@@ -35,12 +41,17 @@ export const authConfig = {
           }
         }
         
-        // If logged in and not a tenant-only user on an admin route, allow access.
+        // If logged in and not requiring a password change, allow access.
         return true;
       }
       
-      // If a logged-in user tries to access a public page like /login, redirect them.
+      // If a logged-in user tries to access a public page like /login
       if (isLoggedIn) {
+        // But they must change their password, force them to the change password page
+        if (user?.forceChangePass) {
+            return Response.redirect(new URL('/portal/change-password', nextUrl));
+        }
+        
         const isTenant = user?.roles?.some((role: any) => role.name === 'TENANT') && user.roles?.length === 1;
         
         // If on the login page, redirect away.
