@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        redirect: false, // Prevent NextAuth from redirecting automatically
+        redirect: false, // We will handle the redirect manually
         phoneNumber: phoneNumber,
         password: password,
       });

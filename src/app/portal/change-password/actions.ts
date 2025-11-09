@@ -49,5 +49,3 @@ export async function forceChangePasswordAction(values: z.infer<typeof changePas
     return { success: false, error: "An unexpected server error occurred." };
   }
 }
-
-    

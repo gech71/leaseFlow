@@ -1,6 +1,5 @@
 
 import NextAuth from 'next-auth';
-import { CredentialsSignin } from "next-auth";
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';
 import { databaseService } from '@/lib/services/databaseService';
@@ -35,7 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Handle temporary password login
           if (user.password === null && user.tempPassword) {
             if (password === user.tempPassword) {
-              // On successful temp password login, indicate a password change is required.
+              // On successful temp password login, return a simple object with the flag
               return { id: user.id, name: user.name, email: user.email, forceChangePass: true };
             } else {
               return null; // Incorrect temp password
@@ -46,7 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (user.password) {
             const passwordsMatch = await bcryptjs.compare(password, user.password);
             if (passwordsMatch) {
-              // Return a standard user object
+              // Return a standard simple user object
               return { id: user.id, name: user.name, email: user.email };
             }
           }
@@ -58,8 +57,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger }) {
-      // If `user` is present, it's the initial sign-in.
+    async jwt({ token, user }) {
       if (user) {
         // Handle the custom flag from the authorize callback
         const authUser = user as AuthorizeUser;
