@@ -7,7 +7,8 @@ import bcryptjs from 'bcryptjs';
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import { z } from 'zod';
 
-// Define a custom user type for the authorize callback
+// Define a custom user type for what the authorize callback should return.
+// It MUST be a simple object, not a complex Prisma model.
 interface AuthorizeUser {
   id: string;
   name: string | null;
@@ -31,10 +32,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const user = await databaseService.findUserByPhoneNumber(phoneNumber);
           if (!user) return null; // User not found
 
-          // Handle temporary password login
+          // Handle temporary password login (when password is null but tempPassword is set)
           if (user.password === null && user.tempPassword) {
             if (password === user.tempPassword) {
-              // On successful temp password login, return a simple object with the flag
+              // CORRECT: Return a simple object with the flag
               return { id: user.id, name: user.name, email: user.email, forceChangePass: true };
             } else {
               return null; // Incorrect temp password
@@ -45,13 +46,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (user.password) {
             const passwordsMatch = await bcryptjs.compare(password, user.password);
             if (passwordsMatch) {
-              // Return a standard simple user object
+              // CORRECT: Return a standard simple user object
               return { id: user.id, name: user.name, email: user.email };
             }
           }
         }
         
-        return null; // Return null if credentials are not valid
+        return null; // Return null if credentials are not valid for any case
       },
     }),
   ],
@@ -59,13 +60,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ...authConfig.callbacks,
     async jwt({ token, user }) {
       if (user) {
-        // Handle the custom flag from the authorize callback
+        // `user` here is the simple object from the `authorize` callback.
         const authUser = user as AuthorizeUser;
-        if (authUser.forceChangePass) {
-            token.forceChangePass = true;
-        }
+        
+        // This is the first time the token is being created for this session
+        token.id = authUser.id;
+        token.forceChangePass = authUser.forceChangePass ?? false;
 
-        const fullUser = await databaseService.getUserById(user.id, {
+        // Now, fetch the full user details from the database to enrich the token
+        const fullUser = await databaseService.getUserById(authUser.id, {
           roles: true,
         });
 
@@ -81,7 +84,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             new Set(plainRoles.flatMap(r => r.permissions))
           );
 
-          token.id = fullUser.id;
           token.roles = plainRoles as any;
           token.effectivePermissions = effectivePermissions;
           token.firstName = fullUser.firstName;
