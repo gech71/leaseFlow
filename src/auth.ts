@@ -4,7 +4,7 @@ import { CredentialsSignin } from "next-auth";
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';
 import { databaseService } from '@/lib/services/databaseService';
-import bcrypt from 'bcryptjs';
+import bcryptjs from 'bcryptjs';
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import { z } from 'zod';
 
@@ -13,7 +13,7 @@ interface AuthorizeUser {
   id: string;
   name: string | null;
   email: string | null;
-  requiresPasswordChange?: boolean;
+  forceChangePass?: boolean;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -36,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (user.password === null && user.tempPassword) {
             if (password === user.tempPassword) {
               // On successful temp password login, indicate a password change is required.
-              throw new CredentialsSignin("User must change their password.", { code: "PASSWORD_CHANGE_REQUIRED" });
+              return { id: user.id, name: user.name, email: user.email, forceChangePass: true };
             } else {
               return null; // Incorrect temp password
             }
@@ -44,7 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           // Handle regular password login
           if (user.password) {
-            const passwordsMatch = await bcrypt.compare(password, user.password);
+            const passwordsMatch = await bcryptjs.compare(password, user.password);
             if (passwordsMatch) {
               // Return a standard user object
               return { id: user.id, name: user.name, email: user.email };
@@ -63,7 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         // Handle the custom flag from the authorize callback
         const authUser = user as AuthorizeUser;
-        if (authUser.requiresPasswordChange) {
+        if (authUser.forceChangePass) {
             token.forceChangePass = true;
         }
 
