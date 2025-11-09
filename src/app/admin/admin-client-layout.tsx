@@ -111,8 +111,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   }, [permissionsLoading, currentUser, router]);
 
   useEffect(() => {
-    if (!permissionsLoading && currentUser?.effectivePermissions) {
-        if (currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
+    if (!permissionsLoading && currentUser) {
+        if (currentUser.roles && currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
             router.replace('/portal/dashboard');
             return;
         }
@@ -123,7 +123,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             router.replace('/admin/dashboard');
         }
     }
-  }, [permissionsLoading, currentUser, pathname, hasPermission]);
+  }, [permissionsLoading, currentUser, pathname, hasPermission, router]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);

@@ -1,8 +1,7 @@
 import type { NextAuthConfig } from 'next-auth';
-import { NextResponse } from 'next/server';
 import type { User as AuthUser } from 'next-auth';
 
-// Extend the User type to include our custom properties
+// Extend the User type to include our custom properties from the token
 interface AppUser extends AuthUser {
   roles?: { name: string }[];
   forceChangePass?: boolean;
@@ -15,22 +14,19 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      
       const isOnProtectedRoue = nextUrl.pathname.startsWith('/admin') || nextUrl.pathname.startsWith('/portal');
 
       if (isOnProtectedRoue) {
-        if (isLoggedIn) return true; // If logged in, allow middleware to handle logic.
+        if (isLoggedIn) {
+          return true; // Allow access, middleware will handle redirects if necessary
+        }
         return false; // Redirect unauthenticated users to login page
-      } else if (isLoggedIn) {
-        // If the user is logged in and tries to access a public page like /login,
-        // redirect them to a relevant dashboard.
-        const isTenant = auth.user.roles?.some((role: any) => role.name === 'TENANT') && auth.user.roles?.length === 1;
-        return NextResponse.redirect(new URL(isTenant ? '/portal/dashboard' : '/admin/dashboard', nextUrl));
-      }
-      
-      return true; // Allow all other unauthenticated requests
+      } 
+      // For non-protected routes, we let the middleware handle login page redirects.
+      // Returning true allows the request to proceed.
+      return true; 
     },
-    // JWT and Session callbacks are handled in auth.ts
+    // The main JWT and Session callbacks are now in the primary auth.ts file.
   },
   providers: [], // Providers are defined in the main auth.ts file
 } satisfies NextAuthConfig;
