@@ -1,4 +1,3 @@
-
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';
@@ -23,16 +22,15 @@ export const {
 
         if (parsedCredentials.success) {
           const { phoneNumber, password } = parsedCredentials.data;
-
+          
           const user = await databaseService.findUserByPhoneNumber(phoneNumber);
-
           if (!user || !user.password) return null;
 
           const passwordsMatch = await bcrypt.compare(password, user.password);
 
           if (passwordsMatch) {
-            // Return a plain user object, NextAuth.js v5 only needs the id here.
-            // We will fetch the rest of the data in the jwt callback.
+            // On success, return only the user object with the id.
+            // The rest of the data will be fetched in the `jwt` callback.
             return { id: user.id };
           }
         }
@@ -45,29 +43,25 @@ export const {
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user, trigger, session }) {
-      // The `user` object is only available on the initial sign-in.
-      if (user?.id) {
-         // Fetch the full user profile from the database, including roles.
+      // If `user` is present, this is the initial sign-in.
+      if (user && user.id) {
+         // Fetch full user profile from the database to enrich the token.
          const userWithRoles = await databaseService.getUserById(user.id, {
             roles: true,
          });
          
          if (userWithRoles) {
+            // This is the correct place to build the token payload.
             const plainRoles = userWithRoles.roles.map(role => ({
                 id: role.id,
                 name: role.name,
                 description: role.description,
                 permissions: role.permissions,
-                createdAt: role.createdAt.toISOString(),
-                updatedAt: role.updatedAt.toISOString(),
-                createdById: role.createdById,
             }));
-
             const effectivePermissions = Array.from(new Set(plainRoles.flatMap(r => r.permissions)));
             
-            // Add all the necessary properties to the token.
             token.id = userWithRoles.id;
-            token.roles = plainRoles;
+            token.roles = plainRoles as PrismaRole[];
             token.effectivePermissions = effectivePermissions;
             token.firstName = userWithRoles.firstName;
             token.lastName = userWithRoles.lastName;
@@ -79,7 +73,7 @@ export const {
       return token;
     },
     async session({ session, token }) {
-      // Pass info from the enriched JWT to the client-side session object
+      // Pass the enriched data from the JWT to the client-side session object.
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.roles = token.roles as PrismaRole[];

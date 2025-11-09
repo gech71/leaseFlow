@@ -8,5 +8,6 @@ export default NextAuth(authConfig).auth;
 export const config = {
   // https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
   // The matcher is used to run the Middleware on specific paths.
+  // This ensures API routes for auth are not intercepted by the middleware.
   matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
 };
