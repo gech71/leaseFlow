@@ -6,74 +6,68 @@ import bcrypt from 'bcrypt';
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import { z } from 'zod';
 
-export const {
-  handlers,
-  auth,
-  signIn,
-  signOut,
-} = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     Credentials({
       async authorize(credentials) {
         const parsedCredentials = z
-          .object({ phoneNumber: z.string(), password: z.string().min(6) })
+          .object({ phoneNumber: z.string(), password: z.string().min(1) })
           .safeParse(credentials);
 
         if (parsedCredentials.success) {
           const { phoneNumber, password } = parsedCredentials.data;
-          
+
           const user = await databaseService.findUserByPhoneNumber(phoneNumber);
           if (!user || !user.password) return null;
 
           const passwordsMatch = await bcrypt.compare(password, user.password);
 
           if (passwordsMatch) {
-            // On success, return only the user object with the id.
-            // The rest of the data will be fetched in the `jwt` callback.
+            // Return only the ID. The `jwt` callback will fetch the rest.
             return { id: user.id };
           }
         }
-        
-        console.log('Invalid credentials');
         return null;
       },
     }),
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger, session }) {
-      // If `user` is present, this is the initial sign-in.
+    async jwt({ token, user, trigger }) {
+      // If `user` is present, it's the initial sign-in.
       if (user && user.id) {
-         // Fetch full user profile from the database to enrich the token.
-         const userWithRoles = await databaseService.getUserById(user.id, {
-            roles: true,
-         });
-         
-         if (userWithRoles) {
-            // This is the correct place to build the token payload.
-            const plainRoles = userWithRoles.roles.map(role => ({
-                id: role.id,
-                name: role.name,
-                description: role.description,
-                permissions: role.permissions,
-            }));
-            const effectivePermissions = Array.from(new Set(plainRoles.flatMap(r => r.permissions)));
-            
-            token.id = userWithRoles.id;
-            token.roles = plainRoles as PrismaRole[];
-            token.effectivePermissions = effectivePermissions;
-            token.firstName = userWithRoles.firstName;
-            token.lastName = userWithRoles.lastName;
-            token.phoneNumber = userWithRoles.phoneNumber;
-            token.name = userWithRoles.name;
-            token.email = userWithRoles.email;
-         }
+        // Fetch the full user profile to enrich the token.
+        const fullUser = await databaseService.getUserById(user.id, {
+          roles: true,
+        });
+
+        if (fullUser) {
+          const plainRoles = fullUser.roles.map(role => ({
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            permissions: role.permissions,
+          }));
+
+          const effectivePermissions = Array.from(
+            new Set(plainRoles.flatMap(r => r.permissions))
+          );
+
+          token.id = fullUser.id;
+          token.roles = plainRoles;
+          token.effectivePermissions = effectivePermissions;
+          token.firstName = fullUser.firstName;
+          token.lastName = fullUser.lastName;
+          token.phoneNumber = fullUser.phoneNumber;
+          token.name = fullUser.name;
+          token.email = fullUser.email;
+        }
       }
       return token;
     },
     async session({ session, token }) {
-      // Pass the enriched data from the JWT to the client-side session object.
+      // Pass the enriched data from the JWT to the client-side session.
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.roles = token.roles as PrismaRole[];

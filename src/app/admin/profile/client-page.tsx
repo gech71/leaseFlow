@@ -88,11 +88,11 @@ export function AdminProfileClientPage() {
         <CardContent className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
-            <Input id="name" value={currentUser.name} readOnly disabled />
+            <Input id="name" value={currentUser.name || ''} readOnly disabled />
           </div>
           <div className="space-y-1">
             <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
-            <Input id="email" value={currentUser.email} readOnly disabled />
+            <Input id="email" value={currentUser.email || ''} readOnly disabled />
           </div>
            <div className="space-y-1">
             <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>

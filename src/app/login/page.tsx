@@ -42,10 +42,8 @@ export default function AdminLoginPage() {
         // If signIn is successful, manually redirect
         toast({
           title: "Login Successful",
-          description: "Redirecting...",
+          description: "Redirecting to your dashboard...",
         });
-        // On successful login, NextAuth middleware will handle redirection
-        // but we can also push the user to the dashboard to be safe.
         router.push('/admin/dashboard'); 
         router.refresh(); // Ensure session is re-fetched on the server
       }

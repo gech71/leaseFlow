@@ -1,13 +1,12 @@
 import type { NextAuthConfig } from 'next-auth';
- 
+
 export const authConfig = {
   pages: {
-    signIn: '/login', // All failed sign-ins will redirect here
+    signIn: '/login',
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnDashboard = nextUrl.pathname.startsWith('/admin/dashboard');
       const isOnAdmin = nextUrl.pathname.startsWith('/admin');
       const isOnPortal = nextUrl.pathname.startsWith('/portal');
 
@@ -15,16 +14,15 @@ export const authConfig = {
         if (isLoggedIn) return true;
         return false; // Redirect unauthenticated users to login page
       } else if (isLoggedIn) {
-        // If the user is logged in and tries to access the login page, redirect them to the dashboard.
+        // If the user is logged in and tries to access the login page, redirect them.
         if (nextUrl.pathname === "/login") {
             return Response.redirect(new URL('/admin/dashboard', nextUrl));
         }
         return true;
       }
-      
-      // Allow all other requests for unauthenticated users (e.g., login page)
+      // Allow all other requests (like /login) for unauthenticated users
       return true;
     },
   },
-  providers: [], // Add providers in the main auth.ts file
+  providers: [], // Providers are defined in the main auth.ts file
 } satisfies NextAuthConfig;
