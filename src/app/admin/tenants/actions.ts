@@ -1,3 +1,4 @@
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -80,12 +81,12 @@ export async function createTenantAction(data: {
             lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
             phoneNumber: data.phone,
             password: hashedPassword,
-            tempPassword: tempPassword,
+            tempPassword: tempPassword, // Store the plain temp password
             roles: { connect: { id: tenantRole.id } },
         });
         
         const emailHtml = `
-          <h1>Welcome to Building Management Solution!</h1>
+          <h1>Welcome to LeaseFlow!</h1>
           <p>Hello ${data.name},</p>
           <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
           <p>You can access the portal here: <a href="${process.env.NEXTAUTH_URL}/login">${process.env.NEXTAUTH_URL}/login</a></p>
@@ -231,3 +232,5 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         return { success: false, error: "An internal error occurred." };
     }
 }
+
+    

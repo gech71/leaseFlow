@@ -25,12 +25,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const passwordsMatch = await bcrypt.compare(password, user.password);
 
           if (passwordsMatch) {
-            // On success, return a plain user object with only the ID.
-            // This prevents serialization errors.
-            return { id: user.id };
+            // Check if it's a temporary password login
+            if (user.tempPassword) {
+              const error = new Error(JSON.stringify({ code: "PASSWORD_CHANGE_REQUIRED", message: "User must change their password." }));
+              // This special error is caught by the sign-in page to trigger a redirect.
+              throw error;
+            }
+            return { id: user.id, name: user.name, email: user.email };
           }
         }
-        // Return null if credentials are not valid
+        
         return null;
       },
     }),
@@ -40,7 +44,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user, trigger }) {
       // If `user` is present, it's the initial sign-in.
       if (user && user.id) {
-        // Fetch the full user profile to enrich the token.
         const fullUser = await databaseService.getUserById(user.id, {
           roles: true,
         });
@@ -72,7 +75,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      // Pass the enriched data from the JWT to the client-side session.
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.roles = token.roles as PrismaRole[];
@@ -87,3 +89,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+    

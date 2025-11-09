@@ -36,22 +36,23 @@ export default function AdminLoginPage() {
         redirect: false, // This is crucial to handle the response here
         phoneNumber: phoneNumber,
         password: password,
-        callbackUrl: '/admin/dashboard' // Explicitly set the callback URL
       });
 
       if (result?.error) {
+        const errorData = JSON.parse(result.error);
+        if (errorData.code === 'PASSWORD_CHANGE_REQUIRED') {
+            router.push('/portal/change-password');
+            return;
+        }
         toast({
           title: "Login Failed",
-          description: "Invalid credentials. Please try again.",
+          description: errorData.message || "Invalid credentials. Please try again.",
           variant: "destructive",
         });
       } else if (result?.ok) {
-        toast({
-          title: "Login Successful",
-          description: "Redirecting to your dashboard...",
-        });
-        // Now let NextAuth handle the redirect based on the callbackUrl we provided.
-        router.push(result.url || '/admin/dashboard'); 
+        // Successful login, NextAuth will handle the redirect via middleware logic
+        // But we can initiate it here to be explicit
+        router.push('/admin/dashboard'); 
         router.refresh(); // Ensure fresh data is loaded on the dashboard
       }
     } catch (error) {
@@ -144,3 +145,5 @@ export default function AdminLoginPage() {
     </>
   );
 }
+
+    
