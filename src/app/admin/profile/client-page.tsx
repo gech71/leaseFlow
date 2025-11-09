@@ -88,7 +88,7 @@ export function AdminProfileClientPage() {
           </div>
            <div className="space-y-1">
             <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
-            <Input value={currentUser?.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
+            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
           </div>
         </CardContent>
       </Card>

@@ -1,4 +1,3 @@
-
 "use server";
 
 import { auth, signOut } from "@/auth";
@@ -30,7 +29,8 @@ export async function forceChangePasswordAction(values: z.infer<typeof changePas
     }
 
     // This action is only for the initial password change. We don't check the current password.
-    if (!user.tempPassword) {
+    // We check the flag from the session which came from the temp password login flow.
+    if (!session.user.forceChangePass) {
         return { success: false, error: "This account does not require a password change." };
     }
 

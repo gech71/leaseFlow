@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/auth";
+import { auth, signOut } from "@/auth";
 import { databaseService } from "@/lib/services/databaseService";
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -38,6 +38,10 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
       password: hashedNewPassword,
       tempPassword: null, // Clear any temporary password
     });
+
+    // After a successful password change, we should log the user out
+    // to ensure all session data is refreshed on next login.
+    await signOut({ redirect: false });
 
     return { success: true };
   } catch (error) {
