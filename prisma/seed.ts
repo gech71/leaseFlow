@@ -1,5 +1,6 @@
 
 import { PrismaClient, Prisma } from "@prisma/client";
+import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
@@ -115,6 +116,7 @@ async function main() {
 
   // 3. Create the default Super Admin User
   console.log("Creating Super Admin User...");
+  const hashedPassword = await bcrypt.hash("Admin@123", 10);
   const superAdminUser = await prisma.user.create({
     data: {
       userId: "4937a4cc-4df8-4161-a701-fbf0b3d21662", // <-- REPLACE THIS VALUE
@@ -123,13 +125,14 @@ async function main() {
       firstName: "Super",
       lastName: "Admin",
       phoneNumber: "0912345678",
+      password: hashedPassword,
       roles: { connect: { id: superAdminRole.id } },
     },
   });
   console.log(`Created Super Admin User: ${superAdminUser.email}`);
 
   console.log(
-    "Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user.",
+    "Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user with a default password.",
   );
 }
 
