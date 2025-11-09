@@ -1,4 +1,3 @@
-
 import NextAuth from 'next-auth';
 import { authConfig } from './auth.config';
 
@@ -8,6 +7,6 @@ export default NextAuth(authConfig).auth;
 
 export const config = {
   // The matcher is used to run the Middleware on specific paths.
-  // This ensures API routes for auth are not intercepted by the middleware.
-  matcher: ['/((?!api/auth/session|_next/static|_next/image|favicon.ico|.*\\.png$).*)'],
+  // This configuration protects all admin and portal routes.
+  matcher: ['/admin/:path*', '/portal/:path*'],
 };
