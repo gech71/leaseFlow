@@ -1,9 +1,8 @@
 import type React from 'react';
 import AdminClientLayout from './admin-client-layout';
 import type { Metadata } from 'next';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import AuthProvider from '@/contexts/AuthProvider';
+import { auth } from '@/auth'; // Use the new auth function
+import { SessionProvider } from 'next-auth/react'; // SessionProvider is still needed for client components
 
 export const metadata: Metadata = {
   title: 'LeaseFlow',
@@ -14,10 +13,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions);
+  const session = await auth(); // Get session on the server
   return (
-    <AuthProvider session={session}>
+    <SessionProvider session={session}>
         <AdminClientLayout>{children}</AdminClientLayout>
-    </AuthProvider>
+    </SessionProvider>
   );
 }

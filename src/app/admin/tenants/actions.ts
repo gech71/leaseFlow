@@ -1,16 +1,13 @@
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type User as PrismaUser, type Role as PrismaRole, TenantStatus } from '@prisma/client';
 import { addMonths, isAfter } from 'date-fns'; 
-import { cookies, headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
 import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
-
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
+import bcrypt from 'bcrypt';
 
 function generateTempPassword(length = 12) {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -70,51 +67,19 @@ export async function createTenantAction(data: {
     } else {
         tempPassword = generateTempPassword();
         
-        const registrationResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cookie': (await headers()).get('Cookie') || "",
-            },
-            body: JSON.stringify({
-                firstName: data.name.split(' ')[0] || data.name,
-                lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
-                phoneNumber: data.phone,
-                email: data.email,
-                password: tempPassword,
-            }),
-        });
-        
-        const responseText = await registrationResponse.text();
-        if (!registrationResponse.ok) {
-            let errorMessages = ["Failed to register user account."];
-             try { if (responseText) { const errorJson = JSON.parse(responseText); errorMessages = errorJson.errors || [errorJson.message] || errorMessages; } } catch (e) { if(responseText && responseText.length < 500) { errorMessages = [responseText]; } }
-            console.error("Failed to register tenant user:", errorMessages);
-            return { success: false, error: `Failed to create user account: ${errorMessages.join(', ')}` };
-        }
-
-        const loginResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phoneNumber: data.phone, password: tempPassword }),
-        });
-        if (!loginResponse.ok) return { success: false, error: "User registered, but failed to retrieve user ID." };
-        
-        const loginData = await loginResponse.json();
-        const tokenPayload = decodeJwtPayload(loginData.accessToken);
-        const newUserId = tokenPayload?.sub;
-        if (!newUserId) return { success: false, error: "User was created, but the new User ID was not returned." };
-        
         const tenantRole = await databaseService.getRoleByName('TENANT');
         if (!tenantRole) return { success: false, error: "The default 'TENANT' role was not found." };
+
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
         
         userForTenant = await databaseService.createUser({
-            userId: newUserId,
+            userId: `local-${crypto.randomUUID()}`,
             email: data.email,
             name: data.name,
             firstName: data.name.split(' ')[0] || data.name,
             lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
             phoneNumber: data.phone,
+            password: hashedPassword,
             tempPassword: tempPassword,
             roles: { connect: { id: tenantRole.id } },
         });
@@ -123,7 +88,7 @@ export async function createTenantAction(data: {
           <h1>Welcome to Building Management Solution!</h1>
           <p>Hello ${data.name},</p>
           <p>A new tenant portal account has been created for you. You can use these credentials to log in and manage your lease.</p>
-          <p>You can access the portal here: <a href="https://nibrental.nibbank.com.et/login">https://nibrental.nibbank.com.et/login</a></p>
+          <p>You can access the portal here: <a href="${process.env.NEXTAUTH_URL}/login">${process.env.NEXTAUTH_URL}/login</a></p>
           <p><strong>Phone Number:</strong> ${data.phone}</p>
           <p><strong>Temporary Password:</strong> ${tempPassword}</p>
           <p>For your security, you will be required to change this password upon your first login.</p>
@@ -158,26 +123,6 @@ export async function createTenantAction(data: {
   }
 }
 
-// Insecure JWT payload decoder
-function decodeJwtPayload(token: string): any | null {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error('Failed to decode JWT payload:', e);
-    return null;
-  }
-}
 
 export async function updateTenantAction(
   tenantId: string,

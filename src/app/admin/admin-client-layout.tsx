@@ -117,6 +117,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             return;
         }
 
+        // This logic seems fine, if user lands on profile, redirect to a useful page if they have perm.
+        // But /admin/profile doesn't exist anymore, so we can adjust it.
         if (pathname === '/admin/profile' && hasPermission('dashboard:view')) {
             router.replace('/admin/dashboard');
         }
@@ -125,6 +127,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+    // Use the signOut function from NextAuth.js v5
     await signOut({ redirect: false });
     toast({
         title: "Logged Out",
@@ -296,6 +299,7 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     );
   }
 
+  // The PermissionProvider is crucial as it uses useSession()
   return (
     <PermissionProvider>
       <SidebarProvider defaultOpen>

@@ -24,24 +24,28 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
+      // Use the signIn function from next-auth/react
       const result = await signIn("credentials", {
-        redirect: false,
+        redirect: false, // Prevent NextAuth from redirecting automatically
         phoneNumber: phoneNumber,
         password: password,
       });
 
       if (result?.error) {
+        // If signIn returns an error, it means authentication failed
         toast({
           title: "Login Failed",
           description: "Invalid credentials. Please try again.",
           variant: "destructive",
         });
       } else if (result?.ok) {
+        // If signIn is successful, manually redirect
         toast({
           title: "Login Successful",
           description: "Redirecting...",
         });
-        // Successful login, redirect to the dashboard.
+        // On successful login, NextAuth middleware will handle redirection
+        // but we can also push the user to the dashboard to be safe.
         router.push('/admin/dashboard'); 
         router.refresh(); // Ensure session is re-fetched on the server
       }
