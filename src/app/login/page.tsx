@@ -36,13 +36,14 @@ export default function AdminLoginPage() {
       });
       
       if (result?.error) {
-        // Correctly check for the specific error code from the CredentialsSignin error
-        const errorCause = (result.error as any).cause;
-        if (errorCause?.code === 'PASSWORD_CHANGE_REQUIRED') {
+        // Check if the error string contains our custom error code.
+        // This is a robust way to handle custom errors from the authorize function.
+        if (result.error.includes('PASSWORD_CHANGE_REQUIRED')) {
             router.push('/portal/change-password');
             return;
         }
 
+        // For all other errors, show a generic invalid credentials message.
         toast({
           title: "Login Failed",
           description: "Invalid credentials. Please try again.",
