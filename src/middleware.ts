@@ -1,5 +1,4 @@
-
-import withAuth from "next-auth/middleware";
+import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
@@ -8,37 +7,39 @@ export default withAuth(
     const { token } = req.nextauth;
     const { pathname } = req.nextUrl;
 
-    const isAuthPage = pathname.startsWith("/login");
-
     // If the user is logged in and tries to access the login page, redirect them.
-    if (isAuthPage && token) {
+    if (pathname.startsWith("/login") && token) {
       const url = req.nextUrl.clone();
-      url.pathname = "/admin/dashboard"; // Default redirect for logged-in users
+      // Default redirect for logged-in users to the admin dashboard.
+      // The layout will handle tenant vs. admin redirection from there.
+      url.pathname = "/admin/dashboard"; 
       return NextResponse.redirect(url);
     }
   },
   {
     callbacks: {
+      // This callback determines if the user is authorized to access a page.
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
         
-        // If they are trying to access the login page, let them.
+        // The login page is always accessible, even if not authenticated.
         if (pathname.startsWith('/login')) {
             return true;
         }
         
-        // For any other page, a token must exist (user must be logged in).
+        // For any other page in the matcher, a token must exist (user must be logged in).
         return !!token;
       },
     },
+    // If `authorized` returns false, the user is redirected to the login page.
     pages: {
-        signIn: '/login', // Redirect here if `authorized` returns false
+        signIn: '/login',
     },
   }
 );
 
-// This config ensures the middleware runs on all admin/portal paths, and also on the login page.
-// It excludes static assets and NextAuth's internal API routes.
+// This config ensures the middleware runs on all protected routes and the login page.
+// It excludes static assets and NextAuth's own API routes.
 export const config = {
   matcher: [
     "/admin/:path*",

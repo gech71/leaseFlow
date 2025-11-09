@@ -1,4 +1,3 @@
-
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { databaseService } from "@/lib/services/databaseService";
@@ -72,7 +71,6 @@ export const authOptions: NextAuthOptions = {
           id: userWithRoles.id,
           name: userWithRoles.name,
           email: userWithRoles.email,
-          // Manually create a plain array of plain objects for roles
           roles: userWithRoles.roles.map(role => ({
             id: role.id,
             name: role.name,
@@ -112,8 +110,8 @@ export const authOptions: NextAuthOptions = {
       // Pass info from the JWT to the session object
       if (token && session.user) {
         session.user.id = token.id;
-        session.user.name = token.name;
-        session.user.email = token.email;
+        session.user.name = token.name as string;
+        session.user.email = token.email as string;
         session.user.roles = token.roles;
         session.user.effectivePermissions = token.effectivePermissions;
         session.user.firstName = token.firstName;
@@ -125,7 +123,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
-    error: "/login", // Redirect to login on error
+    error: "/login", // Redirect to login on auth error
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
