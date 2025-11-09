@@ -81,7 +81,7 @@ export interface TenantPortalData {
 }
 
 // --- User Authentication Helpers ---
-const ACCESS_TOKEN_KEY = "nibrental_admin_access_token";
+const ACCESS_TOKEN_KEY = "nibrental_portal_access_token"; // CORRECTED KEY
 
 // Insecure JWT payload decoder
 async function decodeJwtPayload(token: string): Promise<any | null> {

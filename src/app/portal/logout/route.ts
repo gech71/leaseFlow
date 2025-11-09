@@ -1,8 +1,9 @@
 
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 
-const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_portal_access_token';
+const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_portal_access_token'; // CORRECTED KEY
 const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 
 export async function POST(request: NextRequest) {
