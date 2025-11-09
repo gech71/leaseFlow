@@ -123,7 +123,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             router.replace('/admin/dashboard');
         }
     }
-  }, [permissionsLoading, currentUser, router, pathname, hasPermission]);
+  }, [permissionsLoading, currentUser, pathname, hasPermission]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
