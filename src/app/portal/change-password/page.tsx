@@ -49,12 +49,12 @@ function ChangePasswordForm() {
       router.push('/login');
     } else {
       toast({ title: "Update Failed", description: result.error, variant: "destructive" });
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
+    <div className="flex items-center justify-center min-h-screen bg-background p-4">
       <Card className="w-full max-w-md mx-auto shadow-lg">
         <CardHeader className="text-center">
           <CardTitle>Create New Password</CardTitle>
@@ -71,7 +71,7 @@ function ChangePasswordForm() {
                           <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />New Password</FormLabel>
                           <div className="relative">
                               <FormControl>
-                                  <Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                  <Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} disabled={isLoading} />
                               </FormControl>
                               <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowNewPassword(!showNewPassword)}>
                                 {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -89,7 +89,7 @@ function ChangePasswordForm() {
                           <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Confirm New Password</FormLabel>
                           <div className="relative">
                               <FormControl>
-                                  <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                  <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} disabled={isLoading}/>
                               </FormControl>
                               <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                                 {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
