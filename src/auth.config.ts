@@ -1,26 +1,31 @@
+
 import type { NextAuthConfig } from 'next-auth';
 
 export const authConfig = {
   pages: {
     signIn: '/login',
+    // We don't define an error page, so it redirects to signIn with an error query param
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnAdmin = nextUrl.pathname.startsWith('/admin');
-      const isOnPortal = nextUrl.pathname.startsWith('/portal');
+      const isOnAdminRoute = nextUrl.pathname.startsWith('/admin');
+      const isOnPortalRoute = nextUrl.pathname.startsWith('/portal');
 
-      if (isOnAdmin || isOnPortal) {
-        if (isLoggedIn) return true;
+      if (isOnAdminRoute || isOnPortalRoute) {
+        if (isLoggedIn) return true; // Allow access if logged in
         return false; // Redirect unauthenticated users to login page
-      } else if (isLoggedIn) {
-        // If the user is logged in and tries to access the login page, redirect them.
-        if (nextUrl.pathname === "/login") {
-            return Response.redirect(new URL('/admin/dashboard', nextUrl));
-        }
-        return true;
+      } 
+      
+      // If a logged-in user tries to access the login page, redirect them away.
+      if (isLoggedIn && nextUrl.pathname === '/login') {
+        const user = auth.user as any; // Cast to access roles
+        // Redirect tenants to portal, others to admin dashboard
+        const isTenant = user.roles?.some((role: any) => role.name === 'TENANT') && user.roles?.length === 1;
+        return Response.redirect(new URL(isTenant ? '/portal/dashboard' : '/admin/dashboard', nextUrl));
       }
-      // Allow all other requests (like /login) for unauthenticated users
+      
+      // Allow all other requests for unauthenticated users (e.g., viewing the login page itself)
       return true;
     },
   },

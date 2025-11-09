@@ -2,51 +2,57 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Phone, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
+import { LogIn, Phone, Loader2, Eye, EyeOff, Lock, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { signIn } from "next-auth/react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
+  // Show error message from URL if present
+  const error = searchParams.get('error');
+  const errorMap: Record<string, string> = {
+    "CredentialsSignin": "Invalid credentials. Please try again."
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Use the signIn function from next-auth/react with redirect: false
       const result = await signIn("credentials", {
-        redirect: false, // Prevent NextAuth from redirecting automatically
+        redirect: false, // This is crucial to handle the response here
         phoneNumber: phoneNumber,
         password: password,
       });
 
       if (result?.error) {
-        // If signIn returns an error, it means authentication failed
         toast({
           title: "Login Failed",
           description: "Invalid credentials. Please try again.",
           variant: "destructive",
         });
       } else if (result?.ok) {
-        // If signIn is successful, manually redirect
         toast({
           title: "Login Successful",
           description: "Redirecting to your dashboard...",
         });
-        // router.push() is sufficient, router.refresh() will happen on layout reload
+        // On success, NextAuth.js middleware will handle the redirect
+        // But we can also push the user manually to be explicit.
         router.push('/admin/dashboard'); 
+        router.refresh(); // Ensure fresh data is loaded on the dashboard
       }
     } catch (error) {
       console.error("Login submission error:", error);
@@ -72,6 +78,12 @@ export default function AdminLoginPage() {
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">
           <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
+             {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive text-destructive text-sm rounded-md flex items-start">
+                <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
+                <p>{errorMap[error] || "An authentication error occurred."}</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="phoneNumber" className="flex items-center">
                 <Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number

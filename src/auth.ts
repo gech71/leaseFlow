@@ -1,3 +1,4 @@
+
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';
@@ -17,17 +18,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (parsedCredentials.success) {
           const { phoneNumber, password } = parsedCredentials.data;
-
+          
           const user = await databaseService.findUserByPhoneNumber(phoneNumber);
           if (!user || !user.password) return null;
 
           const passwordsMatch = await bcrypt.compare(password, user.password);
 
           if (passwordsMatch) {
-            // Return only the ID. The `jwt` callback will fetch the rest.
+            // On success, return a plain user object with only the ID.
+            // This prevents serialization errors.
             return { id: user.id };
           }
         }
+        // Return null if credentials are not valid
         return null;
       },
     }),
@@ -48,6 +51,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: role.name,
             description: role.description,
             permissions: role.permissions,
+            createdAt: role.createdAt.toISOString(),
+            updatedAt: role.updatedAt.toISOString(),
           }));
 
           const effectivePermissions = Array.from(
