@@ -30,26 +30,26 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Use the standard signIn flow. It will redirect automatically.
-    // The middleware will handle routing to the correct dashboard or change password page.
     const result = await signIn("credentials", {
-      // No 'redirect: false'. Let NextAuth handle it.
+      redirect: false, // Prevent automatic redirect
       phoneNumber: phoneNumber,
       password: password,
-      callbackUrl: '/admin/dashboard', // Default destination for non-tenants
     });
-
-    // The code below will only run if there's an error and the redirect doesn't happen.
-    // This is a fallback for displaying errors.
-    if (result?.error) {
-       toast({
-          title: "Login Failed",
-          description: "Invalid credentials. Please check your phone number and password.",
-          variant: "destructive",
-        });
-    }
-
+    
     setIsLoading(false);
+
+    if (result?.error) {
+      // Show an error toast if sign-in fails
+      toast({
+        title: "Login Failed",
+        description: "Invalid credentials. Please check your phone number and password.",
+        variant: "destructive",
+      });
+    } else if (result?.ok) {
+      // On success, reload the page. 
+      // The middleware will intercept and redirect to the correct page.
+      window.location.reload();
+    }
   };
 
   return (
