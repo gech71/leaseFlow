@@ -22,42 +22,34 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   
   const errorFromUrl = searchParams.get('error');
+  // NextAuth.js will add this query param if the credentials are wrong
+  const credentialsError = errorFromUrl === "CredentialsSignin";
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      const result = await signIn("credentials", {
-        redirect: false, // We will handle the redirect manually
-        phoneNumber: phoneNumber,
-        password: password,
-      });
-      
-      if (result?.error) {
-        // The middleware will handle redirects for password changes.
-        // Any error reaching here is now treated as a failed login.
-        toast({
+    // Use the standard signIn flow. It will redirect automatically.
+    // The middleware will handle routing to the correct dashboard or change password page.
+    const result = await signIn("credentials", {
+      // No 'redirect: false'. Let NextAuth handle it.
+      phoneNumber: phoneNumber,
+      password: password,
+      callbackUrl: '/admin/dashboard', // Default destination for non-tenants
+    });
+
+    // The code below will only run if there's an error and the redirect doesn't happen.
+    // This is a fallback for displaying errors.
+    if (result?.error) {
+       toast({
           title: "Login Failed",
-          description: "Invalid credentials. Please try again.",
+          description: "Invalid credentials. Please check your phone number and password.",
           variant: "destructive",
         });
-      } else if (result?.ok) {
-        // Successful login. The middleware will now take over and redirect
-        // to the correct page (/admin/dashboard or /portal/change-password).
-        // We just need to refresh the page to trigger the middleware check.
-        router.refresh(); 
-      }
-    } catch (error) {
-      console.error("Login submission error:", error);
-      toast({
-        title: "Login Error",
-        description: "An unexpected error occurred. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   };
 
   return (
@@ -72,10 +64,10 @@ export default function AdminLoginPage() {
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-6">
           <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
-             {errorFromUrl && (
+             {credentialsError && (
               <div className="p-3 bg-destructive/10 border border-destructive text-destructive text-sm rounded-md flex items-start">
                 <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-                <p>{"Your session has expired. Please log in again."}</p>
+                <p>Invalid credentials. Please try again.</p>
               </div>
             )}
             <div className="space-y-2">
@@ -138,3 +130,4 @@ export default function AdminLoginPage() {
     </>
   );
 }
+
