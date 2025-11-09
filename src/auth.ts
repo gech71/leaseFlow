@@ -1,6 +1,8 @@
+
 import NextAuth from 'next-auth';
 import { authConfig } from './auth.config';
-import { credentialsProvider } from './auth.providers'; // Import from the new providers file
+import { credentialsProvider } from './auth.providers';
+import { databaseService } from '@/lib/services/databaseService';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -12,10 +14,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         // This is the first time the token is being created for this session
         token.id = user.id;
+        // Correctly carry over the forceChangePass flag from the authorize user object
         token.forceChangePass = user.forceChangePass ?? false;
 
-        // Dynamically import here to keep prisma out of the edge runtime
-        const { databaseService } = await import('@/lib/services/databaseService');
         const fullUser = await databaseService.getUserById(user.id, {
           roles: true,
         });
@@ -53,6 +54,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.phoneNumber = token.phoneNumber as string | null;
         session.user.name = token.name as string | null;
         session.user.email = token.email as string | null;
+        // Ensure the flag is passed from the token to the final session object
         session.user.forceChangePass = (token.forceChangePass as boolean | undefined) ?? false;
       }
       return session;

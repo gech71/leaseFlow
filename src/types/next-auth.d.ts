@@ -8,13 +8,13 @@ declare module "next-auth" {
    */
   interface Session {
     user: {
-      /** The user's postal address. */
       id: string;
       roles: PrismaRole[];
       effectivePermissions: string[];
       firstName?: string | null;
       lastName?: string | null;
       phoneNumber?: string | null;
+      // Add the forceChangePass flag to the session user
       forceChangePass: boolean;
     } & DefaultSession["user"]
   }
@@ -26,6 +26,7 @@ declare module "next-auth" {
       firstName?: string | null;
       lastName?: string | null;
       phoneNumber?: string | null;
+      // Add the forceChangePass flag to the base User type
       forceChangePass?: boolean;
   }
 }
@@ -39,6 +40,7 @@ declare module "next-auth/jwt" {
     firstName?: string | null;
     lastName?: string | null;
     phoneNumber?: string | null;
+    // Add the forceChangePass flag to the JWT token
     forceChangePass?: boolean;
   }
 }
