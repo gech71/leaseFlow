@@ -8,8 +8,8 @@ export default withAuth(
     const { token } = req.nextauth;
     const { pathname } = req.nextUrl;
 
-    const isAuthPage = pathname === "/login";
-    
+    const isAuthPage = pathname.startsWith("/login");
+
     // If the user is logged in and tries to access the login page, redirect them.
     if (isAuthPage && token) {
       const url = req.nextUrl.clone();
@@ -22,8 +22,8 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl;
         
-        // Login page is always accessible, even if not logged in.
-        if (pathname === '/login') {
+        // If they are trying to access the login page, let them.
+        if (pathname.startsWith('/login')) {
             return true;
         }
         
@@ -37,11 +37,12 @@ export default withAuth(
   }
 );
 
-// This config ensures the middleware runs on all paths EXCEPT for NextAuth's internal API routes and static assets.
+// This config ensures the middleware runs on all admin/portal paths, and also on the login page.
+// It excludes static assets and NextAuth's internal API routes.
 export const config = {
   matcher: [
-    "/((?!api/auth/|login|_next/static|_next/image|favicon.ico|.*\\.png$).*)",
     "/admin/:path*",
     "/portal/:path*",
+    "/login",
   ],
 };
