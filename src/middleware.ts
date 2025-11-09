@@ -47,6 +47,7 @@ export default async function (req: NextRequest) {
     
     // 4. Default behavior (handled by `authorized` callback in auth.config.ts)
     // If no specific rule matches, let the default authorization logic decide.
+    // The `authorized` callback will deny access to protected routes if there's no session.
     return NextResponse.next();
     
   })(req as any, {} as any);
