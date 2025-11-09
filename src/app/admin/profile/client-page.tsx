@@ -56,24 +56,11 @@ export function AdminProfileClientPage() {
   };
 
 
-  if (isUserLoading) {
+  if (isUserLoading || !currentUser) {
     return (
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-6 flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-destructive">Error</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>Could not load user profile. Please try logging in again.</p>
         </CardContent>
       </Card>
     );
