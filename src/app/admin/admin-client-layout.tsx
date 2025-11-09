@@ -112,14 +112,14 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   }, [permissionsLoading, currentUser, router]);
 
   useEffect(() => {
-    if (!permissionsLoading && currentUser && currentUser.roles) {
-        if (currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
+    if (!permissionsLoading && currentUser) {
+        // Robust check for TENANT role to prevent crashes
+        if (Array.isArray(currentUser.roles) && currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
             router.replace('/portal/dashboard');
             return;
         }
 
-        // This logic seems fine, if user lands on profile, redirect to a useful page if they have perm.
-        // But /admin/profile doesn't exist anymore, so we can adjust it.
+        // Redirect from profile page if user has access to the dashboard
         if (pathname === '/admin/profile' && hasPermission('dashboard:view')) {
             router.replace('/admin/dashboard');
         }
