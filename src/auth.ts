@@ -18,6 +18,7 @@ interface AuthorizeUser {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
       async authorize(credentials): Promise<AuthorizeUser | null> {
