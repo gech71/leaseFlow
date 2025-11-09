@@ -4,7 +4,7 @@ import { CredentialsSignin } from "next-auth";
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';
 import { databaseService } from '@/lib/services/databaseService';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import { z } from 'zod';
 
@@ -35,13 +35,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Handle temporary password login
           if (user.password === null && user.tempPassword) {
             if (password === user.tempPassword) {
-              // Instead of throwing an error, return a user object with a flag.
-              return { 
-                id: user.id, 
-                name: user.name, 
-                email: user.email,
-                requiresPasswordChange: true // This flag will be used in the JWT callback
-              };
+              // On successful temp password login, indicate a password change is required.
+              throw new CredentialsSignin("User must change their password.", { code: "PASSWORD_CHANGE_REQUIRED" });
             } else {
               return null; // Incorrect temp password
             }

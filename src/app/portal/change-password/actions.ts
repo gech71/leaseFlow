@@ -3,7 +3,7 @@
 
 import { auth, signOut } from "@/auth";
 import { databaseService } from "@/lib/services/databaseService";
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 const changePasswordSchema = z.object({
