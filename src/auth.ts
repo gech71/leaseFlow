@@ -1,11 +1,16 @@
 
 import NextAuth from 'next-auth';
+import { CredentialsSignin } from "next-auth";
 import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from './auth.config';
 import { databaseService } from '@/lib/services/databaseService';
 import bcrypt from 'bcrypt';
 import type { User as PrismaUser, Role as PrismaRole } from '@prisma/client';
 import { z } from 'zod';
+
+class PasswordChangeRequired extends CredentialsSignin {
+  code = "PASSWORD_CHANGE_REQUIRED";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -25,8 +30,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Handle temporary password login
           if (user.password === null && user.tempPassword) {
             if (password === user.tempPassword) {
-              const error = new Error(JSON.stringify({ code: "PASSWORD_CHANGE_REQUIRED", message: "User must change their password." }));
-              throw error;
+              // Throw a specific error to be caught by the frontend
+              throw new PasswordChangeRequired("User must change their password.");
             } else {
               return null; // Incorrect temp password
             }
@@ -36,6 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (user.password) {
             const passwordsMatch = await bcrypt.compare(password, user.password);
             if (passwordsMatch) {
+              // Return a simplified user object. The JWT callback will fetch the rest.
               return { id: user.id, name: user.name, email: user.email };
             }
           }

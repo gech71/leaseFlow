@@ -21,11 +21,7 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Show error message from URL if present
   const error = searchParams.get('error');
-  const errorMap: Record<string, string> = {
-    "CredentialsSignin": "Invalid credentials. Please try again."
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +34,11 @@ export default function AdminLoginPage() {
         password: password,
         callbackUrl: '/admin/dashboard'
       });
-
+      
       if (result?.error) {
-        // NextAuth v5 passes the error message as a string. We need to check if it's our specific JSON error.
-        const passwordChangeErrorString = '{"code":"PASSWORD_CHANGE_REQUIRED","message":"User must change their password."}';
-        if (result.error.includes(passwordChangeErrorString)) {
+        // Correctly check for the specific error code from the CredentialsSignin error
+        const errorCause = (result.error as any).cause;
+        if (errorCause?.code === 'PASSWORD_CHANGE_REQUIRED') {
             router.push('/portal/change-password');
             return;
         }
@@ -86,7 +82,7 @@ export default function AdminLoginPage() {
              {error && (
               <div className="p-3 bg-destructive/10 border border-destructive text-destructive text-sm rounded-md flex items-start">
                 <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-                <p>{errorMap[error] || "An authentication error occurred."}</p>
+                <p>{"Invalid credentials. Please try again."}</p>
               </div>
             )}
             <div className="space-y-2">
