@@ -36,6 +36,7 @@ export default function AdminLoginPage() {
         redirect: false, // This is crucial to handle the response here
         phoneNumber: phoneNumber,
         password: password,
+        callbackUrl: '/admin/dashboard' // Explicitly set the callback URL
       });
 
       if (result?.error) {
@@ -49,9 +50,8 @@ export default function AdminLoginPage() {
           title: "Login Successful",
           description: "Redirecting to your dashboard...",
         });
-        // On success, NextAuth.js middleware will handle the redirect
-        // But we can also push the user manually to be explicit.
-        router.push('/admin/dashboard'); 
+        // Now let NextAuth handle the redirect based on the callbackUrl we provided.
+        router.push(result.url || '/admin/dashboard'); 
         router.refresh(); // Ensure fresh data is loaded on the dashboard
       }
     } catch (error) {
