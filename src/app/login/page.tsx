@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -24,7 +25,7 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
-      // Use the signIn function from next-auth/react
+      // Use the signIn function from next-auth/react with redirect: false
       const result = await signIn("credentials", {
         redirect: false, // Prevent NextAuth from redirecting automatically
         phoneNumber: phoneNumber,
@@ -44,8 +45,8 @@ export default function AdminLoginPage() {
           title: "Login Successful",
           description: "Redirecting to your dashboard...",
         });
+        // router.push() is sufficient, router.refresh() will happen on layout reload
         router.push('/admin/dashboard'); 
-        router.refresh(); // Ensure session is re-fetched on the server
       }
     } catch (error) {
       console.error("Login submission error:", error);
