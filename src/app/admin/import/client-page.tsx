@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -58,6 +58,7 @@ interface ImportSummary {
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export function ImportClientPage({
   agreementTemplates,
@@ -78,11 +79,13 @@ export function ImportClientPage({
   }, []);
 
   const onDrop = useCallback(
-    (acceptedFiles: File[], rejectedFiles: any[]) => {
+    (acceptedFiles: File[], fileRejections: FileRejection[]) => {
       setFile(null); // Reset on new drop
 
-      if (rejectedFiles.length > 0) {
-        const firstError = rejectedFiles[0].errors[0];
+      if (fileRejections.length > 0) {
+        const firstRejection = fileRejections[0];
+        const firstError = firstRejection.errors[0];
+
         if (firstError.code === "file-too-large") {
           toast({
             title: "File Too Large",
@@ -98,7 +101,7 @@ export function ImportClientPage({
         } else {
           toast({
             title: "File Error",
-            description: "The selected file could not be uploaded. Please try again.",
+            description: firstError.message || "The selected file could not be uploaded. Please try again.",
             variant: "destructive",
           });
         }
@@ -119,9 +122,7 @@ export function ImportClientPage({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
-        ".xlsx",
-      ],
+      [XLSX_MIME_TYPE]: [".xlsx"],
     },
     maxFiles: 1,
     maxSize: MAX_FILE_SIZE_BYTES,
@@ -152,7 +153,7 @@ export function ImportClientPage({
       [
         "Abebe Kebede",
         "abebe.k@example.com",
-        "912345678",
+        "0912345678",
         "",
         "123456789012",
         "",
@@ -234,8 +235,7 @@ export function ImportClientPage({
           workbook.Sheets["Agreements"],
           { raw: false, dateNF: "yyyy-mm-dd" },
         );
-
-        // This is the fix: ensure data is plain objects before sending to server action
+        
         const spaces = JSON.parse(JSON.stringify(spacesRaw));
         const tenants = JSON.parse(JSON.stringify(tenantsRaw));
         const agreements = JSON.parse(JSON.stringify(agreementsRaw));
@@ -446,7 +446,7 @@ export function ImportClientPage({
                   <CheckCircle className="h-4 w-4 !text-green-800" />
                   <AlertTitle>Import Successful</AlertTitle>
                   <AlertDescription>
-                    All records were processed without errors.
+                    All records were processed without critical errors.
                   </AlertDescription>
                 </Alert>
               ) : (
