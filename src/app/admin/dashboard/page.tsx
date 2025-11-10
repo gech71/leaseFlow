@@ -350,7 +350,6 @@ export default function AdminDashboardPage() {
                 {recentActivities.map((activity, index) => (
                     <li key={index} className="flex items-start gap-3 p-3 rounded-md hover:bg-secondary/50 transition-colors">
                     <Avatar className="h-9 w-9 mt-0.5">
-                        <Image src={`https://picsum.photos/seed/${activity.user}/40/40`} alt={activity.user} width={40} height={40} data-ai-hint="user initial" unoptimized />
                         <AvatarFallback>{activity.avatar}</AvatarFallback>
                     </Avatar>
                     <div>
