@@ -36,10 +36,9 @@ export const {
             role.permissions.forEach(p => effectivePermissions.add(p));
           });
           
-          token.roles = userWithRoles.roles;
+          // Only store permissions, not the full roles object
           token.effectivePermissions = Array.from(effectivePermissions);
         } else {
-          token.roles = [];
           token.effectivePermissions = [];
         }
 
@@ -54,8 +53,7 @@ export const {
       // Attach the custom data from the token to the session object
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.roles = token.roles as any[]; // Type assertion for custom prop
-        session.user.effectivePermissions = token.effectivePermissions as string[]; // Type assertion
+        session.user.effectivePermissions = token.effectivePermissions as string[];
         if (token.forceChangePass) {
           session.user.forceChangePass = true;
         }

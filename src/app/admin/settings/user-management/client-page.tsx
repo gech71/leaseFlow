@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -12,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { User, Building, ShieldCheck, Edit, Loader2, Search, EyeOff, InfoIcon, Clipboard, UserCog } from 'lucide-react';
-import { updateUserAssignments, updateUserNamesAction, changeUserPhoneNumberAction } from './actions';
+import { updateUserAssignments, updateUserNamesAction, changeUserPhoneNumberAction, resetUserPasswordAction } from './actions';
 import type { Role, Building as BuildingPrisma, User as UserPrisma } from '@prisma/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePermissions } from '@/contexts/PermissionContext';
@@ -236,6 +237,25 @@ export function UserManagementClientPage({
         toast({ title: "Update Failed", description: errors.join(' '), variant: "destructive"});
     }
   };
+  
+  const handleResetPassword = async () => {
+    if (!currentUserToEdit) return;
+    if (!canManageUserAssignments) {
+      toast({ title: "Permission Denied", description: "You do not have permission to reset passwords.", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+    const result = await resetUserPasswordAction(currentUserToEdit.id);
+    setIsSaving(false);
+
+    if (result.success && result.tempPassword) {
+      setUsers(prev => prev.map(u => u.id === currentUserToEdit.id ? { ...u, tempPassword: result.tempPassword } : u));
+      toast({ title: "Password Reset", description: `A temporary password has been generated. You can now see it by hovering on the info icon.`});
+    } else {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+    }
+  };
+
 
   const copyToClipboard = (textToCopy: string) => {
     navigator.clipboard.writeText(textToCopy);
@@ -431,13 +451,13 @@ export function UserManagementClientPage({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Edit User Details</DialogTitle>
-                    <DialogDescription>Update the name and phone number for {currentUserToEdit.name}.</DialogDescription>
+                    <DialogDescription>Update user information or reset their password.</DialogDescription>
                 </DialogHeader>
                 <Form {...userDetailsForm}>
                     <form onSubmit={userDetailsForm.handleSubmit(handleSaveUserDetails)} className="space-y-4 py-2">
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField control={userDetailsForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={userDetailsForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={userDetailsForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={userDetailsForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                         </div>
                         <FormField control={userDetailsForm.control} name="phoneNumber" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                         <div className="space-y-1">
@@ -453,6 +473,15 @@ export function UserManagementClientPage({
                         </DialogFooter>
                     </form>
                 </Form>
+                <Separator className="my-4"/>
+                <div className="space-y-2">
+                    <h4 className="font-medium">Password Reset</h4>
+                    <p className="text-sm text-muted-foreground">Generate a temporary password and send it to the user. They will be required to change it on their next login.</p>
+                    <Button variant="destructive" onClick={handleResetPassword} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Reset Password
+                    </Button>
+                </div>
             </DialogContent>
           </Dialog>
         </>
