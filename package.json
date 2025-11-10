@@ -10,8 +10,7 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed",
-    "postinstall": "patch-package"
+    "prisma:seed": "prisma db seed"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
