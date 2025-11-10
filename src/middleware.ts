@@ -49,7 +49,7 @@ export default auth((req) => {
     response = NextResponse.redirect(new URL("/login", nextUrl));
   }
   
-  if (nextUrl.pathname.startsWith("/portal/") && !nextUrl.pathname.startsWith("/portal/connect") && !isPortalChangePassPage && !isLoggedIn) {
+  if (nextUrl.pathname.startsWith("/portal/") && !nextUrl.pathname.startsWith("/portal/connect") && !isLoggedIn) {
     response = NextResponse.redirect(new URL("/login", nextUrl));
   }
 
