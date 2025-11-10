@@ -17,12 +17,13 @@ export const credentialsProvider = Credentials({
   },
   async authorize(credentials): Promise<User | null> {
     if (typeof credentials.phone !== 'string' || typeof credentials.password !== 'string') {
+      // This is an invalid request, Auth.js will handle it.
       return null;
     }
 
     const user = await databaseService.findUserByPhoneNumber(credentials.phone);
     if (!user) {
-      // Use a custom error class that Auth.js can catch and pass to the client
+      // Instead of throwing, we throw a specific error that Auth.js will catch.
       throw new Error('Invalid phone number or password.');
     }
 
@@ -70,6 +71,8 @@ export const credentialsProvider = Credentials({
       let updateData: { failedLoginAttempts: number; lockedUntil?: Date | null } = {
         failedLoginAttempts: newAttemptCount,
       };
+      
+      let errorMessage: string;
 
       if (newAttemptCount >= MAX_LOGIN_ATTEMPTS) {
         updateData.lockedUntil = addMinutes(new Date(), LOCKOUT_DURATION_MINUTES);
@@ -78,16 +81,17 @@ export const credentialsProvider = Credentials({
             data: updateData,
         });
         const timeLeft = formatDistanceToNow(updateData.lockedUntil, { addSuffix: true });
-        throw new Error(`Account locked due to too many failed attempts. Please try again ${timeLeft}.`);
+        errorMessage = `Account locked due to too many failed attempts. Please try again ${timeLeft}.`;
+      } else {
+         await prisma.user.update({
+            where: { id: user.id },
+            data: updateData,
+        });
+        const remainingAttempts = MAX_LOGIN_ATTEMPTS - newAttemptCount;
+        errorMessage = `Invalid credentials. ${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining.`;
       }
 
-      await prisma.user.update({
-        where: { id: user.id },
-        data: updateData,
-      });
-
-      const remainingAttempts = MAX_LOGIN_ATTEMPTS - newAttemptCount;
-      throw new Error(`Invalid credentials. ${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining.`);
+      throw new Error(errorMessage);
     }
   },
 });

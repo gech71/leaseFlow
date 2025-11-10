@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -37,14 +36,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // This will handle generic errors passed by Auth.js, like if a provider is misconfigured.
     const authError = searchParams.get("error");
-    if (authError) {
-      // The error message from the provider is directly available here.
-      // We just need to map the generic error code to a more friendly message if needed,
-      // but for our custom messages, they come through directly.
-      setError(authError);
+    if (authError && !error) { // Only set if we don't have a more specific error
+      setError("An unexpected authentication error occurred. Please try again.");
     }
-  }, [searchParams]);
+  }, [searchParams, error]);
 
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -52,17 +49,26 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    // No try-catch needed. Auth.js handles the redirect and error passing via URL.
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       phone,
       password,
-      callbackUrl: "/admin/dashboard", // Let Auth.js handle redirect on success
+      redirect: false, // Set to false to handle the result here
     });
 
-    // If signIn fails, it will redirect back here, and the useEffect will catch the error.
-    // The loading state might need to be reset if the user stays on the page, but usually,
-    // a page reload happens. For safety, we'll stop the loader, though it might not be visible.
     setIsLoading(false);
+
+    if (result?.ok) {
+      // On success, redirect manually.
+      // The middleware will handle redirecting to change-password if needed.
+      router.push("/admin/dashboard");
+    } else {
+      // If there's an error from our custom provider, it will be in result.error
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        setError("An unknown error occurred during login.");
+      }
+    }
   };
 
   return (
