@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -33,40 +33,33 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(
-    searchParams.get("error")
-      ? "Authentication failed. Please check your credentials."
-      : null,
-  );
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Read the error from the URL query parameters
+    const authError = searchParams.get("error");
+    if (authError) {
+      // Decode the error message and display it
+      setError(decodeURIComponent(authError));
+    }
+  }, [searchParams]);
+
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      redirect: false,
+    // No need to handle the result here for errors, as the redirect will happen
+    await signIn("credentials", {
       phone,
       password,
+      callbackUrl: '/admin/dashboard', // Specify where to go on success
     });
 
+    // If signIn doesn't redirect (e.g., on error), we might want to stop loading,
+    // but the redirect with error query param is now the main error handling mechanism.
     setIsLoading(false);
-
-    if (!result || result.error) {
-      // The error from the provider is in result.error.
-      // We can display it directly.
-      setError(result?.error || "An unknown error occurred.");
-      return;
-    }
-
-    // ✅ Get the session to check forceChangePass
-    const session = await getSession();
-
-    if (session?.user?.forceChangePass) {
-      router.push("/portal/change-password");
-    } else {
-      router.push("/admin/dashboard");
-    }
   };
 
   return (
