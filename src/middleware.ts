@@ -11,8 +11,8 @@ export default auth((req) => {
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
     style-src 'self' 'unsafe-inline';
-    img-src 'self' blob: data:;
-    font-src 'self';
+    img-src 'self' blob: data: https://i.imgur.com;
+    font-src 'self' https://fonts.gstatic.com;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
@@ -21,11 +21,8 @@ export default auth((req) => {
   `;
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
-  requestHeaders.set(
-    'Content-Security-Policy',
-    // Replace newline characters and spaces
-    cspHeader.replace(/\s{2,}/g, ' ').trim()
-  );
+  // This header is set on the request so it can be read by Server Components.
+  // The actual CSP header is set on the final response below.
 
   let response = NextResponse.next({
     request: {
@@ -50,11 +47,12 @@ export default auth((req) => {
   }
   
   if (nextUrl.pathname.startsWith("/portal/") && !nextUrl.pathname.startsWith("/portal/connect") && !isLoggedIn) {
-    response = NextResponse.redirect(new URL("/login", nextUrl));
+    response = NextResponse.redirect(new URL("/", nextUrl));
   }
 
-  // Set the CSP header on the final response
+  // Set security headers on the final response
   response.headers.set('Content-Security-Policy', cspHeader.replace(/\s{2,}/g, ' ').trim());
+  response.headers.set('X-Content-Type-Options', 'nosniff');
 
   return response;
 });
@@ -68,8 +66,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - images (public images)
-     * - login (the login page itself)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|images|login).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|images).*)',
   ],
 };
