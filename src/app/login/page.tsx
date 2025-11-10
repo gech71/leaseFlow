@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -49,13 +48,15 @@ export default function LoginPage() {
       phone: phone,
       password: password,
     });
-    
+
     setIsLoading(false);
 
     if (result?.ok) {
-        router.refresh();
+      router.refresh();
     } else {
-        setError(result?.error || "Invalid phone number or password. Please try again.");
+      setError(
+        result?.error || "Invalid phone number or password. Please try again.",
+      );
     }
   };
 
@@ -64,10 +65,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm shadow-2xl animate-fadeIn">
         <CardHeader className="text-center">
           <Image
-            src="https://i.imgur.com/JTzGpIH.png"
+            src="/images/NiTera.png"
             alt="LeaseFlow Logo"
-            width={80}
-            height={80}
+            width={250}
+            height={100}
             className="mx-auto"
             priority
           />
@@ -131,14 +132,8 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Log In
             </Button>
           </form>
