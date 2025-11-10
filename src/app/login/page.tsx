@@ -43,31 +43,26 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const result = await signIn("credentials", {
-        redirect: false,
-        phone,
-        password,
-        callbackUrl: "/",
-      });
+    const result = await signIn("credentials", {
+      redirect: false,
+      phone,
+      password,
+    });
 
-      if (!result?.ok) {
-        setError("Invalid Credential");
-        setIsLoading(false);
-        return;
-      }
-      const session = await getSession();
+    if (!result?.ok) {
       setIsLoading(false);
+      setError(result?.error || "Invalid Credential.");
+      return;
+    }
 
-      if (session?.user?.forceChangePass) {
-        router.push("/portal/change-password");
-      } else {
-        router.push("/admin/dashboard");
-      }
-    } catch (err: any) {
-      // Catch thrown errors from authorize
-      setError("Invalid Credential");
-      setIsLoading(false);
+    // ✅ Get the session to check forceChangePass
+    const session = await getSession();
+    setIsLoading(false);
+
+    if (session?.user?.forceChangePass) {
+      router.push("/portal/change-password");
+    } else {
+      router.push("/admin/dashboard");
     }
   };
 
@@ -84,7 +79,7 @@ export default function LoginPage() {
             priority
           />
           <CardTitle className="mt-4 font-headline text-2xl">
-            Building Management System
+            Welcome Back
           </CardTitle>
           <CardDescription>
             Enter your credentials to access your portal.

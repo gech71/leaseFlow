@@ -1,19 +1,16 @@
-import Credentials from "next-auth/providers/credentials";
-import { databaseService } from "@/lib/services/databaseService";
-import bcrypt from "bcryptjs";
-import type { User } from "next-auth";
+import Credentials from 'next-auth/providers/credentials';
+import { databaseService } from '@/lib/services/databaseService';
+import bcrypt from 'bcryptjs';
+import type { User } from 'next-auth';
 
 export const credentialsProvider = Credentials({
-  name: "Credentials",
+  name: 'Credentials',
   credentials: {
-    phone: { label: "Phone Number", type: "text" },
-    password: { label: "Password", type: "password" },
+    phone: { label: 'Phone Number', type: 'text' },
+    password: { label: 'Password', type: 'password' },
   },
   async authorize(credentials): Promise<User | null> {
-    if (
-      typeof credentials.phone !== "string" ||
-      typeof credentials.password !== "string"
-    ) {
+    if (typeof credentials.phone !== 'string' || typeof credentials.password !== 'string') {
       return null;
     }
 
@@ -21,23 +18,28 @@ export const credentialsProvider = Credentials({
     if (!user) {
       return null;
     }
-
-    // Check main password
-    if (
-      user.password &&
-      (await bcrypt.compare(credentials.password, user.password))
-    ) {
-      const { password, tempPassword, ...userWithoutPasswords } = user;
-      return userWithoutPasswords;
+    
+    // Check main password first
+    if (user.password) {
+        const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
+        if (passwordsMatch) {
+            // Password is correct, return user object without passwords
+            const { password, tempPassword, ...userWithoutPasswords } = user;
+            return userWithoutPasswords;
+        }
     }
-
-    // Check temp password
-    if (user.tempPassword && credentials.password === user.tempPassword) {
-      const { password, tempPassword, ...userWithoutPasswords } = user;
-      return { ...userWithoutPasswords, forceChangePass: true };
+    
+    // If main password doesn't match or doesn't exist, check temporary password
+    if (user.tempPassword) {
+      // NOTE: Temp password is not hashed, direct comparison.
+      if (credentials.password === user.tempPassword) {
+        // Password is correct, return user object with a flag to force change
+        const { password, tempPassword, ...userWithoutPasswords } = user;
+        return { ...userWithoutPasswords, forceChangePass: true };
+      }
     }
-
-    // No match
+    
+    // No password matched
     return null;
   },
 });
