@@ -4,7 +4,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import bcrypt from 'bcryptjs';
 import type { User } from 'next-auth';
 import { prisma } from './lib/prisma';
-import { addMinutes } from 'date-fns';
+import { addMinutes, formatDistanceToNow } from 'date-fns';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 1;
@@ -22,12 +22,13 @@ export const credentialsProvider = Credentials({
 
     const user = await databaseService.findUserByPhoneNumber(credentials.phone);
     if (!user) {
-      return null; // User not found
+      throw new Error('Invalid phone number or password.');
     }
 
     // Check if the account is locked
     if (user.lockedUntil && new Date() < user.lockedUntil) {
-      throw new Error(`Account is locked. Please try again later.`);
+      const timeLeft = formatDistanceToNow(user.lockedUntil, { addSuffix: true });
+      throw new Error(`Account is locked. Please try again ${timeLeft}.`);
     }
 
     let isPasswordCorrect = false;
@@ -48,7 +49,7 @@ export const credentialsProvider = Credentials({
     
     if (isPasswordCorrect) {
       // Reset failed attempts on successful login
-      if (user.failedLoginAttempts > 0) {
+      if (user.failedLoginAttempts > 0 || user.lockedUntil) {
         await prisma.user.update({
           where: { id: user.id },
           data: { failedLoginAttempts: 0, lockedUntil: null },
@@ -71,6 +72,12 @@ export const credentialsProvider = Credentials({
 
       if (newAttemptCount >= MAX_LOGIN_ATTEMPTS) {
         updateData.lockedUntil = addMinutes(new Date(), LOCKOUT_DURATION_MINUTES);
+         await prisma.user.update({
+            where: { id: user.id },
+            data: updateData,
+        });
+        const timeLeft = formatDistanceToNow(updateData.lockedUntil, { addSuffix: true });
+        throw new Error(`Account locked due to too many failed attempts. Please try again ${timeLeft}.`);
       }
 
       await prisma.user.update({
@@ -78,12 +85,8 @@ export const credentialsProvider = Credentials({
         data: updateData,
       });
 
-      if (updateData.lockedUntil) {
-         throw new Error(`Account locked due to too many failed attempts. Please try again in ${LOCKOUT_DURATION_MINUTES} minute.`);
-      }
-
-      // Throw a generic error for invalid credentials
-      throw new Error('Invalid phone number or password.');
+      const remainingAttempts = MAX_LOGIN_ATTEMPTS - newAttemptCount;
+      throw new Error(`Invalid credentials. ${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining.`);
     }
   },
 });
