@@ -4,16 +4,6 @@ import { authConfig } from './auth.config';
 import type { User as AuthUser } from 'next-auth';
 import { SignJWT, jwtVerify } from 'jose';
 
-const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
-
-if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('NEXTAUTH_SECRET must be set and be at least 32 characters long in production.');
-  } else {
-    console.warn('WARN: NEXTAUTH_SECRET is not set or is not long enough. This is not secure for production.');
-  }
-}
-
 // Define token durations in seconds
 const ACCESS_TOKEN_EXPIRES_IN = 15 * 60; // 15 minutes
 const REFRESH_TOKEN_EXPIRES_IN = 7 * 24 * 60 * 60; // 7 days
@@ -74,29 +64,6 @@ export const {
       return session;
     },
   },
-  jwt: {
-    // We now use a single JWT that contains both expiration times.
-    // The expiration time for the JWT itself will be the refresh token's lifetime.
-    async encode({ token, maxAge }) {
-      return await new SignJWT(token!)
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime(`${REFRESH_TOKEN_EXPIRES_IN}s`) // Set JWT to expire with the refresh token
-        .sign(secret);
-    },
-    async decode({ token }) {
-      if (!token) {
-        return null;
-      }
-      try {
-        const { payload } = await jwtVerify(token, secret, {
-          algorithms: ['HS256'],
-        });
-        return payload;
-      } catch (error) {
-        console.error("JWT Decode Error:", error);
-        return null;
-      }
-    },
-  },
+  // next-auth v5 automatically uses process.env.AUTH_SECRET, so we don't need to manually handle it here.
+  // The secret option is only needed if you are using a different environment variable.
 });
