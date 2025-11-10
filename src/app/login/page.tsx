@@ -53,9 +53,6 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (result?.ok) {
-        // Successful login, let the middleware handle redirection.
-        // Forcing a reload to ensure all contexts are correctly initialized.
-        router.push('/admin/dashboard');
         router.refresh();
     } else {
         setError(result?.error || "Invalid phone number or password. Please try again.");
