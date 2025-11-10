@@ -10,9 +10,11 @@ export default auth((req) => {
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
-    style-src 'self' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' blob: data: https://i.imgur.com;
     font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
+    frame-src 'self' *.tinymce.com;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
