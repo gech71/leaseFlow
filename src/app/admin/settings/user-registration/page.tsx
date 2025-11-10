@@ -58,7 +58,7 @@ export default function UserRegistrationPage() {
     if (result.success) {
       toast({
         title: "User Registered Successfully",
-        description: `User ${values.firstName} ${values.lastName} has been created. You can now assign them a role in User Management. They will not be able to log in until a password is set for them.`,
+        description: `User ${values.firstName} ${values.lastName} has been created. A temporary password has been generated for them. You can now assign them a role in User Management.`,
       });
       form.reset(); 
     } else {
