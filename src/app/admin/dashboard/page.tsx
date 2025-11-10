@@ -64,7 +64,7 @@ export default function AdminDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
 
     useEffect(() => {
-        if (!isUserLoading && currentUser) {
+        if (!isUserLoading && currentUser && currentUser.roles) {
             const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
             if (isTenantOnly) {
                 router.replace('/portal/dashboard');
