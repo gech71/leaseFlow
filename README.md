@@ -56,11 +56,11 @@ Create a `.env` file in the project root and populate it with the necessary vari
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 
 # NextAuth.js - generate a secret using: `openssl rand -hex 32`
-NEXTAUTH_URL=http://localhost:9002
+NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=YOUR_NEXTAUTH_SECRET_HERE
 
 # Base URL of this application, used for constructing callback URLs
-NEXT_PUBLIC_BASE_URL=http://localhost:9002
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
 
 # --- Security ---
 # This key MUST be a 64-character hex string (32 bytes) for AES-256 encryption.
@@ -93,7 +93,7 @@ NIB_COMPANY_NAME=BUILDING
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT=587
 SMTP_USER="your-email@gmail.com"
-SMTP_FROM="Your Company Name <your-email@gmail.com>"
+SMTP_FROM="Your Company Name <your-email@example.com>"
 
 ```
 
@@ -132,7 +132,7 @@ SMTP_FROM="Your Company Name <your-email@gmail.com>"
     ```bash
     npm run dev
     ```
-    The application will be available at `http://localhost:9002`.
+    The application will be available at `http://localhost:3000`.
 
 ---
 
