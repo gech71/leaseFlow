@@ -5,15 +5,12 @@ import type { JWT as NextAuthJWT } from 'next-auth/jwt';
 
 declare module 'next-auth' {
   interface User extends Omit<PrismaUser, 'password' | 'tempPassword' | 'emailVerified'> {
-    // Add custom properties here, if any
+    forceChangePass?: boolean;
   }
 
   interface Session {
     user: {
       id: string;
-      name?: string | null;
-      email?: string | null;
-      effectivePermissions: string[];
       forceChangePass?: boolean;
     } & DefaultSession['user'];
   }
@@ -22,7 +19,6 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT extends NextAuthJWT {
     id: string;
-    effectivePermissions: string[];
     forceChangePass?: boolean;
   }
 }

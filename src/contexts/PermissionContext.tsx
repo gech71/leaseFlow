@@ -1,8 +1,11 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { CurrentUser } from '@/lib/types';
 import { useSession } from 'next-auth/react';
+import { databaseService } from '@/lib/services/databaseService'; // Can't be used on client
+import { usePathname } from 'next/navigation';
 
 interface PermissionContextType {
   currentUser: CurrentUser | null;
@@ -26,13 +29,35 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { data: session, status } = useSession();
+  const pathname = usePathname();
 
   useEffect(() => {
     const fetchUserPermissions = async () => {
-      if (status === 'authenticated' && session?.user) {
-        // In JWT strategy, user data is already in the session
-        const userFromSession = session.user as CurrentUser;
-        setCurrentUser(userFromSession);
+      // Don't fetch on public or auth pages
+      if (pathname === '/login' || pathname.startsWith('/portal/connect')) {
+          setIsLoading(false);
+          return;
+      }
+      
+      if (status === 'authenticated') {
+        try {
+          const response = await fetch('/api/user/me');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.isSuccess) {
+              setCurrentUser(data.user);
+            } else {
+              console.error("Failed to fetch user permissions:", data.errors);
+              setCurrentUser(null);
+            }
+          } else {
+            console.error("API error fetching user permissions:", response.statusText);
+            setCurrentUser(null);
+          }
+        } catch (error) {
+          console.error("Network error fetching user permissions:", error);
+          setCurrentUser(null);
+        }
       }
       setIsLoading(false);
     };
@@ -40,8 +65,8 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (status !== 'loading') {
       fetchUserPermissions();
     }
-  }, [session, status]);
-  
+  }, [session, status, pathname]);
+
   const isSuperAdmin = currentUser?.roles?.some(role => role.name === 'SUPER_ADMIN') || false;
 
   const hasPermission = (permission: string): boolean => {
