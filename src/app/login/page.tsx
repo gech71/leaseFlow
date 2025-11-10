@@ -50,15 +50,19 @@ export default function LoginPage() {
       password,
     });
 
+    setIsLoading(false);
+
     if (!result || result.error) {
-      setIsLoading(false);
-      setError(result?.error || "Invalid phone number or password. Please try again.");
+      if (result?.error === 'CredentialsSignin') {
+        setError("Invalid phone number or password. Please try again.");
+      } else {
+        setError(result?.error || "An unknown error occurred during login.");
+      }
       return;
     }
 
     // ✅ Get the session to check forceChangePass
     const session = await getSession();
-    setIsLoading(false);
 
     if (session?.user?.forceChangePass) {
       router.push("/portal/change-password");
