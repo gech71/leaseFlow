@@ -72,7 +72,7 @@ export default function LoginPage() {
             priority
           />
           <CardTitle className="mt-4 font-headline text-2xl">
-            Welcome Back
+            Building Management Solution
           </CardTitle>
           <CardDescription>
             Enter your credentials to access your portal.
