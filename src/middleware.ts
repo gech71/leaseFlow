@@ -1,13 +1,15 @@
-
 import { auth } from "@/auth";
 import { NextResponse, type NextRequest } from "next/server";
 
-export default auth((req) => {
-  const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
+export default auth((req: NextRequest) => {
+  // ✅ Fix the type issue
+  const request = req as any;
 
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-  // Allow tinymce to load its resources
+  const { nextUrl } = request;
+  const isLoggedIn = !!request.auth;
+
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic' *.tinymce.com;
@@ -21,9 +23,12 @@ export default auth((req) => {
     form-action 'self';
     frame-ancestors 'none';
     upgrade-insecure-requests;
-  `;
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set('x-nonce', nonce);
+  `
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
 
   let response = NextResponse.next({
     request: {
@@ -33,32 +38,52 @@ export default auth((req) => {
 
   const isPortalChangePassPage = nextUrl.pathname === "/portal/change-password";
 
-  if (isLoggedIn && req.auth?.user.forceChangePass) {
-    if (!isPortalChangePassPage) {
-      response = NextResponse.redirect(new URL("/portal/change-password", nextUrl));
-    }
+  if (
+    isLoggedIn &&
+    request.auth?.user.forceChangePass &&
+    !isPortalChangePassPage
+  ) {
+    response = NextResponse.redirect(
+      new URL("/portal/change-password", nextUrl),
+      {
+        headers: requestHeaders,
+      },
+    );
   }
 
-  if (isLoggedIn && !req.auth?.user.forceChangePass && isPortalChangePassPage) {
-    response = NextResponse.redirect(new URL("/portal/dashboard", nextUrl));
+  if (
+    isLoggedIn &&
+    !request.auth?.user.forceChangePass &&
+    isPortalChangePassPage
+  ) {
+    response = NextResponse.redirect(new URL("/portal/dashboard", nextUrl), {
+      headers: requestHeaders,
+    });
   }
 
   if (nextUrl.pathname.startsWith("/admin") && !isLoggedIn) {
-    response = NextResponse.redirect(new URL("/login", nextUrl));
-  }
-  
-  if (nextUrl.pathname.startsWith("/portal/") && !nextUrl.pathname.startsWith("/portal/connect") && !isLoggedIn) {
-    response = NextResponse.redirect(new URL("/", nextUrl));
+    response = NextResponse.redirect(new URL("/login", nextUrl), {
+      headers: requestHeaders,
+    });
   }
 
-  response.headers.set('Content-Security-Policy', cspHeader.replace(/\s{2,}/g, ' ').trim());
-  response.headers.set('X-Content-Type-Options', 'nosniff');
+  if (
+    nextUrl.pathname.startsWith("/portal/") &&
+    !nextUrl.pathname.startsWith("/portal/connect") &&
+    !isLoggedIn
+  ) {
+    response = NextResponse.redirect(new URL("/", nextUrl), {
+      headers: requestHeaders,
+    });
+  }
+
+  response.headers.set("x-nonce", nonce);
+  response.headers.set("Content-Security-Policy", cspHeader);
+  response.headers.set("X-Content-Type-Options", "nosniff");
 
   return response;
 });
 
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|images).*)',
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images).*)"],
 };
