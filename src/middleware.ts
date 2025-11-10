@@ -1,3 +1,4 @@
+
 import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 
@@ -30,5 +31,5 @@ export default auth((req) => {
 
 // See "Matching Paths" below to learn more
 export const config = {
-  matcher: ['/admin/:path*', '/portal/change-password'],
+  matcher: ['/admin/:path*', '/portal/:path*'],
 };
