@@ -17,13 +17,10 @@ export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         const target = (error.meta?.target as string[]) || [];
-        if (target.includes('accountNumber')) {
-            return { success: false, error: "This account number is already in use by another building." };
-        }
         if (target.includes('name')) {
             return { success: false, error: "A building with this name already exists. Please use a unique name." };
         }
-        return { success: false, error: "A building with this name or account number already exists." };
+        return { success: false, error: "A building with this name or other unique field already exists." };
       }
     }
     return { success: false, error: error.message || "Failed to create building." };
@@ -56,13 +53,10 @@ export async function updateBuildingAction(
       }
       if (error.code === 'P2002') {
         const target = (error.meta?.target as string[]) || [];
-        if (target.includes('accountNumber')) {
-          return { success: false, error: "This account number is already in use by another building." };
-        }
         if (target.includes('name')) {
             return { success: false, error: "A building with this name already exists. Please use a unique name." };
         }
-        return { success: false, error: "This building's name or account number conflicts with an existing building." };
+        return { success: false, error: "This building's name conflicts with an existing building." };
       }
     }
     return { success: false, error: error.message || "Failed to update building." };
