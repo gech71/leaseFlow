@@ -17,17 +17,14 @@ export const credentialsProvider = Credentials({
   },
   async authorize(credentials): Promise<User | null> {
     if (typeof credentials.phone !== 'string' || typeof credentials.password !== 'string') {
-      // This is an invalid request, Auth.js will handle it.
       return null;
     }
 
     const user = await databaseService.findUserByPhoneNumber(credentials.phone);
     if (!user) {
-      // Instead of throwing, we throw a specific error that Auth.js will catch.
       throw new Error('Invalid phone number or password.');
     }
 
-    // Check if the account is locked
     if (user.lockedUntil && new Date() < user.lockedUntil) {
       const timeLeft = formatDistanceToNow(user.lockedUntil, { addSuffix: true });
       throw new Error(`Account is locked. Please try again ${timeLeft}.`);
@@ -36,12 +33,10 @@ export const credentialsProvider = Credentials({
     let isPasswordCorrect = false;
     let isTempPassword = false;
 
-    // Check main password first
     if (user.password) {
       isPasswordCorrect = await bcrypt.compare(credentials.password, user.password);
     }
     
-    // If main password doesn't match, check temporary password
     if (!isPasswordCorrect && user.tempPassword) {
       if (credentials.password === user.tempPassword) {
         isPasswordCorrect = true;
@@ -50,7 +45,6 @@ export const credentialsProvider = Credentials({
     }
     
     if (isPasswordCorrect) {
-      // Reset failed attempts on successful login
       if (user.failedLoginAttempts > 0 || user.lockedUntil) {
         await prisma.user.update({
           where: { id: user.id },
@@ -66,7 +60,6 @@ export const credentialsProvider = Credentials({
       
       return userWithoutPasswords;
     } else {
-      // Handle failed login attempt
       const newAttemptCount = (user.failedLoginAttempts || 0) + 1;
       let updateData: { failedLoginAttempts: number; lockedUntil?: Date | null } = {
         failedLoginAttempts: newAttemptCount,
@@ -91,6 +84,7 @@ export const credentialsProvider = Credentials({
         errorMessage = `Invalid credentials. ${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining.`;
       }
 
+      // Throw an error with the specific message
       throw new Error(errorMessage);
     }
   },

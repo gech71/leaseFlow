@@ -36,10 +36,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // This will handle generic errors passed by Auth.js, like if a provider is misconfigured.
+    // This will handle generic errors passed by Auth.js if they are in the URL
     const authError = searchParams.get("error");
     if (authError && !error) { // Only set if we don't have a more specific error
-      setError("An unexpected authentication error occurred. Please try again.");
+      if (authError === "CredentialsSignin") {
+        setError("Invalid phone number or password.");
+      } else {
+         setError("An unexpected authentication error occurred.");
+      }
     }
   }, [searchParams, error]);
 
@@ -49,26 +53,29 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      phone,
-      password,
-      redirect: false, // Set to false to handle the result here
-    });
+    try {
+      const result = await signIn("credentials", {
+        phone,
+        password,
+        redirect: false, // Set to false to handle the result here
+      });
+
+      if (result?.ok) {
+        // On success, redirect manually.
+        // The middleware will handle redirecting to change-password if needed.
+        router.push("/admin/dashboard");
+      } else {
+        // This block will be hit for generic errors, but not for errors thrown in `authorize`
+        setError(result?.error || "An unknown error occurred during login.");
+      }
+    } catch (e: any) {
+        // This is the key change: Catch the error thrown from the authorize function
+        // Auth.js v5 passes the error message in the `cause` property for CallbackRouteError
+        const errorMessage = e.cause?.err?.message || e.message || "An unknown error occurred.";
+        setError(errorMessage);
+    }
 
     setIsLoading(false);
-
-    if (result?.ok) {
-      // On success, redirect manually.
-      // The middleware will handle redirecting to change-password if needed.
-      router.push("/admin/dashboard");
-    } else {
-      // If there's an error from our custom provider, it will be in result.error
-      if (result?.error) {
-        setError(result.error);
-      } else {
-        setError("An unknown error occurred during login.");
-      }
-    }
   };
 
   return (
