@@ -4,8 +4,9 @@ export const dynamic = 'force-dynamic';
 import React, { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma } from '@prisma/client';
-import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from '../../dashboard/actions';
-import { CustomerDashboardClientPage, type ClientAgreement, type ClientBill, type SerializedTenantPortalData, type ClientPenaltyTier, type ClientBuilding, type ClientSpace, type ClientTenant, type ClientUtilityBreakdownItem } from '../../dashboard/client-page'; // Import from sibling folder
+import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from './actions';
+import { CustomerDashboardClientPage } from './client-page'; 
+import type { ClientAgreement, ClientBill, SerializedTenantPortalData, ClientPenaltyTier, ClientBuilding, ClientSpace, ClientTenant, ClientUtilityBreakdownItem } from './page';
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 

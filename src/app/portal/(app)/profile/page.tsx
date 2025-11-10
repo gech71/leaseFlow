@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { UserCircle, Loader2, ArrowLeft } from 'lucide-react';
 import { TenantProfileClientPage } from './client-page';
-import { getTenantPortalDashboardDataAction } from '../../dashboard/actions'; // Assuming this action fetches the necessary data
+import { getTenantPortalDashboardDataAction } from '../dashboard/actions';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
