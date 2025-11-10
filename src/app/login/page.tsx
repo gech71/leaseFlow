@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -49,9 +50,9 @@ export default function LoginPage() {
       password,
     });
 
-    if (!result?.ok) {
+    if (!result || result.error) {
       setIsLoading(false);
-      setError(result?.error || "Invalid Credential.");
+      setError(result?.error || "Invalid phone number or password. Please try again.");
       return;
     }
 
@@ -79,7 +80,7 @@ export default function LoginPage() {
             priority
           />
           <CardTitle className="mt-4 font-headline text-2xl">
-            Welcome Back
+            Building Management Solution
           </CardTitle>
           <CardDescription>
             Enter your credentials to access your portal.
