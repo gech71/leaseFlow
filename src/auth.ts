@@ -27,23 +27,26 @@ export const {
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user, trigger, session }) {
-      // On initial sign-in, attach user ID to the token
       if (user) {
         token.id = user.id;
-        
-        // Pass the forceChangePass flag to the token
+        // Pass the forceChangePass flag from the user object to the token
         if ('forceChangePass' in user && user.forceChangePass) {
           token.forceChangePass = true;
+        } else {
+          // Ensure the flag is not present if not applicable
+          delete token.forceChangePass;
         }
       }
       return token;
     },
     async session({ session, token }) {
-      // Attach the user ID from the token to the session object
       if (session.user) {
         session.user.id = token.id as string;
+        // Correctly carry over the flag from the token to the session
         if (token.forceChangePass) {
           session.user.forceChangePass = true;
+        } else {
+          delete session.user.forceChangePass;
         }
       }
       return session;
