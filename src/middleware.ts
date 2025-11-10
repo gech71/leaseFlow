@@ -7,10 +7,11 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  // Allow tinymce to load its resources
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' *.tinymce.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com *.tinymce.com;
     img-src 'self' blob: data: https://i.imgur.com;
     font-src 'self' https://fonts.gstatic.com;
     connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
