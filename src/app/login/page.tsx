@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -94,7 +95,7 @@ export default function LoginPage() {
               <Input
                 id="phone"
                 type="tel"
-                placeholder="0912345678"
+                placeholder="Phone Number"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -110,6 +111,7 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  placeholder="Password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
