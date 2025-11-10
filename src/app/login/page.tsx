@@ -45,16 +45,18 @@ export default function LoginPage() {
     setError(null);
 
     const result = await signIn("credentials", {
-      redirect: false, // Prevent NextAuth from redirecting
+      redirect: false,
       phone: phone,
       password: password,
     });
     
     setIsLoading(false);
 
-    if (result && result.ok && !result.error) {
-        // Successful login, redirect to the dashboard.
+    if (result?.ok) {
+        // Successful login, let the middleware handle redirection.
+        // Forcing a reload to ensure all contexts are correctly initialized.
         router.push('/admin/dashboard');
+        router.refresh();
     } else {
         setError(result?.error || "Invalid phone number or password. Please try again.");
     }

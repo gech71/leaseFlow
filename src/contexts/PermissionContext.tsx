@@ -1,10 +1,9 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { CurrentUser } from '@/lib/types';
 import { useSession } from 'next-auth/react';
-import { databaseService } from '@/lib/services/databaseService'; // Can't be used on client
 import { usePathname } from 'next/navigation';
 
 interface PermissionContextType {
@@ -40,6 +39,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       
       if (status === 'authenticated') {
+        setIsLoading(true);
         try {
           const response = await fetch('/api/user/me');
           if (response.ok) {
@@ -57,17 +57,21 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } catch (error) {
           console.error("Network error fetching user permissions:", error);
           setCurrentUser(null);
+        } finally {
+            setIsLoading(false);
         }
+      } else if (status === 'unauthenticated') {
+        setCurrentUser(null);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
-    if (status !== 'loading') {
-      fetchUserPermissions();
-    }
+    fetchUserPermissions();
   }, [session, status, pathname]);
 
-  const isSuperAdmin = currentUser?.roles?.some(role => role.name === 'SUPER_ADMIN') || false;
+  const isSuperAdmin = useMemo(() => {
+    return currentUser?.roles?.some(role => role.name === 'SUPER_ADMIN') || false;
+  }, [currentUser]);
 
   const hasPermission = (permission: string): boolean => {
     if (!currentUser || !permission) return false;
