@@ -37,12 +37,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // This will handle generic errors passed by NextAuth redirect, if any
     const authError = searchParams.get("error");
-    if (authError && !error) { // only set if no specific error is already displayed
-        setError("An unexpected authentication error occurred.");
+    if (authError) {
+      // The error message from the provider is directly available here.
+      // We just need to map the generic error code to a more friendly message if needed,
+      // but for our custom messages, they come through directly.
+      setError(authError);
     }
-  }, [searchParams, error]);
+  }, [searchParams]);
 
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -50,31 +52,17 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const result = await signIn("credentials", {
-        phone,
-        password,
-        redirect: false, // Set redirect to false to handle the response here
-      });
+    // No try-catch needed. Auth.js handles the redirect and error passing via URL.
+    await signIn("credentials", {
+      phone,
+      password,
+      callbackUrl: "/admin/dashboard", // Let Auth.js handle redirect on success
+    });
 
-      if (result?.error) {
-        // The error from the provider will be in result.error
-        setError(result.error);
-        setIsLoading(false);
-      } else if (result?.ok) {
-        // On successful sign-in, manually redirect
-        router.push("/admin/dashboard");
-        router.refresh();
-      } else {
-         setError("An unknown error occurred. Please try again.");
-         setIsLoading(false);
-      }
-    } catch (e: any) {
-        // This catch block handles network errors or other unexpected issues
-        console.error("Login submission error:", e);
-        setError("A network error occurred. Please check your connection.");
-        setIsLoading(false);
-    }
+    // If signIn fails, it will redirect back here, and the useEffect will catch the error.
+    // The loading state might need to be reset if the user stays on the page, but usually,
+    // a page reload happens. For safety, we'll stop the loader, though it might not be visible.
+    setIsLoading(false);
   };
 
   return (
