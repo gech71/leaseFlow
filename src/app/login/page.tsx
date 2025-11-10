@@ -51,10 +51,9 @@ export default function LoginPage() {
     
     setIsLoading(false);
 
-    if (result && result.ok) {
-        // Instead of a hard redirect, let the middleware handle it.
-        // A reload will trigger the middleware with the new session.
-        window.location.reload();
+    if (result && result.ok && !result.error) {
+        // Successful login, redirect to the dashboard.
+        router.push('/admin/dashboard');
     } else {
         setError(result?.error || "Invalid phone number or password. Please try again.");
     }

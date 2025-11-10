@@ -31,7 +31,7 @@ export const credentialsProvider = Credentials({
     
     // If main password doesn't match or doesn't exist, check temporary password
     if (user.tempPassword) {
-      // NOTE: Temp password is not hashed for now, direct comparison.
+      // NOTE: Temp password is not hashed, direct comparison.
       if (credentials.password === user.tempPassword) {
         // Password is correct, return user object with a flag to force change
         const { password, tempPassword, ...userWithoutPasswords } = user;
