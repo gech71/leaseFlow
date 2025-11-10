@@ -25,6 +25,13 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
+// A mapping of error codes returned by NextAuth to user-friendly messages.
+const errorMessages: { [key: string]: string } = {
+  CredentialsSignin: "Invalid phone number or password.",
+  default: "An unknown error occurred. Please try again.",
+};
+
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,11 +43,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Read the error from the URL query parameters
+    // Read the error from the URL query parameters provided by NextAuth
     const authError = searchParams.get("error");
     if (authError) {
-      // Decode the error message and display it
-      setError(decodeURIComponent(authError));
+      // Use the predefined mapping or the error message directly if it's custom
+      const message = errorMessages[authError] || decodeURIComponent(authError);
+      setError(message);
     }
   }, [searchParams]);
 
@@ -50,15 +58,16 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    // No need to handle the result here for errors, as the redirect will happen
+    // signIn will automatically redirect on error, and the useEffect hook above
+    // will catch the error from the URL query parameter.
     await signIn("credentials", {
       phone,
       password,
       callbackUrl: '/admin/dashboard', // Specify where to go on success
+      redirect: true, // Ensure redirection happens
     });
 
-    // If signIn doesn't redirect (e.g., on error), we might want to stop loading,
-    // but the redirect with error query param is now the main error handling mechanism.
+    // This part is generally not reached on error because of the redirect.
     setIsLoading(false);
   };
 

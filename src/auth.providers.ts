@@ -22,6 +22,7 @@ export const credentialsProvider = Credentials({
 
     const user = await databaseService.findUserByPhoneNumber(credentials.phone);
     if (!user) {
+      // Use a custom error class that Auth.js can catch and pass to the client
       throw new Error('Invalid phone number or password.');
     }
 
@@ -65,7 +66,7 @@ export const credentialsProvider = Credentials({
       return userWithoutPasswords;
     } else {
       // Handle failed login attempt
-      const newAttemptCount = user.failedLoginAttempts + 1;
+      const newAttemptCount = (user.failedLoginAttempts || 0) + 1;
       let updateData: { failedLoginAttempts: number; lockedUntil?: Date | null } = {
         failedLoginAttempts: newAttemptCount,
       };
