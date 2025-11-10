@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -161,7 +162,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   }, [selectedBuilding]);
 
   const createEmptyItem = (): UIUtilityItem => ({
-    uiId: `newItem-${Date.now()}`, name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {}, perSpacePercentages: {}
+    uiId: crypto.randomUUID(), name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {}, perSpacePercentages: {}
   });
 
   useEffect(() => {

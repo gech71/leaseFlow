@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -209,7 +210,7 @@ export async function resetUserPasswordAction(
       return { success: false, error: "Permission denied." };
     }
     
-    const tempPassword = Math.random().toString(36).slice(-8); // Generate a simple temporary password
+    const tempPassword = crypto.randomUUID().slice(0, 8); // Generate a simple temporary password
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
     
     await databaseService.updateUser(userId, {

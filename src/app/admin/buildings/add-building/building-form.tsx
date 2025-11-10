@@ -129,7 +129,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
   const handleAddUIPenaltyRule = () => {
     if (!canManageThisForm) return;
     const newRule: UIPenaltyRule = {
-      id: `uiRule-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      id: crypto.randomUUID(),
       scope: 'Building',
       penaltyType: 'Fixed',
       frequency: 'OneTime',
