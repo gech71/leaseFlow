@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -720,18 +719,3 @@ export async function updateBillAdminDetailsAction(
     return { success: false, error: error.message || "Failed to update bill details." };
   }
 }
-    
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-

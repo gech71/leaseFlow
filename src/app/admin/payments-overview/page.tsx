@@ -1,5 +1,4 @@
 
-
 export const dynamic = 'force-dynamic';
 
 import React, { Suspense } from 'react'; // React is needed for Suspense
