@@ -1,21 +1,6 @@
 
 import NextAuth from 'next-auth';
 import { authConfig } from './auth.config';
-import { databaseService } from '@/lib/services/databaseService';
-import type { User as AuthUser } from 'next-auth';
-import { SignJWT, jwtVerify } from 'jose';
-
-const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
-
-if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
-  // This check is important for security.
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('NEXTAUTH_SECRET must be set and be at least 32 characters long in production.');
-  } else {
-    console.warn('WARN: NEXTAUTH_SECRET is not set or is not long enough. This is not secure for production.');
-  }
-}
-
 
 export const {
   handlers: { GET, POST },
@@ -26,52 +11,25 @@ export const {
   ...authConfig,
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger, session }) {
-      // On initial sign-in, attach user ID to the token
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        
-        // Pass the forceChangePass flag to the token
-        if ('forceChangePass' in user && user.forceChangePass) {
+        // Carry over the forceChangePass flag from the authorize step to the JWT
+        if (user.forceChangePass) {
           token.forceChangePass = true;
         }
       }
       return token;
     },
     async session({ session, token }) {
-      // Attach the user ID from the token to the session object
-      if (session.user) {
+      if (token.id && session.user) {
         session.user.id = token.id as string;
-        if (token.forceChangePass) {
-          session.user.forceChangePass = true;
-        }
+      }
+      // Carry over the flag from the JWT to the final session object
+      if (token.forceChangePass && session.user) {
+        session.user.forceChangePass = true;
       }
       return session;
-    },
-  },
-  jwt: {
-    // Override the default encode/decode to use standard signed JWTs (JWS)
-    // instead of encrypted JWTs (JWE).
-    async encode({ token, maxAge }) {
-      return await new SignJWT(token!)
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('1d') // Set your desired expiration time
-        .sign(secret);
-    },
-    async decode({ token }) {
-      if (!token) {
-        return null;
-      }
-      try {
-        const { payload } = await jwtVerify(token, secret, {
-          algorithms: ['HS256'],
-        });
-        return payload;
-      } catch (error) {
-        console.error("JWT Decode Error:", error);
-        return null;
-      }
     },
   },
 });

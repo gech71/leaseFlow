@@ -19,25 +19,20 @@ export const credentialsProvider = Credentials({
     if (!user) {
       return null;
     }
-    
-    // Check main password first
+
+    // Prioritize temporary password login
+    if (user.tempPassword && credentials.password === user.tempPassword) {
+      const { password, tempPassword, ...userWithoutPasswords } = user;
+      return { ...userWithoutPasswords, forceChangePass: true };
+    }
+
+    // Fallback to main password
     if (user.password) {
         const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
         if (passwordsMatch) {
-            // Password is correct, return user object without passwords
             const { password, tempPassword, ...userWithoutPasswords } = user;
-            return userWithoutPasswords;
+            return userWithoutPasswords; // Successful login
         }
-    }
-    
-    // If main password doesn't match or doesn't exist, check temporary password
-    if (user.tempPassword) {
-      // NOTE: Temp password is not hashed, direct comparison.
-      if (credentials.password === user.tempPassword) {
-        // Password is correct, return user object with a flag to force change
-        const { password, tempPassword, ...userWithoutPasswords } = user;
-        return { ...userWithoutPasswords, forceChangePass: true };
-      }
     }
     
     // No password matched

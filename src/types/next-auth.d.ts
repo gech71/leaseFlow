@@ -18,7 +18,7 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT extends NextAuthJWT {
-    id: string;
+    id?: string; // ID is optional during certain token operations
     forceChangePass?: boolean;
   }
 }
