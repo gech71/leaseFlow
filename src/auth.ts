@@ -6,18 +6,22 @@ import { databaseService } from '@/lib/services/databaseService';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  session: { strategy: 'jwt' }, // Explicitly set JWT strategy
   providers: [credentialsProvider],
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // This is the first time the token is being created for this session (on sign-in)
       if (user) {
-        // This is the first time the token is being created for this session
         token.id = user.id;
-        // Correctly carry over the forceChangePass flag from the authorize user object
         token.forceChangePass = user.forceChangePass ?? false;
-
-        const fullUser = await databaseService.getUserById(user.id, {
+      }
+      
+      // On every JWT read, fetch the latest user data to keep session fresh.
+      // This is a good place to update roles/permissions if they change.
+      if (token.id) {
+         const fullUser = await databaseService.getUserById(token.id as string, {
           roles: true,
         });
 
@@ -27,21 +31,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: role.name,
             description: role.description,
             permissions: role.permissions,
+            createdById: role.createdById,
+            createdAt: role.createdAt,
+            updatedAt: role.updatedAt,
           }));
 
           const effectivePermissions = Array.from(
             new Set(plainRoles.flatMap(r => r.permissions))
           );
 
-          token.roles = plainRoles as any;
+          token.roles = plainRoles;
           token.effectivePermissions = effectivePermissions;
           token.firstName = fullUser.firstName;
           token.lastName = fullUser.lastName;
           token.phoneNumber = fullUser.phoneNumber;
           token.name = fullUser.name;
           token.email = fullUser.email;
+        } else {
+            // User not found, invalidate the token
+            return {};
         }
       }
+
       return token;
     },
     async session({ session, token }) {
@@ -54,7 +65,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.phoneNumber = token.phoneNumber as string | null;
         session.user.name = token.name as string | null;
         session.user.email = token.email as string | null;
-        // Ensure the flag is passed from the token to the final session object
         session.user.forceChangePass = (token.forceChangePass as boolean | undefined) ?? false;
       }
       return session;
