@@ -53,10 +53,14 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (!result || result.error) {
-      if (result?.error === 'CredentialsSignin') {
+      const errorMessage = result?.error;
+      if (errorMessage === 'CredentialsSignin' || errorMessage?.includes('Invalid')) {
         setError("Invalid phone number or password. Please try again.");
-      } else {
-        setError(result?.error || "An unknown error occurred during login.");
+      } else if (errorMessage?.includes('locked')) {
+        setError(errorMessage);
+      }
+      else {
+        setError(errorMessage || "An unknown error occurred during login.");
       }
       return;
     }

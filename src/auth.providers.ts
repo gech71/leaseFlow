@@ -3,6 +3,11 @@ import Credentials from 'next-auth/providers/credentials';
 import { databaseService } from '@/lib/services/databaseService';
 import bcrypt from 'bcryptjs';
 import type { User } from 'next-auth';
+import { prisma } from './lib/prisma';
+import { addMinutes } from 'date-fns';
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MINUTES = 1;
 
 export const credentialsProvider = Credentials({
   name: 'Credentials',
@@ -17,30 +22,68 @@ export const credentialsProvider = Credentials({
 
     const user = await databaseService.findUserByPhoneNumber(credentials.phone);
     if (!user) {
-      return null;
+      return null; // User not found
     }
-    
+
+    // Check if the account is locked
+    if (user.lockedUntil && new Date() < user.lockedUntil) {
+      throw new Error(`Account is locked. Please try again later.`);
+    }
+
+    let isPasswordCorrect = false;
+    let isTempPassword = false;
+
     // Check main password first
     if (user.password) {
-        const passwordsMatch = await bcrypt.compare(credentials.password, user.password);
-        if (passwordsMatch) {
-            // Password is correct, return user object without passwords
-            const { password, tempPassword, ...userWithoutPasswords } = user;
-            return userWithoutPasswords;
-        }
+      isPasswordCorrect = await bcrypt.compare(credentials.password, user.password);
     }
     
-    // If main password doesn't match or doesn't exist, check temporary password
-    if (user.tempPassword) {
-      // NOTE: Temp password is not hashed, direct comparison.
+    // If main password doesn't match, check temporary password
+    if (!isPasswordCorrect && user.tempPassword) {
       if (credentials.password === user.tempPassword) {
-        // Password is correct, return user object with a flag to force change
-        const { password, tempPassword, ...userWithoutPasswords } = user;
-        return { ...userWithoutPasswords, forceChangePass: true };
+        isPasswordCorrect = true;
+        isTempPassword = true;
       }
     }
     
-    // No password matched
-    return null;
+    if (isPasswordCorrect) {
+      // Reset failed attempts on successful login
+      if (user.failedLoginAttempts > 0) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: 0, lockedUntil: null },
+        });
+      }
+      
+      const { password, tempPassword, ...userWithoutPasswords } = user;
+      
+      if (isTempPassword) {
+        return { ...userWithoutPasswords, forceChangePass: true };
+      }
+      
+      return userWithoutPasswords;
+    } else {
+      // Handle failed login attempt
+      const newAttemptCount = user.failedLoginAttempts + 1;
+      let updateData: { failedLoginAttempts: number; lockedUntil?: Date | null } = {
+        failedLoginAttempts: newAttemptCount,
+      };
+
+      if (newAttemptCount >= MAX_LOGIN_ATTEMPTS) {
+        updateData.lockedUntil = addMinutes(new Date(), LOCKOUT_DURATION_MINUTES);
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+
+      if (updateData.lockedUntil) {
+         throw new Error(`Account locked due to too many failed attempts. Please try again in ${LOCKOUT_DURATION_MINUTES} minute.`);
+      }
+
+      // Throw a generic error for invalid credentials
+      throw new Error('Invalid phone number or password.');
+    }
   },
 });
