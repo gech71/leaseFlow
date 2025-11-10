@@ -72,7 +72,6 @@ export async function createTenantAction(data: {
         if (!tenantRole) return { success: false, error: "The default 'TENANT' role was not found." };
         
         userForTenant = await databaseService.createUser({
-            userId: `local-${crypto.randomUUID()}`,
             email: data.email,
             name: data.name,
             firstName: data.name.split(' ')[0] || data.name,

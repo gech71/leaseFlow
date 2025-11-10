@@ -64,7 +64,6 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     const userCreateInput: Prisma.UserCreateInput = {
-      userId: `local-${crypto.randomUUID()}`, // Use a local unique ID
       email: email,
       name: `${firstName} ${lastName}`.trim(),
       firstName: firstName,

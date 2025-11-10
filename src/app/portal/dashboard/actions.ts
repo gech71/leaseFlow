@@ -33,38 +33,7 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     if (user) return user;
   }
   
-  // 2. If no NextAuth session, fall back to the Mini App token for backward compatibility.
-  const cookieStore = await cookies();
-  const miniAppTokenKey = "nibrental_portal_access_token";
-  const accessToken = cookieStore.get(miniAppTokenKey)?.value;
-
-  if (accessToken) {
-    try {
-      const base64Url = accessToken.split(".")[1];
-      if (!base64Url) return null;
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map(function (c) {
-            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-          })
-          .join(""),
-      );
-      const tokenPayload = JSON.parse(jsonPayload);
-      
-      if (tokenPayload && tokenPayload.sub) {
-        return await databaseService.getUserByExternalId(tokenPayload.sub, {
-            roles: true,
-        });
-      }
-    } catch (e) {
-      console.error("Portal Auth Error: Failed to decode Mini App JWT payload:", e);
-      return null;
-    }
-  }
-
-  // If neither method works, there's no valid user session.
+  // No other fallback methods are currently supported for portal login.
   return null;
 }
 

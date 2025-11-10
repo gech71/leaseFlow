@@ -289,13 +289,6 @@ export class DatabaseService {
     return prisma.user.findUnique({ where: { id }, include });
   }
   
-  async getUserByExternalId(userId: string, include?: Prisma.UserInclude): Promise<User | null> { 
-    return prisma.user.findUnique({ 
-        where: { userId }, 
-        include
-    });
-  }
-  
   async findUserByPhoneNumber(phoneNumber: string, include?: Prisma.UserInclude): Promise<User | null> {
     if (!phoneNumber) return null;
     return prisma.user.findFirst({
@@ -327,11 +320,6 @@ export class DatabaseService {
   async updateUser(id: string, data: Prisma.UserUpdateInput): Promise<User> { 
     return prisma.user.update({ where: { id }, data });
   }
-  
-  async updateUserByExternalId(userId: string, data: Prisma.UserUpdateInput): Promise<User> { 
-    return prisma.user.update({ where: { userId }, data });
-  }
-
 
   async deleteUser(id: string): Promise<User> { 
     const userWithBuildings = await prisma.user.findUnique({

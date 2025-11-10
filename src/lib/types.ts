@@ -1,3 +1,4 @@
+
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
@@ -150,7 +151,6 @@ export interface UserRole {
 
 export interface CurrentUser {
   id: string;
-  userId: string; // External ID
   email: string;
   name: string;
   firstName?: string | null;
