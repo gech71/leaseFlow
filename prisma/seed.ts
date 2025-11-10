@@ -1,6 +1,5 @@
 
 import { PrismaClient, Prisma } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -10,7 +9,10 @@ async function main() {
   // 1. Clear existing data in a safe order
   console.log("Clearing existing data...");
   try {
-    // Clear models with relations first
+    await prisma.arifPayment.deleteMany({});
+    console.log("Deleted ArifPayments");
+    await prisma.disabledAgreement.deleteMany({});
+    console.log("Deleted DisabledAgreements");
     await prisma.bill.deleteMany({});
     console.log("Deleted Bills");
     await prisma.agreement.deleteMany({});
@@ -21,36 +23,19 @@ async function main() {
     console.log("Deleted BuildingMonthlyUtilities");
     await prisma.penaltyTier.deleteMany({});
     console.log("Deleted PenaltyTiers");
-
-    // Clear tenant links from Spaces before deleting tenants
-    const spacesWithTenants = await prisma.space.findMany({
-      where: { tenantId: { not: null } },
-      select: { id: true },
-    });
-    for (const space of spacesWithTenants) {
-      await prisma.space.update({
-        where: { id: space.id },
-        data: {
-          tenant: { disconnect: true },
-          isOccupied: false,
-        },
-      });
-    }
-    console.log("Cleared tenant links from Spaces.");
-
-    // Now delete models that were referenced
-    await prisma.tenant.deleteMany({});
-    console.log("Deleted Tenants");
     await prisma.space.deleteMany({});
     console.log("Deleted Spaces");
     await prisma.building.deleteMany({});
     console.log("Deleted Buildings");
-
-    // Finally, clear user and role data
+    await prisma.tenant.deleteMany({});
+    console.log("Deleted Tenants");
     await prisma.user.deleteMany({});
     console.log("Deleted Users");
     await prisma.role.deleteMany({});
     console.log("Deleted Roles");
+    await prisma.agreementTemplate.deleteMany({});
+    console.log("Deleted AgreementTemplates");
+
 
     console.log("Finished clearing data.");
   } catch (e: any) {
@@ -116,23 +101,21 @@ async function main() {
 
   // 3. Create the default Super Admin User
   console.log("Creating Super Admin User...");
-  const hashedPassword = await bcrypt.hash("Admin@123", 10);
   const superAdminUser = await prisma.user.create({
     data: {
-      userId: "4937a4cc-4df8-4161-a701-fbf0b3d21662", // <-- REPLACE THIS VALUE
+      userId: "mock-super-admin", 
       email: "superadmin@nibrental.com",
       name: "Super Admin",
       firstName: "Super",
       lastName: "Admin",
-      phoneNumber: "0912345678",
-      password: hashedPassword,
+      phoneNumber: "0900000000",
       roles: { connect: { id: superAdminRole.id } },
     },
   });
   console.log(`Created Super Admin User: ${superAdminUser.email}`);
 
   console.log(
-    "Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user with a default password.",
+    "Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user.",
   );
 }
 

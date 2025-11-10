@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { SessionProvider } from 'next-auth/react'; // Required for client components using useSession
-import { auth } from '@/auth'; // Import the auth function from your new auth.ts
 
 export const metadata: Metadata = {
   title: 'LeaseFlow',
@@ -11,11 +9,10 @@ export const metadata: Metadata = {
   icons: { icon: 'https://i.imgur.com/JTzGpIH.png' },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: { children: React.ReactNode }) {
-  const nonce = (await headers()).get('x-nonce') || undefined;
-  const session = await auth(); // Get the session on the server
+  const nonce = (headers()).get('x-nonce') || undefined;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -40,11 +37,8 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        {/* Pass the server-side session to the SessionProvider */}
-        <SessionProvider session={session}>
           {children}
           <Toaster />
-        </SessionProvider>
       </body>
     </html>
   );
