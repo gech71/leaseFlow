@@ -19,39 +19,55 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
 import crypto from "crypto";
 import { revalidatePath } from 'next/cache';
+import { auth } from '@/auth'; // Import the main auth helper
 
-// --- Normalization Helper ---
-// Corrected to handle PascalCase keys like 'URL' without mangling them.
-const toCamelCase = (s: string) => {
-  if (typeof s !== 'string' || s.length === 0) {
-    return s;
-  }
-  // This handles snake_case and ensures PascalCase like 'ResponseCode' becomes 'responseCode'
-  // but doesn't affect all-caps acronyms like 'URL'.
-  return s.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
-         .replace(/^[A-Z](?![A-Z]|$)/, (L) => L.toLowerCase());
-};
-
-
-const isObject = function (o: any) {
-  return o === Object(o) && !Array.isArray(o) && typeof o !== "function";
-};
-
-const normalizeKeys = (obj: any): any => {
-  if (isObject(obj)) {
-    const n: { [key: string]: any } = {};
-    Object.keys(obj).forEach((k) => {
-      n[toCamelCase(k)] = normalizeKeys(obj[k]);
+// --- User Authentication Helper ---
+// This function now handles both NextAuth sessions and the Mini App token.
+async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+  // 1. Try to get the user from the standard NextAuth session first.
+  const session = await auth();
+  if (session?.user?.id) {
+    const user = await databaseService.getUserById(session.user.id, {
+      roles: true,
     });
-    return n;
-  } else if (Array.isArray(obj)) {
-    return obj.map((i) => {
-      return normalizeKeys(i);
-    });
+    if (user) return user;
   }
-  return obj;
-};
-// --- End Normalization Helper ---
+  
+  // 2. If no NextAuth session, fall back to the Mini App token for backward compatibility.
+  const cookieStore = await cookies();
+  const miniAppTokenKey = "nibrental_portal_access_token";
+  const accessToken = cookieStore.get(miniAppTokenKey)?.value;
+
+  if (accessToken) {
+    try {
+      const base64Url = accessToken.split(".")[1];
+      if (!base64Url) return null;
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map(function (c) {
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join(""),
+      );
+      const tokenPayload = JSON.parse(jsonPayload);
+      
+      if (tokenPayload && tokenPayload.sub) {
+        return await databaseService.getUserByExternalId(tokenPayload.sub, {
+            roles: true,
+        });
+      }
+    } catch (e) {
+      console.error("Portal Auth Error: Failed to decode Mini App JWT payload:", e);
+      return null;
+    }
+  }
+
+  // If neither method works, there's no valid user session.
+  return null;
+}
+
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -79,62 +95,6 @@ export interface TenantPortalData {
   error?: string;
 }
 
-// --- User Authentication Helpers ---
-const ACCESS_TOKEN_KEY = "nibrental_portal_access_token"; // CORRECTED KEY
-
-// Insecure JWT payload decoder
-async function decodeJwtPayload(token: string): Promise<any | null> {
-  try {
-    const base64Url = token.split(".")[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map(function (c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join(""),
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.error("Portal Auth Error: Failed to decode JWT payload:", e);
-    return null;
-  }
-}
-
-// Gets current user from the session cookie
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_TOKEN_KEY)?.value; 
-
-  if (!accessToken) {
-    console.error(
-      "Portal Auth Error: No session access token found in cookie.",
-    );
-    return null;
-  }
-
-  const tokenPayload = await decodeJwtPayload(accessToken);
-  if (!tokenPayload || !tokenPayload.sub) {
-    console.error(
-      `Portal Auth Error: Failed to decode session token or 'sub' claim is missing.`,
-    );
-    return null;
-  }
-
-  const user = await databaseService.getUserByExternalId(tokenPayload.sub, {
-    roles: true,
-  });
-
-  if (!user) {
-    console.error(
-      `Portal Auth Error: User with external ID (sub) '${tokenPayload.sub}' not found in the local system.`,
-    );
-  }
-
-  return user;
-}
 
 export async function getTenantPortalDashboardDataAction(): Promise<TenantPortalData> {
   try {
