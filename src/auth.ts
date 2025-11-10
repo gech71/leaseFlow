@@ -4,8 +4,15 @@ import { authConfig } from './auth.config';
 import { databaseService } from '@/lib/services/databaseService';
 import type { User as AuthUser } from 'next-auth';
 import { SignJWT, jwtVerify } from 'jose';
+import * as dotenv from 'dotenv';
+
+dotenv.config(); // Load environment variables
 
 const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+
+if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
+  throw new Error('NEXTAUTH_SECRET must be set and be at least 32 characters long.');
+}
 
 export const {
   handlers: { GET, POST },
