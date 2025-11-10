@@ -37,7 +37,7 @@ export async function getBuildingUtilitiesAction(
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
         console.warn(`Permission denied: User tried to access utilities for unmanaged building ${buildingId}`);
-        return null; // Don't return data user can't access
+        return null;
     }
 
     const utilities = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(buildingId, month, year, {
@@ -46,7 +46,6 @@ export async function getBuildingUtilitiesAction(
 
     if (!utilities) return null;
 
-    // Serialize Decimal to number
     const serializableUtilities = {
       ...utilities,
       utilities: utilities.utilities.map(u => ({
@@ -59,21 +58,21 @@ export async function getBuildingUtilitiesAction(
 
   } catch (error: any) {
     console.error("Error fetching building utilities:", error);
-    return null; // Return null on error
+    return null;
   }
 }
 
 export interface BuildingUtilityItemInput {
   name: string;
   totalCost: number;
-  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces'; // Matches Prisma Enum
+  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
 }
 
 export async function saveBuildingUtilitiesAction(
   buildingId: string,
-  buildingName: string, // Denormalized name
+  buildingName: string,
   year: number,
   month: number,
   utilityItems: BuildingUtilityItemInput[]
@@ -85,7 +84,7 @@ export async function saveBuildingUtilitiesAction(
     }
 
     const where: Prisma.BuildingMonthlyUtilitiesWhereUniqueInput = {
-      buildingId_year_month: { // Using the @@unique constraint name
+      buildingId_year_month: {
         buildingId,
         year,
         month,
@@ -112,25 +111,23 @@ export async function saveBuildingUtilitiesAction(
 
     const updateData: Prisma.BuildingMonthlyUtilitiesUpdateInput = {
       utilities: {
-        deleteMany: {}, // Delete all existing items for this period
-        create: utilityItemsCreateData, // Create new ones
+        deleteMany: {},
+        create: utilityItemsCreateData,
       },
-      // buildingName could also be updated here if it can change, though less likely for this entity
     };
 
     const result = await databaseService.upsertBuildingMonthlyUtilities(
       where, 
       createData, 
       updateData, 
-      { // Corrected: Pass include options directly
+      {
         utilities: true 
       }
     );
 
     revalidatePath('/admin/building-utilities');
-    revalidatePath('/admin/billing'); // Billing page might depend on this data
+    revalidatePath('/admin/billing');
     
-    // Serialize the result to convert Decimal to number before returning to the client
     const serializableResult = {
       ...result,
       utilities: result.utilities.map(u => ({
@@ -144,7 +141,6 @@ export async function saveBuildingUtilitiesAction(
     console.error("Error saving building utilities:", error);
     let errorMessage = "Failed to save utility data.";
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // More specific error messages can be added here based on error codes
       errorMessage = `Database error: ${error.message}`;
     } else if (error.message) {
       errorMessage = error.message;
@@ -158,7 +154,7 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingM
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
     if (!isSuperAdmin && managedBuildingIds?.length === 0) {
-       return []; // No buildings, so no utility records
+       return [];
     }
     const whereClause = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
 
@@ -168,7 +164,6 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingM
       orderBy: { createdAt: 'desc' },
     });
     
-    // Correctly serialize the Decimal values to numbers before returning
     const serializedRecords = records.map(record => ({
       ...record,
       utilities: record.utilities.map(util => ({
@@ -189,7 +184,6 @@ export async function deleteBuildingUtilitiesAction(id: string) {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     
-    // Fetch the record first to check for ownership
     const recordToDelete = await databaseService.getBuildingMonthlyUtilitiesById(id);
     if (!recordToDelete) {
         return { success: false, error: "Utility record not found for deletion." };

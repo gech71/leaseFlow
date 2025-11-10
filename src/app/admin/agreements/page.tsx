@@ -6,10 +6,9 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Tenant, Space, User, Role, Prisma } from '@prisma/client';
-import { AgreementsListClientPage, type AgreementWithRelations } from './components'; // Import from new components file
+import { AgreementsListClientPage, type AgreementWithRelations } from './components';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
-// This is now a Server Component
 export default async function AgreementsListPage() {
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
@@ -36,13 +35,13 @@ export default async function AgreementsListPage() {
     startDate: ag.startDate.toISOString(),
     nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
     createdAt: ag.createdAt.toISOString(),
-    updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Safe serialization
+    updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(),
     initialPaymentDate: ag.initialPaymentDate?.toISOString() || undefined,
-    disabledAgreements: ag.disabledAgreements, // Pass this through
+    disabledAgreements: ag.disabledAgreements,
     tenant: ag.tenant ? { 
       ...ag.tenant, 
       createdAt: ag.tenant.createdAt.toISOString(), 
-      updatedAt: ag.tenant.updatedAt?.toISOString() || ag.tenant.createdAt.toISOString() // Safe serialization
+      updatedAt: ag.tenant.updatedAt?.toISOString() || ag.tenant.createdAt.toISOString()
     } : null,
     space: ag.space ? { 
       ...ag.space, 
@@ -50,7 +49,7 @@ export default async function AgreementsListPage() {
       utilityProrationShare: Number(ag.space.utilityProrationShare),
       monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
       createdAt: ag.space.createdAt.toISOString(), 
-      updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString() // Safe serialization
+      updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt.toISOString()
     } : null,
   })) as AgreementWithRelations[];
 

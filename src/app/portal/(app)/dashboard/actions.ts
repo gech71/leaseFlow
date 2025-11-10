@@ -1,5 +1,4 @@
 
-// src/app/portal/dashboard/actions.ts
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -19,12 +18,9 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
 import crypto from "crypto";
 import { revalidatePath } from 'next/cache';
-import { auth } from '@/auth'; // Import the main auth helper
+import { auth } from '@/auth';
 
-// --- User Authentication Helper ---
-// This function now handles both NextAuth sessions and the Mini App token.
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  // 1. Try to get the user from the standard NextAuth session first.
   const session = await auth();
   if (session?.user?.id) {
     const user = await databaseService.getUserById(session.user.id, {
@@ -33,24 +29,21 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
     if (user) return user;
   }
   
-  // No other fallback methods are currently supported for portal login.
   return null;
 }
 
 
-// Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
   id?: string;
   name: string;
   amount: number;
 }
 
-// Types that match the structure of data fetched with Prisma, including relations
 export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
   space: SpacePrisma & {
     building: BuildingPrisma & {
       penaltyPolicyTiers: PenaltyTierPrisma[];
-      managers: User[]; // <-- Ensure managers are included
+      managers: User[];
     };
   };
   tenant: TenantPrisma;
@@ -60,7 +53,7 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
 };
 
 export interface TenantPortalData {
-  agreements: PortalAgreementWithRelations[]; // Changed to an array
+  agreements: PortalAgreementWithRelations[];
   error?: string;
 }
 
@@ -77,7 +70,6 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       };
     }
 
-    // Find the tenant record associated with the logged-in user's email or phone number
     const associatedTenant = await databaseService.findTenantByEmailOrPhone(
       currentUser.email,
       currentUser.phoneNumber,
@@ -103,7 +95,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
             building: {
               include: {
                 penaltyPolicyTiers: true,
-                managers: true, // Fetch managers
+                managers: true,
               },
             },
           },
@@ -111,7 +103,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         bills: {
           orderBy: { billDate: "desc" },
         },
-        disabledAgreements: { // Fetch the disabled status
+        disabledAgreements: {
             select: {
                 disabledById: true
             }
@@ -120,7 +112,6 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
       orderBy: { createdAt: "asc" },
     });
 
-    // Filter out disabled agreements before processing
     const enabledAgreements = allAgreementsRaw.filter(ag => ag.disabledAgreements.length === 0);
 
     const processedAgreements = enabledAgreements.map((ag) => {
@@ -199,7 +190,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
 export async function submitPaymentProofAction(data: {
   billId: string;
-  paymentProofDataUri: string; // Changed from paymentProofUrl to accept data URI
+  paymentProofDataUri: string;
   notes?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
@@ -221,20 +212,19 @@ export async function submitPaymentProofAction(data: {
       return { success: false, error: `Cannot submit proof for a bill with status "${bill.status}".` };
     }
     
-    // Check data URI size before saving
-    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) { // 2MB limit
+    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) {
       return { success: false, error: "The uploaded PDF file is too large. Please upload a file smaller than 2MB." };
     }
 
     await databaseService.updateBill(data.billId, {
       status: 'PendingVerification',
-      paymentProofDataUri: data.paymentProofDataUri, // Save the data URI
+      paymentProofDataUri: data.paymentProofDataUri,
       tenantPaymentNotes: data.notes,
-      paymentDate: new Date(), // Set payment date to when proof is submitted
+      paymentDate: new Date(),
     });
     
     revalidatePath('/portal/dashboard');
-    revalidatePath('/admin/billing'); // Also revalidate admin page
+    revalidatePath('/admin/billing');
 
     return { success: true };
 

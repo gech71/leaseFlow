@@ -37,11 +37,9 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
     await databaseService.updateUser(user.id, {
       password: hashedNewPassword,
-      tempPassword: null, // Clear any temporary password
+      tempPassword: null,
     });
 
-    // After a successful password change, we should log the user out
-    // to ensure all session data is refreshed on next login.
     await signOut({ redirect: false });
 
     return { success: true };
@@ -50,4 +48,3 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
     return { success: false, error: "An unexpected server error occurred." };
   }
 }
-

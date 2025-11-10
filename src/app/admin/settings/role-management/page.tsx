@@ -9,7 +9,6 @@ import { RoleManagementClientPage, type ClientRole } from './client-page';
 
 export const dynamic = 'force-dynamic';
 
-// Helper function to serialize dates for client component props
 const serializeRolesForClient = (roles: any[]): ClientRole[] => {
   return roles.map(role => ({
     ...role,

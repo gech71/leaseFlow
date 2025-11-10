@@ -1,19 +1,16 @@
 
 export const dynamic = 'force-dynamic';
 
-// Main form interaction is client-side, but data fetching for props is server-side.
-
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { FileText, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Tenant, Space, Prisma, User, Role, AgreementTemplate } from '@prisma/client'; // For server-side fetching
-import { GenerateAgreementClientPage } from './client-page'; // Import the new client component
+import type { Tenant, Space, Prisma, User, Role, AgreementTemplate } from '@prisma/client';
+import { GenerateAgreementClientPage } from './client-page';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
-// Server Component to fetch initial data
 export default function GenerateAgreementPage() {
   return (
     <div className="animate-fadeIn">
@@ -35,12 +32,9 @@ export default function GenerateAgreementPage() {
   );
 }
 
-// This is an async Server Component responsible for fetching data
 async function GenerateAgreementDataFetcher() {
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
-  // For generating agreements, a manager should be able to see ANY tenant,
-  // so they can add an existing tenant to one of their buildings.
   const tenantWhereClause: Prisma.TenantWhereInput = {};
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {
@@ -57,11 +51,10 @@ async function GenerateAgreementDataFetcher() {
   const availableSpaces = await databaseService.getAllSpaces({ where: spaceWhereClause, orderBy: [{buildingName: 'asc'},{spaceIdName: 'asc'}] });
   const agreementTemplates = await databaseService.getAllAgreementTemplates({ where: agreementTemplateWhere, orderBy: { name: 'asc' } });
 
-  // Serialize dates before passing to client component
   const serializableTenants = tenants.map(t => ({
     ...t,
     createdAt: t.createdAt.toISOString(),
-    updatedAt: t.updatedAt?.toISOString() || t.createdAt.toISOString() // Fallback for updatedAt
+    updatedAt: t.updatedAt?.toISOString() || t.createdAt.toISOString()
   }));
   const serializableSpaces = availableSpaces.map(s => ({
     ...s,
@@ -69,7 +62,7 @@ async function GenerateAgreementDataFetcher() {
     utilityProrationShare: Number(s.utilityProrationShare),
     monthlyRentalPrice: Number(s.monthlyRentalPrice),
     createdAt: s.createdAt.toISOString(),
-    updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString() // Fallback for updatedAt
+    updatedAt: s.updatedAt?.toISOString() || s.createdAt.toISOString()
   }));
   
   return <GenerateAgreementClientPage tenants={serializableTenants} availableSpaces={serializableSpaces} agreementTemplates={agreementTemplates} />;

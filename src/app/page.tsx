@@ -38,20 +38,17 @@ export default function RootPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If the user is already authenticated, redirect them to the dashboard.
     if (status === 'authenticated') {
       router.replace('/admin/dashboard');
     }
   }, [status, router]);
 
   useEffect(() => {
-    // This will handle generic errors passed by Auth.js if they are in the URL
     const authError = searchParams.get("error");
     if (authError) {
        if (authError === "CredentialsSignin") {
         setError("Invalid phone number or password.");
       } else {
-         // Display the custom error message from the URL if it exists
          setError(authError);
       }
     }
@@ -66,15 +63,13 @@ export default function RootPage() {
       const result = await signIn("credentials", {
         phone,
         password,
-        redirect: false, // Set to false to handle the result here
+        redirect: false,
         callbackUrl: '/admin/dashboard',
       });
 
       if (result?.ok) {
-        // On success, router.push will trigger the useEffect to redirect
         router.push("/admin/dashboard");
       } else if (result?.error) {
-        // This will now catch custom errors passed back
         setError(result.error);
       } else {
         setError("An unknown error occurred during login.");
@@ -87,8 +82,6 @@ export default function RootPage() {
     setIsLoading(false);
   };
 
-  // If session status is loading or already authenticated, show a loading screen
-  // to prevent a flash of the login page.
   if (status === 'loading' || status === 'authenticated') {
     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">

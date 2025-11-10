@@ -7,7 +7,6 @@ import { Prisma } from '@prisma/client';
 
 const NIB_VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
 
-// Helper to validate the Authorization token from NIB
 async function validateNibToken(authHeader: string | null): Promise<boolean> {
     if (!NIB_VALIDATE_TOKEN_URL) {
         console.error("Callback Error: Token validation URL is not configured.");
@@ -33,15 +32,12 @@ async function validateNibToken(authHeader: string | null): Promise<boolean> {
 }
 
 export async function POST(request: NextRequest) {
-    // --- Step 1: Token Validation ---
     const authHeader = request.headers.get('Authorization');
   
 
-    // Extract the token from the string like: Bearer {token: YOUR_TOKEN}
     const tokenMatch = authHeader?.match(/token:\s*(.+)\s*}/);
     const rawToken = tokenMatch?.[1];
 
-    // Reconstruct the standard Bearer token format
     const fixedAuthHeader = rawToken ? `Bearer ${rawToken}` : null;
     
     if (!fixedAuthHeader) {
@@ -79,7 +75,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: "Missing required fields." }, { status: 400 });
     }
 
-    // --- Step 2 & 3: Find Bills and Compare Signatures ---
     try {
         const bills = await prisma.bill.findMany({
             where: {
@@ -91,13 +86,10 @@ export async function POST(request: NextRequest) {
 
         if (bills.length === 0) {
             console.warn(`Callback Success: Received valid callback for transaction ${transactionId}, but no matching bills were found.`);
-            // Acknowledge to NIB that we received it, even if we can't find the bill, to prevent retries.
             return NextResponse.json({ message: "Callback acknowledged, no matching bills found." }, { status: 200 });
         }
 
         
-        // --- Step 4: Update Database ---
-        // Since this is a group payment, we mark all found bills as paid.
         await prisma.bill.updateMany({
             where: {
                 id: { in: bills.map(b => b.id) }
@@ -105,7 +97,7 @@ export async function POST(request: NextRequest) {
             data: {
                 status: 'Paid',
                 paymentDate: new Date(), 
-                paymentReference: txnRef, // Use the final NIB transaction reference.
+                paymentReference: txnRef,
                 adminVerifiedPayment: true, 
                 adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Group Ref: ${transactionId}.`,
                 tenantPaymentNotes: `Paid via NIB Super App. Group Transaction ID: ${transactionId}.`,
@@ -113,13 +105,10 @@ export async function POST(request: NextRequest) {
         });
 
         
-        // --- Step 5: Respond with 200 OK ---
         return NextResponse.json({ message: "Payment confirmed and all associated bills updated." }, { status: 200 });
 
     } catch (dbError: any) {
         console.error("Callback DB Error: Failed to process bills after successful validation.", dbError);
-        // Important: Still return 200 OK to NIB to prevent them from retrying.
-        // We will need to handle this reconciliation separately (e.g., via logging/monitoring).
         return NextResponse.json({ message: "Callback acknowledged, but an internal processing error occurred." }, { status: 200 });
     }
 }

@@ -8,13 +8,12 @@ import { FileText, ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Tenant, Space, User, Role } from '@prisma/client';
-import { ViewAgreementClientPage, type AgreementWithRelations } from './client-page'; // Adjusted import
+import { ViewAgreementClientPage, type AgreementWithRelations } from './client-page';
 import { cookies } from 'next/headers';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
-// Server Component to fetch initial data
 export default async function ViewAgreementPage({ params }: { params: { id: string } }) {
-  const { id } = params; // Destructure ID from params first
+  const { id } = params;
   let agreementData = await databaseService.getAgreementById(id, {
     tenant: true, 
     space: true 
@@ -25,7 +24,7 @@ export default async function ViewAgreementPage({ params }: { params: { id: stri
 
     if (!isSuperAdmin) {
         if (!agreementData.space || !managedBuildingIds?.includes(agreementData.space.buildingId)) {
-            agreementData = null; // User doesn't manage this building, so they can't see the agreement.
+            agreementData = null;
         }
     }
   }
@@ -33,7 +32,7 @@ export default async function ViewAgreementPage({ params }: { params: { id: stri
 
   let serializableAgreement: AgreementWithRelations | null = null;
   if (agreementData) {
-    const fallbackDate = new Date(0).toISOString(); // Use epoch as a fallback for any null dates
+    const fallbackDate = new Date(0).toISOString();
     serializableAgreement = {
       ...agreementData,
       monthlyRentalPrice: Number(agreementData.monthlyRentalPrice),

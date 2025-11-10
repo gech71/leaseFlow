@@ -3,14 +3,13 @@ export const dynamic = 'force-dynamic';
 
 import { databaseService } from '@/lib/services/databaseService';
 import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, User, Role, Prisma } from '@prisma/client';
-import { BuildingsClientPage } from './components'; // Import the new client component
+import { BuildingsClientPage } from './components';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
 }
 
-// This is now a Server Component fetching its own data.
 export default async function BuildingsPage() {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 

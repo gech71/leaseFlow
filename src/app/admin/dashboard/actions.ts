@@ -6,8 +6,6 @@ import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { getMonth, getYear, isAfter, addMonths } from 'date-fns';
 import type { Prisma, Building, Space, Agreement, Bill } from '@prisma/client';
 
-// Define the types that will be serialized and sent to the client.
-// This helps ensure data consistency and avoids sending oversized objects.
 export interface ClientBuilding {
   id: string;
   name: string;
@@ -24,7 +22,7 @@ export interface ClientAgreement {
   id: string;
   tenantId: string;
   spaceId: string | null;
-  startDate: string; // ISO string
+  startDate: string;
   paymentTermMonths: number;
   tenant: { name: string } | null;
   space: { spaceIdName: string } | null;
@@ -34,8 +32,8 @@ export interface ClientBill {
   agreementId: string;
   status: string;
   totalAmount: number;
-  paymentDate: string | null; // ISO string
-  billDate: string; // ISO string
+  paymentDate: string | null;
+  billDate: string;
 }
 
 export interface ClientUtility {
@@ -54,7 +52,6 @@ export interface DashboardData {
   error: string | null;
 }
 
-// This server action encapsulates all data fetching for the dashboard.
 export async function getDashboardDataAction(): Promise<DashboardData> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
@@ -91,7 +88,6 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
       totalCost: Number(u.utilities.reduce((sum, item) => sum + Number(item.totalCost), 0)),
     }));
 
-    // Serialize dates for client components
     const agreements = agreementsData.map(a => ({
         ...a,
         startDate: a.startDate.toISOString(),

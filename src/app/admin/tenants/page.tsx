@@ -5,22 +5,18 @@ import { databaseService } from '@/lib/services/databaseService';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, User, Role } from '@prisma/client';
 import { TenantsClientPage, type TenantWithRelations, type SpaceWithTenant, type ClientAgreement } from './components';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
-import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
+import { addMonths, isAfter } from 'date-fns';
 import { prisma } from '@/lib/prisma';
 
 
-// This is the main Server Component for the page
 export default async function TenantsPage() {
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
   
-  // Non-super-admins can ONLY see tenants they have created.
   const tenantWhere: Prisma.TenantWhereInput = !isSuperAdmin
     ? { createdById: currentUser.id }
     : {};
   
   const agreementsInclude = {
-    // No where clause here because we need all agreements to determine status,
-    // but we will filter them on the client based on managed buildings.
     include: {
       space: true,
       disabledAgreements: {
@@ -55,7 +51,6 @@ export default async function TenantsPage() {
 
   const fallbackDate = new Date().toISOString();
 
-  // Serialize date fields for client component props
   const serializableTenants: TenantWithRelations[] = tenantsData.map(tenant => ({
     ...tenant,
     createdAt: tenant.createdAt?.toISOString() || fallbackDate,
@@ -86,7 +81,6 @@ export default async function TenantsPage() {
         createdAt: ag.space.createdAt?.toISOString() || fallbackDate,
         updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt?.toISOString() || fallbackDate
       } : null,
-      // Pass disabled info to client
       disabledAgreements: (ag as any).disabledAgreements || [],
     })),
   }));

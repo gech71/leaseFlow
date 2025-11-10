@@ -65,13 +65,12 @@ export async function getBillingAmountForPhoneNumberAction(phone: string): Promi
 
     const totalAmount = outstandingBills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
     
-    // Serialize utilityBreakdown
     const serializedBills = outstandingBills.map(bill => {
         let parsedUtilityBreakdown: any[] = [];
         if(bill.utilityBreakdown && typeof bill.utilityBreakdown === 'string') {
             try {
                 parsedUtilityBreakdown = JSON.parse(bill.utilityBreakdown);
-            } catch(e) {/* ignore */}
+            } catch(e) {}
         } else if (Array.isArray(bill.utilityBreakdown)) {
             parsedUtilityBreakdown = bill.utilityBreakdown;
         }
@@ -191,7 +190,6 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
             return { success: false, error: responseData.message || `Payment initiation failed with status ${response.status}.` };
         }
         
-        // Update all bills with the same transaction reference for the callback
         await prisma.bill.updateMany({
             where: { id: { in: billIds } },
             data: { 
@@ -213,13 +211,11 @@ export async function initiatePaymentAction(billIds: string[], amount: number): 
     }
 }
 
-// --- New Bill Status Action ---
 export async function getBillStatusAction(billIds: string[]): Promise<{ status: BillStatus | null, error?: string }> {
   try {
     if (billIds.length === 0) {
       return { status: null, error: "No bill IDs provided." };
     }
-    // Check the status of the first bill in the batch, assuming they all get updated together.
     const bill = await prisma.bill.findUnique({
       where: { id: billIds[0] },
       select: { status: true },

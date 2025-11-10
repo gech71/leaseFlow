@@ -8,7 +8,6 @@ import { cookies } from 'next/headers';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import { prisma } from '@/lib/prisma';
 
-// Helper to get user and check for super admin status
 async function getIsSuperAdmin() {
     const { isSuperAdmin } = await getUserAndPermissions();
     return isSuperAdmin;
@@ -19,8 +18,6 @@ export async function getAllRolesAction(): Promise<{ success: boolean, roles?: R
     const { isSuperAdmin, currentUser } = await getUserAndPermissions();
     
     let whereClause: Prisma.RoleWhereInput = {};
-    // SuperAdmins can see all roles.
-    // Non-super-admins only see roles they have created. System roles (createdById: null) are hidden from them.
     if (!isSuperAdmin) {
       whereClause = { createdById: currentUser.id };
     }
@@ -53,7 +50,7 @@ export async function createRoleAction(data: RoleUpsertData): Promise<{ success:
     
     const newRole = await databaseService.createRole(roleCreateInput);
     revalidatePath('/admin/settings/role-management');
-    revalidatePath('/admin/settings/user-management'); // Roles list might be used there
+    revalidatePath('/admin/settings/user-management');
     return { success: true, role: newRole };
   } catch (error: any) {
     console.error("Error creating role:", error);
@@ -96,7 +93,6 @@ export async function deleteRoleAction(id: string): Promise<{ success: boolean, 
         return { success: false, error: "You do not have permission to delete roles." };
     }
 
-    // Check if role is in use before deleting
     const usersWithRole = await prisma.user.count({ where: { roles: { some: { id } } } });
     if (usersWithRole > 0) {
       return { success: false, error: "Cannot delete role as it is currently assigned to one or more users. Please reassign users first." };

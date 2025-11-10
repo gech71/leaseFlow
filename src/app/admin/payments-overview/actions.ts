@@ -1,5 +1,4 @@
 
-// src/app/admin/payments-overview/actions.ts
 "use server";
 
 import { databaseService } from '@/lib/services/databaseService';
@@ -8,15 +7,12 @@ import { cookies } from 'next/headers';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 
-// Define a simple structure for parsed utility items
 interface ParsedUtilityItem {
   id?: string;
   name: string;
   amount: number;
 }
 
-// Define the structure for the data needed by the Payments Overview page
-// UtilityBreakdown is now an array of simple parsed items.
 export type PaymentsOverviewBill = Omit<BillPrisma, 'utilityBreakdown'> & {
   agreement: Prisma.AgreementGetPayload<{
     include: {
@@ -35,7 +31,7 @@ export type PaymentsOverviewBill = Omit<BillPrisma, 'utilityBreakdown'> & {
 
 export interface PaymentsOverviewData {
   bills: PaymentsOverviewBill[];
-  spaces: SpacePrisma[]; // For "Total Potential Monthly Revenue"
+  spaces: SpacePrisma[];
 }
 
 export async function getPaymentsOverviewDataAction(): Promise<PaymentsOverviewData> {

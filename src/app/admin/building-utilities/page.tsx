@@ -1,18 +1,15 @@
 
 export const dynamic = 'force-dynamic';
 
-// Main page.tsx is now a Server Component by default (no "use client" at the top)
-
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Wrench, Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
 import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrismaType, Space as SpacePrismaType, Prisma } from '@prisma/client';
-import { BuildingUtilitiesClientPage, type ClientBuildingMonthlyUtilitiesPrismaType } from './client-page'; // Import the new client component
+import { BuildingUtilitiesClientPage, type ClientBuildingMonthlyUtilitiesPrismaType } from './client-page';
 import { getAllBuildingUtilitiesForListAction, getRegisteredBuildingsAction } from './actions';
 import { parseISO } from 'date-fns';
 
-// Define a client-safe Space type
 interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
   createdAt: string;
   updatedAt: string;
@@ -21,7 +18,6 @@ interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt' | 
   monthlyRentalPrice: number;
 }
 
-// Define a client-safe Building type that includes spaces
 interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updatedAt' | 'spaces'> {
   createdAt: string;
   updatedAt: string;
@@ -29,7 +25,6 @@ interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updated
 }
 
 
-// Server Component to fetch initial data
 export default function BuildingUtilitiesServerPage() {
   return (
     <div className="animate-fadeIn">
@@ -45,16 +40,14 @@ export default function BuildingUtilitiesServerPage() {
   );
 }
 
-// This is an async Server Component responsible for fetching data
 async function BuildingUtilitiesDataFetcher() {
   const buildingsWithSpaces = await getRegisteredBuildingsAction();
   const initialRecordsRaw = await getAllBuildingUtilitiesForListAction();
   
-  // Serialize dates and Decimals for client component props
   const serializableBuildings: ClientBuilding[] = buildingsWithSpaces.map(b => ({
     ...b,
     createdAt: b.createdAt.toISOString(),
-    updatedAt: b.updatedAt?.toISOString() || b.createdAt.toISOString(), // Safe serialization
+    updatedAt: b.updatedAt?.toISOString() || b.createdAt.toISOString(),
     spaces: b.spaces.map(s => ({
       ...s,
       area: Number(s.area),
@@ -68,7 +61,7 @@ async function BuildingUtilitiesDataFetcher() {
   const serializableInitialRecords: ClientBuildingMonthlyUtilitiesPrismaType[] = initialRecordsRaw.map(r => ({
     ...r,
     createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(), // Safe serialization
+    updatedAt: r.updatedAt?.toISOString() || r.createdAt.toISOString(),
     utilities: r.utilities.map(u => ({...u, totalCost: Number(u.totalCost)}))
   }));
 

@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { getUserManagementPageData } from './actions';
 import { UserManagementClientPage, type ClientUserWithAssignments, type ClientRole, type ClientBuildingForAssignment } from './client-page';
 
-// Helper function to serialize dates for client component props
 const serializeDataForClient = (data: any) => {
   if (Array.isArray(data)) {
     return data.map(item => serializeDataForClient(item));
@@ -33,11 +32,9 @@ async function UserManagementDataFetcher() {
   const { success, users, allRoles, allBuildings, error } = await getUserManagementPageData();
 
   if (!success) {
-    // Handle error state, maybe show an error message component
     return <div className="text-destructive p-4">Error loading user management data: {error}</div>;
   }
   
-  // Serialize data for the client
   const serializableUsers = serializeDataForClient(users) as ClientUserWithAssignments[];
   const serializableRoles = serializeDataForClient(allRoles) as ClientRole[];
   const serializableBuildings = serializeDataForClient(allBuildings) as ClientBuildingForAssignment[];

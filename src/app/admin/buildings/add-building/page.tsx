@@ -18,7 +18,6 @@ import {
 import type { User, Role } from "@prisma/client";
 import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
 
-// Data fetching component
 async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
   let initialBuildingDataSerializable: BuildingUpsertFormInternalProps["initialBuildingData"] =
     null;
@@ -74,7 +73,6 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
   );
 }
 
-// This is the main Server Component for the page
 export default async function AddBuildingPage({
   searchParams,
 }: {

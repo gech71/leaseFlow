@@ -39,7 +39,6 @@ class EncryptionService {
     const encrypted = data.subarray(IV_LENGTH + TAG_LENGTH);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(tag);
-    // Corrected line: removed 'hex' and 'utf8' from update() and let it return a buffer
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return decrypted.toString('utf8');
   }

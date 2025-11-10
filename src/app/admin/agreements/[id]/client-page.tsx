@@ -3,7 +3,7 @@
 "use client"; 
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation'; // useParams can be used if needed, but id is passed via props
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { jsPDF } from 'jspdf';
 
-// Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
 };
@@ -24,7 +23,6 @@ const sanitizeFilename = (name: string) => {
 export interface AgreementWithRelations extends AgreementPrisma {
   tenant: Tenant | null;
   space: Space | null;
-  // Dates are expected as strings from server props
   startDate: string;
   nextPaymentDueDate: string;
   createdAt: string;
@@ -60,7 +58,6 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
     
     const doc = new jsPDF();
     
-    // Add HTML content to jsPDF
     doc.html(agreement.agreementText, {
       callback: function (doc) {
         const tenantName = agreement.tenant?.name || 'UnknownTenant';
@@ -70,8 +67,8 @@ export function ViewAgreementClientPage({ agreement: initialAgreement }: ViewAgr
       },
       x: 15,
       y: 15,
-      width: 170, // A4 width in mm minus margins
-      windowWidth: 650 // An arbitrary number that works well for scaling
+      width: 170,
+      windowWidth: 650
     });
   };
   

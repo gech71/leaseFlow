@@ -129,11 +129,9 @@ export default async function MiniAppConnectionPage() {
   const result = await validateConnection();
 
   if (result.status === 'success' && result.token && result.phone) {
-    // On success, render the client component which will handle setting the cookie and redirecting.
     return <ConnectionSuccessPage token={result.token} phone={result.phone} />;
   }
 
-  // If validation fails, render the error page.
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-background p-4">
       <Card

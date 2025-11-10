@@ -3,20 +3,16 @@ export const dynamic = 'force-dynamic';
 
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import { getBillingPageDataAction } from './actions'; // Server action now returns SerializedBillingPageData
+import { getBillingPageDataAction } from './actions';
 import { BillingClientPage } from './client-page';
 import type { Agreement as AgreementPrisma, Bill as BillPrismaOriginal, Space as SpacePrismaOriginal, Building as BuildingPrismaType, Tenant as TenantPrismaOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, PenaltyTier as PenaltyTierPrisma, Prisma } from '@prisma/client';
 
 
-// Define a simple type for utility items after parsing from JSON (if applicable)
 export interface SerializedParsedUtilityItem {
   id?: string;
   name: string;
   amount: number;
 }
-
-// Client-side representation types, dates as strings
-// These types should match the structure of serialized data passed from Server Components
 
 interface ClientPenaltyTier extends Omit<PenaltyTierPrisma, 'id' | 'feeValue'> { 
   id?: string; 
@@ -44,7 +40,7 @@ export interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | '
 interface ClientSpaceForAgreement extends Omit<SpacePrismaOriginal, 'createdAt' | 'updatedAt' | 'building' | 'tenantId' | 'buildingId' | 'agreements' | 'tenant' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
   createdAt: string;
   updatedAt: string;
-  building: ClientBuilding | null; // Building can be null if space.building relation wasn't fully populated
+  building: ClientBuilding | null;
   tenantId?: string | null;
   buildingId: string;
   area: number;
@@ -66,8 +62,8 @@ export interface ClientAgreement extends Omit<AgreementPrisma, 'createdAt' | 'up
   nextPaymentDueDate: string;
   initialPaymentDate?: string | null;
   endDate?: string | null; 
-  tenant: ClientTenant | null; // Tenant can be null
-  space: ClientSpaceForAgreement | null; // Space can be null
+  tenant: ClientTenant | null;
+  space: ClientSpaceForAgreement | null;
   tenantId: string;
   spaceId: string;
   monthlyRentalPrice: number;
@@ -81,8 +77,8 @@ export interface ClientBill extends Omit<BillPrismaOriginal, 'createdAt' | 'upda
   billDate: string;
   dueDate: string;
   paymentDate?: string | null;
-  agreement: ClientAgreement | null; // Agreement can be null
-  utilityBreakdown: SerializedParsedUtilityItem[]; // Matches the parsed structure
+  agreement: ClientAgreement | null;
+  utilityBreakdown: SerializedParsedUtilityItem[];
   tenantId: string;
   agreementId: string;
   rentAmount: number;
@@ -105,9 +101,7 @@ export interface SerializedBillingPageData {
 }
 
 
-// Server Component to fetch initial data
 async function BillingDataFetcher() {
-  // getBillingPageDataAction now returns SerializedBillingPageData directly
   const serializableData = await getBillingPageDataAction();
   return <BillingClientPage initialData={serializableData} />;
 }

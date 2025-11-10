@@ -1,15 +1,14 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { Suspense } from 'react'; // React is needed for Suspense
+import React, { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Space as SpacePrisma, Bill as BillPrisma, Agreement as AgreementPrisma, Tenant as TenantPrisma, Building as BuildingPrismaType, UtilityBreakdownItem as UtilityBreakdownItemPrisma } from '@prisma/client';
 import { getPaymentsOverviewDataAction, type PaymentsOverviewData, type PaymentsOverviewBill } from './actions';
-import { PaymentsOverviewClientPage, type ClientBill, type ClientSpaceForPotentialRevenue, type ClientPenaltyTier, type ClientBuilding, type ClientSpaceForAgreement, type ClientTenant, type ClientAgreementForBill, type ClientUtilityBreakdownItem } from './client-page'; // Import client page and its types
+import { PaymentsOverviewClientPage, type ClientBill, type ClientSpaceForPotentialRevenue, type ClientPenaltyTier, type ClientBuilding, type ClientSpaceForAgreement, type ClientTenant, type ClientAgreementForBill, type ClientUtilityBreakdownItem } from './client-page';
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
-// Helper function to serialize a single bill with deep relations
 const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
   const agreement = bill.agreement;
   const tenant = agreement?.tenant;
@@ -40,7 +39,7 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
         ...tenant,
         createdAt: tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
         updatedAt: tenant.updatedAt?.toISOString() || tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
-      } : ({} as ClientTenant), // Provide a default empty object if tenant is null
+      } : ({} as ClientTenant),
       space: space ? {
         ...space,
         area: Number(space.area),
@@ -53,14 +52,13 @@ const serializeBill = (bill: PaymentsOverviewBill): ClientBill => {
           createdAt: building.createdAt?.toISOString() || EPOCH_ISO_STRING,
           updatedAt: building.updatedAt?.toISOString() || building.createdAt?.toISOString() || EPOCH_ISO_STRING,
           penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt, feeValue: Number(pt.feeValue) })) || [],
-        } : ({} as ClientBuilding), // Default empty object
-      } : ({} as ClientSpaceForAgreement), // Default empty object
-    } : ({} as ClientAgreementForBill), // Default empty object
+        } : ({} as ClientBuilding),
+      } : ({} as ClientSpaceForAgreement),
+    } : ({} as ClientAgreementForBill),
     utilityBreakdown: bill.utilityBreakdown?.map(ub => ({ ...ub, amount: Number(ub.amount) })) || [],
   };
 };
 
-// Helper function to serialize a single space
 const serializeSpace = (space: SpacePrisma): ClientSpaceForPotentialRevenue => {
   return {
     ...space,

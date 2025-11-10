@@ -3,8 +3,8 @@
 
 import { cookies } from 'next/headers';
 
-const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token'; // Use the unified admin token key
-const PORTAL_ACCESS_TOKEN_MAX_AGE = 60 * 60; // 1 hour
+const PORTAL_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
+const PORTAL_ACCESS_TOKEN_MAX_AGE = 60 * 60;
 
 export async function setPortalSessionAction(token: string): Promise<{ success: boolean }> {
   if (!token) {

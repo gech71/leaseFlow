@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -104,7 +103,6 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 
-// Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, "_").replace(/_{2,}/g, "_");
 };
@@ -130,7 +128,6 @@ const proofFormSchema = z.object({
 });
 type ProofFormValues = z.infer<typeof proofFormSchema>;
 
-// Function to convert file to Base64 Data URI
 const fileToDataUri = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => resolve(reader.result as string);
@@ -245,7 +242,6 @@ export function CustomerDashboardClientPage({
 
     const doc = new jsPDF();
 
-    // Add HTML content to jsPDF
     doc.html(agreement.agreementText, {
       callback: function (doc) {
         const tenantName = agreement.tenant?.name || "UnknownTenant";
@@ -300,9 +296,7 @@ export function CustomerDashboardClientPage({
         let totalPenalty = 0;
         const oneTimeFeesApplied = new Set<string>();
 
-        // Iterate through each overdue day
         for (let day = 1; day <= daysOverdue; day++) {
-            // Find the tier that applies to the current day
             const tierForDay = sortedTiers.find(tier => 
                 day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
             );
@@ -320,7 +314,6 @@ export function CustomerDashboardClientPage({
                 if (tierForDay.frequency === 'Daily') {
                     totalPenalty += dailyFee;
                 } else if (tierForDay.frequency === 'OneTime') {
-                    // Only add the one-time fee if it hasn't been added for this tier yet
                     if (!oneTimeFeesApplied.has(tierForDay.id!)) {
                         totalPenalty += dailyFee;
                         oneTimeFeesApplied.add(tierForDay.id!);

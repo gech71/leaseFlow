@@ -14,7 +14,6 @@ export async function getSmtpConfigurationAction(): Promise<{
 }> {
   try {
     const smtpUser = process.env.SMTP_USER || '';
-    // Use prisma directly here
     const encryptedSmtpPass = await prisma.secret.findUnique({ where: { key: 'SMTP_PASS' } });
     const isSmtpPassSet = !!encryptedSmtpPass;
     
@@ -38,7 +37,6 @@ export async function updateSmtpPasswordAction(newPassword: string): Promise<{ s
 
     const encryptedPassword = encryptionService.encrypt(newPassword);
     
-    // Use prisma directly here
     await prisma.secret.upsert({
       where: { key: 'SMTP_PASS' },
       update: { value: encryptedPassword },

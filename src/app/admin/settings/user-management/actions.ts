@@ -19,7 +19,6 @@ export async function getUserManagementPageData() {
 
     let userWhereClause: Prisma.UserWhereInput = {};
 
-    // Non-superadmins can see users they created and tenants in buildings they manage
     if (!isSuperAdmin) {
         const createdUserIds = (await prisma.user.findMany({
             where: { createdById: currentUser.id },
@@ -65,15 +64,12 @@ export async function getUserManagementPageData() {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Apply role filtering logic
     let roleWhereClause: Prisma.RoleWhereInput = {};
     if (!isSuperAdmin) {
-        // Normal users can only assign roles they have created.
         roleWhereClause = { createdById: currentUser.id };
     }
     const allRoles = await databaseService.getAllRoles({ where: roleWhereClause, orderBy: { name: 'asc' } });
     
-    // Non-super-admins should only see the buildings they can manage to assign
     const buildingWhereClause: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds ?? [] } } : {};
     const allBuildings = await databaseService.getAllBuildings({ where: buildingWhereClause, orderBy: { name: 'asc' } });
     
@@ -210,12 +206,12 @@ export async function resetUserPasswordAction(
       return { success: false, error: "Permission denied." };
     }
     
-    const tempPassword = crypto.randomUUID().slice(0, 8); // Generate a simple temporary password
+    const tempPassword = crypto.randomUUID().slice(0, 8);
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
     
     await databaseService.updateUser(userId, {
       password: hashedPassword,
-      tempPassword: tempPassword, // Store the plain temporary password
+      tempPassword: tempPassword,
     });
     
     revalidatePath('/admin/settings/user-management');

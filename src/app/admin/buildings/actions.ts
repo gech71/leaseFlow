@@ -33,7 +33,6 @@ export async function updateBuildingAction(
   managerIds?: string[]
 ) {
   try {
-    // This is the correct way to handle relation updates in Prisma
     if (managerIds !== undefined) {
       data.managers = {
         set: managerIds.map(id => ({ id }))

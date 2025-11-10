@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma, type Agreement as AgreementPrismaOriginal, type Bill as BillPrismaOriginal, type Space as SpacePrismaOriginal, type Building as BuildingPrismaOriginal, type BuildingMonthlyUtilities as BuildingMonthlyUtilitiesPrisma, type UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, type PenaltyTier as PenaltyTierPrismaOriginal, type Tenant as TenantPrismaOriginal, type User, type Role } from '@prisma/client';
 import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, setMonth, setYear, parseISO, format, addDays, subMonths, isSameDay, isAfter, differenceInCalendarMonths } from 'date-fns';
-import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
+import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page';
 import { cookies } from 'next/headers';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
@@ -15,11 +15,9 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
   if (!isSuperAdmin && managedBuildingIds?.length === 0) {
-      // Return empty data if user manages no buildings
       return { agreements: [], spaces: [], buildings: [], bills: [], buildingMonthlyUtilities: [] };
   }
 
-  // Define where clauses
   const agreementWhere: Prisma.AgreementWhereInput = {
     ...(!isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {}),
     disabledAgreements: {
@@ -100,7 +98,6 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
     })
   ]);
 
-  // Serialization logic moved here
   const serializedAgreements = agreementsData.map(ag => ({
     ...(ag as AgreementPrismaOriginal & { tenant: TenantPrismaOriginal | null; space: (SpacePrismaOriginal & { building: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }) | null }) | null }),
     monthlyRentalPrice: Number(ag.monthlyRentalPrice),
@@ -139,7 +136,7 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
         } : null
     } : null,
     disabledAgreements: (ag.disabledAgreements || []).map(da => ({disabledById: da.disabledById}))
-  })) as SerializedBillingPageData['agreements']; // Cast to ensure type match
+  })) as SerializedBillingPageData['agreements'];
 
   const serializedSpaces = spacesData.map(s => ({
     ...(s as SpacePrismaOriginal & { building: (BuildingPrismaOriginal & { penaltyPolicyTiers: PenaltyTierPrismaOriginal[]; spaces: SpacePrismaOriginal[] }) | null }),
@@ -294,7 +291,6 @@ function calculateIndividualPenalty(
 
   const allTiers = building.penaltyPolicyTiers;
   
-  // Prioritize rules: Specific Space > Floor > Building
   const spaceSpecificTiers = allTiers.filter(
     t => t.scope === 'SpecificSpaces' && t.applicableSpaceIdNames?.includes(space.spaceIdName)
   );
@@ -319,11 +315,9 @@ function calculateIndividualPenalty(
   const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
   
   let totalPenalty = 0;
-  const oneTimeFeesApplied = new Set<string>(); // Keep track of applied one-time fees to prevent re-application
+  const oneTimeFeesApplied = new Set<string>();
 
-  // Iterate through each overdue day
   for (let day = 1; day <= daysOverdue; day++) {
-    // Find the tier that applies to the current day
     const tierForDay = sortedTiers.find(tier => 
       day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
     );
@@ -341,9 +335,8 @@ function calculateIndividualPenalty(
       if (tierForDay.frequency === 'Daily') {
         totalPenalty += dailyFee;
       } else if (tierForDay.frequency === 'OneTime') {
-        // Only add the one-time fee if it hasn't been added for this tier yet
         if (!oneTimeFeesApplied.has(tierForDay.id)) {
-          totalPenalty += dailyFee; // dailyFee here is the one-time amount
+          totalPenalty += dailyFee;
           oneTimeFeesApplied.add(tierForDay.id);
         }
       }
@@ -384,8 +377,6 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     const targetDayStart = targetBillDate;
     const targetDayEnd = addDays(targetDayStart, 1);
     
-    // Check for ANY existing bill for this agreement on the target date.
-    // This will find the initial "Paid" bill and prevent duplicates.
     const existingBill = await databaseService.getAllBills({
         where: {
             agreementId: agreement.id,
@@ -397,21 +388,14 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
         return { success: false, error: `A bill for ${format(targetBillDate, 'PP')} for ${agreement.tenant?.name || 'this tenant'} already exists (Status: ${existingBill[0].status}).`};
     }
 
-    // --- Corrected Rent Calculation Logic ---
-    let rentAmount = agreement.monthlyRentalPrice; // Assume full rent by default
+    let rentAmount = agreement.monthlyRentalPrice;
     
-    // Calculate how many months have passed from the agreement start date to the current bill's date.
-    // This correctly handles cases across year boundaries.
     const monthsPassed = differenceInCalendarMonths(targetBillDate, agreement.startDate);
 
-    // If the number of months passed is less than the number of months paid upfront, rent is zero.
-    // The first bill is for month 0, second for month 1, etc.
     if (agreement.initialPaymentMonths > 0 && monthsPassed < agreement.initialPaymentMonths) {
         rentAmount = new Prisma.Decimal(0);
     }
-    // --- End Corrected Logic ---
     
-    // Calculate Utility Costs
     const utilityItemsForJson: {name: string; amount: number}[] = []; 
     let totalUtilityCostForBill = 0;
 
@@ -482,7 +466,7 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
     if (typeof newBill.utilityBreakdown === 'string') {
         try {
             parsedUtilityBreakdown = JSON.parse(newBill.utilityBreakdown);
-        } catch (e) { /* ignore */ }
+        } catch (e) { }
     } else if (Array.isArray(newBill.utilityBreakdown)) {
         parsedUtilityBreakdown = newBill.utilityBreakdown;
     }
@@ -514,7 +498,7 @@ export async function recordPaymentOrVerificationAction(
     paymentDate: string; 
     paymentReference?: string | null;
     adminVerificationNotes?: string | null;
-    paymentProofUrl?: string | null; // Renamed from adminProofUrl for clarity
+    paymentProofUrl?: string | null;
   },
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
@@ -571,7 +555,6 @@ export async function recordPaymentOrVerificationAction(
     if ( (isBefore(parseISO(bill.dueDate.toISOString()), finalPaymentDate) || bill.status === 'Overdue') && actionType !== 'rejectVerification') {
         const daysOverdue = differenceInDays(finalPaymentDate, parseISO(bill.dueDate.toISOString()));
         if (daysOverdue > 0) {
-             // Recalculate penalty on payment date
              currentPenalty = calculateIndividualPenalty(Number(bill.rentAmount), daysOverdue, bill.agreement.space.building, bill.agreement.space);
         } else { 
             currentPenalty = 0;
@@ -593,14 +576,13 @@ export async function recordPaymentOrVerificationAction(
       billUpdateData.paymentDate = finalPaymentDate;
       billUpdateData.adminVerifiedPayment = true;
       billUpdateData.paymentMethod = actionType === 'recordPayment' ? 'Manual' : bill.paymentMethod;
-      if (paymentData.paymentProofUrl) { // Use the renamed prop
+      if (paymentData.paymentProofUrl) {
         billUpdateData.paymentProofUrl = paymentData.paymentProofUrl;
       }
     } else if (actionType === 'rejectVerification') {
       newStatus = isBefore(parseISO(bill.dueDate.toISOString()), today) ? 'Overdue' : 'Pending';
-      billUpdateData.adminVerifiedPayment = false; // Explicitly set to false
+      billUpdateData.adminVerifiedPayment = false;
       billUpdateData.paymentDate = null; 
-      // Do not clear method or reference, keep them for history
       
       const rejectedBaseAmount = Number(bill.rentAmount) + (utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0) || 0);
       let rejectedPenalty = 0;
@@ -628,7 +610,7 @@ export async function recordPaymentOrVerificationAction(
     if (typeof updatedBill.utilityBreakdown === 'string') {
         try {
             parsedUtilityBreakdown = JSON.parse(updatedBill.utilityBreakdown);
-        } catch (e) { /* ignore */ }
+        } catch (e) { }
     } else if (Array.isArray(updatedBill.utilityBreakdown)) {
         parsedUtilityBreakdown = updatedBill.utilityBreakdown;
     }
@@ -690,12 +672,11 @@ export async function updateBillAdminDetailsAction(
 
     revalidatePath('/admin/billing');
     
-    // Serialize and return bill
     let parsedUtilityBreakdown: any[] = [];
     if (typeof updatedBill.utilityBreakdown === 'string') {
         try {
             parsedUtilityBreakdown = JSON.parse(updatedBill.utilityBreakdown);
-        } catch (e) { /* ignore */ }
+        } catch (e) { }
     } else if (Array.isArray(updatedBill.utilityBreakdown)) {
         parsedUtilityBreakdown = updatedBill.utilityBreakdown;
     }

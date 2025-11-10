@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // The user ID from the session token is the internal Prisma User ID.
     const localUser = await databaseService.getUserById(session.user.id, { roles: true });
 
     if (!localUser) {
@@ -22,7 +21,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ isSuccess: false, errors: ["User not found in the system."] }, { status: 404 });
     }
 
-    // Calculate effective permissions
     const effectivePermissionsSet = new Set<string>();
     if (localUser.roles) {
       localUser.roles.forEach(role => {
@@ -34,6 +32,7 @@ export async function GET(request: NextRequest) {
     
     const currentUserData: CurrentUser = {
       id: localUser.id,
+      userId: localUser.userId,
       email: localUser.email,
       name: localUser.name || `${localUser.firstName} ${localUser.lastName}`.trim(),
       firstName: localUser.firstName,

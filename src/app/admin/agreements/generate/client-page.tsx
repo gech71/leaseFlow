@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -71,12 +72,10 @@ import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { jsPDF } from "jspdf";
 
-// Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, "_").replace(/_{2,}/g, "_");
 };
 
-// Client-side representation of Tenant and Space with serialized dates
 interface ClientTenant
   extends Omit<TenantPrismaType, "createdAt" | "updatedAt"> {
   createdAt: string;
@@ -212,9 +211,8 @@ export function GenerateAgreementClientPage({
           data.additionalTerms || "No additional terms specified.",
       };
 
-      // Helper function to escape special regex characters
       const escapeRegExp = (string: string) => {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
+        return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       };
 
       for (const key in replacements) {
@@ -668,7 +666,7 @@ export function GenerateAgreementClientPage({
                     <FormLabel>Additional Terms</FormLabel>
                     <FormControl>
                       <Textarea
-                        rows={6} // adjust height as needed
+                        rows={6}
                         placeholder="Enter additional terms..."
                         {...field}
                         disabled={

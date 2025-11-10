@@ -8,10 +8,9 @@ interface EmailOptions {
   to: string;
   subject: string;
   html: string;
-  from?: string; // Add optional 'from' field
+  from?: string;
 }
 
-// SMTP configuration is now built dynamically
 async function getTransporter() {
   const smtpUser = process.env.SMTP_USER;
   const encryptedPassword = await prisma.secret.findUnique({
@@ -64,7 +63,7 @@ export async function sendEmail({
   const defaultFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
 
   const mailOptions = {
-    from: from || defaultFrom, // Use provided 'from' or fallback to default
+    from: from || defaultFrom,
     to,
     subject,
     html,

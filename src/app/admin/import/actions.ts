@@ -56,7 +56,6 @@ export async function processImportAction(data: ImportData) {
         return { success: false, createdCount, skippedCount, errors };
     }
 
-    // --- 1. Process Spaces ---
     for (const [index, space] of data.spaces.entries()) {
         const row = index + 2;
         try {
@@ -92,7 +91,6 @@ export async function processImportAction(data: ImportData) {
         }
     }
     
-    // --- 2. Process Tenants ---
     for (const [index, tenant] of data.tenants.entries()) {
         const row = index + 2;
         const tenantName = sanitizeString(tenant.name);
@@ -129,7 +127,6 @@ export async function processImportAction(data: ImportData) {
         }
     }
     
-    // --- 3. Process Agreements ---
     for (const [index, agreement] of data.agreements.entries()) {
         const row = index + 2;
         const tenantEmail = sanitizeString(agreement.tenantEmail);
@@ -158,7 +155,7 @@ export async function processImportAction(data: ImportData) {
                         const agreementData = {
                             tenantId: tenantRecord.id,
                             spaceId: spaceRecord[0].id,
-                            agreementText: "Agreement text generated via bulk import.", // Simplified text for import
+                            agreementText: "Agreement text generated via bulk import.",
                             startDate: startDate.toISOString(),
                             monthlyRentalPrice: sanitizeNumber(spaceRecord[0].monthlyRentalPrice),
                             paymentTermMonths: parseInt(String(agreement.termMonths), 10) || 12,

@@ -8,14 +8,12 @@ import { addMonths, parseISO, isSameDay } from 'date-fns';
 import { prisma } from '@/lib/prisma';
 
 export interface CreateFullAgreementData {
-  // IDs for relations
   tenantId: string;
   spaceId: string;
   
-  // Details for the agreement itself, often from form + AI
   agreementText: string;
-  startDate: string; // ISO String from client
-  monthlyRentalPrice: number; // From selected space
+  startDate: string;
+  monthlyRentalPrice: number;
   paymentTermMonths: number;
   initialPaymentMonths: number;
   additionalTerms?: string | null;
@@ -24,12 +22,10 @@ export interface CreateFullAgreementData {
 export async function createFullAgreementAction(input: CreateFullAgreementData) {
   try {
     const startDateObj = parseISO(input.startDate);
-    // The next due date is for the first monthly utility bill.
     const nextPaymentDueDateObj = addMonths(startDateObj, 1);
     const initialPaymentAmount = input.monthlyRentalPrice * input.initialPaymentMonths;
 
     const newAgreementId = await prisma.$transaction(async (tx) => {
-      // 1. Create the Agreement
       const agreement = await tx.agreement.create({
         data: {
           agreementText: input.agreementText,
@@ -48,7 +44,6 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
         }
       });
 
-      // 2. Create a "Bill" for the initial payment, marked as Pending
       if (initialPaymentAmount > 0) {
         await tx.bill.create({
           data: {
@@ -60,7 +55,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
             utilityBreakdown: Prisma.JsonNull,
             penaltyAmount: 0,
             totalAmount: initialPaymentAmount,
-            status: 'Pending', // Not verified on creation
+            status: 'Pending',
             paymentDate: null,
             paymentMethod: null,
             paymentReference: null,
@@ -69,7 +64,6 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
         });
       }
 
-      // 3. Update space to be occupied by this tenant
       await tx.space.update({
         where: { id: input.spaceId },
         data: {
@@ -78,7 +72,6 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
         },
       });
 
-      // 4. Update tenant's rentedSpaceId
       await tx.tenant.update({
         where: { id: input.tenantId },
         data: {
@@ -89,7 +82,6 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
       return agreement.id;
     });
 
-    // Re-fetch the agreement with all relations to ensure the returned object is complete
     const completeNewAgreement = await databaseService.getAgreementById(newAgreementId, {
       tenant: true,
       space: true
@@ -100,11 +92,10 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     }
 
     revalidatePath('/admin/agreements');
-    revalidatePath('/admin/spaces'); // Space occupancy changed
-    revalidatePath('/admin/tenants'); // Tenant's rentedSpace changed
-    revalidatePath('/admin/billing'); // Invalidate billing page data
+    revalidatePath('/admin/spaces');
+    revalidatePath('/admin/tenants');
+    revalidatePath('/admin/billing');
     
-    // Convert Decimal fields to numbers before returning
     const serializableAgreement = {
       ...completeNewAgreement,
       monthlyRentalPrice: Number(completeNewAgreement.monthlyRentalPrice),

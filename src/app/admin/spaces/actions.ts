@@ -4,13 +4,12 @@
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { Prisma } from '@prisma/client';
-import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
+import { addMonths, isAfter } from 'date-fns';
 
 export async function createSpaceAction(data: Prisma.SpaceCreateInput) {
   try {
     const newSpace = await databaseService.createSpace(data);
     revalidatePath('/admin/spaces');
-    // Convert Decimal fields to numbers before returning to the client
     const serializableSpace = {
       ...newSpace,
       area: Number(newSpace.area),
@@ -31,7 +30,6 @@ export async function updateSpaceAction(id: string, data: Prisma.SpaceUpdateInpu
   try {
     const updatedSpace = await databaseService.updateSpace(id, data);
     revalidatePath('/admin/spaces');
-    // Convert Decimal fields to numbers before returning to the client
     const serializableSpace = {
       ...updatedSpace,
       area: Number(updatedSpace.area),
@@ -55,9 +53,8 @@ export async function updateSpaceAction(id: string, data: Prisma.SpaceUpdateInpu
 
 export async function deleteSpaceAction(id: string) {
   try {
-    // Fetch the space with all its agreements and tenant info
     const space = await databaseService.getSpaceById(id, {
-      agreements: true, // Fetch all agreements
+      agreements: true,
       tenant: true
     });
 
@@ -69,10 +66,8 @@ export async function deleteSpaceAction(id: string) {
         return { success: false, error: "Cannot delete an occupied space. Please vacate the tenant first." };
     }
 
-    // Check for active agreements in application code
     if (space.agreements && space.agreements.length > 0) {
       const activeAgreements = space.agreements.filter(agreement => {
-        // Ensure startDate is a Date object; Prisma typically returns Date objects
         const agreementEndDate = addMonths(agreement.startDate, agreement.paymentTermMonths);
         return isAfter(agreementEndDate, new Date());
       });

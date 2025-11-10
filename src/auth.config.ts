@@ -4,9 +4,9 @@ import { credentialsProvider } from './auth.providers';
 export const authConfig = {
   pages: {
     signIn: '/login',
-    error: '/login', // Redirect users to login page on error
+    error: '/login',
   },
-  trustHost: true, // Add this line to trust the host
+  trustHost: true,
   providers: [credentialsProvider],
   session: { strategy: 'jwt' },
   callbacks: {
@@ -16,10 +16,9 @@ export const authConfig = {
       
       if (isOnAdminArea) {
         if (isLoggedIn) return true;
-        return false; // Redirect unauthenticated users to login page
+        return false;
       }
       
-      // Allow access to login page and other public pages
       return true;
     },
   },

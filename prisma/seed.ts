@@ -7,7 +7,6 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Starting seeding process...");
 
-  // 1. Clear existing data in a safe order
   console.log("Clearing existing data...");
   try {
     await prisma.arifPayment.deleteMany({});
@@ -44,7 +43,6 @@ async function main() {
     throw e;
   }
 
-  // 2. Create the essential Roles
   console.log("Creating SUPER_ADMIN Role...");
   const superAdminRole = await prisma.role.create({
     data: {
@@ -99,7 +97,6 @@ async function main() {
   });
   console.log(`Created Role: ${tenantRole.name}`);
 
-  // 3. Create the default Super Admin User
   console.log("Creating Super Admin User...");
   const hashedPassword = await bcrypt.hash("Admin@123", 10);
   const superAdminUser = await prisma.user.create({

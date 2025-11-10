@@ -14,18 +14,14 @@ import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
 import { addMonths, isAfter, isBefore, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 
-// This is the main Server Component for the page
 export default async function SpacesPage() {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
-  // --- Automatic Space Vacating Logic ---
   const today = startOfDay(new Date());
-  // Find agreements that are now expired but their spaces are still marked as occupied.
   const expiredAgreementsOnOccupiedSpaces = await prisma.agreement.findMany({
     where: {
       space: {
         isOccupied: true,
-        // Limit the check to buildings managed by the current user if not super admin
         ...(!isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {}),
       },
     },
@@ -50,7 +46,6 @@ export default async function SpacesPage() {
     }
   }
 
-  // If we found any spaces to vacate, update them in a batch transaction.
   if (spaceIdsToVacate.length > 0) {
     await prisma.space.updateMany({
       where: {
@@ -58,11 +53,10 @@ export default async function SpacesPage() {
       },
       data: {
         isOccupied: false,
-        tenantId: null, // Disconnect the tenant from the space
+        tenantId: null,
       },
     });
   }
-  // --- End Automatic Logic ---
 
   const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin
     ? { buildingId: { in: managedBuildingIds! } }
@@ -84,7 +78,6 @@ export default async function SpacesPage() {
     orderBy: { name: "asc" },
   });
 
-  // Serialize dates and structure data for the client component
   const serializableSpaces: SpaceWithBuildingName[] = spacesData.map(
     (space) => {
       let availabilityDate: string | null = null;

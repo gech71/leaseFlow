@@ -26,18 +26,15 @@ function generateTempPassword(length = 12): string {
     const randomValues = new Uint32Array(length);
     crypto.getRandomValues(randomValues);
 
-    // Ensure at least one of each character type
     password += upper[randomValues[0] % upper.length];
     password += lower[randomValues[1] % lower.length];
     password += numbers[randomValues[2] % numbers.length];
     password += symbols[randomValues[3] % symbols.length];
 
-    // Fill the rest of the password
     for (let i = 4; i < length; i++) {
         password += allChars[randomValues[i] % allChars.length];
     }
     
-    // Shuffle the password to avoid predictable patterns
     return password.split('').sort(() => 0.5 - (crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296)).join('');
 }
 
@@ -52,7 +49,6 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
 
     const { firstName, lastName, phoneNumber, email } = data;
 
-    // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
@@ -82,7 +78,6 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
 
     const localUser = await prisma.user.create({ data: userCreateInput });
 
-    // Send welcome email
     const emailHtml = `
       <h1>Welcome to LeaseFlow!</h1>
       <p>Hello ${firstName},</p>

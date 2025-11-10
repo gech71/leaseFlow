@@ -26,13 +26,7 @@ export default function SettingsLayout({
         icon={SettingsIcon}
         description="Manage users and other application configurations."
       />
-      {/* Add navigation for sub-settings pages if needed in the future */}
-      {/* 
-      <nav className="mb-6">
-        <Link href="/admin/settings/user-registration" className="mr-4 hover:underline">User Registration</Link>
-        // Other settings links
-      </nav>
-      */}
+      
       <div className="mt-6">
         {children}
       </div>

@@ -53,16 +53,16 @@ export async function upsertAgreementTemplateAction(
         const createOrUpdateData = {
           name: data.name,
           content: data.content,
-          createdBy: data.id ? undefined : { connect: { id: currentUser.id } } // Only connect on create
+          createdBy: data.id ? undefined : { connect: { id: currentUser.id } }
         };
 
-        if (data.id) { // Update
+        if (data.id) {
             await databaseService.updateAgreementTemplate(data.id, {
                 name: data.name,
                 content: data.content,
             });
             revalidatePath('/admin/settings/agreement-template');
-        } else { // Create
+        } else {
             await databaseService.createAgreementTemplate({
                 name: data.name,
                 content: data.content,
@@ -78,7 +78,6 @@ export async function upsertAgreementTemplateAction(
         return { success: false, error: "Failed to save the template." };
     }
     
-    // Redirect after successful operation
     redirect('/admin/settings/agreement-template');
 }
 

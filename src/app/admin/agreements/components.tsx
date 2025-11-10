@@ -51,7 +51,6 @@ import {
 import { jsPDF } from "jspdf";
 import { Label } from "@/components/ui/label";
 
-// Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, "_").replace(/_{2,}/g, "_");
 };
@@ -109,7 +108,6 @@ export function AgreementsListClientPage({
 
   const filteredAgreements = agreements
     .filter((agreement) => {
-      // Status filter logic
       const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
       const isChronologicallyExpired = isBefore(agreementEndDate, today);
       const isManuallyDisabled = agreement.disabledAgreements.some(da => da.disabledById === currentUserId);
@@ -125,7 +123,6 @@ export function AgreementsListClientPage({
 
       if (filterStatus !== status) return false;
 
-      // Search term filter
       if (searchTerm) {
          return (
           agreement.tenant?.name
