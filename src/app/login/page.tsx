@@ -53,15 +53,9 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (!result || result.error) {
-      const errorMessage = result?.error || "An unknown error occurred.";
-      // Catch specific error messages from our custom provider
-      if (errorMessage === 'CredentialsSignin') {
-        setError("Invalid phone number or password. Please try again.");
-      } else {
-        // This will now catch "Invalid credentials. X attempts remaining."
-        // and "Account is locked..."
-        setError(errorMessage);
-      }
+      // The error from the provider is in result.error.
+      // We can display it directly.
+      setError(result?.error || "An unknown error occurred.");
       return;
     }
 
