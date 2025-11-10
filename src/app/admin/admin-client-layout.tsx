@@ -169,7 +169,6 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center group-data-[state=expanded]/sidebar-wrapper:justify-start group-data-[state=collapsed]/sidebar-wrapper:justify-center gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={`https://picsum.photos/seed/${currentUser?.id || 'admin'}/100/100`} alt={currentUser?.name || "Admin User"} data-ai-hint="user avatar"/>
                   <AvatarFallback>{userInitials}</AvatarFallback>
                 </Avatar>
                 <div className={cn("text-left", "group-data-[state=collapsed]/sidebar-wrapper:hidden")}>
