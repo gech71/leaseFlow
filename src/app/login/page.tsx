@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -44,21 +43,31 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      redirect: false,
-      phone: phone,
-      password: password,
-    });
-    
-    setIsLoading(false);
+    try {
+      const result = await signIn("credentials", {
+        redirect: false,
+        phone,
+        password,
+        callbackUrl: "/",
+      });
 
-    if (result?.ok) {
-        // Successful login, let the middleware handle redirection.
-        // Forcing a reload to ensure all contexts are correctly initialized.
-        router.push('/admin/dashboard');
-        router.refresh();
-    } else {
-        setError(result?.error || "Invalid phone number or password. Please try again.");
+      if (!result?.ok) {
+        setError("Invalid Credential");
+        setIsLoading(false);
+        return;
+      }
+      const session = await getSession();
+      setIsLoading(false);
+
+      if (session?.user?.forceChangePass) {
+        router.push("/portal/change-password");
+      } else {
+        router.push("/admin/dashboard");
+      }
+    } catch (err: any) {
+      // Catch thrown errors from authorize
+      setError("Invalid Credential");
+      setIsLoading(false);
     }
   };
 
@@ -67,15 +76,15 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm shadow-2xl animate-fadeIn">
         <CardHeader className="text-center">
           <Image
-            src="https://i.imgur.com/JTzGpIH.png"
+            src="/images/Nibtera.png"
             alt="LeaseFlow Logo"
-            width={80}
-            height={80}
+            width={250}
+            height={100}
             className="mx-auto"
             priority
           />
           <CardTitle className="mt-4 font-headline text-2xl">
-            Welcome Back
+            Building Management System
           </CardTitle>
           <CardDescription>
             Enter your credentials to access your portal.
@@ -134,14 +143,8 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Log In
             </Button>
           </form>
