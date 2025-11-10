@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getSession, signIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,12 +25,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-// A mapping of error codes returned by NextAuth to user-friendly messages.
-const errorMessages: { [key: string]: string } = {
-  CredentialsSignin: "Invalid phone number or password.",
-  default: "An unknown error occurred. Please try again.",
-};
-
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,14 +37,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Read the error from the URL query parameters provided by NextAuth
+    // This will handle generic errors passed by NextAuth redirect, if any
     const authError = searchParams.get("error");
-    if (authError) {
-      // Use the predefined mapping or the error message directly if it's custom
-      const message = errorMessages[authError] || decodeURIComponent(authError);
-      setError(message);
+    if (authError && !error) { // only set if no specific error is already displayed
+        setError("An unexpected authentication error occurred.");
     }
-  }, [searchParams]);
+  }, [searchParams, error]);
 
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -58,17 +50,31 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
-    // signIn will automatically redirect on error, and the useEffect hook above
-    // will catch the error from the URL query parameter.
-    await signIn("credentials", {
-      phone,
-      password,
-      callbackUrl: '/admin/dashboard', // Specify where to go on success
-      redirect: true, // Ensure redirection happens
-    });
+    try {
+      const result = await signIn("credentials", {
+        phone,
+        password,
+        redirect: false, // Set redirect to false to handle the response here
+      });
 
-    // This part is generally not reached on error because of the redirect.
-    setIsLoading(false);
+      if (result?.error) {
+        // The error from the provider will be in result.error
+        setError(result.error);
+        setIsLoading(false);
+      } else if (result?.ok) {
+        // On successful sign-in, manually redirect
+        router.push("/admin/dashboard");
+        router.refresh();
+      } else {
+         setError("An unknown error occurred. Please try again.");
+         setIsLoading(false);
+      }
+    } catch (e: any) {
+        // This catch block handles network errors or other unexpected issues
+        console.error("Login submission error:", e);
+        setError("A network error occurred. Please check your connection.");
+        setIsLoading(false);
+    }
   };
 
   return (
