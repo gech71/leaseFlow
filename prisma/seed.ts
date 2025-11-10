@@ -1,5 +1,6 @@
 
 import { PrismaClient, Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -66,13 +67,12 @@ async function main() {
         "agreement:view",
         "agreement:create",
         "agreement:edit",
-        "agreement:delete",
-        "building_utility:view",
-        "building_utility:save",
         "billing:view",
         "billing:generate",
         "billing:manage_payments",
         "payment_overview:view",
+        "building_utility:view",
+        "building_utility:save",
         "settings:user_registration:manage",
         "settings:user_management:view",
         "settings:user_management:assign",
@@ -101,6 +101,7 @@ async function main() {
 
   // 3. Create the default Super Admin User
   console.log("Creating Super Admin User...");
+  const hashedPassword = await bcrypt.hash("Admin@123", 10);
   const superAdminUser = await prisma.user.create({
     data: {
       userId: "mock-super-admin", 
@@ -108,7 +109,8 @@ async function main() {
       name: "Super Admin",
       firstName: "Super",
       lastName: "Admin",
-      phoneNumber: "0900000000",
+      phoneNumber: "0912345678",
+      password: hashedPassword,
       roles: { connect: { id: superAdminRole.id } },
     },
   });
