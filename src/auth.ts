@@ -1,6 +1,11 @@
+
 import NextAuth from 'next-auth';
 import { authConfig } from './auth.config';
 import { databaseService } from '@/lib/services/databaseService';
+import type { User as AuthUser } from 'next-auth';
+import { SignJWT, jwtVerify } from 'jose';
+
+const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
 
 export const {
   handlers: { GET, POST },
@@ -41,14 +46,39 @@ export const {
     async session({ session, token }) {
       // Attach the custom data from the token to the session object
       if (session.user) {
-        session.user.id = token.id;
-        session.user.roles = token.roles;
-        session.user.effectivePermissions = token.effectivePermissions;
+        session.user.id = token.id as string;
+        session.user.roles = token.roles as any[]; // Type assertion for custom prop
+        session.user.effectivePermissions = token.effectivePermissions as string[]; // Type assertion
         if (token.forceChangePass) {
           session.user.forceChangePass = true;
         }
       }
       return session;
+    },
+  },
+  jwt: {
+    // Override the default encode/decode to use standard signed JWTs (JWS)
+    // instead of encrypted JWTs (JWE).
+    async encode({ token, maxAge }) {
+      return await new SignJWT(token!)
+        .setProtectedHeader({ alg: 'HS256' })
+        .setIssuedAt()
+        .setExpirationTime('1d') // Set your desired expiration time
+        .sign(secret);
+    },
+    async decode({ token }) {
+      if (!token) {
+        return null;
+      }
+      try {
+        const { payload } = await jwtVerify(token, secret, {
+          algorithms: ['HS256'],
+        });
+        return payload;
+      } catch (error) {
+        console.error("JWT Decode Error:", error);
+        return null;
+      }
     },
   },
 });

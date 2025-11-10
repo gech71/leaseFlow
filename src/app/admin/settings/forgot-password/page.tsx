@@ -16,6 +16,17 @@ import { usePermissions } from '@/contexts/PermissionContext';
 import { PageHeader } from '@/components/custom/PageHeader';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { resetUserPasswordAction } from '../user-management/actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const forgotPasswordSchema = z.object({
   phoneNumber: z.string().regex(/^(09|07)\d{8}$/, { message: "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678)."}),
@@ -27,6 +38,7 @@ export default function AdminForgotPasswordPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canSendReset = isSuperAdmin || hasPermission('settings:forgot_password:send_reset');
@@ -37,31 +49,7 @@ export default function AdminForgotPasswordPage() {
   });
 
   const handleSendReset = async (values: ForgotPasswordValues) => {
-    if (!canSendReset) {
-        toast({ title: "Permission Denied", description: "You do not have permission to send password resets.", variant: "destructive" });
-        return;
-    }
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/Auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: values.phoneNumber }),
-      });
-      const data = await response.json();
-      if (response.ok && data.isSuccess && data.token) {
-        toast({
-            title: "Redirecting to reset password...",
-        });
-        router.push(`/admin/settings/reset-password?phone=${values.phoneNumber}&token=${data.token}`);
-      } else {
-        toast({ title: "Request Failed", description: data.errors?.join(', ') || "Failed to initiate password reset.", variant: "destructive" });
-      }
-    } catch (error) {
-      toast({ title: "Request Error", description: "Could not connect to the authentication service.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
+    toast({ title: "Functionality Removed", description: "This external password reset flow has been removed. Please use the password reset functionality in User Management.", variant: "destructive" });
   };
 
   return (
@@ -69,16 +57,16 @@ export default function AdminForgotPasswordPage() {
         <PageHeader
             title="Password Reset"
             icon={KeyRound}
-            description="Change user password"
+            description="This page is no longer in use. Please go to User Management to reset a user's password."
             actions={
-            <Link href="/admin/settings" passHref>
+            <Link href="/admin/settings/user-management" passHref>
                 <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+                <ArrowLeft className="mr-2 h-4 w-4" /> Go to User Management
                 </Button>
             </Link>
             }
         />
-        <Card className="w-full max-w-lg mx-auto shadow-lg">
+        <Card className="w-full max-w-lg mx-auto shadow-lg opacity-50 pointer-events-none">
             <CardHeader>
                 <CardTitle>Password Reset</CardTitle>
                 <CardDescription>Enter the user's phone number.</CardDescription>
@@ -95,7 +83,7 @@ export default function AdminForgotPasswordPage() {
                                 <Phone className="mr-2 h-4 w-4 text-primary" /> User's Phone Number
                                 </FormLabel>
                                 <FormControl>
-                                <Input {...field} placeholder="Enter user's phone number" className="text-base" disabled={isLoading || !canSendReset} />
+                                <Input {...field} placeholder="Enter user's phone number" className="text-base" disabled={true} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -103,14 +91,15 @@ export default function AdminForgotPasswordPage() {
                         />
                     </CardContent>
                     <CardFooter>
-                         <Button type="submit" className="w-full" disabled={isLoading || !canSendReset}>
-                            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
+                         <Button type="submit" className="w-full" disabled={true}>
+                            <Send className="mr-2 h-5 w-5" />
                             Next
                         </Button>
                     </CardFooter>
                 </form>
             </Form>
         </Card>
+
     </div>
   );
 }

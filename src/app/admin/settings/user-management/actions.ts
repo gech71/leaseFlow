@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -8,8 +7,8 @@ import { Prisma, type User, type Role } from '@prisma/client';
 import { cookies, headers } from 'next/headers';
 import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 
-const AUTH_API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_API_BASE_URL;
 const ADMIN_ACCESS_TOKEN_KEY = 'nibrental_admin_access_token';
 
 
@@ -19,27 +18,29 @@ export async function getUserManagementPageData() {
 
     let userWhereClause: Prisma.UserWhereInput = {};
 
-    // ** FIX: Corrected filtering logic for non-superadmins **
+    // Non-superadmins can see users they created and tenants in buildings they manage
     if (!isSuperAdmin) {
-        // 1. Get IDs of tenants created by this admin
-        const createdTenants = await prisma.tenant.findMany({
+        const createdUserIds = (await prisma.user.findMany({
             where: { createdById: currentUser.id },
-            select: { userId: true }
-        });
-        
-        // Filter out any null/undefined userIds and create a list of unique IDs
-        const createdTenantUserIds = [...new Set(createdTenants.map(t => t.userId).filter(Boolean) as string[])];
+            select: { id: true }
+        })).map(u => u.id);
 
-        // 2. Build the WHERE clause
-        // A non-superadmin can see:
-        //  - Users they directly created (for staff)
-        //  - Users associated with tenants they created
-        userWhereClause = {
-            OR: [
-                { createdById: currentUser.id },
-                { id: { in: createdTenantUserIds } }
-            ]
-        };
+        const tenantUserIdsInManagedBuildings = (await prisma.tenant.findMany({
+            where: {
+                agreements: {
+                    some: {
+                        space: {
+                            buildingId: { in: managedBuildingIds }
+                        }
+                    }
+                }
+            },
+            select: { userId: true }
+        })).map(t => t.userId).filter((id): id is string => !!id);
+        
+        const allVisibleUserIds = [...new Set([...createdUserIds, ...tenantUserIdsInManagedBuildings])];
+
+        userWhereClause = { id: { in: allVisibleUserIds } };
     }
 
 
@@ -72,7 +73,7 @@ export async function getUserManagementPageData() {
     const allRoles = await databaseService.getAllRoles({ where: roleWhereClause, orderBy: { name: 'asc' } });
     
     // Non-super-admins should only see the buildings they can manage to assign
-    const buildingWhereClause: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds } } : {};
+    const buildingWhereClause: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds ?? [] } } : {};
     const allBuildings = await databaseService.getAllBuildings({ where: buildingWhereClause, orderBy: { name: 'asc' } });
     
     return { success: true, users, allRoles, allBuildings };
@@ -124,7 +125,6 @@ export async function updateUserAssignments(
   }
 }
 
-
 export async function updateUserNamesAction(
   userId: string,
   data: {
@@ -132,42 +132,10 @@ export async function updateUserNamesAction(
     lastName: string;
   }
 ): Promise<{ success: boolean; error?: string }> {
-    if (!AUTH_API_BASE_URL) {
-        console.error("Auth API base URL is not configured.");
-        return { success: false, error: "Authentication service is not configured." };
-    }
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
       return { success: false, error: "Permission denied." };
-    }
-
-    const adminAccessToken = (await cookies()).get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-    if (!adminAccessToken) {
-        return { success: false, error: "Admin authentication token not found." };
-    }
-
-    const localUserToUpdate = await databaseService.getUserById(userId);
-    if (!localUserToUpdate) {
-        return { success: false, error: "User not found." };
-    }
-    
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/update-user`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${adminAccessToken}`,
-        },
-        body: JSON.stringify({
-            phoneNumber: localUserToUpdate.phoneNumber,
-            firstName: data.firstName,
-            lastName: data.lastName,
-        }),
-    });
-
-    if (!externalResponse.ok) {
-        const errorData = await externalResponse.json().catch(() => ({ errors: ["Failed to update user name on identity server."] }));
-        return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred on the identity server.' };
     }
     
     await databaseService.updateUser(userId, {
@@ -176,9 +144,12 @@ export async function updateUserNamesAction(
         name: `${data.firstName} ${data.lastName}`.trim(),
     });
     
-    const tenantProfile = await databaseService.findTenantByEmailOrPhone(localUserToUpdate.email, localUserToUpdate.phoneNumber);
-    if (tenantProfile) {
-        await databaseService.updateTenant(tenantProfile.id, { name: `${data.firstName} ${data.lastName}`.trim() });
+    const localUserToUpdate = await databaseService.getUserById(userId);
+    if (localUserToUpdate) {
+        const tenantProfile = await databaseService.findTenantByEmailOrPhone(localUserToUpdate.email, localUserToUpdate.phoneNumber);
+        if (tenantProfile) {
+            await databaseService.updateTenant(tenantProfile.id, { name: `${data.firstName} ${data.lastName}`.trim() });
+        }
     }
 
     revalidatePath('/admin/settings/user-management');
@@ -195,48 +166,22 @@ export async function changeUserPhoneNumberAction(
   userId: string,
   newPhoneNumber: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (!AUTH_API_BASE_URL) {
-        console.error("Auth API base URL is not configured.");
-        return { success: false, error: "Authentication service is not configured." };
-    }
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
       return { success: false, error: "Permission denied." };
     }
-
-    const adminAccessToken = (await cookies()).get(ADMIN_ACCESS_TOKEN_KEY)?.value;
-    if (!adminAccessToken) {
-        return { success: false, error: "Admin authentication token not found." };
-    }
-
-    const localUserToUpdate = await databaseService.getUserById(userId);
-    if (!localUserToUpdate || !localUserToUpdate.phoneNumber) {
-        return { success: false, error: "User not found or current phone number is missing." };
-    }
-
-    const externalResponse = await fetch(`${AUTH_API_BASE_URL}/api/Auth/change-phone-number`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminAccessToken}`,
-      },
-      body: JSON.stringify({
-        currentPhoneNumber: localUserToUpdate.phoneNumber,
-        newPhoneNumber: newPhoneNumber,
-      }),
-    });
-
-    if (!externalResponse.ok) {
-      const errorData = await externalResponse.json().catch(() => ({ errors: ["Failed to change phone number on identity server."] }));
-      return { success: false, error: errorData.errors?.join(', ') || 'An unknown error occurred.' };
-    }
     
+    const userToUpdate = await databaseService.getUserById(userId);
+    if (!userToUpdate) {
+        return { success: false, error: "User not found." };
+    }
+
     await databaseService.updateUser(userId, {
       phoneNumber: newPhoneNumber,
     });
     
-    const tenantProfile = await databaseService.findTenantByEmailOrPhone(null, localUserToUpdate.phoneNumber);
+    const tenantProfile = await databaseService.findTenantByEmailOrPhone(null, userToUpdate.phoneNumber);
     if (tenantProfile) {
       await databaseService.updateTenant(tenantProfile.id, {
         phone: newPhoneNumber,
@@ -248,7 +193,34 @@ export async function changeUserPhoneNumberAction(
 
   } catch (error: any) {
     console.error("Error in changeUserPhoneNumberAction:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return { success: false, error: "This phone number is already in use by another user." };
+    }
     return { success: false, error: error.message || "Failed to change phone number." };
   }
 }
     
+export async function resetUserPasswordAction(
+  userId: string
+): Promise<{ success: boolean; tempPassword?: string; error?: string }> {
+  try {
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('settings:user_management:assign')) {
+      return { success: false, error: "Permission denied." };
+    }
+    
+    const tempPassword = Math.random().toString(36).slice(-8); // Generate a simple temporary password
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    
+    await databaseService.updateUser(userId, {
+      password: hashedPassword,
+      tempPassword: tempPassword, // Store the plain temporary password
+    });
+    
+    revalidatePath('/admin/settings/user-management');
+    return { success: true, tempPassword };
+  } catch (error: any) {
+    console.error("Error resetting user password:", error);
+    return { success: false, error: "Failed to reset password." };
+  }
+}

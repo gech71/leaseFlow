@@ -1,3 +1,4 @@
+
 "use server";
 
 import { auth, signOut } from "@/auth";
@@ -49,3 +50,4 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
     return { success: false, error: "An unexpected server error occurred." };
   }
 }
+
