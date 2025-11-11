@@ -64,17 +64,15 @@ export async function getUserManagementPageData() {
     });
 
     // Apply role filtering logic
-    let roleWhereClause: Prisma.RoleWhereInput = {
-        name: {
-            notIn: ['SUPER_ADMIN', 'TENANT']
-        }
-    };
+    let roleWhereClause: Prisma.RoleWhereInput = {};
     if (!isSuperAdmin) {
         // Normal users can only assign roles they have created.
         roleWhereClause = { 
-          ...roleWhereClause,
-          createdById: currentUser.id 
-      };
+            name: {
+                notIn: ['SUPER_ADMIN', 'TENANT']
+            },
+            createdById: currentUser.id 
+        };
     }
     const allRoles = await databaseService.getAllRoles({ where: roleWhereClause, orderBy: { name: 'asc' } });
     
@@ -229,3 +227,4 @@ export async function resetUserPasswordAction(
     return { success: false, error: "Failed to reset password." };
   }
 }
+
