@@ -17,7 +17,6 @@ export default function SettingsPage() {
   const canManageRoleManagement = isSuperAdmin || hasAnyPermission(['settings:role_management:view', 'settings:role_management:manage']);
   const canManageAgreementTemplates = isSuperAdmin || hasAnyPermission(['settings:agreement_templates:manage']);
   const canManageEmailConfig = isSuperAdmin || hasAnyPermission(['settings:email_configuration:view', 'settings:email_configuration:manage']);
-  const canSendPasswordReset = isSuperAdmin || hasAnyPermission(['settings:forgot_password:send_reset']);
   const canManageImport = isSuperAdmin || hasAnyPermission(['import:manage']);
 
   return (
@@ -135,29 +134,6 @@ export default function SettingsPage() {
             </Link>
           </CardFooter>
         </Card>
-      )}
-
-      {canSendPasswordReset && (
-       <Card className="flex flex-col">
-        <CardHeader>
-          <CardTitle className="font-headline">Forgot Password</CardTitle>
-          <CardDescription>
-            Help a user who has forgotten their password.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-grow">
-          <p className="text-sm text-muted-foreground mb-4">
-            Change user password
-          </p>
-        </CardContent>
-        <CardFooter>
-          <Link href="/admin/settings/forgot-password" passHref>
-            <Button>
-              <KeyRound className="mr-2 h-4 w-4" /> Go to Forgot Password
-            </Button>
-          </Link>
-        </CardFooter>
-      </Card>
       )}
       
       {canManageImport && (
