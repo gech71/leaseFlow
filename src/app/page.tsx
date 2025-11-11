@@ -44,44 +44,30 @@ export default function RootPage() {
     }
   }, [status, router]);
 
-  useEffect(() => {
-    // This effect runs when the page loads, checking for an error in the URL.
-    const authError = searchParams.get("error");
-    if (authError) {
-      // Decode the error message from the URL
-      const decodedError = decodeURIComponent(authError);
-      
-      // NextAuth.js will put "CredentialsSignin" in the URL, but the actual detailed
-      // error message from our `authorize` function is available in the `errorMessage` parameter.
-      const detailedErrorMessage = searchParams.get("errorMessage");
-
-      if (detailedErrorMessage) {
-        setError(decodeURIComponent(detailedErrorMessage));
-      } else if (authError === "CredentialsSignin") {
-        setError("Invalid phone number or password.");
-      } else {
-        setError(decodedError);
-      }
-    }
-  }, [searchParams]);
-
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
-    // No try-catch needed here, as we are letting NextAuth handle the redirect
-    // and the error will be caught by the useEffect hook above.
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       phone,
       password,
-      callbackUrl: '/admin/dashboard', // Let NextAuth handle the redirect on success
-      // On error, NextAuth will redirect back to this page with an `error` query param.
+      redirect: false, // Important: prevent auto-redirect
     });
 
-    // If signIn fails, it won't proceed here. We set isLoading to false
-    // only in the case where the user might navigate back before the redirect completes.
-    setIsLoading(false);
+    if (result?.error) {
+      // The `error` property from `signIn` contains the message from the authorize function
+      setError(result.error);
+      setIsLoading(false);
+    } else if (result?.ok) {
+      // On success, manually redirect.
+      // The middleware will handle the forceChangePass redirect if needed.
+      router.replace('/admin/dashboard');
+    } else {
+      // Fallback for other unexpected issues
+      setError("An unexpected error occurred. Please try again.");
+      setIsLoading(false);
+    }
   };
 
   // If session status is loading or already authenticated, show a loading screen
