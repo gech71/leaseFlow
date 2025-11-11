@@ -23,6 +23,8 @@ export default auth((req) => {
   `;
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', cspHeader.replace(/\s{2,}/g, ' ').trim());
+
 
   let response = NextResponse.next({
     request: {
@@ -50,9 +52,15 @@ export default auth((req) => {
     response = NextResponse.redirect(new URL("/", nextUrl));
   }
 
-  response.headers.set('Content-Security-Policy', cspHeader.replace(/\s{2,}/g, ' ').trim());
-
-  return response;
+  // Move the CSP header setting to be part of the final response
+  const finalHeaders = new Headers(response.headers);
+  finalHeaders.set('Content-Security-Policy', cspHeader.replace(/\s{2,}/g, ' ').trim());
+  
+  return new NextResponse(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: finalHeaders,
+  });
 });
 
 export const config = {
