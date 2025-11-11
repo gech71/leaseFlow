@@ -18,11 +18,18 @@ export async function getAllRolesAction(): Promise<{ success: boolean, roles?: R
   try {
     const { isSuperAdmin, currentUser } = await getUserAndPermissions();
     
-    let whereClause: Prisma.RoleWhereInput = {};
-    // SuperAdmins can see all roles.
-    // Non-super-admins only see roles they have created. System roles (createdById: null) are hidden from them.
+    let whereClause: Prisma.RoleWhereInput = {
+        name: {
+            notIn: ['SUPER_ADMIN', 'TENANT']
+        }
+    };
+    
+    // Non-super-admins only see roles they have created.
     if (!isSuperAdmin) {
-      whereClause = { createdById: currentUser.id };
+      whereClause = { 
+        ...whereClause,
+        createdById: currentUser.id 
+      };
     }
     
     const roles = await databaseService.getAllRoles({ where: whereClause, orderBy: { name: 'asc' } });
