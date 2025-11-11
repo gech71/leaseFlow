@@ -18,16 +18,14 @@ export async function getAllRolesAction(): Promise<{ success: boolean, roles?: R
   try {
     const { isSuperAdmin, currentUser } = await getUserAndPermissions();
     
-    let whereClause: Prisma.RoleWhereInput = {
-        name: {
-            notIn: ['SUPER_ADMIN', 'TENANT']
-        }
-    };
+    let whereClause: Prisma.RoleWhereInput = {};
     
-    // Non-super-admins only see roles they have created.
+    // Non-super-admins only see roles they have created, and not the system defaults.
     if (!isSuperAdmin) {
       whereClause = { 
-        ...whereClause,
+        name: {
+            notIn: ['SUPER_ADMIN', 'TENANT']
+        },
         createdById: currentUser.id 
       };
     }

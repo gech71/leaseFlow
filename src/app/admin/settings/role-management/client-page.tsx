@@ -58,7 +58,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const [roleToDelete, setRoleToDelete] = useState<ClientRole | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(3);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   const { hasPermission: contextHasPermission, isSuperAdmin } = usePermissions(); 
   const canManageRoles = isSuperAdmin || contextHasPermission('settings:role_management:manage');
@@ -247,27 +247,33 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedRoles.map((role) => (
-                    <TableRow key={role.id}>
-                      <TableCell className="font-medium">{role.name.replace(/_/g, ' ')}</TableCell>
-                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-xs truncate">{role.description || "-"}</TableCell>
-                      <TableCell>
-                        {role.permissions.length > 0 ? (
-                          <Badge variant="secondary" className="text-xs">{role.permissions.length} assigned</Badge>
-                        ) : <span className="text-xs text-muted-foreground italic">None</span>}
-                      </TableCell>
-                      <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
-                            {canManageRoles ? <Edit className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
-                          </Button>
-                        {canManageRoles && (
-                            <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || role.name === 'SUPER_ADMIN' || role.name === 'PROPERTY_MANAGER' || role.name === 'ACCOUNTANT' || role.name === 'SUPPORT_STAFF'}>
+                  {paginatedRoles.map((role) => {
+                    const isSystemRole = role.name === 'SUPER_ADMIN' || role.name === 'TENANT';
+                    const canEditThisRole = canManageRoles && !isSystemRole;
+                    const canDeleteThisRole = canManageRoles && !isSystemRole;
+
+                    return (
+                      <TableRow key={role.id}>
+                        <TableCell className="font-medium">{role.name.replace(/_/g, ' ')}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-xs truncate">{role.description || "-"}</TableCell>
+                        <TableCell>
+                          {role.name === 'SUPER_ADMIN' ? (
+                            <Badge variant="default" className="text-xs">All</Badge>
+                          ) : role.permissions.length > 0 ? (
+                            <Badge variant="secondary" className="text-xs">{role.permissions.length} assigned</Badge>
+                          ) : <span className="text-xs text-muted-foreground italic">None</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
+                              {canEditThisRole ? <Edit className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || !canDeleteThisRole}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -296,10 +302,10 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
               <div>
                 <FormLabel htmlFor="roleName">Role Name<span className="text-destructive ml-1">*</span></FormLabel>
                 <FormControl>
-                  <Input id="roleName" {...form.register("name")} placeholder="ROLE_NAME" className="mt-1" disabled={isSaving || !canManageRoles || (formMode === 'edit' && (currentRoleForForm?.name === 'SUPER_ADMIN' || currentRoleForForm?.name === 'PROPERTY_MANAGER' || currentRoleForForm?.name === 'ACCOUNTANT' || currentRoleForForm?.name === 'SUPPORT_STAFF'))} />
+                  <Input id="roleName" {...form.register("name")} placeholder="ROLE_NAME" className="mt-1" disabled={isSaving || !canManageRoles || formMode === 'edit'} />
                 </FormControl>
                 <FormMessage>{form.formState.errors.name?.message}</FormMessage>
-                <p className="text-xs text-muted-foreground mt-1">Must be uppercase with underscores (e.g., BILLING_CLERK). System roles (SUPER_ADMIN, PROPERTY_MANAGER, ACCOUNTANT, SUPPORT_STAFF) cannot have their names changed.</p>
+                <p className="text-xs text-muted-foreground mt-1">Must be uppercase with underscores (e.g., BILLING_CLERK). Role name cannot be changed after creation.</p>
               </div>
               <div>
                 <FormLabel htmlFor="roleDescription">Description (Optional)</FormLabel>
