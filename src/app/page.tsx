@@ -44,30 +44,35 @@ export default function RootPage() {
     }
   }, [status, router]);
 
+  useEffect(() => {
+    const authError = searchParams.get('error');
+    if (authError === 'CredentialsSignin') {
+      setError("Invalid credentials. Please check your phone number and password.");
+    } else if (authError) {
+      setError("An unknown authentication error occurred.");
+    }
+  }, [searchParams]);
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
+    // This will now redirect by default, and the useEffect above will catch any errors on the redirected page.
+    await signIn("credentials", {
       phone,
       password,
-      redirect: false, // Important: prevent auto-redirect
+      callbackUrl: '/admin/dashboard', // Explicitly define success redirect
     });
-
-    if (result?.error) {
-      // The `error` property from `signIn` contains the message from the authorize function
-      setError(result.error);
-      setIsLoading(false);
-    } else if (result?.ok) {
-      // On success, manually redirect.
-      // The middleware will handle the forceChangePass redirect if needed.
-      router.replace('/admin/dashboard');
-    } else {
-      // Fallback for other unexpected issues
-      setError("An unexpected error occurred. Please try again.");
-      setIsLoading(false);
-    }
+    
+    // If signIn fails, it will redirect back here with an error param. If it's still loading, it's because a redirect is in progress.
+    // We set a timeout to handle cases where the redirect doesn't happen, e.g., network error.
+    setTimeout(() => {
+        if (isLoading) {
+            setIsLoading(false);
+            setError("Login failed. Please try again.");
+        }
+    }, 5000);
   };
 
   // If session status is loading or already authenticated, show a loading screen
