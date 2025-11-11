@@ -59,16 +59,22 @@ export async function getUserManagementPageData() {
         updatedAt: true,
         roles: true, 
         managedBuildings: true,
-        createdUsers: true,
       },
       orderBy: { createdAt: 'desc' }
     });
 
     // Apply role filtering logic
-    let roleWhereClause: Prisma.RoleWhereInput = {};
+    let roleWhereClause: Prisma.RoleWhereInput = {
+        name: {
+            notIn: ['SUPER_ADMIN', 'TENANT']
+        }
+    };
     if (!isSuperAdmin) {
         // Normal users can only assign roles they have created.
-        roleWhereClause = { createdById: currentUser.id };
+        roleWhereClause = { 
+          ...whereClause,
+          createdById: currentUser.id 
+      };
     }
     const allRoles = await databaseService.getAllRoles({ where: roleWhereClause, orderBy: { name: 'asc' } });
     
