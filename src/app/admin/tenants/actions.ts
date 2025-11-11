@@ -207,11 +207,10 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         const user = await databaseService.findUserByPhoneNumber(phone, { roles: true });
         
         if (user) {
-            // Check if the user has any roles other than 'TENANT'.
             const hasOtherRoles = user.roles.some(role => role.name !== 'TENANT');
             
             if (hasOtherRoles) {
-                return { success: false, error: "This phone number belongs to a staff member, not a tenant. Please use a different phone number." };
+                return { success: false, error: "Tenant not found." };
             }
 
             const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
@@ -224,7 +223,7 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
                 } 
             };
         }
-        return { success: false, error: "No user found with this phone number. Please register them first." };
+        return { success: false, error: "Tenant not found." };
     } catch (error: any) {
         return { success: false, error: "An internal error occurred." };
     }
