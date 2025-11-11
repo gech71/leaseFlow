@@ -10,7 +10,7 @@ if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('NEXTAUTH_SECRET must be set and be at least 32 characters long in production.');
   } else {
-    console.warn('WARN: NEXTAUTH_SECRET is not set or is not long enough. This is not secure for production.');
+    console.warn('NEXTAUTH_SECRET is not set.');
   }
 }
 
