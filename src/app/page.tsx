@@ -45,11 +45,10 @@ export default function RootPage() {
   }, [status, router]);
 
   useEffect(() => {
+    // This effect can handle other generic errors if NextAuth does redirect.
     const authError = searchParams.get('error');
-    if (authError === 'CredentialsSignin') {
-      setError("Invalid credentials. Please check your phone number and password.");
-    } else if (authError) {
-      setError("An unknown authentication error occurred.");
+    if (authError && authError !== 'CredentialsSignin') {
+      setError("An unexpected authentication error occurred. Please try again.");
     }
   }, [searchParams]);
 
@@ -58,21 +57,24 @@ export default function RootPage() {
     setIsLoading(true);
     setError(null);
 
-    // This will now redirect by default, and the useEffect above will catch any errors on the redirected page.
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       phone,
       password,
-      callbackUrl: '/admin/dashboard', // Explicitly define success redirect
+      redirect: false, // Prevent redirect to handle the response directly
     });
-    
-    // If signIn fails, it will redirect back here with an error param. If it's still loading, it's because a redirect is in progress.
-    // We set a timeout to handle cases where the redirect doesn't happen, e.g., network error.
-    setTimeout(() => {
-        if (isLoading) {
-            setIsLoading(false);
-            setError("Login failed. Please try again.");
-        }
-    }, 5000);
+
+    setIsLoading(false);
+
+    if (result?.error) {
+      // The `error` property contains the exact message from the `authorize` function
+      setError(result.error);
+    } else if (result?.ok) {
+      // On success, manually redirect
+      router.push('/admin/dashboard');
+    } else {
+      // Fallback for other unexpected errors
+      setError("An unknown error occurred during login. Please try again.");
+    }
   };
 
   // If session status is loading or already authenticated, show a loading screen
