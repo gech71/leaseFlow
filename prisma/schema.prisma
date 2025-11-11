@@ -1,36 +1,40 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
+// User and authentication models
 model User {
-  id                  String    @id @default(cuid())
-  email               String    @unique
-  name                String
+  id                  String                @id @default(cuid())
+  email               String                @unique
+  name                String?
   firstName           String?
   lastName            String?
-  phoneNumber         String?   @unique
+  phoneNumber         String?               @unique
   password            String?
   tempPassword        String?
-  failedLoginAttempts Int       @default(0)
+  failedLoginAttempts Int                   @default(0)
   lockedUntil         DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  roles             Role[]              @relation("UserRoles")
-  createdRoles      Role[]              @relation("CreatedRoles")
-  createdTenants    Tenant[]            @relation("CreatedTenants")
-  tenant            Tenant?             @relation("TenantProfile")
-  createdAgreements AgreementTemplate[]
-  managedBuildings  Building[]
-  DisabledAgreement DisabledAgreement[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime?             @updatedAt
+  roles               Role[]
+  createdById         String?
+  createdBy           User?                 @relation("UserCreations", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers        User[]                @relation("UserCreations")
+  createdRoles        Role[]                @relation("RoleCreations")
+  createdTenants      Tenant[]              @relation("TenantCreations")
+  tenant              Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId            String?               @unique
+  createdAgreements   AgreementTemplate[]
+  managedBuildings    Building[]            @relation("BuildingManagers")
+  DisabledAgreement   DisabledAgreement[]
 }
 
 model Role {
@@ -38,199 +42,164 @@ model Role {
   name        String   @unique
   description String?
   permissions String[]
-  users       User[]   @relation("UserRoles")
-  createdAt   DateTime @default(now())
-
-  // Relation to the user who created this role
+  users       User[]
   createdById String?
-  createdBy   User?   @relation("CreatedRoles", fields: [createdById], references: [id])
+  createdBy   User?    @relation("RoleCreations", fields: [createdById], references: [id], onDelete: SetNull)
 }
 
-model Tenant {
-  id                  String       @id @default(cuid())
-  name                String
-  email               String       @unique
-  phone               String?      @unique
-  alternativePhone    String?
-  nationalId          String?
-  representativeName  String?
-  representativePhone String?
-  status              TenantStatus @default(Active)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-
-  // Relation to the User model for login
-  user   User?   @relation("TenantProfile", fields: [userId], references: [id])
-  userId String? @unique
-
-  // Relation for tracking who created the tenant
-  createdById String?
-  createdBy   User?   @relation("CreatedTenants", fields: [createdById], references: [id])
-
-  // Relation to the rented space (one-to-one)
-  rentedSpace Space?
-
-  // Relation to Agreements (one-to-many)
-  agreements Agreement[]
-  bills      Bill[]
-}
-
+// Core business models
 model Building {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  address       String?
-  accountNumber String
-  status        BuildingStatus @default(Active)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  managers                 User[]
-  spaces                   Space[]
-  penaltyPolicyTiers       PenaltyTier[]
+  id                      String                     @id @default(cuid())
+  name                    String                     @unique
+  address                 String?
+  accountNumber           String
+  status                  BuildingStatus             @default(Active)
+  penaltyPolicyTiers      PenaltyTier[]
+  spaces                  Space[]
   buildingMonthlyUtilities BuildingMonthlyUtilities[]
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime?                  @updatedAt
+  managers                User[]                     @relation("BuildingManagers")
 }
 
 model Space {
-  id                    String   @id @default(cuid())
+  id                    String      @id @default(cuid())
+  buildingId            String
+  building              Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  buildingName          String
   spaceIdName           String
-  area                  Decimal
+  area                  Decimal     @db.Decimal(10, 2)
   floor                 String
-  utilityProrationShare Decimal  @default(0)
-  monthlyRentalPrice    Decimal
-  isOccupied            Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  utilityProrationShare Decimal     @default(0) @db.Decimal(5, 4) // e.g., 0.05 for 5%
+  monthlyRentalPrice    Decimal     @db.Decimal(12, 2)
+  isOccupied            Boolean     @default(false)
+  tenantId              String?     @unique
+  tenant                Tenant?     @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  agreements            Agreement[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime?   @updatedAt
 
-  building     Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  buildingId   String
-  buildingName String
+  @@unique([buildingId, spaceIdName])
+}
 
-  // One-to-one relation with Tenant
-  tenantId String? @unique
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-
-  agreements Agreement[]
+model Tenant {
+  id                  String      @id @default(cuid())
+  name                String
+  email               String      @unique
+  phone               String      @unique
+  alternativePhone    String?
+  nationalId          String?     @unique
+  representativeName  String?
+  representativePhone String?
+  userId              String?     @unique
+  user                User?
+  rentedSpaceId       String?     @unique
+  rentedSpace         Space?      @relation(fields: [rentedSpaceId], references: [id], onDelete: SetNull)
+  agreements          Agreement[]
+  bills               Bill[]
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime?   @updatedAt
+  createdById         String?
+  createdBy           User?       @relation("TenantCreations", fields: [createdById], references: [id], onDelete: SetNull)
 }
 
 model Agreement {
-  id                   String    @id @default(cuid())
-  agreementText        String    @db.Text
-  startDate            DateTime
-  monthlyRentalPrice   Decimal
-  paymentTermMonths    Int
-  initialPaymentMonths Int
-  nextPaymentDueDate   DateTime
-  additionalTerms      String?   @db.Text
-  endDate              DateTime?
+  id                       String               @id @default(cuid())
+  tenantId                 String
+  tenant                   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  spaceId                  String
+  space                    Space                @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  agreementText            String
+  startDate                DateTime
+  paymentTermMonths        Int
+  initialPaymentMonths     Int                  @default(1)
+  nextPaymentDueDate       DateTime
+  monthlyRentalPrice       Decimal              @db.Decimal(12, 2)
+  additionalTerms          String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime?            @updatedAt
+  endDate                  DateTime?
+  initialPaymentAmount     Decimal?             @db.Decimal(12, 2)
+  initialPaymentDate       DateTime?
+  bills                    Bill[]
+  disabledAgreements       DisabledAgreement[]
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model DisabledAgreement {
+  agreementId  String
+  disabledById String
+  agreement    Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  disabledBy   User      @relation(fields: [disabledById], references: [id], onDelete: Cascade)
 
-  // Fields for initial payment
-  initialPaymentAmount Decimal?
-  initialPaymentDate   DateTime?
-
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-  space    Space  @relation(fields: [spaceId], references: [id])
-  spaceId  String
-
-  bills              Bill[]
-  disabledAgreements DisabledAgreement[]
-
-  @@unique([tenantId, spaceId, startDate])
+  @@id([agreementId, disabledById])
 }
 
 model Bill {
-  id               String     @id @default(cuid())
-  billDate         DateTime
-  dueDate          DateTime
-  rentAmount       Decimal
-  utilityBreakdown Json?
-  penaltyAmount    Decimal?
-  totalAmount      Decimal
-  status           BillStatus @default(Pending)
-
+  id                     String                 @id @default(cuid())
+  agreementId            String
+  agreement              Agreement              @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  tenantId               String
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  billDate               DateTime
+  dueDate                DateTime
+  rentAmount             Decimal                @db.Decimal(12, 2)
+  utilityBreakdown       Json?
+  penaltyAmount          Decimal?               @db.Decimal(12, 2)
+  totalAmount            Decimal                @db.Decimal(12, 2)
+  status                 BillStatus             @default(Pending)
   paymentDate            DateTime?
   paymentMethod          String?
   paymentReference       String?
   paymentProofUrl        String?
   paymentProofDataUri    String?
-  tenantPaymentNotes     String?
   adminVerifiedPayment   Boolean?
+  tenantPaymentNotes     String?
   adminVerificationNotes String?
+  arifPayments           ArifPayment[]
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime?              @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  agreement   Agreement @relation(fields: [agreementId], references: [id])
-  agreementId String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
-  tenantId    String
-}
-
-// A join table for many-to-many relationship between Admins and disabled Agreements
-model DisabledAgreement {
-  agreementId  String
-  disabledById String
-
-  agreement  Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
-  disabledBy User      @relation(fields: [disabledById], references: [id])
-
-  @@id([agreementId, disabledById])
+  @@index([status])
+  @@index([dueDate])
 }
 
 model BuildingMonthlyUtilities {
-  id           String   @id @default(cuid())
+  id           String                  @id @default(cuid())
   buildingId   String
+  building     Building                @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   buildingName String
   year         Int
-  month        Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  building  Building              @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  utilities BuildingUtilityItem[]
+  month        Int // 0-11 for Jan-Dec
+  utilities    BuildingUtilityItem[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime?               @updatedAt
 
   @@unique([buildingId, year, month])
 }
 
 model BuildingUtilityItem {
-  id                     String    @id @default(cuid())
-  name                   String
-  totalCost              Decimal
-  appliesToScope         ScopeType @default(Building)
-  applicableFloor        String?
-  applicableSpaceIdNames String[]  @default([])
-
-  monthlyUtilities   BuildingMonthlyUtilities @relation(fields: [monthlyUtilitiesId], references: [id], onDelete: Cascade)
-  monthlyUtilitiesId String
+  id                     String                   @id @default(cuid())
+  name                   String // e.g., "Electricity", "Water"
+  totalCost              Decimal                  @db.Decimal(12, 2)
+  appliesToScope         UtilityScope
+  applicableFloor        String? // Used if scope is 'Floor'
+  applicableSpaceIdNames String[] // Used if scope is 'SpecificSpaces'
+  monthlyUtilitiesId     String
+  monthlyUtilities       BuildingMonthlyUtilities @relation(fields: [monthlyUtilitiesId], references: [id], onDelete: Cascade)
 }
 
 model PenaltyTier {
-  id                     String           @id @default(cuid())
-  fromDay                Int
-  toDay                  Int?
+  id                     String       @id @default(cuid())
+  buildingId             String
+  building               Building     @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  fromDay                Int // Penalty starts from this day
+  toDay                  Int? // Penalty ends on this day (inclusive). Null means indefinitely.
   penaltyType            PenaltyType
-  feeValue               Decimal
   frequency              PenaltyFrequency
-  scope                  ScopeType        @default(Building)
+  feeValue               Decimal      @db.Decimal(12, 2) // Either a fixed amount or a percentage
+  scope                  PenaltyScope
   applicableFloor        String?
-  applicableSpaceIdNames String[]         @default([])
-
-  buildingId String
-  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-}
-
-model AgreementTemplate {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  content   String   @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
+  applicableSpaceIdNames String[]
 }
 
 model Secret {
@@ -238,19 +207,40 @@ model Secret {
   value String
 }
 
+model AgreementTemplate {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  content     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+}
+
 model ArifPayment {
-  id        String   @id @default(cuid())
-  sessionId String   @unique
-  status    String // e.g., 'Pending', 'Success', 'Failed'
-  billId    String
-  amount    Decimal
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String     @id @default(cuid())
+  billId          String
+  bill            Bill       @relation(fields: [billId], references: [id], onDelete: Cascade)
+  sessionId       String     @unique // The unique ID for the ArifPay checkout session
+  transactionId   String? // The final transaction ID from ArifPay after completion
+  status          ArifPayStatus @default(Pending)
+  amount          Decimal    @db.Decimal(12, 2)
+  paymentMethod   String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
 
-  transactionId String?
-  paymentMethod String?
+// Enums
+enum BillStatus {
+  Pending
+  Paid
+  Overdue
+  PendingVerification
+}
 
-  @@index([sessionId])
+enum BuildingStatus {
+  Active
+  Inactive
 }
 
 enum TenantStatus {
@@ -258,11 +248,10 @@ enum TenantStatus {
   Inactive
 }
 
-enum BillStatus {
-  Pending
-  Paid
-  Overdue
-  PendingVerification
+enum UtilityScope {
+  Building
+  Floor
+  SpecificSpaces
 }
 
 enum PenaltyType {
@@ -275,13 +264,16 @@ enum PenaltyFrequency {
   Daily
 }
 
-enum ScopeType {
+enum PenaltyScope {
   Building
   Floor
   SpecificSpaces
 }
 
-enum BuildingStatus {
-  Active
-  Inactive
+enum ArifPayStatus {
+  Pending
+  Success
+  Failed
+  Cancelled
+  Expired
 }

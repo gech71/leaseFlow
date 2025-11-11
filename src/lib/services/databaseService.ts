@@ -321,24 +321,35 @@ export class DatabaseService {
     return prisma.user.update({ where: { id }, data });
   }
 
-  async deleteUser(id: string): Promise<User> { 
-    const userWithBuildings = await prisma.user.findUnique({
-      where: { id },
-      include: { managedBuildings: { select: { id: true } } },
+  async deleteUser(id: string): Promise<User> {
+    // Manually handle disconnecting relations before deleting the user.
+    await prisma.user.update({
+        where: { id },
+        data: {
+            managedBuildings: { set: [] },
+            createdRoles: {
+                updateMany: {
+                    where: { createdById: id },
+                    data: { createdById: null }
+                }
+            },
+            createdTenants: {
+                updateMany: {
+                    where: { createdById: id },
+                    data: { createdById: null }
+                }
+            },
+            createdUsers: {
+                updateMany: {
+                    where: { createdById: id },
+                    data: { createdById: null }
+                }
+            },
+        }
     });
-
-    if (userWithBuildings && userWithBuildings.managedBuildings.length > 0) {
-      await prisma.user.update({
-          where: { id },
-          data: {
-              managedBuildings: {
-                  set: []
-              }
-          }
-      });
-    }
     return prisma.user.delete({ where: { id } });
   }
+
 
   // --- Role ---
   async createRole(data: Prisma.RoleCreateInput): Promise<Role> {
