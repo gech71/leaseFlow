@@ -13,7 +13,7 @@ export function AppLogo() {
   return (
     <Link href="/admin/dashboard" className="flex items-center gap-2 text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors w-full">
       <Image 
-        src="https://i.imgur.com/JTzGpIH.png"
+        src="/images/Nibtera.png"
         alt="Building Management Solution Logo" 
         width={40}
         height={40}
