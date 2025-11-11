@@ -9,7 +9,7 @@ import { addMonths, isAfter } from 'date-fns';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/services/emailService';
 import { getUserAndPermissions, getUserAndManagedIds } from '@/lib/actions/server-helpers';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 function generateTempPassword(length = 12): string {
     const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -22,23 +22,19 @@ function generateTempPassword(length = 12): string {
     const randomValues = new Uint32Array(length);
     crypto.getRandomValues(randomValues);
 
-    // Ensure at least one of each character type
     password += upper[randomValues[0] % upper.length];
     password += lower[randomValues[1] % lower.length];
     password += numbers[randomValues[2] % numbers.length];
     password += symbols[randomValues[3] % symbols.length];
 
-    // Fill the rest of the password
     for (let i = 4; i < length; i++) {
         password += allChars[randomValues[i] % allChars.length];
     }
     
-    // Shuffle the password to avoid predictable patterns
     return password.split('').sort(() => 0.5 - (crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296)).join('');
 }
 
 
-// This function now expects password and will trigger user registration
 export async function createTenantAction(data: {
   name: string;
   email: string;
@@ -63,7 +59,6 @@ export async function createTenantAction(data: {
       };
     }
 
-    // --- Step 2: Check for an existing User account ---
     const existingUser = await databaseService.findUserByEmailOrPhone(data.email, data.phone);
 
     let userForTenant: PrismaUser;
@@ -83,8 +78,8 @@ export async function createTenantAction(data: {
             firstName: data.name.split(' ')[0] || data.name,
             lastName: data.name.split(' ').slice(1).join(' ') || 'Tenant',
             phoneNumber: data.phone,
-            password: null, // Set main password to null
-            tempPassword: tempPassword, // Store the plain temp password
+            password: null, 
+            tempPassword: tempPassword, 
             roles: { connect: { id: tenantRole.id } },
         });
         
@@ -111,13 +106,12 @@ export async function createTenantAction(data: {
       representativeName: data.representativeName,
       representativePhone: data.representativePhone,
       user: { connect: { id: userForTenant.id } },
-      createdBy: { connect: { id: adminUser.id } }, // Associate tenant with creator
+      createdBy: { connect: { id: adminUser.id } }, 
     });
 
     revalidatePath('/admin/tenants');
     return { success: true, tenant: newTenant, tempPassword: tempPassword };
   } catch (error: any) {
-    console.error("Error creating tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const target = (error.meta?.target as string[]) || [];
       const fieldName = target.join(', ');
@@ -137,7 +131,6 @@ export async function updateTenantAction(
     revalidatePath('/admin/tenants');
     return { success: true, tenant: updatedTenant };
   } catch (error: any) {
-    console.error("Error updating tenant:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         const target = (error.meta?.target as string[]) || [];
@@ -155,7 +148,6 @@ export async function updateTenantAction(
 
 export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Active' | 'Inactive'): Promise<{ success: boolean; error?: string }> {
   try {
-    // This is the corrected line. We need the full user object with permissions.
     const { currentUser, isSuperAdmin, permissions } = await getUserAndPermissions();
     const { managedBuildingIds } = await getUserAndManagedIds();
 
@@ -163,12 +155,11 @@ export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Act
         return { success: false, error: "You do not have permission to change a tenant's status." };
     }
     
-    // Find all agreements for the tenant within the admin's managed buildings.
     const agreements = await prisma.agreement.findMany({
         where: {
             tenantId: tenantId,
             space: {
-                buildingId: { in: managedBuildingIds ?? undefined } // Super admin has no buildingId filter
+                buildingId: { in: managedBuildingIds ?? undefined } 
             }
         },
         select: { id: true }
@@ -177,18 +168,16 @@ export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Act
     const agreementIds = agreements.map(a => a.id);
 
     if (newStatus === 'Inactive') {
-        // Create DisabledAgreement records for all relevant agreements.
         if (agreementIds.length > 0) {
             await prisma.disabledAgreement.createMany({
                 data: agreementIds.map(agreementId => ({
                     agreementId: agreementId,
                     disabledById: currentUser.id
                 })),
-                skipDuplicates: true // Ignore if a record already exists
+                skipDuplicates: true 
             });
         }
-    } else { // 'Active'
-        // Delete DisabledAgreement records for the relevant agreements created by this admin.
+    } else { 
         if (agreementIds.length > 0) {
              await prisma.disabledAgreement.deleteMany({
                 where: {
@@ -203,7 +192,6 @@ export async function toggleTenantStatusAction(tenantId: string, newStatus: 'Act
     return { success: true };
 
   } catch (error: any) {
-    console.error(`Error changing tenant ${tenantId} status to ${newStatus}:`, error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return { success: false, error: "Tenant not found." };
     }
@@ -217,8 +205,15 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
     }
     try {
         const user = await databaseService.findUserByPhoneNumber(phone, { roles: true });
+        
         if (user) {
-            // No need to check for tenant role here. Any user can become a tenant.
+            // Check if the user has any roles other than 'TENANT'.
+            const hasOtherRoles = user.roles.some(role => role.name !== 'TENANT');
+            
+            if (hasOtherRoles) {
+                return { success: false, error: "This phone number belongs to a staff member, not a tenant. Please use a different phone number." };
+            }
+
             const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
             return { 
                 success: true, 
@@ -231,7 +226,6 @@ export async function findUserByPhoneAction(phone: string): Promise<{ success: b
         }
         return { success: false, error: "No user found with this phone number. Please register them first." };
     } catch (error: any) {
-        console.error("Error finding user by phone:", error);
         return { success: false, error: "An internal error occurred." };
     }
 }
