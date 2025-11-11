@@ -204,6 +204,33 @@ export async function changeUserPhoneNumberAction(
   }
 }
     
+function generateTempPassword(length = 12): string {
+    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lower = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    const allChars = upper + lower + numbers + symbols;
+
+    let password = '';
+    const randomValues = new Uint32Array(length);
+    crypto.getRandomValues(randomValues);
+
+    // Ensure at least one of each character type
+    password += upper[randomValues[0] % upper.length];
+    password += lower[randomValues[1] % lower.length];
+    password += numbers[randomValues[2] % numbers.length];
+    password += symbols[randomValues[3] % symbols.length];
+
+    // Fill the rest of the password
+    for (let i = 4; i < length; i++) {
+        password += allChars[randomValues[i] % allChars.length];
+    }
+    
+    // Shuffle the password to avoid predictable patterns
+    return password.split('').sort(() => 0.5 - (crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296)).join('');
+}
+
+
 export async function resetUserPasswordAction(
   userId: string
 ): Promise<{ success: boolean; tempPassword?: string; error?: string }> {
@@ -213,7 +240,7 @@ export async function resetUserPasswordAction(
       return { success: false, error: "Permission denied." };
     }
     
-    const tempPassword = crypto.randomUUID().slice(0, 8); // Generate a simple temporary password
+    const tempPassword = generateTempPassword();
     
     await databaseService.updateUser(userId, {
       password: null, // Remove the main password
@@ -227,4 +254,3 @@ export async function resetUserPasswordAction(
     return { success: false, error: "Failed to reset password." };
   }
 }
-
