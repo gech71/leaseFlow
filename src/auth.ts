@@ -10,7 +10,7 @@ if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('NEXTAUTH_SECRET must be set and be at least 32 characters long in production.');
   } else {
-    console.warn('NEXTAUTH_SECRET is not set.');
+    console.warn('WARN: NEXTAUTH_SECRET is not set.');
   }
 }
 
@@ -55,6 +55,7 @@ export const {
         return token; // Return the token with a new access token expiration
       }
       
+      // If both tokens have expired, return an empty object to signal session end
       return {};
     },
     async session({ session, token }) {
