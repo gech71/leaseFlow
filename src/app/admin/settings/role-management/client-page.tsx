@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -264,7 +263,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                           ) : <span className="text-xs text-muted-foreground italic">None</span>}
                         </TableCell>
                         <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving}>
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving || isSystemRole}>
                               {canEditThisRole ? <Edit className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || !canDeleteThisRole}>
