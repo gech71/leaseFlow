@@ -9,7 +9,7 @@ export default auth((req) => {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval' *.tinymce.com;
+    script-src 'self' 'nonce-${nonce}' *.tinymce.com;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com *.tinymce.com;
     img-src 'self' blob: data: ;
     font-src 'self' https://fonts.gstatic.com *.tinymce.com;
