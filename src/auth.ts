@@ -55,8 +55,6 @@ export const {
         return token; // Return the token with a new access token expiration
       }
       
-      // If both tokens are expired, the user will be forced to log in again.
-      // Returning an empty object effectively invalidates the session.
       return {};
     },
     async session({ session, token }) {
@@ -75,8 +73,6 @@ export const {
     },
   },
   jwt: {
-    // We now use a single JWT that contains both expiration times.
-    // The expiration time for the JWT itself will be the refresh token's lifetime.
     async encode({ token, maxAge }) {
       return await new SignJWT(token!)
         .setProtectedHeader({ alg: 'HS256' })
