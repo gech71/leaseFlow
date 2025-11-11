@@ -9,10 +9,10 @@ export default auth((req) => {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' *.tinymce.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com *.tinymce.com;
     img-src 'self' blob: data: ;
-    font-src 'self' https://fonts.gstatic.com;
+    font-src 'self' https://fonts.gstatic.com *.tinymce.com;
     connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
     frame-src 'self' *.tinymce.com;
     object-src 'none';
@@ -54,7 +54,6 @@ export default auth((req) => {
 
   // Set security headers on the final response
   response.headers.set('Content-Security-Policy', cspHeader.replace(/\s{2,}/g, ' ').trim());
-  response.headers.set('X-Content-Type-Options', 'nosniff');
 
   return response;
 });
