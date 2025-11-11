@@ -43,15 +43,7 @@ export default function RootPage() {
       router.replace('/admin/dashboard');
     }
   }, [status, router]);
-
-  useEffect(() => {
-    // This effect can handle other generic errors if NextAuth does redirect.
-    const authError = searchParams.get('error');
-    if (authError && authError !== 'CredentialsSignin') {
-      setError("An unexpected authentication error occurred. Please try again.");
-    }
-  }, [searchParams]);
-
+  
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -66,16 +58,18 @@ export default function RootPage() {
     setIsLoading(false);
 
     if (result?.error) {
-      // The `error` property contains the exact message from the `authorize` function
+      // The `error` property now contains the exact message from our custom `authorize` function.
       setError(result.error);
     } else if (result?.ok) {
-      // On success, manually redirect
-      router.push('/admin/dashboard');
+      // On success, manually redirect.
+      // A full page reload is good here to ensure all server-side contexts are fresh.
+      window.location.href = '/admin/dashboard';
     } else {
       // Fallback for other unexpected errors
       setError("An unknown error occurred during login. Please try again.");
     }
   };
+
 
   // If session status is loading or already authenticated, show a loading screen
   // to prevent a flash of the login page.
