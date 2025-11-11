@@ -1000,7 +1000,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                             <FormLabel>Verification Notes</FormLabel>
                             <FormControl>
                               <Textarea
-                                placeholder="e.g., 'Confirmed transaction in bank statement.'"
+                                placeholder="Verification Notes"
                                 {...field}
                                 disabled={isLoading}
                               />
