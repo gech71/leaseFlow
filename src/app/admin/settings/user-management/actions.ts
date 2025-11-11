@@ -49,7 +49,6 @@ export async function getUserManagementPageData() {
       where: userWhereClause,
       select: {
         id: true,
-        userId: true,
         email: true,
         name: true,
         firstName: true,
