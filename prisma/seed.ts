@@ -81,7 +81,6 @@ async function main() {
         "settings:agreement_templates:manage",
         "settings:email_configuration:view",
         "settings:email_configuration:manage",
-        "settings:forgot_password:send_reset",
         "import:manage",
         "portal:view",
       ],
