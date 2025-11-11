@@ -7,9 +7,21 @@ import { Prisma, type User, type Role, BuildingStatus } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
-export async function createBuildingAction(data: Prisma.BuildingCreateInput) {
+export async function createBuildingAction(data: Omit<Prisma.BuildingCreateInput, 'createdBy'>) {
   try {
-    const newBuilding = await databaseService.createBuilding(data);
+    const { currentUser } = await getUserAndPermissions();
+    if (!currentUser) {
+        return { success: false, error: "User session not found." };
+    }
+
+    const buildingCreateInput: Prisma.BuildingCreateInput = {
+      ...data,
+      createdBy: {
+        connect: { id: currentUser.id }
+      }
+    };
+
+    const newBuilding = await databaseService.createBuilding(buildingCreateInput);
     revalidatePath('/admin/buildings');
     return { success: true, building: newBuilding };
   } catch (error: any) {
