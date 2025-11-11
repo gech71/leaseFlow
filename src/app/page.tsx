@@ -45,14 +45,12 @@ export default function RootPage() {
   }, [status, router]);
 
   useEffect(() => {
-    // This will handle generic errors passed by Auth.js if they are in the URL
     const authError = searchParams.get("error");
     if (authError) {
-       if (authError === "CredentialsSignin") {
+      if (authError === "CredentialsSignin") {
         setError("Invalid phone number or password.");
       } else {
-         // Display the custom error message from the URL if it exists
-         setError(authError);
+        setError(authError);
       }
     }
   }, [searchParams]);
@@ -66,20 +64,22 @@ export default function RootPage() {
       const result = await signIn("credentials", {
         phone,
         password,
-        redirect: false, // Set to false to handle the result here
+        redirect: false,
         callbackUrl: '/admin/dashboard',
       });
 
       if (result?.ok) {
-        // On success, router.push will trigger the useEffect to redirect
         router.push("/admin/dashboard");
       } else if (result?.error) {
-        // This will now catch custom errors passed back
+        // NextAuth.js converts thrown errors into result.error.
+        // The error messages from our custom provider will be available here.
         setError(result.error);
       } else {
         setError("An unknown error occurred during login.");
       }
     } catch (e: any) {
+        // This catch block is less likely to be hit with `redirect: false`,
+        // but it's good for catching unexpected client-side issues.
         const errorMessage = e.message || "An unknown error occurred.";
         setError(errorMessage);
     }
