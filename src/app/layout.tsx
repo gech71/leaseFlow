@@ -1,26 +1,33 @@
-import type { Metadata } from 'next';
-import { headers } from 'next/headers';
-import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-import { SessionProvider } from 'next-auth/react';
-import { auth } from '@/auth';
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+import { SessionProvider } from "next-auth/react";
+import { auth } from "@/auth";
 
 export const metadata: Metadata = {
-  title: 'LeaseFlow',
-  description: 'A comprehensive building management solution.',
-  icons: { icon: 'https://i.imgur.com/JTzGpIH.png' },
+  title: "LeaseFlow",
+  description: "A comprehensive building management solution.",
+  icons: { icon: "/images/Nibtera.png" },
 };
 
 export default async function RootLayout({
   children,
-}: { children: React.ReactNode }) {
-  const nonce = headers().get('x-nonce') || undefined;
+}: {
+  children: React.ReactNode;
+}) {
+  const nonce = headers().get("x-nonce") || undefined;
   const session = await auth();
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="https://i.imgur.com/JTzGpIH.png" type="image/png" sizes="any" />
+        <link
+          rel="icon"
+          href="/images/Nibtera.png"
+          type="image/png"
+          sizes="any"
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

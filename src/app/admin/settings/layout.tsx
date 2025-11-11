@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Building Management Solution',
-  description: 'A comprehensive building management solution.',
+  title: "Building Management Solution",
+  description: "A comprehensive building management solution.",
   icons: {
-    icon: 'https://i.imgur.com/JTzGpIH.png',
+    icon: "/images/Nibtera.png",
   },
 };
 

@@ -11,7 +11,7 @@ export default auth((req) => {
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' blob: data: https://i.imgur.com;
+    img-src 'self' blob: data: ;
     font-src 'self' https://fonts.gstatic.com;
     connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com;
     frame-src 'self' *.tinymce.com;
