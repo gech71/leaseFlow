@@ -72,7 +72,7 @@ export async function getUserManagementPageData() {
     if (!isSuperAdmin) {
         // Normal users can only assign roles they have created.
         roleWhereClause = { 
-          ...whereClause,
+          ...roleWhereClause,
           createdById: currentUser.id 
       };
     }
@@ -216,10 +216,9 @@ export async function resetUserPasswordAction(
     }
     
     const tempPassword = crypto.randomUUID().slice(0, 8); // Generate a simple temporary password
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
     
     await databaseService.updateUser(userId, {
-      password: hashedPassword,
+      password: null, // Remove the main password
       tempPassword: tempPassword, // Store the plain temporary password
     });
     
