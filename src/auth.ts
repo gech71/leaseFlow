@@ -96,4 +96,8 @@ export const {
       }
     },
   },
+  pages: {
+    signIn: '/login',
+    error: '/login', // Redirect users to login page on any error
+  },
 });

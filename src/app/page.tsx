@@ -45,12 +45,22 @@ export default function RootPage() {
   }, [status, router]);
 
   useEffect(() => {
+    // This effect runs when the page loads, checking for an error in the URL.
     const authError = searchParams.get("error");
     if (authError) {
-      if (authError === "CredentialsSignin") {
+      // Decode the error message from the URL
+      const decodedError = decodeURIComponent(authError);
+      
+      // NextAuth.js will put "CredentialsSignin" in the URL, but the actual detailed
+      // error message from our `authorize` function is available in the `errorMessage` parameter.
+      const detailedErrorMessage = searchParams.get("errorMessage");
+
+      if (detailedErrorMessage) {
+        setError(decodeURIComponent(detailedErrorMessage));
+      } else if (authError === "CredentialsSignin") {
         setError("Invalid phone number or password.");
       } else {
-        setError(authError);
+        setError(decodedError);
       }
     }
   }, [searchParams]);
@@ -60,30 +70,17 @@ export default function RootPage() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const result = await signIn("credentials", {
-        phone,
-        password,
-        redirect: false,
-        callbackUrl: '/admin/dashboard',
-      });
+    // No try-catch needed here, as we are letting NextAuth handle the redirect
+    // and the error will be caught by the useEffect hook above.
+    await signIn("credentials", {
+      phone,
+      password,
+      callbackUrl: '/admin/dashboard', // Let NextAuth handle the redirect on success
+      // On error, NextAuth will redirect back to this page with an `error` query param.
+    });
 
-      if (result?.ok) {
-        router.push("/admin/dashboard");
-      } else if (result?.error) {
-        // NextAuth.js converts thrown errors into result.error.
-        // The error messages from our custom provider will be available here.
-        setError(result.error);
-      } else {
-        setError("An unknown error occurred during login.");
-      }
-    } catch (e: any) {
-        // This catch block is less likely to be hit with `redirect: false`,
-        // but it's good for catching unexpected client-side issues.
-        const errorMessage = e.message || "An unknown error occurred.";
-        setError(errorMessage);
-    }
-
+    // If signIn fails, it won't proceed here. We set isLoading to false
+    // only in the case where the user might navigate back before the redirect completes.
     setIsLoading(false);
   };
 

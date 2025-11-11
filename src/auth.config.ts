@@ -2,10 +2,6 @@ import type { NextAuthConfig } from 'next-auth';
 import { credentialsProvider } from './auth.providers';
 
 export const authConfig = {
-  pages: {
-    signIn: '/login',
-    error: '/login', // Redirect users to login page on error
-  },
   trustHost: true, // Add this line to trust the host
   providers: [credentialsProvider],
   session: { strategy: 'jwt' },
