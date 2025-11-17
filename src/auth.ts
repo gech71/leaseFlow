@@ -14,9 +14,8 @@ if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   }
 }
 
-// Define token durations in seconds
-const ACCESS_TOKEN_EXPIRES_IN = 15 * 60; // 15 minutes
-const REFRESH_TOKEN_EXPIRES_IN = 7 * 24 * 60 * 60; // 7 days
+// Define token duration in seconds
+const SESSION_DURATION_IN_SECONDS = 15 * 60; // 15 minutes
 
 export const {
   handlers: { GET, POST },
@@ -27,36 +26,27 @@ export const {
   ...authConfig,
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user }) {
       const now = Math.floor(Date.now() / 1000);
 
-      // On initial sign-in, set up both access and refresh tokens
+      // On initial sign-in, add user details to the token.
       if (user) {
         token.id = user.id;
-        token.accessTokenExp = now + ACCESS_TOKEN_EXPIRES_IN;
-        token.refreshTokenExp = now + REFRESH_TOKEN_EXPIRES_IN;
-        
         if ('forceChangePass' in user && user.forceChangePass) {
           token.forceChangePass = true;
-        } else {
-          delete token.forceChangePass;
         }
         return token;
       }
-      
-      // If the access token has not expired, return the current token
-      if (token.accessTokenExp && now < (token.accessTokenExp as number)) {
-        return token;
-      }
 
-      // If the access token has expired, but the refresh token is still valid, refresh the access token
-      if (token.refreshTokenExp && now < (token.refreshTokenExp as number)) {
-        token.accessTokenExp = now + ACCESS_TOKEN_EXPIRES_IN;
-        return token; // Return the token with a new access token expiration
+      // On subsequent requests, check if the token has expired.
+      // The `exp` claim is automatically set by the `encode` function.
+      if (token.exp && now > (token.exp as number)) {
+        // If the token is expired, return an empty object to invalidate the session.
+        return {};
       }
       
-      // If both tokens have expired, return an empty object to signal session end
-      return {};
+      // If the token is still valid, return it as is.
+      return token;
     },
     async session({ session, token }) {
       if (session.user && token.id) {
@@ -78,7 +68,7 @@ export const {
       return await new SignJWT(token!)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
-        .setExpirationTime(`${REFRESH_TOKEN_EXPIRES_IN}s`) // Set JWT to expire with the refresh token
+        .setExpirationTime(`${SESSION_DURATION_IN_SECONDS}s`) // Set JWT to expire in 15 minutes
         .sign(secret);
     },
     async decode({ token }) {
@@ -91,6 +81,7 @@ export const {
         });
         return payload;
       } catch (error) {
+        // This will be logged if the token is expired or invalid
         console.error("JWT Decode Error:", error);
         return null;
       }
