@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -306,7 +305,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       }
       
       const totalCostValue = item.totalCost;
-      if (totalCostValue === undefined || totalCostValue <= 0) {
+      if (item.appliesToScope !== 'SpecificSpaces' && (totalCostValue === undefined || totalCostValue <= 0)) {
         toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
         validationFailed = true;
         continue;
@@ -316,50 +315,39 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         finalUtilityItemsForDb.push({
           id: item.id,
           name: item.name,
-          totalCost: totalCostValue,
+          totalCost: totalCostValue!,
           appliesToScope: 'Building',
         });
-      } else if (item.appliesToScope === 'Floor' || item.appliesToScope === 'SpecificSpaces') {
-         if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
-          toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
-          validationFailed = true;
-          continue;
+      } else if (item.appliesToScope === 'Floor') {
+        if (!item.applicableFloor) {
+            toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
+            validationFailed = true;
+            continue;
         }
-
-        const percentages = item.perSpacePercentages || {};
-        const totalPercentage = Object.values(percentages).reduce((sum, p) => sum + (p || 0), 0);
-        if (Math.abs(totalPercentage - 100) > 0.01) {
-            // toast({ title: 'Validation Warning', description: `Percentages for "${item.name}" do not add up to 100%.`, variant: 'default' });
-        }
-
-        const spacesToProcess = item.appliesToScope === 'Floor'
-          ? selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor)
-          : selectedBuilding.spaces;
-        
-        let costItemsForThisGroup: { name: string; totalCost: number; spaceIdName: string }[] = [];
-
-        for (const space of spacesToProcess) {
-          const percentageForSpace = percentages[space.id] || 0;
-          if (percentageForSpace > 0) {
-            const costForSpace = totalCostValue * (percentageForSpace / 100);
-            costItemsForThisGroup.push({
-                name: item.name,
-                totalCost: parseFloat(costForSpace.toFixed(2)),
-                spaceIdName: space.spaceIdName
-            });
-          }
-        }
-        
-        // This is a simplification. We save one DB record per space for floor/space scoped items.
-        // A more complex approach might be needed if we want to retain the logical grouping.
-        costItemsForThisGroup.forEach(costItem => {
-             finalUtilityItemsForDb.push({
-              name: costItem.name,
-              totalCost: costItem.totalCost,
-              appliesToScope: 'SpecificSpaces',
-              applicableSpaceIdNames: [costItem.spaceIdName],
-            });
+        finalUtilityItemsForDb.push({
+            id: item.id,
+            name: item.name,
+            totalCost: totalCostValue!,
+            appliesToScope: 'Floor',
+            applicableFloor: item.applicableFloor,
         });
+      } else if (item.appliesToScope === 'SpecificSpaces') {
+         const costs = item.perSpaceCosts || {};
+         const costEntries = Object.entries(costs).filter(([, cost]) => cost > 0);
+         if (costEntries.length === 0) {
+             toast({ title: 'Validation Error', description: `At least one space must have a cost for "${item.name}".`, variant: 'destructive' });
+             validationFailed = true;
+             continue;
+         }
+         costEntries.forEach(([spaceIdName, cost]) => {
+             finalUtilityItemsForDb.push({
+                // No ID here, these are conceptual. Save action will handle create/update.
+                name: item.name,
+                totalCost: cost,
+                appliesToScope: 'SpecificSpaces',
+                applicableSpaceIdNames: [spaceIdName],
+             });
+         });
       }
     }
 
@@ -369,17 +357,47 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     
     setIsSaving(true);
     try {
+      // The save action now needs to be smarter. It can't just take the UI model.
+      // We will simplify and save each UI item as a DB item.
+      const dbItems: BuildingUtilityItemInput[] = currentUtilityItems
+        .filter(item => item.name && item.totalCost && item.totalCost > 0)
+        .map(item => ({
+            id: item.id,
+            name: item.name,
+            totalCost: item.totalCost!,
+            appliesToScope: item.appliesToScope,
+            applicableFloor: item.applicableFloor,
+            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? Object.keys(item.perSpaceCosts || {}) : [],
+        }));
+
+
       const result = await saveBuildingUtilitiesAction(
         selectedBuilding.id,
         selectedBuilding.name,
         selectedYear,
         selectedMonth,
-        finalUtilityItemsForDb
+        dbItems
       );
 
       if (result?.success) {
         toast({ title: 'Utilities Saved', description: `Utility costs for ${selectedBuilding.name} for ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')} have been saved.` });
         await refreshUtilityRecordsList();
+        
+        // Refetch the data for the current view to get the new IDs
+        const updatedEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
+        if (updatedEntry?.utilities) {
+             setCurrentUtilityItems(updatedEntry.utilities.map(dbItem => ({
+                uiId: crypto.randomUUID(),
+                id: dbItem.id,
+                name: dbItem.name,
+                totalCost: Number(dbItem.totalCost),
+                appliesToScope: dbItem.appliesToScope,
+                applicableFloor: dbItem.applicableFloor || undefined,
+                perSpaceCosts: {},
+                perSpacePercentages: {},
+            })));
+        }
+
       } else {
         toast({ title: 'Error Saving Utilities', description: result?.error || 'An unknown server error occurred.', variant: 'destructive' });
       }
@@ -519,7 +537,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                     <CardContent className="p-0 space-y-4">
                       <div className="flex justify-between items-start">
                           <Label className="text-base font-medium text-foreground">Utility Item {index + 1}</Label>
-                          {canSaveUtilities && (
+                          {canSaveUtilities && currentUtilityItems.length > 1 && (
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveUtilityItem(item.uiId)} className="text-destructive hover:bg-destructive/10 h-7 w-7" disabled={isSaving}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -539,110 +557,53 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                           </div>
                       </div>
                       
-                      {item.appliesToScope === 'Building' && (
+                      {item.appliesToScope !== 'SpecificSpaces' && (
                           <div className="space-y-1.5">
-                              <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
+                              <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for {item.appliesToScope}</Label>
                               <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
-                              <p className="text-xs text-muted-foreground">This cost will be prorated among all spaces based on their individual Proration Share %.</p>
+                              {item.appliesToScope === 'Building' && <p className="text-xs text-muted-foreground">This cost will be prorated among all spaces based on their individual Proration Share %.</p>}
                           </div>
                       )}
 
                       {item.appliesToScope === 'Floor' && (
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                              <div className="space-y-1.5">
-                                  <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Floor</Label>
-                                  <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 200.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
-                              </div>
-                              <div className="space-y-1.5">
-                                  <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor</Label>
-                                  <Select value={item.applicableFloor || ''} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'applicableFloor', value)} disabled={isSaving || !canSaveUtilities}>
-                                      <SelectTrigger id={`applicableFloor-${item.uiId}`}><SelectValue placeholder="Select a floor" /></SelectTrigger>
-                                      <SelectContent>{uniqueFloors.map(floor => (<SelectItem key={floor} value={floor}>{floor}</SelectItem>))}</SelectContent>
-                                  </Select>
-                              </div>
+                          <div className="space-y-3 pt-2">
+                            <div className="space-y-1.5">
+                                <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor</Label>
+                                <Select value={item.applicableFloor || ''} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'applicableFloor', value)} disabled={isSaving || !canSaveUtilities}>
+                                    <SelectTrigger id={`applicableFloor-${item.uiId}`}><SelectValue placeholder="Select a floor" /></SelectTrigger>
+                                    <SelectContent>{uniqueFloors.map(floor => (<SelectItem key={floor} value={floor}>{floor}</SelectItem>))}</SelectContent>
+                                </Select>
+                            </div>
                           </div>
-                          {item.applicableFloor && (
-                              <div className="space-y-2 pt-2">
-                                  <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
-                                  <p className="text-xs text-muted-foreground">Define how the total cost is split. This is not required to add up to 100%.</p>
-                                  <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
-                                          {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(space => (
-                                              <div key={space.id} className="flex items-center gap-2">
-                                                  <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
-                                                      {space.spaceIdName}
-                                                  </Label>
-                                                  <div className="relative w-28">
-                                                      <Input
-                                                          id={`space-percent-${item.uiId}-${space.id}`}
-                                                          type="number"
-                                                          placeholder="0"
-                                                          value={item.perSpacePercentages?.[space.id] || ''}
-                                                          onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
-                                                          className="w-full h-8 pr-6"
-                                                          disabled={isSaving || !canSaveUtilities}
-                                                      />
-                                                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
-                                                  </div>
-                                              </div>
-                                          ))}
-                                      </div>
-                                  </ScrollArea>
-                                  <div className="text-right text-sm font-medium mt-2">
-                                      Total Allocated: 
-                                      <span className="text-foreground ml-1">
-                                          {totalPercentage.toFixed(2)}%
-                                      </span>
-                                  </div>
-                              </div>
-                          )}
-                        </div>
                       )}
                       
                       {item.appliesToScope === 'SpecificSpaces' && (
-                          <div className="space-y-3">
-                            <div className="space-y-1.5">
-                              <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost to Allocate</Label>
-                              <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 300.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                           <div className="space-y-2 pt-2">
+                                <Label className="flex items-center text-sm font-medium"><HomeIcon className="mr-2 h-4 w-4 text-primary"/>Per-Space Cost Allocation</Label>
+                                <p className="text-xs text-muted-foreground">Enter the exact cost for each specific space. Only spaces with a cost greater than zero will be saved.</p>
+                                <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
+                                        {(selectedBuilding?.spaces ?? []).length > 0 ? selectedBuilding?.spaces.map(space => (
+                                            <div key={space.id} className="flex items-center gap-2">
+                                                <Label htmlFor={`space-cost-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
+                                                    {space.spaceIdName}
+                                                </Label>
+                                                <Input
+                                                    id={`space-cost-${item.uiId}-${space.id}`}
+                                                    type="number"
+                                                    placeholder="0.00"
+                                                    value={item.perSpaceCosts?.[space.spaceIdName] || ''}
+                                                    onChange={(e) => handlePerSpaceCostChange(item.uiId, space.spaceIdName, e.target.value)}
+                                                    className="w-28 h-8"
+                                                    disabled={isSaving || !canSaveUtilities}
+                                                />
+                                            </div>
+                                        )) : (
+                                            <p className="text-sm text-muted-foreground text-center col-span-2">No spaces found in this building.</p>
+                                        )}
+                                    </div>
+                                </ScrollArea>
                             </div>
-
-                            <div className="space-y-2 pt-2">
-                              <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
-                              <p className="text-xs text-muted-foreground">Define how the total cost is split across any spaces. This is not required to add up to 100%.</p>
-                              <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
-                                  {(selectedBuilding?.spaces ?? []).length > 0 ? selectedBuilding?.spaces.map(space => (
-                                      <div key={space.id} className="flex items-center gap-2">
-                                          <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
-                                              {space.spaceIdName}
-                                          </Label>
-                                          <div className="relative w-28">
-                                              <Input
-                                                  id={`space-percent-${item.uiId}-${space.id}`}
-                                                  type="number"
-                                                  placeholder="0"
-                                                  value={item.perSpacePercentages?.[space.id] || ''}
-                                                  onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
-                                                  className="w-full h-8 pr-6"
-                                                  disabled={isSaving || !canSaveUtilities}
-                                              />
-                                              <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
-                                          </div>
-                                      </div>
-                                  )) : (
-                                      <p className="text-sm text-muted-foreground text-center col-span-2">No spaces found in this building.</p>
-                                  )}
-                                </div>
-                              </ScrollArea>
-                              <div className="text-right text-sm font-medium mt-2">
-                                  Total Allocated: 
-                                  <span className="text-foreground ml-1">
-                                      {totalPercentage.toFixed(2)}%
-                                  </span>
-                              </div>
-                            </div>
-                          </div>
                       )}
 
                     </CardContent>
