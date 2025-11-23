@@ -1,7 +1,6 @@
 
 import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
-import type { User as AuthUser } from "next-auth";
 import { databaseService } from "./lib/services/databaseService";
 
 const ACCESS_TOKEN_EXPIRY = 15 * 60; // 15 minutes in seconds
@@ -86,10 +85,5 @@ export const {
       }
       return session;
     },
-  },
-
-  pages: {
-    signIn: "/login",
-    error: "/login",
   },
 });
