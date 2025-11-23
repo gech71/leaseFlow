@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, useSession, getCsrfToken } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,14 +36,21 @@ export default function RootPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [csrfToken, setCsrfToken] = useState("");
 
   useEffect(() => {
-    // This effect handles showing a redirect error message from NextAuth
+    // Fetch the CSRF token when the component mounts
+    const fetchCsrfToken = async () => {
+      const token = await getCsrfToken();
+      if (token) {
+        setCsrfToken(token);
+      }
+    };
+    fetchCsrfToken();
+
     const callbackError = searchParams.get('error');
-    if (callbackError === "CredentialsSignin") {
-        setError("Invalid phone number or password.");
-    } else if (callbackError) {
-        setError("An unknown error occurred during login.");
+    if (callbackError) {
+      setError("Invalid phone number or password.");
     }
   }, [searchParams]);
   
@@ -55,30 +62,22 @@ export default function RootPage() {
     const result = await signIn("credentials", {
       phone,
       password,
-      redirect: false, // Handle redirect manually
+      csrfToken, // Include CSRF token in the sign-in call
+      redirect: false,
     });
 
     setIsLoading(false);
 
     if (result?.error) {
-      if (result.error === "CredentialsSignin") {
-        setError("Invalid phone number or password.");
-      } else {
-        setError(result.error);
-      }
+       setError("Invalid phone number or password.");
     } else if (result?.ok) {
-      // On success, manually redirect.
-      // A full page reload is good here to ensure all server-side contexts are fresh.
       window.location.href = '/admin/dashboard';
     } else {
-      // Fallback for other unexpected errors
       setError("An unknown error occurred during login. Please try again.");
     }
   };
 
 
-  // If session status is loading or already authenticated, show a loading screen
-  // to prevent a flash of the login page. This gives middleware time to redirect.
   if (status === 'loading' || status === 'authenticated') {
     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">
@@ -108,6 +107,7 @@ export default function RootPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
+             <input name="csrfToken" type="hidden" defaultValue={csrfToken} />
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive text-destructive text-sm rounded-md flex items-start">
                 <AlertCircle className="h-5 w-5 mr-2 shrink-0" />
@@ -159,7 +159,7 @@ export default function RootPage() {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || !csrfToken}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Log In
             </Button>
