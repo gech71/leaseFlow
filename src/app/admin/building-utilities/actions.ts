@@ -86,75 +86,80 @@ export async function saveBuildingUtilitiesAction(
         return { success: false, error: "Permission denied." };
     }
 
-    const existingMonthlyUtil = await prisma.buildingMonthlyUtilities.findUnique({
-      where: {
-        buildingId_year_month: { buildingId, year, month },
-      },
-      include: { utilities: true },
+    const result = await prisma.$transaction(async (tx) => {
+      // Step 1: Find or create the parent BuildingMonthlyUtilities record
+      let monthlyUtil = await tx.buildingMonthlyUtilities.findUnique({
+        where: {
+          buildingId_year_month: { buildingId, year, month },
+        },
+        include: { utilities: true },
+      });
+
+      if (!monthlyUtil) {
+        monthlyUtil = await tx.buildingMonthlyUtilities.create({
+          data: {
+            building: { connect: { id: buildingId } },
+            buildingName,
+            year,
+            month,
+          },
+          include: { utilities: true },
+        });
+      }
+
+      // Step 2: Separate items into create, update, and identify items to delete
+      const itemsToCreate = utilityItems.filter(item => !item.id);
+      const itemsToUpdate = utilityItems.filter(item => item.id);
+      const clientItemIds = new Set(itemsToUpdate.map(item => item.id!));
+      const dbItemIds = new Set(monthlyUtil.utilities.map(item => item.id));
+      const itemIdsToDelete = [...dbItemIds].filter(id => !clientItemIds.has(id));
+      
+      // Step 3: Perform database operations
+      if (itemIdsToDelete.length > 0) {
+        await tx.buildingUtilityItem.deleteMany({
+          where: { id: { in: itemIdsToDelete } },
+        });
+      }
+
+      for (const item of itemsToUpdate) {
+        await tx.buildingUtilityItem.update({
+          where: { id: item.id! },
+          data: {
+            name: item.name,
+            totalCost: item.totalCost,
+            appliesToScope: item.appliesToScope,
+            applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
+            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
+          },
+        });
+      }
+
+      if (itemsToCreate.length > 0) {
+        await tx.buildingUtilityItem.createMany({
+          data: itemsToCreate.map(item => ({
+            monthlyUtilitiesId: monthlyUtil!.id,
+            name: item.name,
+            totalCost: item.totalCost,
+            appliesToScope: item.appliesToScope,
+            applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
+            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
+          })),
+        });
+      }
+
+      // Step 4: Fetch the final state of the record to return
+      return tx.buildingMonthlyUtilities.findUnique({
+        where: { id: monthlyUtil.id },
+        include: { utilities: true },
+      });
     });
-
-    const itemsToCreate = utilityItems.filter(item => !item.id);
-    const itemsToUpdate = utilityItems.filter(item => item.id);
-    const itemIdsFromClient = new Set(itemsToUpdate.map(item => item.id));
-
-    let result;
-
-    if (existingMonthlyUtil) {
-      // Record exists, perform updates
-      const itemIdsInDb = new Set(existingMonthlyUtil.utilities.map(item => item.id));
-      const itemIdsToDelete = [...itemIdsInDb].filter(id => !itemIdsFromClient.has(id));
-
-      result = await prisma.buildingMonthlyUtilities.update({
-        where: { id: existingMonthlyUtil.id },
-        data: {
-          buildingName,
-          utilities: {
-            deleteMany: itemIdsToDelete.length > 0 ? { id: { in: itemIdsToDelete } } : undefined,
-            update: itemsToUpdate.map(item => ({
-              where: { id: item.id },
-              data: {
-                name: item.name,
-                totalCost: item.totalCost,
-                appliesToScope: item.appliesToScope,
-                applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
-                applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-              },
-            })),
-            create: itemsToCreate.map(item => ({
-              name: item.name,
-              totalCost: item.totalCost,
-              appliesToScope: item.appliesToScope,
-              applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
-              applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-            })),
-          },
-        },
-        include: { utilities: true },
-      });
-    } else {
-      // No record exists, create a new one
-      result = await prisma.buildingMonthlyUtilities.create({
-        data: {
-          building: { connect: { id: buildingId } },
-          buildingName,
-          year,
-          month,
-          utilities: {
-            create: utilityItems.map(item => ({
-              name: item.name,
-              totalCost: item.totalCost,
-              appliesToScope: item.appliesToScope,
-              applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
-              applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-            })),
-          },
-        },
-        include: { utilities: true },
-      });
-    }
 
     revalidatePath('/admin/building-utilities');
     revalidatePath('/admin/billing');
+    
+    if (!result) {
+        throw new Error("Transaction failed and did not return a result.");
+    }
     
     const serializableResult = {
       ...result,
