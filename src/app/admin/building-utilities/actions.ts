@@ -54,7 +54,7 @@ export async function getBuildingUtilitiesAction(
       utilities: utilities.utilities.map(u => ({
         ...u,
         totalCost: Number(u.totalCost),
-        perSpaceAllocation: u.perSpaceAllocation ? JSON.parse(u.perSpaceAllocation as string) : null,
+        perSpaceAllocation: u.perSpaceAllocation && typeof u.perSpaceAllocation === 'string' ? JSON.parse(u.perSpaceAllocation) : null,
       }))
     };
     
@@ -124,24 +124,24 @@ export async function saveBuildingUtilitiesAction(
 
       // Upsert items from the submission
       for (const item of utilityItems) {
-        const dataPayload = {
+        const dataPayload: Prisma.BuildingUtilityItemUncheckedUpdateInput | Prisma.BuildingUtilityItemUncheckedCreateInput = {
             name: item.name,
             totalCost: item.totalCost,
             appliesToScope: item.appliesToScope,
             applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
             applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-            perSpaceAllocation: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : null,
+            perSpaceAllocation: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : Prisma.JsonNull,
         };
 
-        if (item.id) { // If ID exists, it's an update
+        if (item.id && dbItemIds.has(item.id)) { // If ID exists and was in the DB, it's an update
           await tx.buildingUtilityItem.update({
             where: { id: item.id },
             data: dataPayload,
           });
-        } else { // No ID, it's a new item
+        } else { // No ID or ID not in DB, it's a new item
           await tx.buildingUtilityItem.create({
             data: {
-              ...dataPayload,
+              ...(dataPayload as Prisma.BuildingUtilityItemUncheckedCreateInput),
               monthlyUtilitiesId: monthlyUtil!.id,
             },
           });
@@ -167,7 +167,7 @@ export async function saveBuildingUtilitiesAction(
       utilities: result.utilities.map(u => ({
         ...u,
         totalCost: Number(u.totalCost),
-        perSpaceAllocation: u.perSpaceAllocation ? JSON.parse(u.perSpaceAllocation as string) : null,
+        perSpaceAllocation: u.perSpaceAllocation && typeof u.perSpaceAllocation === 'string' ? JSON.parse(u.perSpaceAllocation) : null,
       }))
     };
 
