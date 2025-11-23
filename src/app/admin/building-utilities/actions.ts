@@ -34,7 +34,7 @@ export async function getBuildingUtilitiesAction(
   buildingId: string,
   year: number,
   month: number
-): Promise<(BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpacePercentages?: Record<string, number> | null })[] }) | null> {
+): Promise<(BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpaceAllocation?: Record<string, number> | null })[] }) | null> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
@@ -54,11 +54,11 @@ export async function getBuildingUtilitiesAction(
       utilities: utilities.utilities.map(u => ({
         ...u,
         totalCost: Number(u.totalCost),
-        perSpacePercentages: u.perSpacePercentages ? JSON.parse(u.perSpacePercentages as string) : null,
+        perSpaceAllocation: u.perSpaceAllocation ? JSON.parse(u.perSpaceAllocation as string) : null,
       }))
     };
     
-    return serializableUtilities as (BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpacePercentages?: Record<string, number> | null })[] });
+    return serializableUtilities as (BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpaceAllocation?: Record<string, number> | null })[] });
 
   } catch (error: any) {
     console.error("Error fetching building utilities:", error);
@@ -130,7 +130,7 @@ export async function saveBuildingUtilitiesAction(
             appliesToScope: item.appliesToScope,
             applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
             applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-            perSpacePercentages: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : null,
+            perSpaceAllocation: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : null,
         };
 
         if (item.id) { // If ID exists, it's an update
@@ -167,7 +167,7 @@ export async function saveBuildingUtilitiesAction(
       utilities: result.utilities.map(u => ({
         ...u,
         totalCost: Number(u.totalCost),
-        perSpacePercentages: u.perSpacePercentages ? JSON.parse(u.perSpacePercentages as string) : null,
+        perSpaceAllocation: u.perSpaceAllocation ? JSON.parse(u.perSpaceAllocation as string) : null,
       }))
     };
 
