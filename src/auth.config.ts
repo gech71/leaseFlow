@@ -1,3 +1,4 @@
+
 import type { NextAuthConfig } from 'next-auth';
 import { credentialsProvider } from './auth.providers';
 
