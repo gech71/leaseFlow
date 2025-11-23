@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, useSession, getCsrfToken } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,12 +36,21 @@ export default function RootPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [csrfToken, setCsrfToken] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     // If the user is already authenticated, redirect them to the dashboard.
     if (status === 'authenticated') {
       router.replace('/admin/dashboard');
     }
+    
+    // Fetch the CSRF token when the component mounts
+    const fetchCsrfToken = async () => {
+        const token = await getCsrfToken();
+        setCsrfToken(token);
+    };
+    fetchCsrfToken();
+
   }, [status, router]);
   
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -52,20 +61,15 @@ export default function RootPage() {
     const result = await signIn("credentials", {
       phone,
       password,
+      csrfToken, // Include the CSRF token in the sign-in request
       redirect: false, // Prevent redirect to handle the response directly
     });
 
     setIsLoading(false);
 
     if (result?.error) {
-      // NextAuth returns a generic error key "CredentialsSignin" for custom errors.
-      // We can map this to a user-friendly message.
-      if (result.error === "CredentialsSignin") {
-        setError("Invalid phone number or password.");
-      } else {
-        // For other errors like account lockout, the exact message is passed.
-        setError(result.error);
-      }
+      // Directly display the error message from the authorize function
+      setError(result.error);
     } else if (result?.ok) {
       // On success, manually redirect.
       // A full page reload is good here to ensure all server-side contexts are fresh.
@@ -108,6 +112,7 @@ export default function RootPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
+            <input name="csrfToken" type="hidden" defaultValue={csrfToken} />
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive text-destructive text-sm rounded-md flex items-start">
                 <AlertCircle className="h-5 w-5 mr-2 shrink-0" />
