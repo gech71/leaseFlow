@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 // Client-safe types passed as props
@@ -442,323 +443,348 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
 
 
   return (
-    <div className="animate-fadeIn">
-      {registeredBuildings.length === 0 && isMounted && (
-         <Card className="mb-6 bg-yellow-50 border-yellow-300">
-          <CardHeader><CardTitle className="text-yellow-700">No Buildings Registered</CardTitle>
-            <CardDescription className="text-yellow-600">Please register buildings on the "Buildings" page first.</CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-
-      <AlertDialog open={!!recordToDelete} onOpenChange={(open) => { if(!open) setRecordToDelete(null); }}>
-        <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-5 w-5"/>Confirm Deletion</AlertDialogTitle>
-            <AlertDialogDescription>
-                Are you sure you want to delete the utility record for {recordToDelete?.buildingName} for {recordToDelete ? format(setMonth(setYear(new Date(), recordToDelete.year), recordToDelete.month), 'MMMM yyyy') : ''}? This action cannot be undone.
-            </AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter> 
-              <AlertDialogCancel onClick={() => setRecordToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel> 
-              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90" disabled={isSaving || !canSaveUtilities}> 
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Record
-              </AlertDialogAction> 
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
-          <CardDescription>Select building and period, then input utility details. A bill due in a given month uses utilities from that same month.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div>
-              <Label htmlFor="buildingName" className="flex items-center mb-1"><BuildingIconLucide className="mr-2 h-4 w-4 text-primary" />Building</Label>
-              <Select value={selectedBuildingId} onValueChange={setSelectedBuildingId} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
-                <SelectTrigger id="buildingName"><SelectValue placeholder="Select a building" /></SelectTrigger>
-                <SelectContent>{registeredBuildings.map(building => (<SelectItem key={building.id} value={building.id}>{building.name}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="year" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Year</Label>
-              <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
-                <SelectTrigger id="year"><SelectValue /></SelectTrigger>
-                <SelectContent>{yearsForEntry.map(year => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="month" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Month</Label>
-              <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
-                <SelectTrigger id="month"><SelectValue /></SelectTrigger>
-                <SelectContent>{monthsForEntry.map(month => (<SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {selectedBuildingId && (
-            <div className="space-y-4 pt-4 border-t">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold text-lg text-foreground">
-                  Utility Items for {selectedBuildingName} - {format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}
-                </h3>
-                {canSaveUtilities && (
-                  <Button variant="outline" onClick={handleAddUtilityItem} size="sm" disabled={isLoadingData || isSaving}>
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Item
-                  </Button>
-                )}
-              </div>
-              {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-              {!isLoadingData && currentUtilityItems.map((item, index) => {
-                const totalPercentage = Object.values(item.perSpacePercentages || {}).reduce((sum, p) => sum + (p || 0), 0);
-
-                return (
-                <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
-                  <CardContent className="p-0 space-y-4">
-                    <div className="flex justify-between items-start">
-                        <Label className="text-base font-medium text-foreground">Utility Item {index + 1}</Label>
-                        {canSaveUtilities && (
-                          <Button variant="ghost" size="icon" onClick={() => handleRemoveUtilityItem(item.uiId)} className="text-destructive hover:bg-destructive/10 h-7 w-7" disabled={isSaving}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                       <div className="space-y-1.5">
-                            <Label htmlFor={`utilityName-${item.uiId}`}>Type</Label>
-                            <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
-                        </div>
-                        <div className="space-y-1.5">
-                             <Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
-                            <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value as UIUtilityItem['appliesToScope'])} disabled={isSaving || !canSaveUtilities}>
-                                <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    
-                    {item.appliesToScope === 'Building' && (
-                        <div className="space-y-1.5">
-                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
-                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
-                            <p className="text-xs text-muted-foreground">This cost will be prorated among all spaces based on their individual Proration Share %.</p>
-                        </div>
-                    )}
-
-                    {item.appliesToScope === 'Floor' && (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                            <div className="space-y-1.5">
-                                <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Floor</Label>
-                                <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 200.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor</Label>
-                                <Select value={item.applicableFloor || ''} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'applicableFloor', value)} disabled={isSaving || !canSaveUtilities}>
-                                    <SelectTrigger id={`applicableFloor-${item.uiId}`}><SelectValue placeholder="Select a floor" /></SelectTrigger>
-                                    <SelectContent>{uniqueFloors.map(floor => (<SelectItem key={floor} value={floor}>{floor}</SelectItem>))}</SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        {item.applicableFloor && (
-                             <div className="space-y-2 pt-2">
-                                <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
-                                <p className="text-xs text-muted-foreground">Define how the total cost is split. This is not required to add up to 100%.</p>
-                                <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
-                                        {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(space => (
-                                            <div key={space.id} className="flex items-center gap-2">
-                                                <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
-                                                    {space.spaceIdName}
-                                                </Label>
-                                                <div className="relative w-28">
-                                                    <Input
-                                                        id={`space-percent-${item.uiId}-${space.id}`}
-                                                        type="number"
-                                                        placeholder="0"
-                                                        value={item.perSpacePercentages?.[space.id] || ''}
-                                                        onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
-                                                        className="w-full h-8 pr-6"
-                                                        disabled={isSaving || !canSaveUtilities}
-                                                    />
-                                                    <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </ScrollArea>
-                                <div className="text-right text-sm font-medium mt-2">
-                                    Total Allocated: 
-                                    <span className="text-foreground ml-1">
-                                        {totalPercentage.toFixed(2)}%
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {item.appliesToScope === 'SpecificSpaces' && (
-                        <div className="space-y-3">
-                          <div className="space-y-1.5">
-                            <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost to Allocate</Label>
-                            <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 300.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
-                          </div>
-
-                          <div className="space-y-2 pt-2">
-                            <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
-                            <p className="text-xs text-muted-foreground">Define how the total cost is split across any spaces. This is not required to add up to 100%.</p>
-                            <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
-                                {(selectedBuilding?.spaces ?? []).length > 0 ? selectedBuilding?.spaces.map(space => (
-                                    <div key={space.id} className="flex items-center gap-2">
-                                        <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
-                                            {space.spaceIdName}
-                                        </Label>
-                                        <div className="relative w-28">
-                                            <Input
-                                                id={`space-percent-${item.uiId}-${space.id}`}
-                                                type="number"
-                                                placeholder="0"
-                                                value={item.perSpacePercentages?.[space.id] || ''}
-                                                onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
-                                                className="w-full h-8 pr-6"
-                                                disabled={isSaving || !canSaveUtilities}
-                                            />
-                                            <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <p className="text-sm text-muted-foreground text-center col-span-2">No spaces found in this building.</p>
-                                )}
-                              </div>
-                            </ScrollArea>
-                            <div className="text-right text-sm font-medium mt-2">
-                                Total Allocated: 
-                                <span className="text-foreground ml-1">
-                                    {totalPercentage.toFixed(2)}%
-                                </span>
-                            </div>
-                          </div>
-                        </div>
-                    )}
-
-                  </CardContent>
-                </Card>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-        {canSaveUtilities && (
-          <CardFooter className="border-t p-6">
-            <Button onClick={handleSaveUtilities} disabled={!selectedBuildingId || currentUtilityItems.length === 0 || registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-              Save Utilities for {selectedBuildingName ? `${selectedBuildingName} - ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}` : 'Selected Period'}
-            </Button>
-          </CardFooter>
+    <TooltipProvider>
+      <div className="animate-fadeIn">
+        {registeredBuildings.length === 0 && isMounted && (
+          <Card className="mb-6 bg-yellow-50 border-yellow-300">
+            <CardHeader><CardTitle className="text-yellow-700">No Buildings Registered</CardTitle>
+              <CardDescription className="text-yellow-600">Please register buildings on the "Buildings" page first.</CardDescription>
+            </CardHeader>
+          </Card>
         )}
-      </Card>
 
-      <Card className="mt-8 shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline text-xl">Saved Utility Records</CardTitle>
-          <CardDescription>Overview of previously entered utility costs. Click the edit icon to load and modify a record.</CardDescription>
-        </CardHeader>
-        <CardContent>
-           <div className="flex flex-col sm:flex-row gap-2 mb-4">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="utility-filter"
-                  placeholder="Filter by building name..."
-                  className="pl-10 h-9"
-                  value={utilityFilterTerm}
-                  onChange={(e) => setUtilityFilterTerm(e.target.value)}
-                />
+        <AlertDialog open={!!recordToDelete} onOpenChange={(open) => { if(!open) setRecordToDelete(null); }}>
+          <AlertDialogContent>
+              <AlertDialogHeader><AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-5 w-5"/>Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription>
+                  Are you sure you want to delete the utility record for {recordToDelete?.buildingName} for {recordToDelete ? format(setMonth(setYear(new Date(), recordToDelete.year), recordToDelete.month), 'MMMM yyyy') : ''}? This action cannot be undone.
+              </AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter> 
+                <AlertDialogCancel onClick={() => setRecordToDelete(null)} disabled={isSaving}>Cancel</AlertDialogCancel> 
+                <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90" disabled={isSaving || !canSaveUtilities}> 
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete Record
+                </AlertDialogAction> 
+              </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="font-headline text-xl">Enter Utility Costs</CardTitle>
+            <CardDescription>Select building and period, then input utility details. A bill due in a given month uses utilities from that same month.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div>
+                <Label htmlFor="buildingName" className="flex items-center mb-1"><BuildingIconLucide className="mr-2 h-4 w-4 text-primary" />Building</Label>
+                <Select value={selectedBuildingId} onValueChange={setSelectedBuildingId} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
+                  <SelectTrigger id="buildingName"><SelectValue placeholder="Select a building" /></SelectTrigger>
+                  <SelectContent>{registeredBuildings.map(building => (<SelectItem key={building.id} value={building.id}>{building.name}</SelectItem>))}</SelectContent>
+                </Select>
               </div>
-              <div className="flex gap-2">
-                <Select value={String(filterYear)} onValueChange={(val) => { setFilterYear(val === 'all' ? 'all' : Number(val)); if(val === 'all') setFilterMonth('all'); }}>
-                    <SelectTrigger className="w-full sm:w-[120px] h-9">
-                        <SelectValue placeholder="Year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Years</SelectItem>
-                        {yearsForFilter.map(year => (
-                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                        ))}
-                    </SelectContent>
+              <div>
+                <Label htmlFor="year" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Year</Label>
+                <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
+                  <SelectTrigger id="year"><SelectValue /></SelectTrigger>
+                  <SelectContent>{yearsForEntry.map(year => (<SelectItem key={year} value={String(year)}>{year}</SelectItem>))}</SelectContent>
                 </Select>
-                <Select value={String(filterMonth)} onValueChange={(val) => setFilterMonth(val === 'all' ? 'all' : Number(val))} disabled={filterYear === 'all'}>
-                    <SelectTrigger className="w-full sm:w-[150px] h-9">
-                        <SelectValue placeholder="Month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Months</SelectItem>
-                        {monthsForFilter.map(month => (
-                             <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                        ))}
-                    </SelectContent>
+              </div>
+              <div>
+                <Label htmlFor="month" className="flex items-center mb-1"><CalendarIcon className="mr-2 h-4 w-4 text-primary" />Month</Label>
+                <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))} disabled={registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities}>
+                  <SelectTrigger id="month"><SelectValue /></SelectTrigger>
+                  <SelectContent>{monthsForEntry.map(month => (<SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>))}</SelectContent>
                 </Select>
+              </div>
             </div>
-           </div>
 
-          {isLoadingData && filteredRecords.length === 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
-          {!isLoadingData && filteredRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">{utilityFilterTerm || filterYear !== 'all' ? "No records match your filters." : "No utility records saved yet."}</p>)}
-          {filteredRecords.length > 0 && (
-            <>
-              <div className="border rounded-md overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Building</TableHead>
-                      <TableHead>Period</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
-                      <TableHead className="text-center hidden sm:table-cell">Items</TableHead>
-                      <TableHead className="hidden md:table-cell">Created</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedUtilityRecords.map(entry => {
-                      const totalCost = (entry.utilities || []).reduce((sum, util) => sum + util.totalCost, 0);
-                      return (
-                        <TableRow key={entry.id}>
-                          <TableCell className="font-medium">{entry.buildingName}</TableCell>
-                          <TableCell>{format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</TableCell>
-                          <TableCell className="text-right whitespace-nowrap">{totalCost.toFixed(2)} Birr</TableCell>
-                          <TableCell className="text-center hidden sm:table-cell">{(entry.utilities || []).length}</TableCell>
-                          <TableCell className="hidden md:table-cell text-xs">{format(parseISO(entry.createdAt), 'PP')}</TableCell>
-                          <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" onClick={() => { setSelectedBuildingId(entry.buildingId); setSelectedYear(entry.year); setSelectedMonth(entry.month);}} className="h-8 w-8 text-blue-600 hover:text-blue-700">
-                                  <Edit className="h-4 w-4" />
-                                  <span className="sr-only">Edit Record</span>
-                              </Button>
-                              {canSaveUtilities && (
-                                  <Button variant="ghost" size="icon" onClick={() => setRecordToDelete(entry)} disabled={isSaving} className="h-8 w-8 text-destructive hover:text-destructive/80">
-                                      <Trash2 className="h-4 w-4" />
-                                      <span className="sr-only">Delete Record</span>
-                                  </Button>
-                              )}
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+            {selectedBuildingId && (
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold text-lg text-foreground">
+                    Utility Items for {selectedBuildingName} - {format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}
+                  </h3>
+                  {canSaveUtilities && (
+                    <Button variant="outline" onClick={handleAddUtilityItem} size="sm" disabled={isLoadingData || isSaving}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+                    </Button>
+                  )}
+                </div>
+                {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
+                {!isLoadingData && currentUtilityItems.map((item, index) => {
+                  const totalPercentage = Object.values(item.perSpacePercentages || {}).reduce((sum, p) => sum + (p || 0), 0);
+
+                  return (
+                  <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
+                    <CardContent className="p-0 space-y-4">
+                      <div className="flex justify-between items-start">
+                          <Label className="text-base font-medium text-foreground">Utility Item {index + 1}</Label>
+                          {canSaveUtilities && (
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveUtilityItem(item.uiId)} className="text-destructive hover:bg-destructive/10 h-7 w-7" disabled={isSaving}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                        <div className="space-y-1.5">
+                              <Label htmlFor={`utilityName-${item.uiId}`}>Type</Label>
+                              <Input id={`utilityName-${item.uiId}`} placeholder="e.g., Electricity" value={item.name} onChange={(e) => handleUtilityItemChange(item.uiId, 'name', e.target.value)} disabled={isSaving || !canSaveUtilities}/>
+                          </div>
+                          <div className="space-y-1.5">
+                              <Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
+                              <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value as UIUtilityItem['appliesToScope'])} disabled={isSaving || !canSaveUtilities}>
+                                  <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
+                                  <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
+                              </Select>
+                          </div>
+                      </div>
+                      
+                      {item.appliesToScope === 'Building' && (
+                          <div className="space-y-1.5">
+                              <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Building</Label>
+                              <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                              <p className="text-xs text-muted-foreground">This cost will be prorated among all spaces based on their individual Proration Share %.</p>
+                          </div>
+                      )}
+
+                      {item.appliesToScope === 'Floor' && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                              <div className="space-y-1.5">
+                                  <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for Floor</Label>
+                                  <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 200.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                              </div>
+                              <div className="space-y-1.5">
+                                  <Label htmlFor={`applicableFloor-${item.uiId}`}>Floor</Label>
+                                  <Select value={item.applicableFloor || ''} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'applicableFloor', value)} disabled={isSaving || !canSaveUtilities}>
+                                      <SelectTrigger id={`applicableFloor-${item.uiId}`}><SelectValue placeholder="Select a floor" /></SelectTrigger>
+                                      <SelectContent>{uniqueFloors.map(floor => (<SelectItem key={floor} value={floor}>{floor}</SelectItem>))}</SelectContent>
+                                  </Select>
+                              </div>
+                          </div>
+                          {item.applicableFloor && (
+                              <div className="space-y-2 pt-2">
+                                  <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
+                                  <p className="text-xs text-muted-foreground">Define how the total cost is split. This is not required to add up to 100%.</p>
+                                  <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
+                                          {selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor).map(space => (
+                                              <div key={space.id} className="flex items-center gap-2">
+                                                  <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
+                                                      {space.spaceIdName}
+                                                  </Label>
+                                                  <div className="relative w-28">
+                                                      <Input
+                                                          id={`space-percent-${item.uiId}-${space.id}`}
+                                                          type="number"
+                                                          placeholder="0"
+                                                          value={item.perSpacePercentages?.[space.id] || ''}
+                                                          onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
+                                                          className="w-full h-8 pr-6"
+                                                          disabled={isSaving || !canSaveUtilities}
+                                                      />
+                                                      <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </ScrollArea>
+                                  <div className="text-right text-sm font-medium mt-2">
+                                      Total Allocated: 
+                                      <span className="text-foreground ml-1">
+                                          {totalPercentage.toFixed(2)}%
+                                      </span>
+                                  </div>
+                              </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {item.appliesToScope === 'SpecificSpaces' && (
+                          <div className="space-y-3">
+                            <div className="space-y-1.5">
+                              <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost to Allocate</Label>
+                              <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 300.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                            </div>
+
+                            <div className="space-y-2 pt-2">
+                              <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
+                              <p className="text-xs text-muted-foreground">Define how the total cost is split across any spaces. This is not required to add up to 100%.</p>
+                              <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
+                                  {(selectedBuilding?.spaces ?? []).length > 0 ? selectedBuilding?.spaces.map(space => (
+                                      <div key={space.id} className="flex items-center gap-2">
+                                          <Label htmlFor={`space-percent-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
+                                              {space.spaceIdName}
+                                          </Label>
+                                          <div className="relative w-28">
+                                              <Input
+                                                  id={`space-percent-${item.uiId}-${space.id}`}
+                                                  type="number"
+                                                  placeholder="0"
+                                                  value={item.perSpacePercentages?.[space.id] || ''}
+                                                  onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
+                                                  className="w-full h-8 pr-6"
+                                                  disabled={isSaving || !canSaveUtilities}
+                                              />
+                                              <span className="absolute inset-y-0 right-0 flex items-center pr-2 text-muted-foreground text-sm">%</span>
+                                          </div>
+                                      </div>
+                                  )) : (
+                                      <p className="text-sm text-muted-foreground text-center col-span-2">No spaces found in this building.</p>
+                                  )}
+                                </div>
+                              </ScrollArea>
+                              <div className="text-right text-sm font-medium mt-2">
+                                  Total Allocated: 
+                                  <span className="text-foreground ml-1">
+                                      {totalPercentage.toFixed(2)}%
+                                  </span>
+                              </div>
+                            </div>
+                          </div>
+                      )}
+
+                    </CardContent>
+                  </Card>
+                  );
+                })}
               </div>
-              <PaginationControls
-                currentPage={recordsCurrentPage}
-                totalPages={recordsTotalPages}
-                onPageChange={setRecordsCurrentPage}
-                itemsPerPage={recordsItemsPerPage}
-                onItemsPerPageChange={handleRecordsItemsPerPageChange}
-                className="mt-4"
-              />
-            </>
+            )}
+          </CardContent>
+          {canSaveUtilities && (
+            <CardFooter className="border-t p-6">
+              <Button onClick={handleSaveUtilities} disabled={!selectedBuildingId || currentUtilityItems.length === 0 || registeredBuildings.length === 0 || isLoadingData || isSaving || !canSaveUtilities} className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                Save Utilities for {selectedBuildingName ? `${selectedBuildingName} - ${format(setMonth(setYear(new Date(), selectedYear), selectedMonth), 'MMMM yyyy')}` : 'Selected Period'}
+              </Button>
+            </CardFooter>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </Card>
+
+        <Card className="mt-8 shadow-lg">
+          <CardHeader>
+            <CardTitle className="font-headline text-xl">Saved Utility Records</CardTitle>
+            <CardDescription>Overview of previously entered utility costs. Click the edit icon to load and modify a record.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                <div className="relative flex-grow">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="utility-filter"
+                    placeholder="Filter by building name..."
+                    className="pl-10 h-9"
+                    value={utilityFilterTerm}
+                    onChange={(e) => setUtilityFilterTerm(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={String(filterYear)} onValueChange={(val) => { setFilterYear(val === 'all' ? 'all' : Number(val)); if(val === 'all') setFilterMonth('all'); }}>
+                      <SelectTrigger className="w-full sm:w-[120px] h-9">
+                          <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Years</SelectItem>
+                          {yearsForFilter.map(year => (
+                              <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <Select value={String(filterMonth)} onValueChange={(val) => setFilterMonth(val === 'all' ? 'all' : Number(val))} disabled={filterYear === 'all'}>
+                      <SelectTrigger className="w-full sm:w-[150px] h-9">
+                          <SelectValue placeholder="Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Months</SelectItem>
+                          {monthsForFilter.map(month => (
+                              <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+              </div>
+            </div>
+
+            {isLoadingData && filteredRecords.length === 0 && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
+            {!isLoadingData && filteredRecords.length === 0 && (<p className="text-muted-foreground text-center py-4">{utilityFilterTerm || filterYear !== 'all' ? "No records match your filters." : "No utility records saved yet."}</p>)}
+            {filteredRecords.length > 0 && (
+              <>
+                <div className="border rounded-md overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Building</TableHead>
+                        <TableHead>Period</TableHead>
+                        <TableHead className="text-center">Items</TableHead>
+                        <TableHead className="text-right">Total Cost</TableHead>
+                        <TableHead className="hidden md:table-cell">Created</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedUtilityRecords.map(entry => {
+                        const totalCost = (entry.utilities || []).reduce((sum, util) => sum + util.totalCost, 0);
+                        const itemNames = (entry.utilities || []).map(u => u.name);
+                        const firstItemName = itemNames[0] || 'N/A';
+                        const moreItemsCount = itemNames.length - 1;
+
+                        return (
+                          <TableRow key={entry.id}>
+                            <TableCell className="font-medium">{entry.buildingName}</TableCell>
+                            <TableCell>{format(setMonth(setYear(new Date(), entry.year), entry.month), 'MMMM yyyy')}</TableCell>
+                            <TableCell className="text-center">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="secondary" className="cursor-help">
+                                    {itemNames.length > 0 ? firstItemName : 'None'}
+                                    {moreItemsCount > 0 && ` (+${moreItemsCount})`}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="p-1 space-y-1">
+                                    <p className="font-semibold">Utility Items:</p>
+                                    <ul className="list-disc list-inside text-xs">
+                                      {itemNames.map((name, i) => (
+                                        <li key={i}>{name}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell className="text-right whitespace-nowrap">{totalCost.toFixed(2)} Birr</TableCell>
+                            <TableCell className="hidden md:table-cell text-xs">{format(parseISO(entry.createdAt), 'PP')}</TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" onClick={() => { setSelectedBuildingId(entry.buildingId); setSelectedYear(entry.year); setSelectedMonth(entry.month);}} className="h-8 w-8 text-blue-600 hover:text-blue-700">
+                                    <Edit className="h-4 w-4" />
+                                    <span className="sr-only">Edit Record</span>
+                                </Button>
+                                {canSaveUtilities && (
+                                    <Button variant="ghost" size="icon" onClick={() => setRecordToDelete(entry)} disabled={isSaving} className="h-8 w-8 text-destructive hover:text-destructive/80">
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Delete Record</span>
+                                    </Button>
+                                )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                <PaginationControls
+                  currentPage={recordsCurrentPage}
+                  totalPages={recordsTotalPages}
+                  onPageChange={setRecordsCurrentPage}
+                  itemsPerPage={recordsItemsPerPage}
+                  onItemsPerPageChange={handleRecordsItemsPerPageChange}
+                  className="mt-4"
+                />
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   );
 }
