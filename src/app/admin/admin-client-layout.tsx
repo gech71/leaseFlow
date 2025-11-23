@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -74,6 +75,7 @@ const allNavItems: NavItem[] = [
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, permission: 'building_utility:view' },
   { href: '/admin/billing', label: 'Billing', icon: Banknote, permission: 'billing:view' },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, permission: 'payment_overview:view' },
+  { href: '/admin/import', label: 'Import Data', icon: UploadCloud, permission: 'import:manage' },
   { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings:user_management:view' }, // Generic settings permission
 ];
 
@@ -106,7 +108,13 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   
   const userInitials = currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'AD';
 
-  const availableNavItems = allNavItems.filter(item => isSuperAdmin || hasPermission(item.permission));
+  const availableNavItems = allNavItems.filter(item => {
+    // A special check for the generic settings link
+    if (item.href === '/admin/settings') {
+      return isSuperAdmin || hasPermission('settings:user_management:view') || hasPermission('settings:role_management:view') || hasPermission('settings:agreement_templates:manage') || hasPermission('settings:email_configuration:view');
+    }
+    return isSuperAdmin || hasPermission(item.permission);
+  });
 
   return (
     <>
@@ -230,15 +238,32 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect a 'TENANT' only user away from admin pages
-    if (status === 'authenticated' && !isPermissionsLoading && currentUser?.roles) {
-      const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
+    // If authenticated but still loading permissions, wait.
+    if (status === 'authenticated' && isPermissionsLoading) {
+      return;
+    }
+    
+    // When done loading permissions:
+    if (status === 'authenticated' && !isPermissionsLoading) {
+      // If user is a tenant, redirect them immediately to the portal.
+      const isTenantOnly = currentUser?.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
       if (isTenantOnly) {
         router.replace('/portal/dashboard');
+        return;
+      }
+      
+      // If user has no admin permissions at all, redirect them away.
+      const hasAnyAdminPermissions = currentUser?.effectivePermissions && currentUser.effectivePermissions.some(p => p !== 'portal:view');
+      if (!hasAnyAdminPermissions) {
+        // Sign out and redirect to login with an error message
+        signOut({ redirect: false }).then(() => {
+          router.replace('/login?error=' + encodeURIComponent('You do not have any assigned permissions to access the admin panel.'));
+        });
       }
     }
   }, [session, status, isPermissionsLoading, currentUser, router]);
 
+  // Show a global loading spinner while session or permissions are loading.
   if (status === 'loading' || isPermissionsLoading) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
@@ -247,8 +272,11 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     );
   }
 
-  // If user is authenticated but is a tenant, show loading while redirecting
-  if (currentUser?.roles && currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT') {
+  // If user is authenticated but is a tenant (or has no permissions), show a loader during the redirect.
+  const isTenantOnly = currentUser?.roles?.length === 1 && currentUser.roles[0].name === 'TENANT';
+  const hasNoAdminPermissions = !isPermissionsLoading && currentUser && !currentUser.effectivePermissions.some(p => p !== 'portal:view');
+
+  if (isTenantOnly || hasNoAdminPermissions) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />

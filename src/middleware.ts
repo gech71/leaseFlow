@@ -3,6 +3,23 @@ import { auth } from "@/auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { PERMISSION_MAP } from "@/lib/auth-utils";
 
+// The ordered list of pages to check for redirection.
+// More common/default pages should be higher up.
+const ORDERED_ADMIN_PAGES = [
+  "/admin/dashboard",
+  "/admin/buildings",
+  "/admin/spaces",
+  "/admin/tenants",
+  "/admin/agreements",
+  "/admin/billing",
+  "/admin/payments-overview",
+  "/admin/building-utilities",
+  "/admin/settings/user-management",
+  "/admin/import",
+  // Add other pages as needed
+];
+
+
 export default auth((req) => {
   const { nextUrl, auth } = req;
   const isLoggedIn = !!auth;
@@ -51,16 +68,34 @@ export default auth((req) => {
 
     const userPermissions = new Set(auth.user.permissions || []);
     
+    // Redirect tenants away from any admin page immediately
+    if (userPermissions.size === 1 && userPermissions.has('portal:view')) {
+      return NextResponse.redirect(new URL("/portal/dashboard", nextUrl));
+    }
+    
     // Find a matching required permission for the current path
     const requiredPermission = Object.entries(PERMISSION_MAP).find(([pathPrefix]) => 
       nextUrl.pathname.startsWith(pathPrefix)
     )?.[1];
 
     if (requiredPermission && !userPermissions.has(requiredPermission)) {
-      // User does not have permission, redirect with an error message
-      const dashboardUrl = new URL("/admin/dashboard", nextUrl);
-      dashboardUrl.searchParams.set("error", "You do not have permission to access that page.");
-      return NextResponse.redirect(dashboardUrl);
+      // User does not have permission, find the first page they CAN access.
+      const firstAllowedPage = ORDERED_ADMIN_PAGES.find(page => {
+        const permission = PERMISSION_MAP[page];
+        return permission && userPermissions.has(permission);
+      });
+      
+      // If they have access to at least one page, redirect them there with an error.
+      if (firstAllowedPage) {
+        const redirectUrl = new URL(firstAllowedPage, nextUrl);
+        redirectUrl.searchParams.set("error", "You do not have permission to access the requested page.");
+        return NextResponse.redirect(redirectUrl);
+      } else {
+        // If the user has no admin permissions at all, redirect them away from admin.
+        const loginUrl = new URL("/login", nextUrl);
+        loginUrl.searchParams.set("error", "You do not have any assigned permissions to access the admin panel.");
+        return NextResponse.redirect(loginUrl);
+      }
     }
   }
 
