@@ -33,15 +33,14 @@ export const credentialsProvider = Credentials({
     let isPasswordCorrect = false;
     let isTempPassword = false;
 
-    if (user.password) {
-      isPasswordCorrect = await bcrypt.compare(credentials.password, user.password);
-    }
-    
-    if (!isPasswordCorrect && user.tempPassword) {
-      if (credentials.password === user.tempPassword) {
+    // First, check if a temporary password exists and matches.
+    if (user.tempPassword && credentials.password === user.tempPassword) {
         isPasswordCorrect = true;
         isTempPassword = true;
-      }
+    } 
+    // If not, check the permanent password (if it exists).
+    else if (user.password) {
+      isPasswordCorrect = await bcrypt.compare(credentials.password, user.password);
     }
     
     if (isPasswordCorrect) {

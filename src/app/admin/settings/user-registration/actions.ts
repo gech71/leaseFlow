@@ -67,15 +67,14 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
     }
 
     const tempPassword = generateTempPassword();
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
+    
     const userCreateInput: Prisma.UserCreateInput = {
       email: email,
       name: `${firstName} ${lastName}`.trim(),
       firstName: firstName,
       lastName: lastName,
       phoneNumber: phoneNumber,
-      password: hashedPassword,
+      password: null, // Set main password to null initially
       tempPassword: tempPassword,
       createdBy: { connect: { id: adminUser.id } },
     };

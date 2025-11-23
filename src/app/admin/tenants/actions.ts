@@ -1,3 +1,4 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -101,8 +102,8 @@ export async function createTenantAction(data: {
         firstName: data.name.split(" ")[0] || data.name,
         lastName: data.name.split(" ").slice(1).join(" ") || "Tenant",
         phoneNumber: data.phone,
-        password: null,
-        tempPassword: tempPassword,
+        password: null, // Set main password to null
+        tempPassword: tempPassword, // Store temp password
         roles: { connect: { id: tenantRole.id } },
       });
 
