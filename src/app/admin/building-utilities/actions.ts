@@ -124,7 +124,7 @@ export async function saveBuildingUtilitiesAction(
 
       // Upsert items from the submission
       for (const item of utilityItems) {
-        const dataPayload: Prisma.BuildingUtilityItemUncheckedUpdateInput | Prisma.BuildingUtilityItemUncheckedCreateInput = {
+        const dataPayload: Omit<Prisma.BuildingUtilityItemUncheckedCreateInput, 'monthlyUtilitiesId'> = {
             name: item.name,
             totalCost: item.totalCost,
             appliesToScope: item.appliesToScope,
@@ -141,7 +141,8 @@ export async function saveBuildingUtilitiesAction(
         } else { // No ID or ID not in DB, it's a new item
           await tx.buildingUtilityItem.create({
             data: {
-              ...(dataPayload as Prisma.BuildingUtilityItemUncheckedCreateInput),
+              ...dataPayload,
+              perSpaceAllocation: dataPayload.perSpaceAllocation ?? null, // Ensure null is passed explicitly
               monthlyUtilitiesId: monthlyUtil!.id,
             },
           });
