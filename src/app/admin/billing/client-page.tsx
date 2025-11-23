@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import React, {
@@ -152,15 +153,14 @@ import {
 const paymentFormSchema = z.object({
   paymentDate: z.date({ required_error: "Payment date is required." }),
   paymentReference: z.string().optional(),
-  adminVerificationNotes: z.string().optional(),
 });
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 
-const editFormSchema = z.object({
-  paymentReference: z.string().optional(),
+const verificationFormSchema = z.object({
   adminVerificationNotes: z.string().optional(),
 });
-type EditFormValues = z.infer<typeof editFormSchema>;
+type VerificationFormValues = z.infer<typeof verificationFormSchema>;
+
 
 interface BillingClientPageProps {
   initialData: SerializedBillingPageData;
@@ -177,10 +177,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<ClientBill | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [billForEdit, setBillForEdit] = useState<ClientBill | null>(null);
-
-  const adminProofFileInputRef = useRef<HTMLInputElement>(null);
 
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
@@ -216,13 +212,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     defaultValues: {
       paymentDate: new Date(),
       paymentReference: "",
-      adminVerificationNotes: "",
     },
   });
 
-  const editForm = useForm<EditFormValues>({
-    resolver: zodResolver(editFormSchema),
-    defaultValues: { paymentReference: "", adminVerificationNotes: "" },
+  const verificationForm = useForm<VerificationFormValues>({
+      resolver: zodResolver(verificationFormSchema),
+      defaultValues: { adminVerificationNotes: "" },
   });
 
   const isReadOnly = billForPayment?.status === "Paid";
@@ -501,22 +496,16 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           ? parseISO(processedBill.paymentDate)
           : new Date(),
         paymentReference: processedBill?.paymentReference || "",
-        adminVerificationNotes: processedBill?.adminVerificationNotes || "",
       });
-    }
-    if (isEditDialogOpen && billForEdit) {
-      editForm.reset({
-        paymentReference: billForEdit.paymentReference || "",
-        adminVerificationNotes: billForEdit.adminVerificationNotes || "",
+      verificationForm.reset({
+        adminVerificationNotes: processedBill?.adminVerificationNotes || "",
       });
     }
   }, [
     isPaymentDialogOpen,
     billForPayment,
-    isEditDialogOpen,
-    billForEdit,
     paymentForm,
-    editForm,
+    verificationForm,
     processedClientBills,
   ]);
 
@@ -661,10 +650,6 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setBillForPayment(bill);
     setIsPaymentDialogOpen(true);
   };
-  const handleOpenEditDialog = (bill: ClientBill) => {
-    setBillForEdit(bill);
-    setIsEditDialogOpen(true);
-  };
 
   const handlePaymentAction = async (actionType: 'confirmVerification' | 'rejectVerification') => {
     if (!billForPayment) return;
@@ -673,11 +658,13 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       return;
     }
     setIsLoading(true);
+    
+    const verificationValues = verificationForm.getValues();
     const result = await recordPaymentOrVerificationAction(
       billForPayment.id,
       {
         paymentDate: billForPayment.paymentDate || new Date().toISOString(),
-        adminVerificationNotes: paymentForm.getValues('adminVerificationNotes'),
+        adminVerificationNotes: verificationValues.adminVerificationNotes,
       },
       actionType
     );
@@ -965,6 +952,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           if (!isOpen) {
             setBillForPayment(null);
             paymentForm.reset();
+            verificationForm.reset();
           }
         }}
       >
@@ -990,10 +978,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                         </a>
                     </Button>
                 )}
-                 <Form {...paymentForm}>
-                   <form className="space-y-4">
+                 <Form {...verificationForm}>
+                   <form className="space-y-4" onSubmit={e => e.preventDefault()}>
                       <FormField
-                        control={paymentForm.control}
+                        control={verificationForm.control}
                         name="adminVerificationNotes"
                         render={({ field }) => (
                           <FormItem>

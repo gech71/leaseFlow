@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -36,6 +37,21 @@ import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+const spaceFormSchema = z.object({
+  buildingId: z.string().min(1, "Building is required."),
+  spaceIdName: z.string().min(1, "Space ID/Name is required."),
+  area: z.coerce.number().min(0.1, "Area must be a positive number."),
+  floor: z.string().min(1, "Floor is required."),
+  utilityProrationShare: z.coerce.number().min(0, "Proration cannot be negative.").max(100, "Proration cannot exceed 100%."),
+  monthlyRentalPrice: z.coerce.number().min(0, "Monthly rent must be a non-negative number."),
+});
+
+type SpaceFormValues = z.infer<typeof spaceFormSchema>;
 
 export interface SpaceWithBuildingName extends SpaceTypePrisma {
   buildingName: string; 
@@ -51,10 +67,9 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const { toast } = useToast();
   const router = useRouter();
 
-  const [currentSpaceData, setCurrentSpaceData] = useState<Partial<SpaceTypePrisma & { buildingName?: string }>>({});
-  const [prorationInput, setProrationInput] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
+  const [currentSpaceId, setCurrentSpaceId] = useState<string | null>(null);
   const [spaceToDelete, setSpaceToDelete] = useState<SpaceWithBuildingName | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -69,6 +84,17 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const canDeleteSpaces = isSuperAdmin || hasPermission('space:delete');
   const canViewSpaces = isSuperAdmin || hasPermission('space:view') || canCreateSpaces || canEditSpaces || canDeleteSpaces;
 
+  const form = useForm<SpaceFormValues>({
+    resolver: zodResolver(spaceFormSchema),
+    defaultValues: {
+      buildingId: '',
+      spaceIdName: '',
+      area: 0,
+      floor: '',
+      utilityProrationShare: 0,
+      monthlyRentalPrice: 0
+    }
+  });
 
   const filteredSpaces = spaces.filter(space => {
     const searchMatch = !searchTerm ||
@@ -111,86 +137,42 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     currentPage * itemsPerPage
   );
 
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleFormSubmit = async (values: SpaceFormValues) => {
     if ((formMode === 'add' && !canCreateSpaces) || (formMode === 'edit' && !canEditSpaces)) {
       toast({ title: "Permission Denied", description: "You do not have permission to save space details.", variant: "destructive" });
       return;
     }
     setIsSaving(true);
-
-    if (!currentSpaceData.buildingId) {
-      toast({ title: "Validation Error", description: "Please select a building.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-    if (!currentSpaceData.spaceIdName?.trim()) {
-      toast({ title: "Validation Error", description: "Space ID/Name is required.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-    if (currentSpaceData.area === undefined || currentSpaceData.area <= 0) {
-      toast({ title: "Validation Error", description: "Area must be a positive number.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-    if (!currentSpaceData.floor?.trim()) {
-      toast({ title: "Validation Error", description: "Floor is required.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-    const prorationShareValue = currentSpaceData.utilityProrationShare;
-    if (prorationShareValue === undefined || prorationShareValue < 0 || prorationShareValue > 1) {
-      toast({ title: "Validation Error", description: "Proration share must be between 0% and 100%.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-    if (currentSpaceData.monthlyRentalPrice === undefined || currentSpaceData.monthlyRentalPrice <= 0) {
-      toast({ title: "Validation Error", description: "Monthly rent must be a positive number.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-
-    const selectedBuilding = buildings.find(b => b.id === currentSpaceData.buildingId);
+    
+    const selectedBuilding = buildings.find(b => b.id === values.buildingId);
 
     const spaceInputData = {
-      buildingId: currentSpaceData.buildingId!,
+      buildingId: values.buildingId,
       buildingName: selectedBuilding?.name || 'Unknown Building',
-      spaceIdName: currentSpaceData.spaceIdName.trim(),
-      area: Number(currentSpaceData.area),
-      floor: currentSpaceData.floor!.trim(),
-      utilityProrationShare: Number(prorationShareValue),
-      monthlyRentalPrice: Number(currentSpaceData.monthlyRentalPrice),
-      isOccupied: currentSpaceData.isOccupied || false,
-      tenantId: currentSpaceData.tenantId || null,
+      spaceIdName: values.spaceIdName.trim(),
+      area: values.area,
+      floor: values.floor.trim(),
+      utilityProrationShare: values.utilityProrationShare / 100, // Convert percentage to decimal
+      monthlyRentalPrice: values.monthlyRentalPrice,
     };
 
     let result;
     if (formMode === 'add') {
       result = await createSpaceAction(spaceInputData);
     } else {
-      if (!currentSpaceData.id) {
+      if (!currentSpaceId) {
         toast({ title: "Error", description: "Space ID is missing for update.", variant: "destructive" });
         setIsSaving(false);
         return;
       }
-      const updatePayload: Prisma.SpaceUpdateInput = {
-        building: { connect: { id: spaceInputData.buildingId } },
-        buildingName: spaceInputData.buildingName,
-        spaceIdName: spaceInputData.spaceIdName,
-        area: spaceInputData.area,
-        floor: spaceInputData.floor,
-        utilityProrationShare: spaceInputData.utilityProrationShare,
-        monthlyRentalPrice: spaceInputData.monthlyRentalPrice,
-      };
-      result = await updateSpaceAction(currentSpaceData.id, updatePayload);
+      result = await updateSpaceAction(currentSpaceId, spaceInputData);
     }
     setIsSaving(false);
 
     if (result.success) {
       toast({ title: `Space ${formMode === 'add' ? 'Added' : 'Updated'}`, description: `${result.space?.spaceIdName} has been saved.` });
       setIsFormOpen(false);
-      setCurrentSpaceData({});
+      form.reset();
       router.refresh();
     } else {
       toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Space`, description: result.error, variant: "destructive" });
@@ -207,8 +189,8 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       return;
     }
     setFormMode('add');
-    setCurrentSpaceData({ utilityProrationShare: 0.1, buildingId: buildings[0]?.id || "" });
-    setProrationInput('10');
+    setCurrentSpaceId(null);
+    form.reset({ buildingId: buildings[0]?.id || "" });
     setIsFormOpen(true);
   };
 
@@ -218,13 +200,15 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       return;
     }
     setFormMode('edit');
-    setCurrentSpaceData({
-      ...space,
-      utilityProrationShare: Number(space.utilityProrationShare), 
+    setCurrentSpaceId(space.id);
+    form.reset({
+      buildingId: space.buildingId,
+      spaceIdName: space.spaceIdName,
       area: Number(space.area),
+      floor: space.floor,
+      utilityProrationShare: Number(space.utilityProrationShare) * 100,
       monthlyRentalPrice: Number(space.monthlyRentalPrice),
     });
-    setProrationInput((Number(space.utilityProrationShare || 0) * 100).toString());
     setIsFormOpen(true);
   };
 
@@ -284,10 +268,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
         </Card>
       )}
 
-      <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
-        setIsFormOpen(isOpen);
-        if (!isOpen) setCurrentSpaceData({});
-      }}>
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-headline flex items-center gap-2">
@@ -298,81 +279,44 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
               {formMode === 'add' ? "Fill in the details for the rental space." : (canEditSpaces ? "Update the space details." : "Viewing space details.")}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleFormSubmit}>
-            <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-              <div>
-                <Label htmlFor="buildingId">Building<span className="text-destructive ml-1">*</span></Label>
-                <Select 
-                  value={currentSpaceData.buildingId || ""}
-                  onValueChange={(value) => setCurrentSpaceData(prev => ({...prev, buildingId: value}))}
-                  required
-                  disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}
-                >
-                  <SelectTrigger id="buildingId" className="mt-1">
-                    <SelectValue placeholder="Select a building" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {buildings.map(building => (
-                      <SelectItem key={building.id} value={building.id}>
-                        {building.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="spaceIdName">Space ID/Name<span className="text-destructive ml-1">*</span></Label>
-                <Input id="spaceIdName" value={currentSpaceData.spaceIdName || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, spaceIdName: e.target.value}))} className="mt-1" placeholder="Space ID/Name" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
-              </div>
-              <div>
-                <Label htmlFor="area">Area (m²)<span className="text-destructive ml-1">*</span></Label>
-                <Input id="area" type="number" value={currentSpaceData.area || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, area: parseFloat(e.target.value)}))} className="mt-1" placeholder="Area in square meters" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
-              </div>
-              <div>
-                <Label htmlFor="floor">Floor<span className="text-destructive ml-1">*</span></Label>
-                <Input id="floor" value={currentSpaceData.floor || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, floor: e.target.value}))} className="mt-1" placeholder="e.g., 1st Floor, Ground" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
-              </div>
-              <div>
-                <Label htmlFor="utilityProrationShare">Proration Share (%)<span className="text-destructive ml-1">*</span></Label>
-                <Input
-                  id="utilityProrationShare"
-                  type="text"
-                  value={prorationInput}
-                  onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '' || /^[0-9]*(\.[0-9]*)?$/.test(val)) {
-                          setProrationInput(val);
-                          const numVal = parseFloat(val);
-                          if (val === '') {
-                              setCurrentSpaceData(prev => ({ ...prev, utilityProrationShare: undefined }));
-                          } else if (!isNaN(numVal)) {
-                              setCurrentSpaceData(prev => ({ ...prev, utilityProrationShare: numVal / 100 }));
-                          }
-                      }
-                  }}
-                  className="mt-1"
-                  placeholder="Utility proration share percentage"
-                  required
-                  disabled={isSaving || (!canCreateSpaces && formMode === 'add') || (!canEditSpaces && formMode === 'edit')}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleFormSubmit)}>
+              <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                <FormField
+                  control={form.control}
+                  name="buildingId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Building<span className="text-destructive ml-1">*</span></FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSaving || !canCreateSpaces}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select a building" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {buildings.map(building => (<SelectItem key={building.id} value={building.id}>{building.name}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
+                <FormField control={form.control} name="spaceIdName" render={({ field }) => (<FormItem><FormLabel>Space ID/Name<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input placeholder="e.g. Office 101" {...field} disabled={isSaving || !canEditSpaces} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="area" render={({ field }) => (<FormItem><FormLabel>Area (m²)<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="Area in square meters" {...field} disabled={isSaving || !canEditSpaces} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="floor" render={({ field }) => (<FormItem><FormLabel>Floor<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input placeholder="e.g. 1st Floor, Ground" {...field} disabled={isSaving || !canEditSpaces} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="utilityProrationShare" render={({ field }) => (<FormItem><FormLabel>Proration Share (%)<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="Utility proration share percentage" {...field} disabled={isSaving || !canEditSpaces} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="monthlyRentalPrice" render={({ field }) => (<FormItem><FormLabel>Monthly Rent<span className="text-destructive ml-1">*</span></FormLabel><FormControl><Input type="number" placeholder="Monthly rental price" {...field} disabled={isSaving || !canEditSpaces} /></FormControl><FormMessage /></FormItem>)} />
               </div>
-              <div>
-                <Label htmlFor="monthlyRentalPrice">Monthly Rent<span className="text-destructive ml-1">*</span></Label>
-                <Input id="monthlyRentalPrice" type="number" value={currentSpaceData.monthlyRentalPrice || ''} onChange={(e) => setCurrentSpaceData(prev => ({...prev, monthlyRentalPrice: parseFloat(e.target.value)}))} className="mt-1" placeholder="Monthly rental price" required disabled={isSaving || (!canCreateSpaces && formMode==='add') || (!canEditSpaces && formMode==='edit')}/>
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={isSaving}>Cancel</Button>
-              </DialogClose>
-              {((formMode === 'add' && canCreateSpaces) || (formMode === 'edit' && canEditSpaces)) && (
-                <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
-                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {formMode === 'add' ? 'Add Space' : 'Save Changes'}
-                </Button>
-              )}
-            </DialogFooter>
-          </form>
+              <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
+                {((formMode === 'add' && canCreateSpaces) || (formMode === 'edit' && canEditSpaces)) && (
+                  <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {formMode === 'add' ? 'Add Space' : 'Save Changes'}
+                  </Button>
+                )}
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

@@ -18,29 +18,38 @@ import { createBuildingAction, updateBuildingAction } from '../actions';
 import { usePermissions } from '@/contexts/PermissionContext'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { z } from 'zod';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-interface UIPenaltyRule {
-  id: string; 
-  dbId?: string; 
-  fromDay?: number;
-  toDay?: number;
-  penaltyType: 'Fixed' | 'Percentage';
-  frequency: 'OneTime' | 'Daily';
-  feeValue?: number;
-  scope: 'Building' | 'Floor' | 'SpecificSpaces';
-  applicableFloor?: string;
-  applicableSpaceIdNamesStr?: string; 
-}
+const penaltyRuleSchema = z.object({
+  id: z.string(),
+  dbId: z.string().optional(),
+  fromDay: z.coerce.number().min(1, "Must be at least 1"),
+  toDay: z.coerce.number().optional().nullable(),
+  penaltyType: z.enum(['Fixed', 'Percentage']),
+  frequency: z.enum(['OneTime', 'Daily']),
+  feeValue: z.coerce.number().min(0, "Cannot be negative"),
+  scope: z.enum(['Building', 'Floor', 'SpecificSpaces']),
+  applicableFloor: z.string().optional().nullable(),
+  applicableSpaceIdNamesStr: z.string().optional().nullable(),
+}).refine(data => data.toDay === null || data.toDay === undefined || data.fromDay <= data.toDay, {
+  message: "'To Day' must be greater than or equal to 'From Day'",
+  path: ['toDay'],
+});
 
-interface BuildingFormState {
-  id?: string; 
-  name: string;
-  address: string;
-  accountNumber: string;
-  uiPenaltyRules: UIPenaltyRule[];
-}
+const buildingFormSchema = z.object({
+  name: z.string().min(2, "Building name must be at least 2 characters."),
+  address: z.string().min(5, "Address must be at least 5 characters."),
+  accountNumber: z.string().regex(/^[7]\d{12}$/, "Account number must start with '7' and be 13 digits."),
+  penaltyRules: z.array(penaltyRuleSchema).optional(),
+});
 
-export interface BuildingUpsertFormInternalProps {
+type BuildingFormValues = z.infer<typeof buildingFormSchema>;
+
+
+interface BuildingUpsertFormInternalProps {
   initialBuildingData?: {
     id: string;
     name: string;
@@ -73,40 +82,53 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
     canManageThisForm = false;
   }
 
-  const [currentBuildingForm, setCurrentBuildingForm] = useState<BuildingFormState>({ name: '', address: '', accountNumber: '', uiPenaltyRules: [] });
   const [selectedManagerIds, setSelectedManagerIds] = useState<Set<string>>(new Set());
   const [managerSearchTerm, setManagerSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
+  const form = useForm<BuildingFormValues>({
+    resolver: zodResolver(buildingFormSchema),
+    defaultValues: {
+      name: '',
+      address: '',
+      accountNumber: '',
+      penaltyRules: [],
+    }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "penaltyRules",
+  });
+
   useEffect(() => {
     if (initialBuildingData) {
-      const uiRules: UIPenaltyRule[] = (initialBuildingData.penaltyPolicyTiers || []).map(tier => ({
+      const uiRules: z.infer<typeof penaltyRuleSchema>[] = (initialBuildingData.penaltyPolicyTiers || []).map(tier => ({
           id: tier.id, 
           dbId: tier.id,
           fromDay: tier.fromDay,
           toDay: tier.toDay ?? undefined,
-          penaltyType: tier.penaltyType as UIPenaltyRule['penaltyType'],
-          frequency: tier.frequency as UIPenaltyRule['frequency'],
+          penaltyType: tier.penaltyType as 'Fixed' | 'Percentage',
+          frequency: tier.frequency as 'OneTime' | 'Daily',
           feeValue: Number(tier.feeValue),
-          scope: tier.scope as UIPenaltyRule['scope'],
+          scope: tier.scope as 'Building' | 'Floor' | 'SpecificSpaces',
           applicableFloor: tier.applicableFloor || undefined,
           applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || undefined,
-      })).sort((a,b) => (a.fromDay ?? 0) - (b.fromDay ?? 0));
-
-      setCurrentBuildingForm({
-        id: initialBuildingData.id,
+      })).sort((a,b) => a.fromDay - b.fromDay);
+      
+      form.reset({
         name: initialBuildingData.name,
         address: initialBuildingData.address || '',
         accountNumber: initialBuildingData.accountNumber || '',
-        uiPenaltyRules: uiRules,
+        penaltyRules: uiRules,
       });
 
       setSelectedManagerIds(new Set(initialBuildingData.managers.map(m => m.id)));
     } else {
-      setCurrentBuildingForm({ name: '', address: '', accountNumber: '', uiPenaltyRules: [] });
+      form.reset({ name: '', address: '', accountNumber: '', penaltyRules: [] });
       setSelectedManagerIds(new Set());
     }
-  }, [initialBuildingData]);
+  }, [initialBuildingData, form]);
 
   const handleManagerToggle = (userId: string) => {
     if (!canManageThisForm) return;
@@ -128,7 +150,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
 
   const handleAddUIPenaltyRule = () => {
     if (!canManageThisForm) return;
-    const newRule: UIPenaltyRule = {
+    append({
       id: crypto.randomUUID(),
       scope: 'Building',
       penaltyType: 'Fixed',
@@ -136,117 +158,26 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       feeValue: undefined,
       fromDay: undefined,
       toDay: undefined,
-    };
-    setCurrentBuildingForm(prev => ({
-      ...prev,
-      uiPenaltyRules: [...(prev.uiPenaltyRules || []), newRule],
-    }));
+    });
   };
 
-  const handleRemoveUIPenaltyRule = (ruleId: string) => {
-    if (!canManageThisForm) return;
-    setCurrentBuildingForm(prev => ({
-      ...prev,
-      uiPenaltyRules: (prev.uiPenaltyRules || []).filter(rule => rule.id !== ruleId)
-    }));
-  };
-
-  const handleUIPenaltyRuleChange = (ruleId: string, field: keyof UIPenaltyRule, value: any) => {
-    if (!canManageThisForm) return;
-    setCurrentBuildingForm(prev => ({
-      ...prev,
-      uiPenaltyRules: (prev.uiPenaltyRules || []).map(rule => {
-        if (rule.id !== ruleId) return rule;
-        let updatedRule = { ...rule, [field]: value };
-
-        if (field === 'fromDay' || field === 'toDay' || field === 'feeValue') {
-           updatedRule[field] = (value === '' || value === null || value === undefined || isNaN(Number(value))) ? undefined : Number(value);
-        }
-
-        if (field === 'scope') {
-          updatedRule.scope = value as UIPenaltyRule['scope'];
-          if (value !== 'Floor') updatedRule.applicableFloor = undefined;
-          if (value !== 'SpecificSpaces') updatedRule.applicableSpaceIdNamesStr = undefined;
-        }
-        return updatedRule;
-      })
-    }));
-  };
-
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleFormSubmit = async (values: BuildingFormValues) => {
     if (!canManageThisForm) {
       toast({ title: "Permission Denied", description: "You do not have permission to save building details.", variant: "destructive" });
       return;
     }
     setIsSaving(true);
-
-    if (!currentBuildingForm.name?.trim()) {
-      toast({ title: "Validation Error", description: "Building name is required.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-
-    if (!currentBuildingForm.address?.trim()) {
-      toast({ title: "Validation Error", description: "Address is required.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
     
-    const accountNumber = currentBuildingForm.accountNumber?.trim();
-    if (!accountNumber) {
-      toast({ title: "Validation Error", description: "Account number is required.", variant: "destructive" });
-      setIsSaving(false);
-      return;
-    }
-
-    if (!/^[7]\d{12}$/.test(accountNumber)) {
-        toast({ title: "Validation Error", description: "Account number must start with '7' and be exactly 13 digits long.", variant: "destructive" });
-        setIsSaving(false);
-        return;
-    }
-
-
-    const finalPenaltyTiersCreateInput: Prisma.PenaltyTierCreateWithoutBuildingInput[] = [];
-
-    try {
-        const configuredRules = currentBuildingForm.uiPenaltyRules.filter(
-            rule => rule.feeValue !== undefined && rule.feeValue >= 0 && rule.fromDay !== undefined && rule.fromDay > 0
-        );
-
-        for (const uiRule of configuredRules) {
-             if (!uiRule.penaltyType || !uiRule.frequency) {
-                toast({ title: "Validation Error", description: `A rule is missing 'Penalty Type' or 'Frequency'.`, variant: "destructive" });
-                throw new Error("Incomplete UI rule.");
-            }
-            if (uiRule.toDay !== undefined && uiRule.fromDay !== undefined && uiRule.toDay < uiRule.fromDay) {
-                 toast({ title: "Validation Error", description: `Rule error: 'To Day' cannot be less than 'From Day'.`, variant: "destructive" });
-                throw new Error("Invalid day range.");
-            }
-            if (uiRule.scope === 'Floor' && !uiRule.applicableFloor?.trim()) {
-                toast({ title: "Validation Error", description: `Floor name is required for floor-scoped rule.`, variant: "destructive" });
-                throw new Error("Missing floor name.");
-            } else if (uiRule.scope === 'SpecificSpaces' && !uiRule.applicableSpaceIdNamesStr?.trim()) {
-                toast({ title: "Validation Error", description: `Space ID(s) are required for space-scoped rule.`, variant: "destructive" });
-                throw new Error("Missing space IDs.");
-            }
-
-            finalPenaltyTiersCreateInput.push({
-                fromDay: uiRule.fromDay!,
-                toDay: uiRule.toDay,
-                penaltyType: uiRule.penaltyType,
-                frequency: uiRule.frequency,
-                feeValue: Number(uiRule.feeValue!), 
-                scope: uiRule.scope,
-                applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
-                applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : [],
-            });
-        }
-    } catch (error: any) {
-        console.error("Validation error during penalty tier processing:", error.message);
-        setIsSaving(false);
-        return;
-    }
+    const finalPenaltyTiersCreateInput: Prisma.PenaltyTierCreateWithoutBuildingInput[] = (values.penaltyRules || []).map(uiRule => ({
+        fromDay: uiRule.fromDay!,
+        toDay: uiRule.toDay,
+        penaltyType: uiRule.penaltyType,
+        frequency: uiRule.frequency,
+        feeValue: Number(uiRule.feeValue!), 
+        scope: uiRule.scope,
+        applicableFloor: uiRule.scope === 'Floor' ? uiRule.applicableFloor?.trim() : undefined,
+        applicableSpaceIdNames: uiRule.scope === 'SpecificSpaces' ? uiRule.applicableSpaceIdNamesStr?.split(',').map(s => s.trim()).filter(s => s) : [],
+    }));
 
     let result;
     if (formMode === 'add') {
@@ -256,9 +187,9 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         return;
       }
       const buildingCreateInput: Prisma.BuildingCreateInput = {
-        name: currentBuildingForm.name!.trim(),
-        address: currentBuildingForm.address!.trim(),
-        accountNumber: currentBuildingForm.accountNumber!.trim(),
+        name: values.name.trim(),
+        address: values.address.trim(),
+        accountNumber: values.accountNumber.trim(),
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
         },
@@ -269,16 +200,16 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       result = await createBuildingAction(buildingCreateInput);
     } else {
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
-        name: currentBuildingForm.name!.trim(),
-        address: currentBuildingForm.address!.trim(),
-        accountNumber: currentBuildingForm.accountNumber!.trim(),
+        name: values.name.trim(),
+        address: values.address.trim(),
+        accountNumber: values.accountNumber.trim(),
         penaltyPolicyTiers: {
           deleteMany: {}, 
           create: finalPenaltyTiersCreateInput, 
         },
       };
       const managerIds = Array.from(selectedManagerIds);
-      result = await updateBuildingAction(currentBuildingForm.id!, buildingUpdateInput, managerIds);
+      result = await updateBuildingAction(initialBuildingData?.id!, buildingUpdateInput, managerIds);
     }
 
     setIsSaving(false);
@@ -312,7 +243,8 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
 
   return (
       <Card className="shadow-lg">
-        <form onSubmit={handleFormSubmit}>
+        <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)}>
           <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
              {isViewOnlyMode && (
               <div className="p-3 bg-yellow-50 border border-yellow-300 text-yellow-700 text-sm rounded-md flex items-center md:col-span-2">
@@ -322,49 +254,39 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
             )}
             <div className="space-y-6">
               <div className="space-y-4 border-b pb-6">
-                <div>
-                  <Label htmlFor="buildingNameMain" className="flex items-center text-sm font-medium">
-                    Name<span className="text-destructive ml-1">*</span>
-                  </Label>
-                  <Input
-                    id="buildingNameMain"
-                    value={currentBuildingForm.name || ''}
-                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Building Name"
-                    required
-                    className="mt-1"
-                    disabled={isSaving || !canManageThisForm}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="buildingAccountNumber" className="flex items-center text-sm font-medium">
-                    Account Number<span className="text-destructive ml-1">*</span>
-                  </Label>
-                  <Input
-                    id="buildingAccountNumber"
-                    value={currentBuildingForm.accountNumber || ''}
-                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, accountNumber: e.target.value }))}
-                    placeholder="7************"
-                    className="mt-1"
-                    required
-                    disabled={isSaving || !canManageThisForm}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="buildingAddressMain" className="flex items-center text-sm font-medium">
-                    Address<span className="text-destructive ml-1">*</span>
-                  </Label>
-                  <Textarea
-                    id="buildingAddressMain"
-                    value={currentBuildingForm.address || ''}
-                    onChange={(e) => setCurrentBuildingForm(prev => ({ ...prev, address: e.target.value }))}
-                    placeholder="Building Address"
-                    rows={2}
-                    className="mt-1"
-                    required
-                    disabled={isSaving || !canManageThisForm}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">Name<span className="text-destructive ml-1">*</span></FormLabel>
+                      <FormControl><Input placeholder="Building Name" {...field} disabled={isSaving || !canManageThisForm} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="accountNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">Account Number<span className="text-destructive ml-1">*</span></FormLabel>
+                      <FormControl><Input placeholder="7************" {...field} disabled={isSaving || !canManageThisForm} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">Address<span className="text-destructive ml-1">*</span></FormLabel>
+                      <FormControl><Textarea placeholder="Building Address" rows={2} {...field} disabled={isSaving || !canManageThisForm} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 
@@ -380,17 +302,17 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
               <CardDescription>
                 Define sequential penalty rules. For the last rule in a group, leave "To Day" blank for an indefinite period.
               </CardDescription>
-              {currentBuildingForm.uiPenaltyRules.length === 0 && <p className="text-sm text-muted-foreground text-center py-3">No penalty rules defined. {canManageThisForm ? 'Click "Add Rule" to begin.' : ''}</p>}
+              {fields.length === 0 && <p className="text-sm text-muted-foreground text-center py-3">No penalty rules defined. {canManageThisForm ? 'Click "Add Rule" to begin.' : ''}</p>}
 
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                {currentBuildingForm.uiPenaltyRules.map((uiRule, ruleIndex) => (
-                  <Card key={uiRule.id} className="p-4 bg-secondary/30 shadow-sm">
+                {fields.map((field, index) => (
+                  <Card key={field.id} className="p-4 bg-secondary/30 shadow-sm">
                     <CardHeader className="p-0 pb-3">
                       <div className="flex justify-between items-center">
-                        <CardTitle className="text-md font-medium">Rule {ruleIndex + 1}</CardTitle>
+                        <CardTitle className="text-md font-medium">Rule {index + 1}</CardTitle>
                         {canManageThisForm && (
                           <Button type="button" variant="ghost" size="icon"
-                                  onClick={() => handleRemoveUIPenaltyRule(uiRule.id)}
+                                  onClick={() => remove(index)}
                                   className="h-7 w-7 text-destructive hover:bg-destructive/10"
                                   disabled={isSaving}>
                               <Trash2 className="h-4 w-4"/>
@@ -400,79 +322,130 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                     </CardHeader>
                     <CardContent className="p-0 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                              <Label htmlFor={`fromDay-${uiRule.id}`} className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>From Day<span className="text-destructive ml-1">*</span></Label>
-                              <Input id={`fromDay-${uiRule.id}`} type="number" min="1" placeholder="e.g., 1"
-                                      value={uiRule.fromDay ?? ''} 
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'fromDay', e.target.value)}
-                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManageThisForm}/>
-                          </div>
-                          <div>
-                              <Label htmlFor={`toDay-${uiRule.id}`} className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>To Day</Label>
-                              <Input id={`toDay-${uiRule.id}`} type="number" min={uiRule.fromDay} placeholder="e.g., 5"
-                                      value={uiRule.toDay ?? ''} 
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'toDay', e.target.value)}
-                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManageThisForm}/>
-                          </div>
+                          <FormField
+                            control={form.control}
+                            name={`penaltyRules.${index}.fromDay`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>From Day<span className="text-destructive ml-1">*</span></FormLabel>
+                                    <FormControl><Input type="number" min="1" placeholder="e.g., 1" {...field} className="text-sm h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name={`penaltyRules.${index}.toDay`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>To Day</FormLabel>
+                                    <FormControl><Input type="number" min={form.getValues(`penaltyRules.${index}.fromDay`)} placeholder="e.g., 5" {...field} className="text-sm h-9" disabled={isSaving || !canManageThisForm}/></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                          />
                       </div>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                           <div>
-                              <Label htmlFor={`rulePenaltyType-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Penalty Type<span className="text-destructive ml-1">*</span></Label>
-                              <Select value={uiRule.penaltyType} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'penaltyType', value as UIPenaltyRule['penaltyType'])} disabled={isSaving || !canManageThisForm}>
-                                  <SelectTrigger id={`rulePenaltyType-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue placeholder="Select penalty type" /></SelectTrigger>
+                          <FormField
+                            control={form.control}
+                            name={`penaltyRules.${index}.penaltyType`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Penalty Type<span className="text-destructive ml-1">*</span></FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSaving || !canManageThisForm}>
+                                  <FormControl>
+                                    <SelectTrigger className="text-sm h-9"><SelectValue placeholder="Select penalty type" /></SelectTrigger>
+                                  </FormControl>
                                   <SelectContent>
                                       <SelectItem value="Fixed">Fixed Amount</SelectItem>
                                       <SelectItem value="Percentage">Percentage</SelectItem>
                                   </SelectContent>
-                              </Select>
-                          </div>
-                           <div>
-                              <Label htmlFor={`frequency-${uiRule.id}`} className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>Frequency<span className="text-destructive ml-1">*</span></Label>
-                              <Select value={uiRule.frequency} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'frequency', value as UIPenaltyRule['frequency'])} disabled={isSaving || !canManageThisForm}>
-                                  <SelectTrigger id={`frequency-${uiRule.id}`} className="mt-1 text-sm h-9"><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                           <FormField
+                            control={form.control}
+                            name={`penaltyRules.${index}.frequency`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>Frequency<span className="text-destructive ml-1">*</span></FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSaving || !canManageThisForm}>
+                                  <FormControl>
+                                    <SelectTrigger className="text-sm h-9"><SelectValue placeholder="Select frequency" /></SelectTrigger>
+                                  </FormControl>
                                   <SelectContent>
                                       <SelectItem value="OneTime">One-time</SelectItem>
                                       <SelectItem value="Daily">Daily</SelectItem>
                                   </SelectContent>
-                              </Select>
-                          </div>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                       </div>
                        <div className="grid grid-cols-1">
-                          <div>
-                              <Label htmlFor={`ruleFeeValue-${uiRule.id}`} className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Fee Value<span className="text-destructive ml-1">*</span></Label>
-                              <Input id={`ruleFeeValue-${uiRule.id}`} type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5"
-                                      value={uiRule.feeValue ?? ''} 
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'feeValue', e.target.value)}
-                                      className="mt-1 text-sm h-9" disabled={isSaving || !canManageThisForm}/>
-                          </div>
+                          <FormField
+                            control={form.control}
+                            name={`penaltyRules.${index}.feeValue`}
+                            render={({ field }) => (
+                               <FormItem>
+                                <FormLabel className="text-xs flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Fee Value<span className="text-destructive ml-1">*</span></FormLabel>
+                                <FormControl><Input type="number" step="0.01" min="0" placeholder="e.g., 50 or 2.5" {...field} className="text-sm h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
+                                <FormMessage />
+                               </FormItem>
+                            )}
+                          />
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                              <Label htmlFor={`scopeType-${uiRule.id}`} className="text-xs flex items-center"><Layers className="mr-1 h-3 w-3"/>Scope<span className="text-destructive ml-1">*</span></Label>
-                              <Select value={uiRule.scope} onValueChange={(value) => handleUIPenaltyRuleChange(uiRule.id, 'scope', value as UIPenaltyRule['scope'])} disabled={isSaving || !canManageThisForm}>
-                                  <SelectTrigger id={`scopeType-${uiRule.id}`} className="mt-1 h-9"><SelectValue placeholder="Select scope" /></SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="Building">Entire Building</SelectItem>
-                                      <SelectItem value="Floor">Specific Floor</SelectItem>
-                                      <SelectItem value="SpecificSpaces">Specific Space(s)</SelectItem>
-                                  </SelectContent>
-                              </Select>
-                          </div>
-                          {uiRule.scope === 'Floor' && (
-                              <div>
-                                  <Label htmlFor={`applicableFloor-${uiRule.id}`} className="text-xs">Floor Name<span className="text-destructive ml-1">*</span></Label>
-                                  <Input id={`applicableFloor-${uiRule.id}`} placeholder="Floor Name" value={uiRule.applicableFloor || ''}
-                                          onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableFloor', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
-                              </div>
+                          <FormField
+                            control={form.control}
+                            name={`penaltyRules.${index}.scope`}
+                            render={({ field }) => (
+                               <FormItem>
+                                <FormLabel className="text-xs flex items-center"><Layers className="mr-1 h-3 w-3"/>Scope<span className="text-destructive ml-1">*</span></FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSaving || !canManageThisForm}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-9"><SelectValue placeholder="Select scope" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="Building">Entire Building</SelectItem>
+                                        <SelectItem value="Floor">Specific Floor</SelectItem>
+                                        <SelectItem value="SpecificSpaces">Specific Space(s)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                               </FormItem>
+                            )}
+                          />
+                          {form.watch(`penaltyRules.${index}.scope`) === 'Floor' && (
+                              <FormField
+                                control={form.control}
+                                name={`penaltyRules.${index}.applicableFloor`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs">Floor Name<span className="text-destructive ml-1">*</span></FormLabel>
+                                    <FormControl><Input placeholder="Floor Name" {...field} className="h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
                           )}
                       </div>
-                      {uiRule.scope === 'SpecificSpaces' && (
-                          <div>
-                              <Label htmlFor={`applicableSpaces-${uiRule.id}`} className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)<span className="text-destructive ml-1">*</span></Label>
-                              <Input id={`applicableSpaces-${uiRule.id}`} placeholder="Space ID, e.g., Unit 10A, Office 202B" value={uiRule.applicableSpaceIdNamesStr || ''}
-                                      onChange={(e) => handleUIPenaltyRuleChange(uiRule.id, 'applicableSpaceIdNamesStr', e.target.value)} className="mt-1 h-9" disabled={isSaving || !canManageThisForm}/>
-                              <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>
-                          </div>
+                      {form.watch(`penaltyRules.${index}.scope`) === 'SpecificSpaces' && (
+                          <FormField
+                            control={form.control}
+                            name={`penaltyRules.${index}.applicableSpaceIdNamesStr`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)<span className="text-destructive ml-1">*</span></FormLabel>
+                                <FormControl><Input placeholder="Space ID, e.g., Unit 10A, Office 202B" {...field} className="h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
+                                <FormMessage />
+                                <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>
+                              </FormItem>
+                            )}
+                          />
                       )}
                     </CardContent>
                   </Card>
@@ -492,6 +465,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
             )}
           </CardFooter>
         </form>
+        </Form>
       </Card>
   );
 }
