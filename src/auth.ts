@@ -65,6 +65,7 @@ export const {
           delete session.user.forceChangePass;
         }
       } else {
+        // This will effectively end the session if the token is invalid or expired
         return null;
       }
       return session;
@@ -73,7 +74,8 @@ export const {
 
   jwt: {
     async encode({ token }) {
-      return await new SignJWT(token!)
+      if (!token) throw new Error("Token to encode is empty");
+      return await new SignJWT(token)
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
         .setExpirationTime(`${SESSION_DURATION_IN_SECONDS}s`)
