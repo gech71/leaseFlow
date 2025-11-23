@@ -15,7 +15,8 @@ if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   }
 }
 
-const SESSION_DURATION_IN_SECONDS = 15 * 60; // 15 minutes
+const ACCESS_TOKEN_EXPIRY = 15 * 60; // 15 minutes in seconds
+const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
 
 export const {
   handlers: { GET, POST },
@@ -25,73 +26,57 @@ export const {
 } = NextAuth({
   ...authConfig,
 
-  cookies: {
-    sessionToken: {
-      name: "authjs.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production", // Secure cookie in production
-      },
-    },
-  },
-
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user }) {
       const now = Math.floor(Date.now() / 1000);
 
+      // 1. Initial sign-in: Augment token with access/refresh details
       if (user) {
         token.id = user.id;
+        token.accessTokenExp = now + ACCESS_TOKEN_EXPIRY;
+        token.refreshTokenExp = now + REFRESH_TOKEN_EXPIRY;
         if ("forceChangePass" in user && user.forceChangePass) {
           token.forceChangePass = true;
         }
         return token;
       }
-
-      if (token.exp && now > (token.exp as number)) {
-        return {};
+      
+      // 2. On subsequent requests, check if access token is still valid
+      if (now < (token.accessTokenExp as number)) {
+        return token;
       }
 
-      return token;
+      // 3. Access token has expired, check if refresh token is still valid
+      if (now < (token.refreshTokenExp as number)) {
+        // Issue a new access token (refresh the session)
+        token.accessTokenExp = now + ACCESS_TOKEN_EXPIRY;
+        return token;
+      }
+
+      // 4. Both access and refresh tokens have expired, end the session
+      return {}; // Returning an empty object will invalidate the session
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
+        
         if (token.forceChangePass) {
           session.user.forceChangePass = true;
         } else {
           delete session.user.forceChangePass;
         }
+
+        // Pass token expiry to the client session
+        if (token.accessTokenExp) {
+           session.expires = new Date((token.accessTokenExp as number) * 1000).toISOString();
+        }
+
       } else {
-        // This will effectively end the session if the token is invalid or expired
+        // This will effectively end the session if the token is invalid or has been expired by the jwt callback
         return null;
       }
       return session;
-    },
-  },
-
-  jwt: {
-    async encode({ token }) {
-      if (!token) throw new Error("Token to encode is empty");
-      return await new SignJWT(token)
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime(`${SESSION_DURATION_IN_SECONDS}s`)
-        .sign(secret);
-    },
-    async decode({ token }) {
-      if (!token) return null;
-      try {
-        const { payload } = await jwtVerify(token, secret, {
-          algorithms: ["HS256"],
-        });
-        return payload;
-      } catch (error) {
-        console.error("JWT Decode Error:", error);
-        return null;
-      }
     },
   },
 
