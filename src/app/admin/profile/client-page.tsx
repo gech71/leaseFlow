@@ -13,8 +13,8 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
-import { signOut } from 'next-auth/react';
 import { changePassword } from './actions';
+import { useRouter } from 'next/navigation';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -28,9 +28,10 @@ const changePasswordSchema = z.object({
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
 export function AdminProfileClientPage() {
-  const { currentUser, isLoading: isUserLoading } = usePermissions();
+  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const router = useRouter();
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -48,7 +49,7 @@ export function AdminProfileClientPage() {
     if (result.success) {
         toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
         form.reset();
-        await signOut({ redirect: true, callbackUrl: '/login' });
+        await logout(); // Use the logout function from context
     } else {
         toast({ title: "Error", description: result.error, variant: "destructive" });
     }

@@ -1,8 +1,8 @@
-
 "use client";
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { usePermissions } from '@/contexts/PermissionContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,11 +12,8 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
-import type { Tenant as TenantPrisma } from '@prisma/client';
-import { AlertTriangle } from 'lucide-react';
-import { changePassword } from '@/app/admin/profile/actions'; // Use the same robust action
-import { signOut } from 'next-auth/react';
-
+import { changePassword } from './actions';
+import { useRouter } from 'next/navigation';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -29,14 +26,11 @@ const changePasswordSchema = z.object({
 
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
-interface TenantProfileClientPageProps {
-  initialTenant: (Omit<TenantPrisma, 'createdAt' | 'updatedAt'> & { createdAt: string; updatedAt?: string | null }) | null;
-  error?: string;
-}
-
-export function TenantProfileClientPage({ initialTenant, error }: TenantProfileClientPageProps) {
+export function AdminProfileClientPage() {
+  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const router = useRouter();
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -46,7 +40,7 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
     resolver: zodResolver(changePasswordSchema),
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
   });
-
+  
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
     const result = await changePassword(values);
@@ -54,34 +48,19 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
     if (result.success) {
         toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
         form.reset();
-        await signOut({ redirect: true, callbackUrl: '/login' });
+        await logout(); // Use the logout function from context
     } else {
         toast({ title: "Error", description: result.error, variant: "destructive" });
     }
     setIsSaving(false);
   };
 
-  if (error) {
+
+  if (isUserLoading || !currentUser) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Error</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>Could not load your profile data: {error}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!initialTenant) {
-     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Error</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>Could not load user profile. Please try logging in again.</p>
+        <CardContent className="p-6 flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </CardContent>
       </Card>
     );
@@ -92,20 +71,24 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="font-headline text-xl">Your Information</CardTitle>
-          <CardDescription>This is the information associated with your tenant profile.</CardDescription>
+          <CardDescription>This is the information associated with your account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
-            <Input id="name" value={initialTenant.name} readOnly disabled />
+            <Input id="name" value={currentUser.name || ''} readOnly disabled />
           </div>
           <div className="space-y-1">
             <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
-            <Input id="email" value={initialTenant.email} readOnly disabled />
+            <Input id="email" value={currentUser.email || ''} readOnly disabled />
           </div>
            <div className="space-y-1">
             <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>
-            <Input id="phone" value={initialTenant.phone || 'N/A'} readOnly disabled />
+            <Input id="phone" value={currentUser.phoneNumber || 'N/A'} readOnly disabled />
+          </div>
+           <div className="space-y-1">
+            <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
+            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
           </div>
         </CardContent>
       </Card>
@@ -118,7 +101,7 @@ export function TenantProfileClientPage({ initialTenant, error }: TenantProfileC
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleChangePasswordSubmit)} className="space-y-4">
-               <FormField
+                <FormField
                     control={form.control}
                     name="currentPassword"
                     render={({ field }) => (

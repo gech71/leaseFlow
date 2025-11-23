@@ -56,7 +56,6 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { PermissionId } from '@/lib/types';
 import Image from 'next/image';
-import { signOut, useSession } from 'next-auth/react';
 import { usePermissions } from '@/contexts/PermissionContext';
 
 interface NavItem {
@@ -85,8 +84,8 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const { isMobile, state: sidebarState } = useSidebar();
-  const { data: session } = useSession();
-  const { currentUser, hasPermission, isSuperAdmin } = usePermissions();
+  const { currentUser, hasPermission, isSuperAdmin, logout } = usePermissions();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -102,8 +101,10 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   }, [searchParams, pathname, router, toast]);
 
   const handleLogout = async () => {
-    await signOut({ redirect: true, callbackUrl: '/login' });
-    toast({ title: 'Logged Out', description: 'You have been successfully logged out.' });
+    setIsLoggingOut(true);
+    await logout();
+    // The logout function should handle redirection.
+    setIsLoggingOut(false);
   };
   
   const userInitials = currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'AD';
@@ -211,9 +212,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                   <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleLogout}>
+              <DropdownMenuItem onSelect={handleLogout} disabled={isLoggingOut}>
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+                <span>{isLoggingOut ? 'Logging out...' : 'Log out'}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -233,38 +234,37 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminClientLayout({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
-  const { currentUser, isLoading: isPermissionsLoading } = usePermissions();
+  const { currentUser, isLoading, isAuthenticated } = usePermissions();
   const router = useRouter();
 
   useEffect(() => {
-    // If authenticated but still loading permissions, wait.
-    if (status === 'authenticated' && isPermissionsLoading) {
+    if (isLoading) return;
+
+    if (!isAuthenticated) {
+        router.replace('/login');
+        return;
+    }
+    
+    // If user is authenticated but has no current user data yet (initial load), wait.
+    if (!currentUser) return;
+      
+    // If user is a tenant, redirect them immediately to the portal.
+    const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
+    if (isTenantOnly) {
+      router.replace('/portal/dashboard');
       return;
     }
     
-    // When done loading permissions:
-    if (status === 'authenticated' && !isPermissionsLoading) {
-      // If user is a tenant, redirect them immediately to the portal.
-      const isTenantOnly = currentUser?.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
-      if (isTenantOnly) {
-        router.replace('/portal/dashboard');
-        return;
-      }
-      
-      // If user has no admin permissions at all, redirect them away.
-      const hasAnyAdminPermissions = currentUser?.effectivePermissions && currentUser.effectivePermissions.some(p => p !== 'portal:view');
-      if (!hasAnyAdminPermissions) {
-        // Sign out and redirect to login with an error message
-        signOut({ redirect: false }).then(() => {
-          router.replace('/login?error=' + encodeURIComponent('You do not have any assigned permissions to access the admin panel.'));
-        });
-      }
+    // If user has no admin permissions at all, redirect them away.
+    const hasAnyAdminPermissions = currentUser.effectivePermissions && currentUser.effectivePermissions.some(p => p !== 'portal:view');
+    if (!hasAnyAdminPermissions) {
+      router.replace('/login?error=' + encodeURIComponent('You do not have any assigned permissions to access the admin panel.'));
     }
-  }, [session, status, isPermissionsLoading, currentUser, router]);
+    
+  }, [isAuthenticated, isLoading, currentUser, router]);
 
   // Show a global loading spinner while session or permissions are loading.
-  if (status === 'loading' || isPermissionsLoading) {
+  if (isLoading || !currentUser || !isAuthenticated) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -274,7 +274,7 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
 
   // If user is authenticated but is a tenant (or has no permissions), show a loader during the redirect.
   const isTenantOnly = currentUser?.roles?.length === 1 && currentUser.roles[0].name === 'TENANT';
-  const hasNoAdminPermissions = !isPermissionsLoading && currentUser && !currentUser.effectivePermissions.some(p => p !== 'portal:view');
+  const hasNoAdminPermissions = !isLoading && currentUser && !currentUser.effectivePermissions.some(p => p !== 'portal:view');
 
   if (isTenantOnly || hasNoAdminPermissions) {
     return (

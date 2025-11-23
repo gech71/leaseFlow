@@ -1,107 +1,168 @@
+"use client";
 
-export const dynamic = 'force-dynamic';
+import React, { useState } from 'react';
+import { usePermissions } from '@/contexts/PermissionContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { changePassword } from './actions';
+import { useRouter } from 'next/navigation';
 
-import React, { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
-import type { PenaltyTier as PenaltyTierPrisma, Agreement as AgreementPrisma, Bill as BillPrisma, Space as SpacePrisma, Building as BuildingPrisma, Tenant as TenantPrisma } from '@prisma/client';
-import { getTenantPortalDashboardDataAction, type PortalAgreementWithRelations } from '../../dashboard/actions';
-import { CustomerDashboardClientPage, type ClientAgreement, type ClientBill, type SerializedTenantPortalData, type ClientPenaltyTier, type ClientBuilding, type ClientSpace, type ClientTenant, type ClientUtilityBreakdownItem } from '../../dashboard/client-page'; // Import from sibling folder
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, { message: "Current password is required." }),
+  newPassword: z.string().min(6, { message: "New password must be at least 6 characters." }),
+  confirmPassword: z.string()
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "New passwords do not match.",
+  path: ["confirmPassword"]
+});
 
-const EPOCH_ISO_STRING = new Date(0).toISOString();
+type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
-// Helper function to serialize a single agreement with deep relations
-const serializeAgreementData = (agreementWithParsedUtilities: PortalAgreementWithRelations): ClientAgreement => {
-  const tenant = agreementWithParsedUtilities.tenant;
-  const space = agreementWithParsedUtilities.space;
-  const building = space?.building;
+export function AdminProfileClientPage() {
+  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const router = useRouter();
 
-  return {
-    ...agreementWithParsedUtilities,
-    monthlyRentalPrice: Number(agreementWithParsedUtilities.monthlyRentalPrice),
-    initialPaymentAmount: agreementWithParsedUtilities.initialPaymentAmount ? Number(agreementWithParsedUtilities.initialPaymentAmount) : null,
-    createdAt: agreementWithParsedUtilities.createdAt?.toISOString() || EPOCH_ISO_STRING,
-    updatedAt: agreementWithParsedUtilities.updatedAt?.toISOString() || agreementWithParsedUtilities.createdAt?.toISOString() || EPOCH_ISO_STRING,
-    startDate: agreementWithParsedUtilities.startDate?.toISOString() || EPOCH_ISO_STRING,
-    nextPaymentDueDate: agreementWithParsedUtilities.nextPaymentDueDate?.toISOString() || EPOCH_ISO_STRING,
-    initialPaymentDate: agreementWithParsedUtilities.initialPaymentDate?.toISOString() || null,
-    endDate: agreementWithParsedUtilities.endDate?.toISOString() || undefined,
-    tenant: tenant ? {
-      ...tenant,
-      createdAt: tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
-      updatedAt: tenant.updatedAt?.toISOString() || tenant.createdAt?.toISOString() || EPOCH_ISO_STRING,
-    } : ({} as ClientTenant), 
-    space: space ? {
-      ...space,
-      area: Number(space.area),
-      utilityProrationShare: Number(space.utilityProrationShare),
-      monthlyRentalPrice: Number(space.monthlyRentalPrice),
-      createdAt: space.createdAt?.toISOString() || EPOCH_ISO_STRING,
-      updatedAt: space.updatedAt?.toISOString() || space.createdAt?.toISOString() || EPOCH_ISO_STRING,
-      building: building ? {
-        ...building,
-        createdAt: building.createdAt?.toISOString() || EPOCH_ISO_STRING,
-        updatedAt: building.updatedAt?.toISOString() || building.createdAt?.toISOString() || EPOCH_ISO_STRING,
-        penaltyPolicyTiers: building.penaltyPolicyTiers?.map(pt => ({ ...pt, feeValue: Number(pt.feeValue) })) || [],
-      } : ({} as ClientBuilding),
-    } : ({} as ClientSpace), 
-    bills: (agreementWithParsedUtilities.bills || []).map(bill => ({
-      ...bill,
-      rentAmount: Number(bill.rentAmount),
-      penaltyAmount: bill.penaltyAmount ? Number(bill.penaltyAmount) : null,
-      totalAmount: Number(bill.totalAmount),
-      createdAt: bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
-      updatedAt: bill.updatedAt?.toISOString() || bill.createdAt?.toISOString() || EPOCH_ISO_STRING,
-      billDate: bill.billDate?.toISOString() || EPOCH_ISO_STRING,
-      dueDate: bill.dueDate?.toISOString() || EPOCH_ISO_STRING,
-      paymentDate: bill.paymentDate?.toISOString() || null,
-      utilityBreakdown: (bill.utilityBreakdown || []).map(ub => ({ ...ub, amount: Number(ub.amount) })),
-    })),
-  };
-};
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-
-async function TenantPortalDataFetcher({ agreementId }: { agreementId?: string }) {
-  const portalData = await getTenantPortalDashboardDataAction();
+  const form = useForm<ChangePasswordValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
+  });
   
-  let serializedData: SerializedTenantPortalData | null = null;
-  let selectedAgreement: ClientAgreement | null = null;
+  const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
+    setIsSaving(true);
+    const result = await changePassword(values);
 
-  if (portalData.agreements.length > 0) {
-    const allSerializedAgreements = portalData.agreements.map(serializeAgreementData);
-
-    if (agreementId) {
-      selectedAgreement = allSerializedAgreements.find(ag => ag.id === agreementId) || allSerializedAgreements[0];
+    if (result.success) {
+        toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
+        form.reset();
+        await logout(); // Use the logout function from context
     } else {
-      selectedAgreement = allSerializedAgreements[0];
+        toast({ title: "Error", description: result.error, variant: "destructive" });
     }
-    
-    serializedData = {
-      agreements: allSerializedAgreements,
-      selectedAgreement: selectedAgreement,
-      error: portalData.error,
-    };
+    setIsSaving(false);
+  };
 
-  } else { 
-    serializedData = {
-        agreements: [],
-        selectedAgreement: null,
-        error: portalData.error || "No active agreement found or failed to load data.",
-    };
+
+  if (isUserLoading || !currentUser) {
+    return (
+      <Card>
+        <CardContent className="p-6 flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
   }
-  
-  return <CustomerDashboardClientPage initialData={serializedData} />;
-}
-
-export default function CustomerDashboardServerPage({
-  searchParams,
-}: {
-  searchParams?: { agreementId?: string };
-}) {
-  const agreementId = searchParams?.agreementId;
 
   return (
-    <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-      <TenantPortalDataFetcher agreementId={agreementId} />
-    </Suspense>
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">Your Information</CardTitle>
+          <CardDescription>This is the information associated with your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
+            <Input id="name" value={currentUser.name || ''} readOnly disabled />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
+            <Input id="email" value={currentUser.email || ''} readOnly disabled />
+          </div>
+           <div className="space-y-1">
+            <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>
+            <Input id="phone" value={currentUser.phoneNumber || 'N/A'} readOnly disabled />
+          </div>
+           <div className="space-y-1">
+            <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
+            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">Change Password</CardTitle>
+          <CardDescription>Update your password for security.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleChangePasswordSubmit)} className="space-y-4">
+                <FormField
+                    control={form.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Current Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showCurrentPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+                                  {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />New Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowNewPassword(!showNewPassword)}>
+                                  {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Confirm New Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <Button type="submit" disabled={isSaving} className="w-full">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Update Password
+                </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

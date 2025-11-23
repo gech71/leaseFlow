@@ -1,237 +1,168 @@
+"use client";
 
-"use server";
+import React, { useState } from 'react';
+import { usePermissions } from '@/contexts/PermissionContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { changePassword } from './actions';
+import { useRouter } from 'next/navigation';
 
-import { prisma } from '@/lib/prisma';
-import { addMonths, isAfter, format } from 'date-fns';
-import { cookies } from 'next/headers';
-import crypto from 'crypto';
-import type { Bill, BillStatus } from '@prisma/client';
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, { message: "Current password is required." }),
+  newPassword: z.string().min(6, { message: "New password must be at least 6 characters." }),
+  confirmPassword: z.string()
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "New passwords do not match.",
+  path: ["confirmPassword"]
+});
 
-interface BillingResult {
-  success: boolean;
-  bills?: (Omit<Bill, 'utilityBreakdown'> & { utilityBreakdown: any[] })[] | null;
-  totalAmount?: number | null;
-  message?: string | null;
-  error?: string;
-}
+type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
-export async function getBillingAmountForPhoneNumberAction(phone: string): Promise<BillingResult> {
-  if (!phone || typeof phone !== 'string' || !/^\d+$/.test(phone)) {
-    return { success: false, error: 'A valid phone number is required.' };
-  }
+export function AdminProfileClientPage() {
+  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const router = useRouter();
 
-  try {
-    const tenant = await prisma.tenant.findFirst({
-      where: {
-        OR: [
-          { phone: phone },
-          { alternativePhone: phone }
-        ],
-      },
-    });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    if (!tenant) {
-      return { success: false, error: 'No tenant profile found for this phone number.' };
+  const form = useForm<ChangePasswordValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
+  });
+  
+  const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
+    setIsSaving(true);
+    const result = await changePassword(values);
+
+    if (result.success) {
+        toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
+        form.reset();
+        await logout(); // Use the logout function from context
+    } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" });
     }
+    setIsSaving(false);
+  };
 
-    const agreements = await prisma.agreement.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { startDate: 'desc' },
-    });
 
-    const activeAgreements = agreements.filter(ag => 
-      isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date())
+  if (isUserLoading || !currentUser) {
+    return (
+      <Card>
+        <CardContent className="p-6 flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
     );
-
-    if (activeAgreements.length === 0) {
-      return { success: false, error: 'No active rental agreement found for this tenant.' };
-    }
-
-    const activeAgreementIds = activeAgreements.map(ag => ag.id);
-
-    const outstandingBills = await prisma.bill.findMany({
-      where: {
-        agreementId: { in: activeAgreementIds },
-        status: { in: ['Pending', 'Overdue'] },
-      },
-      orderBy: {
-        dueDate: 'asc',
-      },
-    });
-
-    if (outstandingBills.length === 0) {
-      return { success: true, bills: [], totalAmount: 0, message: 'You have no outstanding payments. Thank you!' };
-    }
-
-    const totalAmount = outstandingBills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
-    
-    // Serialize utilityBreakdown
-    const serializedBills = outstandingBills.map(bill => {
-        let parsedUtilityBreakdown: any[] = [];
-        if(bill.utilityBreakdown && typeof bill.utilityBreakdown === 'string') {
-            try {
-                parsedUtilityBreakdown = JSON.parse(bill.utilityBreakdown);
-            } catch(e) {/* ignore */}
-        } else if (Array.isArray(bill.utilityBreakdown)) {
-            parsedUtilityBreakdown = bill.utilityBreakdown;
-        }
-
-        return {
-            ...bill,
-            utilityBreakdown: parsedUtilityBreakdown,
-        }
-    });
-
-    return { success: true, bills: serializedBills, totalAmount };
-
-  } catch (error) {
-    console.error("Error in getBillingAmountForPhoneNumberAction:", error);
-    return { success: false, error: 'An internal server error occurred. Please try again later.' };
   }
-}
 
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">Your Information</CardTitle>
+          <CardDescription>This is the information associated with your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
+            <Input id="name" value={currentUser.name || ''} readOnly disabled />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
+            <Input id="email" value={currentUser.email || ''} readOnly disabled />
+          </div>
+           <div className="space-y-1">
+            <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>
+            <Input id="phone" value={currentUser.phoneNumber || 'N/A'} readOnly disabled />
+          </div>
+           <div className="space-y-1">
+            <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
+            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
+          </div>
+        </CardContent>
+      </Card>
 
-interface PaymentInitiationResult {
-    success: boolean;
-    message?: string;
-    error?: string;
-    redirectUrl?: string; 
-    data?: any; 
-}
-
-export async function initiatePaymentAction(billIds: string[], amount: number): Promise<PaymentInitiationResult> {
-    const NIB_PAYMENT_URL = process.env.NIB_PAYMENT_URL;
-    const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
-    const COMPANY_NAME = process.env.NIB_COMPANY_NAME || 'BUILDING';
-    const CALLBACK_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/api/portal/payment-callback`;
-
-    try {
-        if (billIds.length === 0) {
-          return { success: false, error: "No bills selected for payment." };
-        }
-
-        const firstBill = await prisma.bill.findUnique({
-            where: { id: billIds[0] },
-            include: {
-                agreement: {
-                    include: {
-                        space: {
-                            include: {
-                                building: true
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        if (!firstBill) {
-            return { success: false, error: "Bill to be paid was not found." };
-        }
-        
-        const buildingAccountNumber = firstBill.agreement?.space?.building?.accountNumber;
-
-        if (!buildingAccountNumber) {
-            console.error(`CRITICAL: Building account number is not set for the building associated with bill ${firstBill.id}.`);
-            return { success: false, error: "The property's account information is not configured. Please contact support." };
-        }
-
-        if (!NIB_PAYMENT_URL || !NIB_PAYMENT_KEY) {
-            console.error("NIB payment environment variables (URL or KEY) are not set.");
-            return { success: false, error: "Payment service is not configured correctly." };
-        }
-
-        const cookieStore = await cookies();
-        const token = cookieStore.get('nibrental_admin_access_token')?.value;
-
-        if (!token) {
-            return { success: false, error: "Authentication session not found. Please re-enter from the Mini App." };
-        }
-
-        const transactionId = crypto.randomUUID();
-        const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
-
-        const signatureString = [
-            `accountNo=${buildingAccountNumber}`,
-            `amount=${amount}`,
-            `callBackURL=${CALLBACK_URL}`,
-            `companyName=${COMPANY_NAME}`,
-            `Key=${NIB_PAYMENT_KEY}`,
-            `token=${token}`,
-            `transactionId=${transactionId}`,
-            `transactionTime=${transactionTime}`
-        ].join('&');
-        
-        const signature = crypto.createHash('sha256').update(signatureString, 'utf8').digest('hex');
-        
-        const payload = {
-            accountNo: buildingAccountNumber,
-            amount: String(amount),
-            callBackURL: CALLBACK_URL,
-            companyName: COMPANY_NAME,
-            token: token,
-            transactionId: transactionId,
-            transactionTime: transactionTime,
-            signature: signature
-        };
-        
-        const response = await fetch(NIB_PAYMENT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(payload),
-        });
-
-        const responseData = await response.json();
-
-        if (!response.ok) {
-            console.error("NIB Payment API Error:", responseData);
-            return { success: false, error: responseData.message || `Payment initiation failed with status ${response.status}.` };
-        }
-        
-        // Update all bills with the same transaction reference for the callback
-        await prisma.bill.updateMany({
-            where: { id: { in: billIds } },
-            data: { 
-              tenantPaymentNotes: `Payment initiated with NIB. Group Transaction Ref: ${transactionId}`,
-              paymentReference: signature
-            }
-        });
-        
-        return {
-            success: true,
-            message: "Payment initiated successfully!",
-            redirectUrl: responseData.redirectUrl,
-            data: responseData
-        };
-
-    } catch (error) {
-        console.error("Error in initiatePaymentAction:", error);
-        return { success: false, error: 'An unexpected error occurred while initiating payment.' };
-    }
-}
-
-// --- New Bill Status Action ---
-export async function getBillStatusAction(billIds: string[]): Promise<{ status: BillStatus | null, error?: string }> {
-  try {
-    if (billIds.length === 0) {
-      return { status: null, error: "No bill IDs provided." };
-    }
-    // Check the status of the first bill in the batch, assuming they all get updated together.
-    const bill = await prisma.bill.findUnique({
-      where: { id: billIds[0] },
-      select: { status: true },
-    });
-
-    if (!bill) {
-      return { status: null, error: "Bill not found." };
-    }
-
-    return { status: bill.status };
-  } catch (error) {
-    console.error("Error fetching bill status:", error);
-    return { status: null, error: "Database error." };
-  }
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">Change Password</CardTitle>
+          <CardDescription>Update your password for security.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleChangePasswordSubmit)} className="space-y-4">
+                <FormField
+                    control={form.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Current Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showCurrentPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+                                  {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />New Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowNewPassword(!showNewPassword)}>
+                                  {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Confirm New Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <Button type="submit" disabled={isSaving} className="w-full">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Update Password
+                </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

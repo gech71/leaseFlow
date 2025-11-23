@@ -1,10 +1,12 @@
 
 "use server";
 
-import { auth, signOut } from "@/auth";
 import { databaseService } from "@/lib/services/databaseService";
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { lucia } from '@/lib/auth';
+import { cookies } from 'next/headers';
+import { validateRequest } from '@/lib/auth';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string(),
@@ -13,8 +15,8 @@ const changePasswordSchema = z.object({
 
 export async function changePassword(values: z.infer<typeof changePasswordSchema>): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const { user: sessionUser } = await validateRequest();
+    if (!sessionUser) {
       return { success: false, error: "Authentication required." };
     }
 
@@ -24,7 +26,7 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
     }
     const { currentPassword, newPassword } = validatedData.data;
 
-    const user = await databaseService.getUserById(session.user.id);
+    const user = await databaseService.getUserById(sessionUser.id);
     if (!user || !user.password) {
       return { success: false, error: "User not found or password not set." };
     }
@@ -40,9 +42,12 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
       tempPassword: null, // Clear any temporary password
     });
 
-    // After a successful password change, we should log the user out
-    // to ensure all session data is refreshed on next login.
-    await signOut({ redirect: false });
+    // Invalidate the user's session, forcing them to log in again.
+    await lucia.invalidateUserSessions(sessionUser.id);
+    
+    // Create and set a blank session cookie to overwrite the existing one
+    const sessionCookie = lucia.createBlankSessionCookie();
+    cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
 
     return { success: true };
   } catch (error) {
@@ -50,4 +55,3 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
     return { success: false, error: "An unexpected server error occurred." };
   }
 }
-

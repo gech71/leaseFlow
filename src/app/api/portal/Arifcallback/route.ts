@@ -1,135 +1,168 @@
+"use client";
 
+import React, { useState } from 'react';
+import { usePermissions } from '@/contexts/PermissionContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { changePassword } from './actions';
+import { useRouter } from 'next/navigation';
 
-import { NextResponse, type NextRequest } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { databaseService } from '@/lib/services/databaseService';
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, { message: "Current password is required." }),
+  newPassword: z.string().min(6, { message: "New password must be at least 6 characters." }),
+  confirmPassword: z.string()
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "New passwords do not match.",
+  path: ["confirmPassword"]
+});
 
-// --- Normalization Helper ---
-const toCamelCase = (s: string) => {
-  if (typeof s !== 'string' || s.length === 0) {
-    return s;
-  }
-   // Handles PascalCase (like ResponseCode) by converting the first letter to lowercase
-  const cameled = s.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-  return cameled.charAt(0).toLowerCase() + cameled.slice(1);
-};
+type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
-const isObject = function (o: any) {
-  return o === Object(o) && !Array.isArray(o) && typeof o !== 'function';
-};
+export function AdminProfileClientPage() {
+  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const router = useRouter();
 
-const normalizeKeys = (obj: any): any => {
-  if (isObject(obj)) {
-    const n: { [key: string]: any } = {};
-    Object.keys(obj)
-      .forEach((k) => {
-        n[toCamelCase(k)] = normalizeKeys(obj[k]);
-      });
-    return n;
-  } else if (Array.isArray(obj)) {
-    return obj.map((i) => {
-      return normalizeKeys(i);
-    });
-  }
-  return obj;
-};
-// --- End Normalization Helper ---
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const form = useForm<ChangePasswordValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
+  });
+  
+  const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
+    setIsSaving(true);
+    const result = await changePassword(values);
 
-// This is a simplified handler. Production environments might add more checks.
-export async function POST(request: NextRequest) {
-  const ARIFPAY_API_KEY = process.env.ARIFPAY_API_KEY;
-  const NOTIFY_TOKEN = process.env.ARIFPAY_NOTIFY_TOKEN; // Your custom verification token
-
-  // 1. Verify the API key from ArifPay
-  const apiKey = request.headers.get('x-arifpay-key');
-  if (apiKey !== ARIFPAY_API_KEY) {
-    console.warn("ArifPay Callback: Received request with invalid API key.");
-    return NextResponse.json({ message: "Unauthorized: Invalid API key." }, { status: 401 });
-  }
-
-  // 2. Verify a custom token for an extra layer of security
-  const notifyToken = request.headers.get('x-notify-token');
-  if (notifyToken !== NOTIFY_TOKEN) {
-    console.warn("ArifPay Callback: Received request with invalid notification token.");
-    return NextResponse.json({ message: "Unauthorized: Invalid token." }, { status: 401 });
-  }
-
-  try {
-    const rawPayload = await request.json();
-    const payload = normalizeKeys(rawPayload); // Normalize the incoming payload
-   
-
-    const { sessionId, transaction } = payload;
-    const { transactionId, transactionStatus, paymentMethod } = transaction || {};
-
-    if (!sessionId || !transactionId || !transactionStatus) {
-      console.error("ArifPay Callback: Missing required fields in payload (sessionId, transactionId, transactionStatus).");
-      return NextResponse.json({ message: "Invalid payload: missing required fields." }, { status: 400 });
-    }
-    
-    // Find the ArifPayment record using the session ID
-    const arifPayment = await databaseService.getArifPaymentBySessionId(sessionId);
-
-    if (!arifPayment) {
-      console.warn(`ArifPay Callback: ArifPayment record with Session ID ${sessionId} not found.`);
-      return NextResponse.json({ message: "Payment record not found, but callback acknowledged." }, { status: 200 });
-    }
-
-    // Process based on status
-    if (transactionStatus === 'SUCCESS') {
-      await prisma.$transaction(async (tx) => {
-        // Update the ArifPayment record
-        await tx.arifPayment.update({
-          where: { id: arifPayment.id },
-          data: {
-            status: 'Success',
-            transactionId: transactionId,
-            paymentMethod: paymentMethod || 'ArifPay',
-          }
-        });
-        
-        // Update the associated Bill record
-        await tx.bill.update({
-          where: { id: arifPayment.billId },
-          data: {
-            status: 'Paid',
-            paymentDate: new Date(),
-            paymentMethod: paymentMethod || 'ArifPay',
-            paymentReference: transactionId,
-            adminVerifiedPayment: true,
-            adminVerificationNotes: `Payment confirmed via ArifPay callback. Session ID: ${sessionId}.`,
-          }
-        });
-      });
-     
+    if (result.success) {
+        toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
+        form.reset();
+        await logout(); // Use the logout function from context
     } else {
-      // Handle other statuses like FAILED, CANCELED, EXPIRED
-       await prisma.$transaction(async (tx) => {
-         await tx.arifPayment.update({
-          where: { id: arifPayment.id },
-          data: {
-            status: 'Failed', // or transactionStatus
-            transactionId: transactionId,
-            paymentMethod: paymentMethod,
-          }
-        });
-        await tx.bill.update({
-          where: { id: arifPayment.billId },
-          data: {
-            status: 'Pending', // Revert to Pending
-            tenantPaymentNotes: `ArifPay payment attempt failed or was cancelled. Status: ${transactionStatus}.`
-          }
-        });
-      });
-   
+        toast({ title: "Error", description: result.error, variant: "destructive" });
     }
+    setIsSaving(false);
+  };
 
-    // Acknowledge receipt to ArifPay
-    return NextResponse.json({ message: "Callback processed successfully." }, { status: 200 });
 
-  } catch (error) {
-    console.error("Error processing ArifPay callback:", error);
-    return NextResponse.json({ message: "Internal server error." }, { status: 500 });
+  if (isUserLoading || !currentUser) {
+    return (
+      <Card>
+        <CardContent className="p-6 flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
   }
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">Your Information</CardTitle>
+          <CardDescription>This is the information associated with your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
+            <Input id="name" value={currentUser.name || ''} readOnly disabled />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
+            <Input id="email" value={currentUser.email || ''} readOnly disabled />
+          </div>
+           <div className="space-y-1">
+            <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>
+            <Input id="phone" value={currentUser.phoneNumber || 'N/A'} readOnly disabled />
+          </div>
+           <div className="space-y-1">
+            <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
+            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">Change Password</CardTitle>
+          <CardDescription>Update your password for security.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleChangePasswordSubmit)} className="space-y-4">
+                <FormField
+                    control={form.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Current Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showCurrentPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+                                  {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />New Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowNewPassword(!showNewPassword)}>
+                                  {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Confirm New Password</FormLabel>
+                            <div className="relative">
+                                <FormControl>
+                                    <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <Button type="submit" disabled={isSaving} className="w-full">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Update Password
+                </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
