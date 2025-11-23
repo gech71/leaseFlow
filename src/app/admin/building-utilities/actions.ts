@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -107,44 +108,41 @@ export async function saveBuildingUtilitiesAction(
         });
       }
 
-      // Step 2: Separate items into create, update, and identify items to delete
-      const itemsToCreate = utilityItems.filter(item => !item.id);
-      const itemsToUpdate = utilityItems.filter(item => item.id);
-      const clientItemIds = new Set(itemsToUpdate.map(item => item.id!));
+      // Step 2: Process items
+      const clientItemIds = new Set(utilityItems.filter(item => item.id).map(item => item.id!));
       const dbItemIds = new Set(monthlyUtil.utilities.map(item => item.id));
       const itemIdsToDelete = [...dbItemIds].filter(id => !clientItemIds.has(id));
-      
-      // Step 3: Perform database operations
+
+      // Delete items that are no longer in the submission
       if (itemIdsToDelete.length > 0) {
         await tx.buildingUtilityItem.deleteMany({
           where: { id: { in: itemIdsToDelete } },
         });
       }
 
-      for (const item of itemsToUpdate) {
-        await tx.buildingUtilityItem.update({
-          where: { id: item.id! },
-          data: {
+      // Upsert items from the submission
+      for (const item of utilityItems) {
+        const dataPayload = {
             name: item.name,
             totalCost: item.totalCost,
             appliesToScope: item.appliesToScope,
             applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
             applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-          },
-        });
-      }
+        };
 
-      if (itemsToCreate.length > 0) {
-        await tx.buildingUtilityItem.createMany({
-          data: itemsToCreate.map(item => ({
-            monthlyUtilitiesId: monthlyUtil!.id,
-            name: item.name,
-            totalCost: item.totalCost,
-            appliesToScope: item.appliesToScope,
-            applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
-            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-          })),
-        });
+        if (item.id) { // If ID exists, it's an update
+          await tx.buildingUtilityItem.update({
+            where: { id: item.id },
+            data: dataPayload,
+          });
+        } else { // No ID, it's a new item
+          await tx.buildingUtilityItem.create({
+            data: {
+              ...dataPayload,
+              monthlyUtilitiesId: monthlyUtil!.id,
+            },
+          });
+        }
       }
 
       // Step 4: Fetch the final state of the record to return

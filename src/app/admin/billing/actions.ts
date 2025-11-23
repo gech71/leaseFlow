@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -436,6 +437,11 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
           if (!isNaN(prorationShare) && prorationShare > 0) {
             costForThisItem = utilTotalCost * prorationShare;
           }
+        } else if (utilItem.appliesToScope === 'Floor' && utilItem.applicableFloor === space.floor) {
+           const spacesOnFloor = agreement.space.building.spaces.filter(s => s.floor === utilItem.applicableFloor);
+           if (spacesOnFloor.length > 0) {
+                costForThisItem = utilTotalCost / spacesOnFloor.length;
+           }
         } else if (utilItem.appliesToScope === 'SpecificSpaces') {
           if (Array.isArray(utilItem.applicableSpaceIdNames) && utilItem.applicableSpaceIdNames.includes(space.spaceIdName)) {
             costForThisItem = utilTotalCost;

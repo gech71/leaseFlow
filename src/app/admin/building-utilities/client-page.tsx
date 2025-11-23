@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -73,7 +74,6 @@ interface UIUtilityItem {
   totalCost?: number;
   applicableFloor?: string;
   perSpaceCosts?: { [spaceId: string]: number };
-  perSpacePercentages?: { [spaceId: string]: number };
 }
 
 
@@ -163,7 +163,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   }, [selectedBuilding]);
 
   const createEmptyItem = (): UIUtilityItem => ({
-    uiId: crypto.randomUUID(), name: '', appliesToScope: 'Building', totalCost: 0, perSpaceCosts: {}, perSpacePercentages: {}
+    uiId: crypto.randomUUID(), name: '', appliesToScope: 'Building', totalCost: undefined, perSpaceCosts: {}
   });
 
   useEffect(() => {
@@ -181,23 +181,34 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
         if (existingEntry?.utilities) {
-          const uiItems: UIUtilityItem[] = existingEntry.utilities.map(item => {
-            const cost = Number(item.totalCost);
-            return {
-              uiId: crypto.randomUUID(),
-              id: item.id, // Keep the DB ID
-              name: item.name,
-              appliesToScope: item.appliesToScope,
-              totalCost: isNaN(cost) ? undefined : cost,
-              applicableFloor: item.applicableFloor || undefined,
-              // If it's a specific space, we just have one entry.
-              // We'll need to reconstruct grouping logic on save if needed, or change save logic.
-              perSpacePercentages: {},
-              perSpaceCosts: {},
-            };
+          // Group by name and scope to reconstruct UI items
+          const grouped: Record<string, UIUtilityItem> = {};
+
+          existingEntry.utilities.forEach(dbItem => {
+              // For SpecificSpaces, we want one UI item per utility NAME, which holds multiple space costs
+              const key = dbItem.appliesToScope === 'SpecificSpaces' ? `${dbItem.name}-SpecificSpaces` : dbItem.id;
+              
+              if (!grouped[key]) {
+                  grouped[key] = {
+                      uiId: crypto.randomUUID(),
+                      id: dbItem.id, // Store original ID for updates
+                      name: dbItem.name,
+                      appliesToScope: dbItem.appliesToScope,
+                      totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
+                      applicableFloor: dbItem.applicableFloor || undefined,
+                      perSpaceCosts: {},
+                  };
+              }
+
+              if (dbItem.appliesToScope === 'SpecificSpaces' && dbItem.applicableSpaceIdNames.length > 0) {
+                  const spaceName = dbItem.applicableSpaceIdNames[0];
+                  grouped[key].perSpaceCosts![spaceName] = Number(dbItem.totalCost);
+              }
           });
 
+          const uiItems = Object.values(grouped);
           setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
+
         } else {
           setCurrentUtilityItems([createEmptyItem()]);
         }
@@ -247,9 +258,8 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         let updatedItem = { ...item, [field]: value };
 
         if (field === 'appliesToScope') {
-            updatedItem.totalCost = 0;
+            updatedItem.totalCost = undefined;
             updatedItem.perSpaceCosts = {};
-            updatedItem.perSpacePercentages = {};
             updatedItem.applicableFloor = '';
         }
         
@@ -265,17 +275,6 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
             
             const newPerSpaceCosts = { ...item.perSpaceCosts, [spaceId]: isNaN(cost) ? 0 : cost };
             return { ...item, perSpaceCosts: newPerSpaceCosts };
-        }));
-   };
-
-   const handlePerSpacePercentageChange = (uiId: string, spaceId: string, percentageStr: string) => {
-        if (!canSaveUtilities) return;
-        const percentage = parseFloat(percentageStr);
-        setCurrentUtilityItems(prev => prev.map(item => {
-            if (item.uiId !== uiId) return item;
-            
-            const newPercentages = { ...item.perSpacePercentages, [spaceId]: isNaN(percentage) ? 0 : percentage };
-            return { ...item, perSpacePercentages: newPercentages };
         }));
    };
 
@@ -297,51 +296,44 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       if (validationFailed) break;
 
       if (!item.name.trim()) {
-        if (currentUtilityItems.length > 1 || (currentUtilityItems.length === 1 && (item.totalCost && item.totalCost > 0))) {
-          toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
-          validationFailed = true;
+        if (currentUtilityItems.length > 1 || (item.appliesToScope === 'SpecificSpaces' ? Object.values(item.perSpaceCosts ?? {}).some(c => c > 0) : (item.totalCost && item.totalCost > 0))) {
+            toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
+            validationFailed = true;
         }
-        continue;
+        continue; 
       }
       
-      const totalCostValue = item.totalCost;
-      if (item.appliesToScope !== 'SpecificSpaces' && (totalCostValue === undefined || totalCostValue <= 0)) {
-        toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
-        validationFailed = true;
-        continue;
-      }
-
-      if (item.appliesToScope === 'Building') {
-        finalUtilityItemsForDb.push({
-          id: item.id,
-          name: item.name,
-          totalCost: totalCostValue!,
-          appliesToScope: 'Building',
-        });
-      } else if (item.appliesToScope === 'Floor') {
-        if (!item.applicableFloor) {
+      if (item.appliesToScope === 'Building' || item.appliesToScope === 'Floor') {
+        const totalCostValue = item.totalCost;
+        if (totalCostValue === undefined || totalCostValue <= 0) {
+          toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
+          validationFailed = true;
+          continue;
+        }
+         if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
             toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
             validationFailed = true;
             continue;
         }
         finalUtilityItemsForDb.push({
-            id: item.id,
-            name: item.name,
-            totalCost: totalCostValue!,
-            appliesToScope: 'Floor',
-            applicableFloor: item.applicableFloor,
+          id: item.id,
+          name: item.name,
+          totalCost: totalCostValue!,
+          appliesToScope: item.appliesToScope,
+          applicableFloor: item.applicableFloor
         });
       } else if (item.appliesToScope === 'SpecificSpaces') {
          const costs = item.perSpaceCosts || {};
          const costEntries = Object.entries(costs).filter(([, cost]) => cost > 0);
          if (costEntries.length === 0) {
-             toast({ title: 'Validation Error', description: `At least one space must have a cost for "${item.name}".`, variant: 'destructive' });
-             validationFailed = true;
-             continue;
+             if (currentUtilityItems.length > 1 || item.name) {
+                 toast({ title: 'Validation Error', description: `At least one space must have a cost for "${item.name}".`, variant: 'destructive' });
+                 validationFailed = true;
+                 continue;
+             }
          }
          costEntries.forEach(([spaceIdName, cost]) => {
              finalUtilityItemsForDb.push({
-                // No ID here, these are conceptual. Save action will handle create/update.
                 name: item.name,
                 totalCost: cost,
                 appliesToScope: 'SpecificSpaces',
@@ -357,26 +349,12 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     
     setIsSaving(true);
     try {
-      // The save action now needs to be smarter. It can't just take the UI model.
-      // We will simplify and save each UI item as a DB item.
-      const dbItems: BuildingUtilityItemInput[] = currentUtilityItems
-        .filter(item => item.name && item.totalCost && item.totalCost > 0)
-        .map(item => ({
-            id: item.id,
-            name: item.name,
-            totalCost: item.totalCost!,
-            appliesToScope: item.appliesToScope,
-            applicableFloor: item.applicableFloor,
-            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? Object.keys(item.perSpaceCosts || {}) : [],
-        }));
-
-
       const result = await saveBuildingUtilitiesAction(
         selectedBuilding.id,
         selectedBuilding.name,
         selectedYear,
         selectedMonth,
-        dbItems
+        finalUtilityItemsForDb
       );
 
       if (result?.success) {
@@ -386,16 +364,26 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         // Refetch the data for the current view to get the new IDs
         const updatedEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         if (updatedEntry?.utilities) {
-             setCurrentUtilityItems(updatedEntry.utilities.map(dbItem => ({
-                uiId: crypto.randomUUID(),
-                id: dbItem.id,
-                name: dbItem.name,
-                totalCost: Number(dbItem.totalCost),
-                appliesToScope: dbItem.appliesToScope,
-                applicableFloor: dbItem.applicableFloor || undefined,
-                perSpaceCosts: {},
-                perSpacePercentages: {},
-            })));
+             const grouped: Record<string, UIUtilityItem> = {};
+              updatedEntry.utilities.forEach(dbItem => {
+                const key = dbItem.appliesToScope === 'SpecificSpaces' ? `${dbItem.name}-SpecificSpaces` : dbItem.id;
+                if (!grouped[key]) {
+                  grouped[key] = {
+                    uiId: crypto.randomUUID(),
+                    id: dbItem.id,
+                    name: dbItem.name,
+                    appliesToScope: dbItem.appliesToScope,
+                    totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
+                    applicableFloor: dbItem.applicableFloor || undefined,
+                    perSpaceCosts: {},
+                  };
+                }
+                if (dbItem.appliesToScope === 'SpecificSpaces' && dbItem.applicableSpaceIdNames.length > 0) {
+                  const spaceName = dbItem.applicableSpaceIdNames[0];
+                  grouped[key].perSpaceCosts![spaceName] = Number(dbItem.totalCost);
+                }
+              });
+              setCurrentUtilityItems(Object.values(grouped));
         }
 
       } else {
@@ -530,8 +518,6 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 </div>
                 {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
                 {!isLoadingData && currentUtilityItems.map((item, index) => {
-                  const totalPercentage = Object.values(item.perSpacePercentages || {}).reduce((sum, p) => sum + (p || 0), 0);
-
                   return (
                   <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
                     <CardContent className="p-0 space-y-4">
@@ -552,7 +538,11 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                               <Label htmlFor={`utilityScope-${item.uiId}`} className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" />Applies To</Label>
                               <Select value={item.appliesToScope} onValueChange={(value) => handleUtilityItemChange(item.uiId, 'appliesToScope', value as UIUtilityItem['appliesToScope'])} disabled={isSaving || !canSaveUtilities}>
                                   <SelectTrigger id={`utilityScope-${item.uiId}`}><SelectValue /></SelectTrigger>
-                                  <SelectContent><SelectItem value="Building">Entire Building</SelectItem><SelectItem value="Floor">Specific Floor</SelectItem><SelectItem value="SpecificSpaces">Specific Spaces</SelectItem></SelectContent>
+                                  <SelectContent>
+                                      <SelectItem value="Building">Entire Building</SelectItem>
+                                      <SelectItem value="Floor">Specific Floor</SelectItem>
+                                      <SelectItem value="SpecificSpaces">Specific Space(s)</SelectItem>
+                                  </SelectContent>
                               </Select>
                           </div>
                       </div>
@@ -560,7 +550,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                       {item.appliesToScope !== 'SpecificSpaces' && (
                           <div className="space-y-1.5">
                               <Label htmlFor={`utilityCost-${item.uiId}`} className="flex items-center"><BanknoteIcon className="mr-1 h-3 w-3"/>Total Cost for {item.appliesToScope}</Label>
-                              <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost || ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
+                              <Input id={`utilityCost-${item.uiId}`} type="number" placeholder="e.g., 500.00" value={item.totalCost ?? ''} onChange={(e) => handleUtilityItemChange(item.uiId, 'totalCost', parseFloat(e.target.value))} disabled={isSaving || !canSaveUtilities}/>
                               {item.appliesToScope === 'Building' && <p className="text-xs text-muted-foreground">This cost will be prorated among all spaces based on their individual Proration Share %.</p>}
                           </div>
                       )}
