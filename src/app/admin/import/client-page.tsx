@@ -230,6 +230,13 @@ export function ImportClientPage({
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
 
+        // **Strict Sheet Name Validation**
+        const requiredSheets = ["Spaces", "Tenants", "Agreements"];
+        const missingSheets = requiredSheets.filter(sheetName => !workbook.SheetNames.includes(sheetName));
+        if (missingSheets.length > 0) {
+            throw new Error(`The Excel file is missing required sheets: ${missingSheets.join(', ')}. Please use the template.`);
+        }
+
         const spacesRaw = XLSX.utils.sheet_to_json(workbook.Sheets["Spaces"]);
         const tenantsRaw = XLSX.utils.sheet_to_json(workbook.Sheets["Tenants"]);
         const agreementsRaw = XLSX.utils.sheet_to_json(

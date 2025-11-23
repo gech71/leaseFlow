@@ -5,14 +5,13 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { createTenantAction } from '../tenants/actions';
 import { createFullAgreementAction } from '../agreements/actions';
-import { getUserAndManagedIds, getUserAndPermissions } from '@/lib/actions/server-helpers';
+import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import type { Prisma } from '@prisma/client';
 
 export async function getAgreementTemplatesForImportAction(): Promise<{ id: string; name: string }[]> {
   const { isSuperAdmin, currentUser, permissions } = await getUserAndPermissions();
   
   if (!isSuperAdmin && !permissions.has('import:manage')) {
-      // Secure this endpoint: only users who can import should see the templates.
       return [];
   }
   
@@ -76,7 +75,6 @@ export async function processImportAction(data: ImportData) {
         return { success: false, createdCount, skippedCount, errors };
     }
     
-    // Security Fix: Ensure non-super-admins can only use their own templates.
     if (!isSuperAdmin && agreementTemplate.createdById !== currentUser.id) {
         errors.push("You do not have permission to use this agreement template.");
         return { success: false, createdCount, skippedCount, errors };
@@ -86,7 +84,6 @@ export async function processImportAction(data: ImportData) {
     for (const [index, rawSpace] of data.spaces.entries()) {
         const row = index + 2;
         try {
-            // Whitelisting and sanitizing fields
             const space = {
                 buildingName: sanitizeString(rawSpace.buildingName),
                 spaceIdName: sanitizeString(rawSpace.spaceIdName),
@@ -106,7 +103,6 @@ export async function processImportAction(data: ImportData) {
                 skippedCount.spaces++;
                 continue;
             }
-
 
             const buildingForSpace = await databaseService.getAllBuildings({ where: { name: space.buildingName }, take: 1 });
             if (buildingForSpace.length > 0) {
@@ -139,7 +135,6 @@ export async function processImportAction(data: ImportData) {
     for (const [index, rawTenant] of data.tenants.entries()) {
         const row = index + 2;
         try {
-            // Whitelisting and sanitizing fields
             const tenant = {
                 name: sanitizeString(rawTenant.name),
                 email: sanitizeString(rawTenant.email),
@@ -177,8 +172,13 @@ export async function processImportAction(data: ImportData) {
                 if (result.success) {
                     createdCount.tenants++;
                 } else {
-                    errors.push(`Tenant Row ${row} (${tenant.name}): ${result.error}`);
-                    skippedCount.tenants++;
+                    if (result.error?.includes("already exists")) {
+                         errors.push(`Tenant Row ${row} (${tenant.name}): Skipped. A tenant with this email/phone likely exists or was just created.`);
+                         skippedCount.tenants++;
+                    } else {
+                        errors.push(`Tenant Row ${row} (${tenant.name}): ${result.error}`);
+                        skippedCount.tenants++;
+                    }
                 }
             } else {
                 skippedCount.tenants++;
@@ -193,7 +193,6 @@ export async function processImportAction(data: ImportData) {
     for (const [index, rawAgreement] of data.agreements.entries()) {
         const row = index + 2;
         try {
-            // Whitelisting and sanitizing fields
             const agreement = {
                 tenantEmail: sanitizeString(rawAgreement.tenantEmail),
                 buildingName: sanitizeString(rawAgreement.buildingName),
@@ -216,7 +215,6 @@ export async function processImportAction(data: ImportData) {
                 continue;
             }
 
-
             const tenantRecord = await databaseService.findTenantByEmailOrPhone(agreement.tenantEmail, null);
             const buildingRecord = await databaseService.getAllBuildings({ where: { name: agreement.buildingName }, take: 1 });
 
@@ -234,7 +232,7 @@ export async function processImportAction(data: ImportData) {
                         const agreementData = {
                             tenantId: tenantRecord.id,
                             spaceId: spaceRecord[0].id,
-                            agreementText: "Agreement text generated via bulk import.", // Simplified text for import
+                            agreementText: "Agreement text generated via bulk import.",
                             startDate: startDate.toISOString(),
                             monthlyRentalPrice: sanitizeNumber(spaceRecord[0].monthlyRentalPrice),
                             paymentTermMonths: agreement.termMonths,
