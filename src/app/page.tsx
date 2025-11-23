@@ -93,7 +93,7 @@ export default function RootPage() {
         <CardHeader className="text-center">
           <Image
             src="/images/Nibtera.png"
-            alt="LeaseFlow Logo"
+            alt="Nib Building Management Logo"
             width={250}
             height={100}
             className="mx-auto"

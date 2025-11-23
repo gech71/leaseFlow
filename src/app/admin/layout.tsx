@@ -7,7 +7,7 @@ import { PermissionProvider } from '@/contexts/PermissionContext';
 
 
 export const metadata: Metadata = {
-  title: "LeaseFlow",
+  title: "Nib Building Management",
   description: "A comprehensive building management solution.",
   icons: {
     icon: "/images/Nibtera.png",

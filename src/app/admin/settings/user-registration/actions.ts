@@ -84,7 +84,7 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
 
     // Send welcome email
     const emailHtml = `
-      <h1>Welcome to LeaseFlow!</h1>
+      <h1>Welcome to Nib Building Management!</h1>
       <p>Hello ${firstName},</p>
       <p>A new staff account has been created for you by an administrator.</p>
       <p>Please contact your administrator to receive your temporary password and assigned role.</p>
@@ -96,8 +96,8 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
 
     await sendEmail({
       to: email,
-      subject: 'Your New Staff Account for LeaseFlow',
-      html: emailHtml
+      subject: "Your New Staff Account for Nib Building Management",
+      html: emailHtml,
     });
     
     return { success: true, message: "User registered successfully. Please assign them a role in User Management.", user: localUser };
