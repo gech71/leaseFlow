@@ -1,16 +1,17 @@
-
-import NextAuth from 'next-auth';
-import { authConfig } from './auth.config';
-import type { User as AuthUser } from 'next-auth';
-import { SignJWT, jwtVerify } from 'jose';
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config";
+import type { User as AuthUser } from "next-auth";
+import { SignJWT, jwtVerify } from "jose";
 
 const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
 
 if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('NEXTAUTH_SECRET must be set and be at least 32 characters long in production.');
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "NEXTAUTH_SECRET must be set and be at least 32 characters long in production.",
+    );
   } else {
-    console.warn('WARN: NEXTAUTH_SECRET is not set.');
+    console.warn("WARN: NEXTAUTH_SECRET is not set.");
   }
 }
 
@@ -32,7 +33,7 @@ export const {
       // On initial sign-in, add user details to the token.
       if (user) {
         token.id = user.id;
-        if ('forceChangePass' in user && user.forceChangePass) {
+        if ("forceChangePass" in user && user.forceChangePass) {
           token.forceChangePass = true;
         }
         return token;
@@ -44,7 +45,7 @@ export const {
         // If the token is expired, return an empty object to invalidate the session.
         return {};
       }
-      
+
       // If the token is still valid, return it as is.
       return token;
     },
@@ -66,7 +67,7 @@ export const {
   jwt: {
     async encode({ token, maxAge }) {
       return await new SignJWT(token!)
-        .setProtectedHeader({ alg: 'HS256' })
+        .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
         .setExpirationTime(`${SESSION_DURATION_IN_SECONDS}s`) // Set JWT to expire in 15 minutes
         .sign(secret);
@@ -77,7 +78,7 @@ export const {
       }
       try {
         const { payload } = await jwtVerify(token, secret, {
-          algorithms: ['HS256'],
+          algorithms: ["HS256"],
         });
         return payload;
       } catch (error) {
@@ -88,7 +89,7 @@ export const {
     },
   },
   pages: {
-    signIn: '/login',
-    error: '/login', // Redirect users to login page on any error
+    signIn: "/login",
+    error: "/login", // Redirect users to login page on any error
   },
 });

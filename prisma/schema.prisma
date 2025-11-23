@@ -201,6 +201,7 @@ model BuildingUtilityItem {
   applicableFloor         String?
   applicableSpaceIdNames  String[]
   monthlyUtilitiesId      String
+  perSpaceAllocation      String?
 
   monthlyUtilities  BuildingMonthlyUtilities @relation(fields: [monthlyUtilitiesId], references: [id], onDelete: Cascade)
 }
