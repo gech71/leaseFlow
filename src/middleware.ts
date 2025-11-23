@@ -1,10 +1,7 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { verifySession, type SessionPayload } from '@/lib/auth/jwt';
+import { PERMISSION_MAP } from '@/lib/auth-utils';
 
-import { auth } from "@/auth";
-import { NextResponse, type NextRequest } from "next/server";
-import { PERMISSION_MAP } from "@/lib/auth-utils";
-
-// The ordered list of pages to check for redirection.
-// More common/default pages should be higher up.
 const ORDERED_ADMIN_PAGES = [
   "/admin/dashboard",
   "/admin/buildings",
@@ -16,94 +13,87 @@ const ORDERED_ADMIN_PAGES = [
   "/admin/building-utilities",
   "/admin/settings/user-management",
   "/admin/import",
-  // Add other pages as needed
 ];
 
+const PUBLIC_ROUTES = ['/login', '/portal/connect', '/portal/cancel', '/portal/error'];
 
-export default auth((req) => {
-  const { nextUrl, auth } = req;
-  const isLoggedIn = !!auth;
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const session = await verifySession();
 
-  const isPortalChangePassPage = nextUrl.pathname === "/portal/change-password";
-  const isAdminPath = nextUrl.pathname.startsWith("/admin");
-  const isPortalPath = nextUrl.pathname.startsWith("/portal/");
-  const isConnectPath = nextUrl.pathname.startsWith("/portal/connect");
+  const isApiAuthRoute = pathname.startsWith('/api/auth');
+  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path));
 
-  // If user must change password, enforce it.
-  if (isLoggedIn && auth.user.forceChangePass && !isPortalChangePassPage) {
-    return NextResponse.redirect(new URL("/portal/change-password", nextUrl));
-  }
-
-  // If user is on change password page but doesn't need to be, redirect away.
-  if (isLoggedIn && !auth.user.forceChangePass && isPortalChangePassPage) {
-    return NextResponse.redirect(new URL("/portal/dashboard", nextUrl));
-  }
-
-  // Protect all non-auth and non-connect routes
-  if (
-    !isLoggedIn &&
-    nextUrl.pathname !== "/" &&
-    nextUrl.pathname !== "/login" &&
-    !isConnectPath
-  ) {
-    let from = nextUrl.pathname;
-    if (nextUrl.search) {
-      from += nextUrl.search;
+  // If trying to access a public route or an API auth route, allow it
+  if (isPublicRoute || isApiAuthRoute) {
+    // But if logged in and trying to access login, redirect to dashboard
+    if (session && pathname === '/login') {
+      const redirectUrl = session.permissions.includes('portal:view') && session.permissions.length === 1
+        ? '/portal/dashboard'
+        : '/admin/dashboard';
+      return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
-    return NextResponse.redirect(new URL(`/login?from=${encodeURIComponent(from)}`, nextUrl));
-  }
-  
-  if(isLoggedIn && (nextUrl.pathname === '/' || nextUrl.pathname === '/login')) {
-      const isTenantOnly = auth.user.permissions?.length === 1 && auth.user.permissions[0] === 'portal:view';
-      const redirectUrl = isTenantOnly ? '/portal/dashboard' : '/admin/dashboard';
-      return NextResponse.redirect(new URL(redirectUrl, nextUrl));
+    return NextResponse.next();
   }
 
-  // Enforce role-based access for admin pages
-  if (isLoggedIn && isAdminPath) {
-    const isSuperAdmin = auth.user.isSuperAdmin;
-    if (isSuperAdmin) {
-      return NextResponse.next(); // Super admin has access to everything
+  // --- Protected Routes Logic ---
+
+  if (!session) {
+    let from = pathname;
+    if (request.nextUrl.search) {
+      from += request.nextUrl.search;
+    }
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('from', from);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Enforce password change if required
+  if (session.forceChangePass && pathname !== '/portal/change-password') {
+    return NextResponse.redirect(new URL('/portal/change-password', request.url));
+  }
+  if (!session.forceChangePass && pathname === '/portal/change-password') {
+    return NextResponse.redirect(new URL('/portal/dashboard', request.url));
+  }
+
+  // Admin path protection
+  if (pathname.startsWith('/admin')) {
+    if (session.isSuperAdmin) {
+      return NextResponse.next(); // Super admin bypasses permission checks
     }
 
-    const userPermissions = new Set(auth.user.permissions || []);
+    const userPermissions = new Set(session.permissions);
     
-    // Redirect tenants away from any admin page immediately
+    // Redirect pure tenants away from admin
     if (userPermissions.size === 1 && userPermissions.has('portal:view')) {
-      return NextResponse.redirect(new URL("/portal/dashboard", nextUrl));
+      return NextResponse.redirect(new URL('/portal/dashboard', request.url));
     }
-    
-    // Find a matching required permission for the current path
-    const requiredPermission = Object.entries(PERMISSION_MAP).find(([pathPrefix]) => 
-      nextUrl.pathname.startsWith(pathPrefix)
-    )?.[1];
 
+    // Check permission for the specific admin route
+    const requiredPermission = Object.entries(PERMISSION_MAP).find(([pathPrefix]) => 
+      pathname.startsWith(pathPrefix)
+    )?.[1];
+    
     if (requiredPermission && !userPermissions.has(requiredPermission)) {
-      // User does not have permission, find the first page they CAN access.
+      // Find the first page they are allowed to see
       const firstAllowedPage = ORDERED_ADMIN_PAGES.find(page => {
         const permission = PERMISSION_MAP[page];
         return permission && userPermissions.has(permission);
       });
-      
-      // If they have access to at least one page, redirect them there with an error.
-      if (firstAllowedPage) {
-        const redirectUrl = new URL(firstAllowedPage, nextUrl);
-        redirectUrl.searchParams.set("error", "You do not have permission to access the requested page.");
-        return NextResponse.redirect(redirectUrl);
-      } else {
-        // If the user has no admin permissions at all, redirect them away from admin.
-        const loginUrl = new URL("/login", nextUrl);
-        loginUrl.searchParams.set("error", "You do not have any assigned permissions to access the admin panel.");
-        return NextResponse.redirect(loginUrl);
-      }
+
+      const redirectUrl = new URL(firstAllowedPage || '/login', request.url);
+      const errorMessage = firstAllowedPage 
+        ? "You do not have permission to access the requested page."
+        : "You do not have any assigned permissions to access the admin panel.";
+      redirectUrl.searchParams.set("error", errorMessage);
+      return NextResponse.redirect(redirectUrl);
     }
   }
 
-  // For all other cases, proceed with the request
   return NextResponse.next();
-});
+}
 
-// Matcher to run the middleware on all routes except for static assets and API routes.
+// Matcher to run the middleware on all routes except for static assets and _next internal files.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images).*)"],
+  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|images).*)'],
 };

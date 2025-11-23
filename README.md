@@ -1,4 +1,3 @@
-
 # LeaseFlow: Building Management Solution
 
 LeaseFlow is a comprehensive, modern web application designed to streamline property management. Built with Next.js, it provides a robust platform for managing buildings, spaces, tenants, and the entire billing lifecycle.
@@ -34,7 +33,7 @@ This document provides an overview of the project setup, key features, and a det
 -   **Language**: TypeScript
 -   **Styling**: Tailwind CSS with ShadCN UI components
 -   **Database**: PostgreSQL with Prisma ORM
--   **Authentication**: NextAuth.js (JWT-based)
+-   **Authentication**: Custom Server-Side JWTs with HttpOnly cookies
 -   **Email**: Nodemailer with Gmail SMTP
 
 ## Getting Started
@@ -55,9 +54,9 @@ Create a `.env` file in the project root and populate it with the necessary vari
 # Database connection string for Prisma
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 
-# NextAuth.js - generate a secret using: `openssl rand -hex 32`
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=YOUR_NEXTAUTH_SECRET_HERE
+# Custom JWT Authentication - generate a secret using: `openssl rand -hex 32`
+# This key MUST be a 64-character hex string (32 bytes).
+JWT_SECRET_KEY=YOUR_64_CHARACTER_JWT_SECRET_KEY_HERE
 
 # Base URL of this application, used for constructing callback URLs
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
@@ -159,14 +158,14 @@ A brief overview of the key directories:
 ├── src/
 │   ├── app/            # Next.js App Router (pages and layouts)
 │   │   ├── admin/      # Admin panel routes
-│   │   ├── api/        # API routes (including /api/auth/[...nextauth])
+│   │   ├── api/        # API routes (including /api/auth/*)
 │   │   ├── portal/     # Tenant portal routes
 │   │   └── ...
 │   ├── components/     # Reusable UI components (ShadCN and custom)
-│   ├── contexts/       # React Context providers (e.g., SessionProvider, permissions)
+│   ├── contexts/       # React Context providers (e.g., PermissionContext)
 │   ├── hooks/          # Custom React hooks
 │   ├── lib/            # Core libraries, services, and utilities
-│   │   ├── auth.ts     # NextAuth.js configuration
+│   │   ├── auth/       # Custom authentication logic (JWT, rate limiter)
 │   │   ├── services/   # Database service layer
 │   │   └── ...
 │   └── middleware.ts   # Edge middleware for routing and authentication
