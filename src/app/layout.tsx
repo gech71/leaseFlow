@@ -1,9 +1,9 @@
+
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { SessionProvider } from "next-auth/react";
-import { auth } from "@/auth";
+import { PermissionProvider } from "@/contexts/PermissionContext";
 
 export const metadata: Metadata = {
   title: "Nib Building Management",
@@ -17,7 +17,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const nonce = headers().get("x-nonce") || undefined;
-  const session = await auth();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -44,10 +43,10 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <SessionProvider session={session}>
+        <PermissionProvider>
           {children}
           <Toaster />
-        </SessionProvider>
+        </PermissionProvider>
       </body>
     </html>
   );

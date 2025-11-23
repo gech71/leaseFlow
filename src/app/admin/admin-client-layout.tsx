@@ -103,7 +103,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     await logout();
-    // The logout function should handle redirection.
+    // The logout function handles redirection.
     setIsLoggingOut(false);
   };
   
