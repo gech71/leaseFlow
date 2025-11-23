@@ -203,7 +203,8 @@ export async function deleteBuildingUtilitiesAction(id: string) {
     revalidatePath('/admin/building-utilities');
     revalidatePath('/admin/billing');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: any)
+ {
     console.error("Error deleting building utilities:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return { success: false, error: "Utility record not found for deletion." };

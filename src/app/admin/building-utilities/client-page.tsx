@@ -180,17 +180,18 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
         if (existingEntry && existingEntry.utilities && selectedBuilding) {
-            const logicalGroups: { [key: string]: typeof existingEntry.utilities } = {};
+            // Group raw DB items by a logical key (e.g., "Building_Water", "Floor_5th Floor_Electricity")
+            const logicalGroups: Record<string, typeof existingEntry.utilities> = {};
 
-            // Group DB items by a logical key (e.g., "Building_Water", "Floor_5th Floor_Electricity")
             for (const item of existingEntry.utilities) {
                 let groupKey: string;
                 if (item.appliesToScope === 'Building') {
                     groupKey = `Building_${item.name}`;
-                } else {
-                    const spaceForItem = selectedBuilding.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
-                    const floorName = spaceForItem?.floor || 'unknown_floor';
-                    groupKey = `Floor_${floorName}_${item.name}`;
+                } else if (item.appliesToScope === 'Floor' && item.applicableFloor) {
+                    groupKey = `Floor_${item.applicableFloor}_${item.name}`;
+                } else { // SpecificSpaces
+                    // Grouping specific spaces by name, assuming they were created as a logical group
+                    groupKey = `SpecificSpaces_${item.name}`;
                 }
                 
                 if (!logicalGroups[groupKey]) logicalGroups[groupKey] = [];
@@ -199,43 +200,24 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
 
             const uiItems: UIUtilityItem[] = Object.values(logicalGroups).map(group => {
                 const firstItem = group[0];
-                const spaceForFirstItem = selectedBuilding.spaces.find(s => s.spaceIdName === firstItem.applicableSpaceIdNames?.[0]);
-                
                 const groupTotalCost = group.reduce((sum, i) => sum + i.totalCost, 0);
                 
                 const perSpacePercentages: { [spaceId: string]: number } = {};
                 if (groupTotalCost > 0) {
                     group.forEach(item => {
-                        const space = selectedBuilding.spaces.find(s => s.spaceIdName === item.applicableSpaceIdNames?.[0]);
+                        const space = selectedBuilding.spaces.find(s => item.applicableSpaceIdNames.includes(s.spaceIdName));
                         if (space) {
                             perSpacePercentages[space.id] = (item.totalCost / groupTotalCost) * 100;
                         }
                     });
                 }
                 
-                let scope: UIUtilityItem['appliesToScope'] = 'SpecificSpaces';
-                let applicableFloor: string | undefined = undefined;
-
-                if (firstItem.appliesToScope === 'Building') {
-                    scope = 'Building';
-                } else if (spaceForFirstItem?.floor) {
-                    const floorName = spaceForFirstItem.floor;
-                    const spacesOnFloor = selectedBuilding.spaces.filter(s => s.floor === floorName);
-                    const groupCoversAllSpacesOnFloor = spacesOnFloor.every(s => 
-                        group.some(item => item.applicableSpaceIdNames?.includes(s.spaceIdName))
-                    );
-                    if (groupCoversAllSpacesOnFloor && group.length === spacesOnFloor.length) {
-                        scope = 'Floor';
-                        applicableFloor = floorName;
-                    }
-                }
-                
                 return {
-                    uiId: `logical-${firstItem.name}-${spaceForFirstItem?.floor || firstItem.id}`,
+                    uiId: crypto.randomUUID(),
                     name: firstItem.name,
-                    appliesToScope: scope,
+                    appliesToScope: firstItem.appliesToScope,
                     totalCost: groupTotalCost > 0 ? parseFloat(groupTotalCost.toFixed(2)) : undefined,
-                    applicableFloor: applicableFloor,
+                    applicableFloor: firstItem.applicableFloor || undefined,
                     perSpacePercentages: perSpacePercentages,
                     perSpaceCosts: {},
                 };
