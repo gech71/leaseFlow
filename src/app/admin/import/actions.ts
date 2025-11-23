@@ -61,6 +61,12 @@ const isValidEmail = (email: string): boolean => {
   return emailRegex.test(email);
 }
 
+// Define the exact expected keys for each sheet
+const EXPECTED_SPACE_KEYS = new Set(['buildingName', 'spaceIdName', 'floor', 'area', 'monthlyRentalPrice', 'prorationShare']);
+const EXPECTED_TENANT_KEYS = new Set(['name', 'email', 'phone', 'alternativePhone (Optional)', 'nationalId', 'representativeName (Optional)', 'representativePhone (Optional)']);
+const EXPECTED_AGREEMENT_KEYS = new Set(['tenantEmail', 'buildingName', 'spaceIdName', 'startDate', 'termMonths', 'initialPaymentMonths', 'additionalTerms (Optional)']);
+
+
 export async function processImportAction(data: ImportData) {
     const { isSuperAdmin, permissions, currentUser } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('import:manage')) {
@@ -96,6 +102,13 @@ export async function processImportAction(data: ImportData) {
     for (const [index, rawSpace] of data.spaces.entries()) {
         const row = index + 2;
         try {
+            // Validate keys for the current row
+            for (const key in rawSpace) {
+                if (!EXPECTED_SPACE_KEYS.has(key)) {
+                    throw new Error(`Unexpected column "${key}" found.`);
+                }
+            }
+            
             const space = {
                 buildingName: sanitizeString(rawSpace.buildingName),
                 spaceIdName: sanitizeString(rawSpace.spaceIdName),
@@ -147,6 +160,12 @@ export async function processImportAction(data: ImportData) {
     for (const [index, rawTenant] of data.tenants.entries()) {
         const row = index + 2;
         try {
+            for (const key in rawTenant) {
+                if (!EXPECTED_TENANT_KEYS.has(key)) {
+                    throw new Error(`Unexpected column "${key}" found.`);
+                }
+            }
+            
             const tenant = {
                 name: sanitizeString(rawTenant.name),
                 email: sanitizeString(rawTenant.email),
@@ -205,6 +224,12 @@ export async function processImportAction(data: ImportData) {
     for (const [index, rawAgreement] of data.agreements.entries()) {
         const row = index + 2;
         try {
+            for (const key in rawAgreement) {
+                if (!EXPECTED_AGREEMENT_KEYS.has(key)) {
+                    throw new Error(`Unexpected column "${key}" found.`);
+                }
+            }
+
             const agreement = {
                 tenantEmail: sanitizeString(rawAgreement.tenantEmail),
                 buildingName: sanitizeString(rawAgreement.buildingName),
