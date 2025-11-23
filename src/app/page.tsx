@@ -38,11 +38,14 @@ export default function RootPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If the user is already authenticated, redirect them to the dashboard.
-    if (status === 'authenticated') {
-      router.replace('/admin/dashboard');
+    // This effect handles showing a redirect error message from NextAuth
+    const callbackError = searchParams.get('error');
+    if (callbackError === "CredentialsSignin") {
+        setError("Invalid phone number or password.");
+    } else if (callbackError) {
+        setError("An unknown error occurred during login.");
     }
-  }, [status, router]);
+  }, [searchParams]);
   
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -52,18 +55,15 @@ export default function RootPage() {
     const result = await signIn("credentials", {
       phone,
       password,
-      redirect: false, // Prevent redirect to handle the response directly
+      redirect: false, // Handle redirect manually
     });
 
     setIsLoading(false);
 
     if (result?.error) {
-      // NextAuth returns a generic error key "CredentialsSignin" for custom errors.
-      // We can map this to a user-friendly message.
       if (result.error === "CredentialsSignin") {
         setError("Invalid phone number or password.");
       } else {
-        // For other errors like account lockout, the exact message is passed.
         setError(result.error);
       }
     } else if (result?.ok) {
@@ -78,7 +78,7 @@ export default function RootPage() {
 
 
   // If session status is loading or already authenticated, show a loading screen
-  // to prevent a flash of the login page.
+  // to prevent a flash of the login page. This gives middleware time to redirect.
   if (status === 'loading' || status === 'authenticated') {
     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">
