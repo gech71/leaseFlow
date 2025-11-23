@@ -1,6 +1,4 @@
 
-'use server';
-
 import { auth } from '@/auth';
 import { databaseService } from '@/lib/services/databaseService';
 import type { User, Role } from '@prisma/client';
