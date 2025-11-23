@@ -61,7 +61,7 @@ const isValidEmail = (email: string): boolean => {
 }
 
 export async function processImportAction(data: ImportData) {
-    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    const { isSuperAdmin, permissions, currentUser } = await getUserAndPermissions();
     if (!isSuperAdmin && !permissions.has('import:manage')) {
         return { success: false, createdCount: { spaces: 0, tenants: 0, agreements: 0 }, skippedCount: { spaces: 0, tenants: 0, agreements: 0 }, errors: ["Permission denied."] };
     }
@@ -73,6 +73,12 @@ export async function processImportAction(data: ImportData) {
     const agreementTemplate = await databaseService.getAgreementTemplateById(data.agreementTemplateId);
     if (!agreementTemplate) {
         errors.push("The selected agreement template could not be found.");
+        return { success: false, createdCount, skippedCount, errors };
+    }
+    
+    // Security Fix: Ensure non-super-admins can only use their own templates.
+    if (!isSuperAdmin && agreementTemplate.createdById !== currentUser.id) {
+        errors.push("You do not have permission to use this agreement template.");
         return { success: false, createdCount, skippedCount, errors };
     }
 
