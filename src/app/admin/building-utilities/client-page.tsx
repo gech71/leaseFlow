@@ -61,7 +61,7 @@ export interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingM
     appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
     applicableFloor: string | null;
     applicableSpaceIdNames: string[];
-    perSpacePercentages?: Record<string, number> | null; // Added for floor scope
+    perSpaceAllocation?: Record<string, number> | null; 
     monthlyUtilitiesId: string;
   }[]; 
 }
@@ -191,7 +191,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
             totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
             applicableFloor: dbItem.applicableFloor || undefined,
             perSpaceCosts: dbItem.appliesToScope === 'SpecificSpaces' ? { [dbItem.applicableSpaceIdNames[0]]: Number(dbItem.totalCost) } : {},
-            perSpacePercentages: dbItem.appliesToScope === 'Floor' ? dbItem.perSpacePercentages || {} : {},
+            perSpacePercentages: dbItem.appliesToScope === 'Floor' ? dbItem.perSpaceAllocation || {} : {},
           }));
 
           // Group per-space-cost items by name
@@ -404,7 +404,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
                 applicableFloor: dbItem.applicableFloor || undefined,
                 perSpaceCosts: dbItem.appliesToScope === 'SpecificSpaces' ? { [dbItem.applicableSpaceIdNames[0]]: Number(dbItem.totalCost) } : {},
-                perSpacePercentages: dbItem.appliesToScope === 'Floor' ? dbItem.perSpacePercentages || {} : {},
+                perSpacePercentages: dbItem.appliesToScope === 'Floor' ? dbItem.perSpaceAllocation || {} : {},
              }));
 
              const groupedItems = uiItems.reduce((acc, item) => {

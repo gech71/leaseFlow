@@ -142,7 +142,6 @@ export async function saveBuildingUtilitiesAction(
           await tx.buildingUtilityItem.create({
             data: {
               ...dataPayload,
-              perSpaceAllocation: dataPayload.perSpaceAllocation ?? null, // Ensure null is passed explicitly
               monthlyUtilitiesId: monthlyUtil!.id,
             },
           });
