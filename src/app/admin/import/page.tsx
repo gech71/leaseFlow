@@ -4,8 +4,6 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { UploadCloud, Loader2 } from 'lucide-react';
 import { getAgreementTemplatesForImportAction } from './actions';
 import { ImportClientPage } from './client-page';
-import { getUserAndManagedIds, redirectWithToast } from '@/lib/actions/server-helpers';
-import { hasPermission } from '@/lib/auth-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +13,6 @@ async function ImportDataFetcher() {
 }
 
 export default async function ImportPage() {
-  const { isSuperAdmin, permissions } = await getUserAndManagedIds();
-
-  if (!isSuperAdmin && !hasPermission(permissions, 'import:manage')) {
-    return redirectWithToast('/admin/dashboard', 'You do not have permission to import data.');
-  }
-  
   return (
     <div className="animate-fadeIn">
       <PageHeader

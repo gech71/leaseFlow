@@ -13,28 +13,6 @@ import type { Tenant, Space, Prisma, User, Role, AgreementTemplate } from '@pris
 import { GenerateAgreementClientPage } from './client-page'; // Import the new client component
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
-// Server Component to fetch initial data
-export default function GenerateAgreementPage() {
-  return (
-    <div className="animate-fadeIn">
-       <PageHeader
-        title="Generate Rental Agreement"
-        description="Select a template, tenant, and space, then generate and save the complete record."
-        actions={
-            <Link href="/admin/agreements" passHref>
-                <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Agreements
-                </Button>
-            </Link>
-        }
-      />
-      <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-        <GenerateAgreementDataFetcher />
-      </Suspense>
-    </div>
-  );
-}
-
 // This is an async Server Component responsible for fetching data
 async function GenerateAgreementDataFetcher() {
   const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
@@ -73,4 +51,26 @@ async function GenerateAgreementDataFetcher() {
   }));
   
   return <GenerateAgreementClientPage tenants={serializableTenants} availableSpaces={serializableSpaces} agreementTemplates={agreementTemplates} />;
+}
+
+// Server Component to fetch initial data
+export default function GenerateAgreementPage() {
+  return (
+    <div className="animate-fadeIn">
+       <PageHeader
+        title="Generate Rental Agreement"
+        description="Select a template, tenant, and space, then generate and save the complete record."
+        actions={
+            <Link href="/admin/agreements" passHref>
+                <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Agreements
+                </Button>
+            </Link>
+        }
+      />
+      <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
+        <GenerateAgreementDataFetcher />
+      </Suspense>
+    </div>
+  );
 }

@@ -1,3 +1,4 @@
+
 // A simple server-side utility for checking permissions.
 
 /**
@@ -20,3 +21,24 @@ export function hasPermission(permissionsSet: Set<string>, requiredPermission: s
 export function hasAnyPermission(permissionsSet: Set<string>, requiredPermissions: string[]): boolean {
     return requiredPermissions.some(p => permissionsSet.has(p));
 }
+
+// Defines the mapping from URL path prefixes to the required permission.
+// The middleware will use this to protect routes.
+// Keys should be ordered from more specific to less specific.
+export const PERMISSION_MAP: Record<string, string> = {
+  "/admin/settings/user-registration": "settings:user_registration:manage",
+  "/admin/settings/user-management": "settings:user_management:view",
+  "/admin/settings/role-management": "settings:role_management:view",
+  "/admin/settings/agreement-template": "settings:agreement_templates:manage",
+  "/admin/settings/email-configuration": "settings:email_configuration:view",
+  "/admin/settings": "settings:user_management:view", // Fallback for the main settings page
+  "/admin/import": "import:manage",
+  "/admin/buildings": "building:view",
+  "/admin/spaces": "space:view",
+  "/admin/tenants": "tenant:view",
+  "/admin/agreements": "agreement:view",
+  "/admin/building-utilities": "building_utility:view",
+  "/admin/billing": "billing:view",
+  "/admin/payments-overview": "payment_overview:view",
+  "/admin/dashboard": "dashboard:view",
+};

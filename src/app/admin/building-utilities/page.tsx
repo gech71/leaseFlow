@@ -1,5 +1,4 @@
 
-
 export const dynamic = 'force-dynamic';
 
 // Main page.tsx is now a Server Component by default (no "use client" at the top)
@@ -12,8 +11,6 @@ import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as Buildi
 import { BuildingUtilitiesClientPage, type ClientBuildingMonthlyUtilitiesPrismaType } from './client-page'; // Import the new client component
 import { getAllBuildingUtilitiesForListAction, getRegisteredBuildingsAction } from './actions';
 import { parseISO } from 'date-fns';
-import { getUserAndManagedIds, redirectWithToast } from '@/lib/actions/server-helpers';
-import { hasPermission } from '@/lib/auth-utils';
 
 // Define a client-safe Space type
 interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
@@ -31,28 +28,6 @@ interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updated
   spaces: ClientSpace[];
 }
 
-
-// Server Component to fetch initial data
-export default async function BuildingUtilitiesServerPage() {
-  const { isSuperAdmin, permissions } = await getUserAndManagedIds();
-
-  if (!isSuperAdmin && !hasPermission(permissions, 'building_utility:view')) {
-    return redirectWithToast('/admin/dashboard', 'You do not have permission to view building utilities.');
-  }
-
-  return (
-    <div className="animate-fadeIn">
-      <PageHeader
-        title="Manage Building Utilities"
-        icon={Wrench}
-        description="Enter monthly utility costs for each building. Define costs by scope: entire building, specific floors, or specific spaces."
-      />
-      <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
-        <BuildingUtilitiesDataFetcher />
-      </Suspense>
-    </div>
-  );
-}
 
 // This is an async Server Component responsible for fetching data
 async function BuildingUtilitiesDataFetcher() {
@@ -82,4 +57,20 @@ async function BuildingUtilitiesDataFetcher() {
   }));
 
   return <BuildingUtilitiesClientPage initialBuildings={serializableBuildings} initialUtilityRecords={serializableInitialRecords} />;
+}
+
+// Server Component to fetch initial data
+export default async function BuildingUtilitiesServerPage() {
+  return (
+    <div className="animate-fadeIn">
+      <PageHeader
+        title="Manage Building Utilities"
+        icon={Wrench}
+        description="Enter monthly utility costs for each building. Define costs by scope: entire building, specific floors, or specific spaces."
+      />
+      <Suspense fallback={<div className="flex justify-center items-center h-[50vh]"><Loader2 className="h-12 w-12 animate-spin text-primary"/></div>}>
+        <BuildingUtilitiesDataFetcher />
+      </Suspense>
+    </div>
+  );
 }

@@ -2,38 +2,36 @@
 export const dynamic = 'force-dynamic';
 
 import { Suspense } from 'react';
-import { PageHeader } from '@/components/custom/PageHeader';
-import { Button } from '@/components/ui/button';
-import { FileText, ArrowLeft, Loader2 } from 'lucide-react';
-import Link from 'next/link';
+import { Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Agreement as AgreementPrisma, Tenant, Space, User, Role } from '@prisma/client';
-import { ViewAgreementClientPage, type AgreementWithRelations } from './client-page'; // Adjusted import
-import { cookies } from 'next/headers';
+import { ViewAgreementClientPage, type AgreementWithRelations } from './client-page';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+import { redirect } from 'next/navigation';
 
 // Server Component to fetch initial data
 export default async function ViewAgreementPage({ params }: { params: { id: string } }) {
-  const { id } = params; // Destructure ID from params first
+  const { id } = params;
+  
+  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+
   let agreementData = await databaseService.getAgreementById(id, {
     tenant: true, 
     space: true 
   });
 
-  if (agreementData) {
-    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
-
-    if (!isSuperAdmin) {
-        if (!agreementData.space || !managedBuildingIds?.includes(agreementData.space.buildingId)) {
-            agreementData = null; // User doesn't manage this building, so they can't see the agreement.
-        }
+  if (agreementData && !isSuperAdmin) {
+    if (!agreementData.space || !managedBuildingIds?.includes(agreementData.space.buildingId)) {
+        // User doesn't manage this building, so they can't see the agreement.
+        // Instead of returning null, we redirect.
+        const dashboardUrl = new URL("/admin/agreements", process.env.NEXTAUTH_URL);
+        dashboardUrl.searchParams.set("error", "You do not have permission to view this agreement.");
+        redirect(dashboardUrl.toString());
     }
   }
 
-
   let serializableAgreement: AgreementWithRelations | null = null;
   if (agreementData) {
-    const fallbackDate = new Date(0).toISOString(); // Use epoch as a fallback for any null dates
+    const fallbackDate = new Date(0).toISOString();
     serializableAgreement = {
       ...agreementData,
       monthlyRentalPrice: Number(agreementData.monthlyRentalPrice),

@@ -7,16 +7,11 @@ import { FileText, Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
 import type { Agreement as AgreementPrisma, Tenant, Space, User, Role, Prisma } from '@prisma/client';
 import { AgreementsListClientPage, type AgreementWithRelations } from './components'; // Import from new components file
-import { getUserAndManagedIds, redirectWithToast } from '@/lib/actions/server-helpers';
-import { hasPermission } from '@/lib/auth-utils';
+import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
 // This is now a Server Component
 export default async function AgreementsListPage() {
-  const { isSuperAdmin, managedBuildingIds, currentUser, permissions } = await getUserAndManagedIds();
-
-  if (!isSuperAdmin && !hasPermission(permissions, 'agreement:view')) {
-    return redirectWithToast('/admin/dashboard', 'You do not have permission to view agreements.');
-  }
+  const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
   const whereClause: Prisma.AgreementWhereInput = !isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {};
   

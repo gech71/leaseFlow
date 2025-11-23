@@ -2,6 +2,7 @@
 import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
 import type { User as AuthUser } from "next-auth";
+import { databaseService } from "./lib/services/databaseService";
 
 const ACCESS_TOKEN_EXPIRY = 15 * 60; // 15 minutes in seconds
 const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -16,60 +17,71 @@ export const {
 
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       const now = Math.floor(Date.now() / 1000);
 
-      // 1. Initial sign-in: Augment token with access/refresh details
+      // Initial sign-in or session update
       if (user) {
         token.id = user.id;
         token.accessTokenExp = now + ACCESS_TOKEN_EXPIRY;
         token.refreshTokenExp = now + REFRESH_TOKEN_EXPIRY;
-        // Correctly carry over the forceChangePass flag from the user object to the token
+        
+        const dbUser = await databaseService.getUserById(user.id, { roles: true });
+        if (dbUser) {
+            const isSuperAdmin = dbUser.roles.some(role => role.name === 'SUPER_ADMIN');
+            const permissions = new Set<string>();
+            if (!isSuperAdmin) {
+                dbUser.roles.forEach(role => {
+                    role.permissions.forEach(permission => permissions.add(permission));
+                });
+            }
+            token.permissions = Array.from(permissions);
+            token.isSuperAdmin = isSuperAdmin;
+        }
+
         if ("forceChangePass" in user && user.forceChangePass) {
           token.forceChangePass = true;
         } else {
-          // Ensure the flag is not present if not applicable
           delete token.forceChangePass;
         }
         return token;
       }
       
-      // 2. On subsequent requests, check if access token is still valid
+      // On subsequent requests, check if access token is still valid
       if (now < (token.accessTokenExp as number)) {
         return token;
       }
 
-      // 3. Access token has expired, check if refresh token is still valid
+      // Access token has expired, check if refresh token is still valid
       if (now < (token.refreshTokenExp as number)) {
         // Issue a new access token (refresh the session)
         token.accessTokenExp = now + ACCESS_TOKEN_EXPIRY;
         return token;
       }
 
-      // 4. Both access and refresh tokens have expired, end the session
-      return {}; // Returning an empty object will invalidate the session
+      // Both access and refresh tokens have expired, end the session
+      return {}; 
     },
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
         
-        // Pass the forceChangePass flag from the token to the session
+        session.user.isSuperAdmin = token.isSuperAdmin as boolean;
+        session.user.permissions = token.permissions as string[];
+
         if (token.forceChangePass) {
           session.user.forceChangePass = true;
         } else {
-          // Ensure the flag is not present if not applicable
           if ('forceChangePass' in session.user) {
             delete session.user.forceChangePass;
           }
         }
 
-        // Pass token expiry to the client session
         if (token.accessTokenExp) {
            session.expires = new Date((token.accessTokenExp as number) * 1000).toISOString();
         }
 
       } else {
-        // This will effectively end the session if the token is invalid or has been expired by the jwt callback
         return null;
       }
       return session;

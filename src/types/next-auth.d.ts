@@ -1,3 +1,4 @@
+
 import type { User as PrismaUser, Role } from '@prisma/client';
 import type { DefaultSession, User as NextAuthUser } from 'next-auth';
 import type { JWT as NextAuthJWT } from 'next-auth/jwt';
@@ -11,8 +12,9 @@ declare module 'next-auth' {
     user: {
       id: string;
       forceChangePass?: boolean;
+      isSuperAdmin?: boolean;
+      permissions?: string[];
     } & DefaultSession['user'];
-    // The expires property is part of the default session, but we override it
     expires: string;
   }
 }
@@ -23,5 +25,7 @@ declare module 'next-auth/jwt' {
     forceChangePass?: boolean;
     accessTokenExp?: number;
     refreshTokenExp?: number;
+    isSuperAdmin?: boolean;
+    permissions?: string[];
   }
 }

@@ -20,7 +20,7 @@ export default function AgreementTemplatePage() {
       <PageHeader
         title="Agreement Templates"
         icon={FileText}
-        description="Create and manage reusable rental agreement templates for generating new leases."
+        description="Create and manage reusable agreement templates for generating new leases."
         actions={
           <Link href="/admin/settings" passHref>
             <Button variant="outline">

@@ -10,18 +10,13 @@ import type {
   Role,
 } from "@prisma/client";
 import { SpacesClientPage, type SpaceWithBuildingName } from "./components";
-import { getUserAndManagedIds, redirectWithToast } from "@/lib/actions/server-helpers";
+import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
 import { addMonths, isAfter, isBefore, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { hasPermission } from "@/lib/auth-utils";
 
 // This is the main Server Component for the page
 export default async function SpacesPage() {
-  const { isSuperAdmin, managedBuildingIds, permissions } = await getUserAndManagedIds();
-
-  if (!isSuperAdmin && !hasPermission(permissions, 'space:view')) {
-    return redirectWithToast('/admin/dashboard', 'You do not have permission to view spaces.');
-  }
+  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
   // --- Automatic Space Vacating Logic ---
   const today = startOfDay(new Date());
