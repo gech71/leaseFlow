@@ -42,8 +42,12 @@ const normalizePhoneNumber = (phone: any): string | undefined => {
 const sanitizeString = (value: any): string => (value ? String(value).trim() : '');
 const sanitizeNumber = (value: any): number => {
   const num = parseFloat(String(value));
-  return isNaN(num) ? 0 : num;
+  return num; // Will return NaN if parsing fails, which we check for later
 };
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 
 export async function processImportAction(data: ImportData) {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
@@ -79,6 +83,11 @@ export async function processImportAction(data: ImportData) {
                 errors.push(`Space Row ${row}: 'buildingName' and 'spaceIdName' are required.`);
                 continue;
             }
+            if (isNaN(space.area) || isNaN(space.monthlyRentalPrice) || isNaN(space.prorationShare)) {
+                errors.push(`Space Row ${row} (${space.spaceIdName}): One or more numerical fields (area, price, proration) are invalid.`);
+                continue;
+            }
+
 
             const buildingForSpace = await databaseService.getAllBuildings({ where: { name: space.buildingName }, take: 1 });
             if (buildingForSpace.length > 0) {
@@ -108,20 +117,24 @@ export async function processImportAction(data: ImportData) {
     // --- 2. Process Tenants ---
     for (const [index, rawTenant] of data.tenants.entries()) {
         const row = index + 2;
-        // Whitelisting and sanitizing fields
-        const tenant = {
-            name: sanitizeString(rawTenant.name),
-            email: sanitizeString(rawTenant.email),
-            phone: normalizePhoneNumber(rawTenant.phone),
-            alternativePhone: normalizePhoneNumber(rawTenant['alternativePhone (Optional)']),
-            nationalId: sanitizeString(rawTenant.nationalId),
-            representativeName: sanitizeString(rawTenant['representativeName (Optional)']),
-            representativePhone: normalizePhoneNumber(rawTenant['representativePhone (Optional)']),
-        };
-
         try {
+            // Whitelisting and sanitizing fields
+            const tenant = {
+                name: sanitizeString(rawTenant.name),
+                email: sanitizeString(rawTenant.email),
+                phone: normalizePhoneNumber(rawTenant.phone),
+                alternativePhone: normalizePhoneNumber(rawTenant['alternativePhone (Optional)']),
+                nationalId: sanitizeString(rawTenant.nationalId),
+                representativeName: sanitizeString(rawTenant['representativeName (Optional)']),
+                representativePhone: normalizePhoneNumber(rawTenant['representativePhone (Optional)']),
+            };
+
             if (!tenant.phone) {
                 errors.push(`Tenant Row ${row} (${tenant.name || 'N/A'}): Missing or invalid primary phone number.`);
+                continue;
+            }
+             if (!tenant.email || !isValidEmail(tenant.email)) {
+                errors.push(`Tenant Row ${row} (${tenant.name}): Email "${tenant.email}" is not a valid format.`);
                 continue;
             }
 
@@ -154,18 +167,29 @@ export async function processImportAction(data: ImportData) {
     // --- 3. Process Agreements ---
     for (const [index, rawAgreement] of data.agreements.entries()) {
         const row = index + 2;
-        // Whitelisting and sanitizing fields
-        const agreement = {
-            tenantEmail: sanitizeString(rawAgreement.tenantEmail),
-            buildingName: sanitizeString(rawAgreement.buildingName),
-            spaceIdName: sanitizeString(rawAgreement.spaceIdName),
-            startDate: sanitizeString(rawAgreement.startDate),
-            termMonths: parseInt(String(rawAgreement.termMonths), 10) || 12,
-            initialPaymentMonths: parseInt(String(rawAgreement.initialPaymentMonths), 10) || 1,
-            additionalTerms: sanitizeString(rawAgreement['additionalTerms (Optional)']),
-        };
-
         try {
+            // Whitelisting and sanitizing fields
+            const agreement = {
+                tenantEmail: sanitizeString(rawAgreement.tenantEmail),
+                buildingName: sanitizeString(rawAgreement.buildingName),
+                spaceIdName: sanitizeString(rawAgreement.spaceIdName),
+                startDate: sanitizeString(rawAgreement.startDate),
+                termMonths: sanitizeNumber(rawAgreement.termMonths),
+                initialPaymentMonths: sanitizeNumber(rawAgreement.initialPaymentMonths),
+                additionalTerms: sanitizeString(rawAgreement['additionalTerms (Optional)']),
+            };
+
+            const startDate = new Date(agreement.startDate);
+            if (isNaN(startDate.getTime())) {
+                errors.push(`Agreement Row ${row}: Invalid start date "${agreement.startDate}" for tenant "${agreement.tenantEmail}".`);
+                continue;
+            }
+            if (isNaN(agreement.termMonths) || isNaN(agreement.initialPaymentMonths) || agreement.termMonths <= 0) {
+                errors.push(`Agreement Row ${row} (${agreement.tenantEmail}): Invalid numerical value for 'termMonths' or 'initialPaymentMonths'.`);
+                continue;
+            }
+
+
             const tenantRecord = await databaseService.findTenantByEmailOrPhone(agreement.tenantEmail, null);
             const buildingRecord = await databaseService.getAllBuildings({ where: { name: agreement.buildingName }, take: 1 });
 
@@ -173,11 +197,6 @@ export async function processImportAction(data: ImportData) {
                 const spaceRecord = await databaseService.getAllSpaces({ where: { buildingId: buildingRecord[0].id, spaceIdName: agreement.spaceIdName }, take: 1 });
 
                 if (spaceRecord.length > 0) {
-                    const startDate = new Date(agreement.startDate);
-                    if (isNaN(startDate.getTime())) {
-                        errors.push(`Agreement Row ${row}: Invalid start date for "${agreement.tenantEmail}".`);
-                        continue;
-                    }
                     
                     const existingAgreement = await databaseService.getAllAgreements({
                         where: { tenantId: tenantRecord.id, spaceId: spaceRecord[0].id, startDate: startDate },
@@ -212,7 +231,7 @@ export async function processImportAction(data: ImportData) {
                  if (buildingRecord.length === 0) errors.push(`Agreement Row ${row}: Building "${agreement.buildingName}" not found.`);
             }
         } catch (e: any) {
-            errors.push(`Agreement Row ${row} ("${agreement.tenantEmail}"): ${e.message}`);
+            errors.push(`Agreement Row ${row} ("${rawAgreement.tenantEmail}"): ${e.message}`);
         }
     }
 
