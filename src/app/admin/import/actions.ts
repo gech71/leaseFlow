@@ -8,6 +8,8 @@ import { createFullAgreementAction } from '../agreements/actions';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import type { Prisma } from '@prisma/client';
 
+const MAX_ROWS_PER_SHEET = 2000; // Server-side limit
+
 export async function getAgreementTemplatesForImportAction(): Promise<{ id: string; name: string }[]> {
   const { isSuperAdmin, currentUser, permissions } = await getUserAndPermissions();
   
@@ -65,6 +67,16 @@ export async function processImportAction(data: ImportData) {
         return { success: false, createdCount: { spaces: 0, tenants: 0, agreements: 0 }, skippedCount: { spaces: 0, tenants: 0, agreements: 0 }, errors: ["Permission denied."] };
     }
 
+    // Server-side row limit validation
+    if (data.spaces.length > MAX_ROWS_PER_SHEET || data.tenants.length > MAX_ROWS_PER_SHEET || data.agreements.length > MAX_ROWS_PER_SHEET) {
+      return { 
+        success: false, 
+        createdCount: { spaces: 0, tenants: 0, agreements: 0 }, 
+        skippedCount: { spaces: 0, tenants: 0, agreements: 0 }, 
+        errors: [`Import failed. The number of rows in one or more sheets exceeds the server limit of ${MAX_ROWS_PER_SHEET}.`] 
+      };
+    }
+
     let createdCount = { spaces: 0, tenants: 0, agreements: 0 };
     let skippedCount = { spaces: 0, tenants: 0, agreements: 0 };
     let errors: string[] = [];
@@ -90,7 +102,7 @@ export async function processImportAction(data: ImportData) {
                 floor: sanitizeString(rawSpace.floor),
                 area: sanitizeNumber(rawSpace.area),
                 monthlyRentalPrice: sanitizeNumber(rawSpace.monthlyRentalPrice),
-                prorationShare: sanitizeNumber(rawSpace.prorationShare),
+                utilityProrationShare: sanitizeNumber(rawSpace.prorationShare),
             };
 
             if (!space.buildingName || !space.spaceIdName) {
@@ -98,7 +110,7 @@ export async function processImportAction(data: ImportData) {
                 skippedCount.spaces++;
                 continue;
             }
-            if (isNaN(space.area) || isNaN(space.monthlyRentalPrice) || isNaN(space.prorationShare)) {
+            if (isNaN(space.area) || isNaN(space.monthlyRentalPrice) || isNaN(space.utilityProrationShare)) {
                 errors.push(`Space Row ${row} (${space.spaceIdName}): One or more numerical fields (area, price, proration) are invalid.`);
                 skippedCount.spaces++;
                 continue;
@@ -115,7 +127,7 @@ export async function processImportAction(data: ImportData) {
                         floor: space.floor,
                         area: space.area,
                         monthlyRentalPrice: space.monthlyRentalPrice,
-                        utilityProrationShare: space.prorationShare / 100,
+                        utilityProrationShare: space.utilityProrationShare / 100,
                     });
                     createdCount.spaces++;
                 } else {
