@@ -4,23 +4,31 @@ export const dynamic = 'force-dynamic';
 import { databaseService } from '@/lib/services/databaseService';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, User, Role } from '@prisma/client';
 import { TenantsClientPage, type TenantWithRelations, type SpaceWithTenant, type ClientAgreement } from './components';
-import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+import { getUserAndManagedIds, redirectWithToast } from '@/lib/actions/server-helpers';
 import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
 import { prisma } from '@/lib/prisma';
+import { hasPermission } from '@/lib/auth-utils';
 
 
 // This is the main Server Component for the page
 export default async function TenantsPage() {
-  const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
+  const { isSuperAdmin, managedBuildingIds, currentUser, permissions } = await getUserAndManagedIds();
   
-  // Non-super-admins can ONLY see tenants they have created.
+  if (!isSuperAdmin && !hasPermission(permissions, 'tenant:view')) {
+    return redirectWithToast('/admin/dashboard', 'You do not have permission to view tenants.');
+  }
+
+  // Non-super-admins can ONLY see tenants they have created or tenants in their buildings.
   const tenantWhere: Prisma.TenantWhereInput = !isSuperAdmin
-    ? { createdById: currentUser.id }
+    ? { 
+        OR: [
+          { createdById: currentUser.id },
+          { agreements: { some: { space: { buildingId: { in: managedBuildingIds! } } } } }
+        ]
+      }
     : {};
   
   const agreementsInclude = {
-    // No where clause here because we need all agreements to determine status,
-    // but we will filter them on the client based on managed buildings.
     include: {
       space: true,
       disabledAgreements: {

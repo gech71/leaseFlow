@@ -67,6 +67,23 @@ export async function getUserAndManagedIds() {
     const managedBuildingIds = isSuperAdmin 
         ? null 
         : currentUser.managedBuildings.map(building => building.id);
+
+    const permissions = new Set<string>();
+    if (!isSuperAdmin) {
+        currentUser.roles.forEach(role => {
+            role.permissions.forEach(permission => permissions.add(permission));
+        });
+    }
     
-    return { currentUser, isSuperAdmin, managedBuildingIds };
+    return { currentUser, isSuperAdmin, managedBuildingIds, permissions };
+}
+
+/**
+ * Redirects to a specified URL and appends an error message for the client to display as a toast.
+ * @param {string} url - The URL to redirect to.
+ * @param {string} message - The error message to display.
+ */
+export function redirectWithToast(url: string, message: string) {
+  const finalUrl = `${url}?error=${encodeURIComponent(message)}`;
+  return redirect(finalUrl);
 }

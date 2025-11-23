@@ -12,6 +12,8 @@ import type { Building as BuildingPrismaType, BuildingMonthlyUtilities as Buildi
 import { BuildingUtilitiesClientPage, type ClientBuildingMonthlyUtilitiesPrismaType } from './client-page'; // Import the new client component
 import { getAllBuildingUtilitiesForListAction, getRegisteredBuildingsAction } from './actions';
 import { parseISO } from 'date-fns';
+import { getUserAndManagedIds, redirectWithToast } from '@/lib/actions/server-helpers';
+import { hasPermission } from '@/lib/auth-utils';
 
 // Define a client-safe Space type
 interface ClientSpace extends Omit<SpacePrismaType, 'createdAt' | 'updatedAt' | 'area' | 'utilityProrationShare' | 'monthlyRentalPrice'> {
@@ -31,7 +33,13 @@ interface ClientBuilding extends Omit<BuildingPrismaType, 'createdAt' | 'updated
 
 
 // Server Component to fetch initial data
-export default function BuildingUtilitiesServerPage() {
+export default async function BuildingUtilitiesServerPage() {
+  const { isSuperAdmin, permissions } = await getUserAndManagedIds();
+
+  if (!isSuperAdmin && !hasPermission(permissions, 'building_utility:view')) {
+    return redirectWithToast('/admin/dashboard', 'You do not have permission to view building utilities.');
+  }
+
   return (
     <div className="animate-fadeIn">
       <PageHeader

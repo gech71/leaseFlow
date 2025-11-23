@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -44,7 +43,7 @@ interface BuildingFinancialSummary {
 
 
 export default function AdminDashboardPage() {
-    const { currentUser, isLoading: isUserLoading } = usePermissions();
+    const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin } = usePermissions();
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -64,10 +63,17 @@ export default function AdminDashboardPage() {
     const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
 
     useEffect(() => {
-        if (!isUserLoading && currentUser && currentUser.roles) {
+        if (!isUserLoading && currentUser) {
             const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
             if (isTenantOnly) {
                 router.replace('/portal/dashboard');
+                return;
+            }
+            if (!isSuperAdmin && !hasPermission('dashboard:view')) {
+                // If they don't have dashboard access, try to find the first page they DO have access to
+                const navItems = ['/admin/buildings', '/admin/spaces', '/admin/tenants', '/admin/agreements', '/admin/billing'];
+                const firstAllowedPage = navItems.find(p => hasPermission(p.replace('/admin/', '') + ':view' as any));
+                router.replace(firstAllowedPage || '/login'); // fallback to login if no permissions found
                 return;
             }
         }
@@ -96,7 +102,7 @@ export default function AdminDashboardPage() {
         if (!isUserLoading) {
             fetchData();
         }
-    }, [isUserLoading, currentUser, router]);
+    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission]);
 
     const periodDescription = format(new Date(selectedYear, selectedMonth), "MMMM yyyy");
 

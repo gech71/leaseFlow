@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
 import {
   SidebarProvider,
@@ -81,9 +81,23 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   const { isMobile, state: sidebarState } = useSidebar();
   const { data: session } = useSession();
   const { currentUser, hasPermission, isSuperAdmin } = usePermissions();
+
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (error) {
+      toast({
+        title: "Access Denied",
+        description: decodeURIComponent(error),
+        variant: "destructive",
+      });
+      // Remove the error from the URL without reloading the page
+      router.replace(pathname, {scroll: false});
+    }
+  }, [searchParams, pathname, router, toast]);
 
   const handleLogout = async () => {
     await signOut({ redirect: true, callbackUrl: '/login' });

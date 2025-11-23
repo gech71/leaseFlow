@@ -6,6 +6,8 @@ import { Loader2 } from 'lucide-react';
 import type { PenaltyTier as PenaltyTierPrisma, Space as SpacePrisma, Bill as BillPrisma, Agreement as AgreementPrisma, Tenant as TenantPrisma, Building as BuildingPrismaType, UtilityBreakdownItem as UtilityBreakdownItemPrisma } from '@prisma/client';
 import { getPaymentsOverviewDataAction, type PaymentsOverviewData, type PaymentsOverviewBill } from './actions';
 import { PaymentsOverviewClientPage, type ClientBill, type ClientSpaceForPotentialRevenue, type ClientPenaltyTier, type ClientBuilding, type ClientSpaceForAgreement, type ClientTenant, type ClientAgreementForBill, type ClientUtilityBreakdownItem } from './client-page'; // Import client page and its types
+import { getUserAndManagedIds, redirectWithToast } from '@/lib/actions/server-helpers';
+import { hasPermission } from '@/lib/auth-utils';
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
@@ -74,6 +76,12 @@ const serializeSpace = (space: SpacePrisma): ClientSpaceForPotentialRevenue => {
 
 
 async function PaymentsOverviewDataFetcher() {
+  const { isSuperAdmin, permissions } = await getUserAndManagedIds();
+
+  if (!isSuperAdmin && !hasPermission(permissions, 'payment_overview:view')) {
+    return redirectWithToast('/admin/dashboard', 'You do not have permission to view payments overview.');
+  }
+
   const data: PaymentsOverviewData = await getPaymentsOverviewDataAction();
   
   const serializedBills: ClientBill[] = data.bills.map(serializeBill);

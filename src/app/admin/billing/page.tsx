@@ -6,7 +6,8 @@ import { Loader2 } from 'lucide-react';
 import { getBillingPageDataAction } from './actions'; // Server action now returns SerializedBillingPageData
 import { BillingClientPage } from './client-page';
 import type { Agreement as AgreementPrisma, Bill as BillPrismaOriginal, Space as SpacePrismaOriginal, Building as BuildingPrismaType, Tenant as TenantPrismaOriginal, UtilityBreakdownItem as UtilityBreakdownItemPrismaOriginal, PenaltyTier as PenaltyTierPrisma, Prisma } from '@prisma/client';
-
+import { getUserAndManagedIds, redirectWithToast } from '@/lib/actions/server-helpers';
+import { hasPermission } from '@/lib/auth-utils';
 
 // Define a simple type for utility items after parsing from JSON (if applicable)
 export interface SerializedParsedUtilityItem {
@@ -107,6 +108,12 @@ export interface SerializedBillingPageData {
 
 // Server Component to fetch initial data
 async function BillingDataFetcher() {
+  const { isSuperAdmin, permissions } = await getUserAndManagedIds();
+  
+  if (!isSuperAdmin && !hasPermission(permissions, 'billing:view')) {
+    return redirectWithToast('/admin/dashboard', 'You do not have permission to view billing.');
+  }
+
   // getBillingPageDataAction now returns SerializedBillingPageData directly
   const serializableData = await getBillingPageDataAction();
   return <BillingClientPage initialData={serializableData} />;
