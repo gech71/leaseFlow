@@ -59,6 +59,7 @@ interface ImportSummary {
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const MAX_ROWS_PER_SHEET = 500;
 
 export function ImportClientPage({
   agreementTemplates,
@@ -236,6 +237,17 @@ export function ImportClientPage({
           { raw: false, dateNF: "yyyy-mm-dd" },
         );
         
+        // Row count validation
+        if (spacesRaw.length > MAX_ROWS_PER_SHEET) {
+            throw new Error(`The "Spaces" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`);
+        }
+        if (tenantsRaw.length > MAX_ROWS_PER_SHEET) {
+            throw new Error(`The "Tenants" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`);
+        }
+        if (agreementsRaw.length > MAX_ROWS_PER_SHEET) {
+            throw new Error(`The "Agreements" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`);
+        }
+
         const spaces = JSON.parse(JSON.stringify(spacesRaw));
         const tenants = JSON.parse(JSON.stringify(tenantsRaw));
         const agreements = JSON.parse(JSON.stringify(agreementsRaw));
@@ -262,13 +274,12 @@ export function ImportClientPage({
           });
         }
       } catch (error: any) {
-        setImportSummary({
-          createdCount: { spaces: 0, tenants: 0, agreements: 0 },
-          skippedCount: { spaces: 0, tenants: 0, agreements: 0 },
-          errors: [
-            "Failed to read or process the Excel file. Ensure it is not corrupted and matches the template format.",
-          ],
+        toast({
+          title: "Import Failed",
+          description: error.message || "Failed to read or process the Excel file. Ensure it is not corrupted and matches the template format.",
+          variant: "destructive",
         });
+        setImportSummary(null); // Clear summary on failure
       } finally {
         setIsProcessing(false);
       }
@@ -341,7 +352,7 @@ export function ImportClientPage({
           </Button>
           <p className="text-xs text-muted-foreground mt-4">
             The template has three sheets: Spaces, Tenants, and Agreements.
-            Please ensure buildings exist before importing spaces.
+            Please ensure buildings exist before importing spaces. Each sheet has a maximum limit of {MAX_ROWS_PER_SHEET} rows.
           </p>
         </CardContent>
         <CardHeader>
