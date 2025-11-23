@@ -59,7 +59,7 @@ interface ImportSummary {
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const MAX_ROWS_PER_SHEET = 500;
+const MAX_ROWS_PER_SHEET = 2000;
 
 export function ImportClientPage({
   agreementTemplates,
