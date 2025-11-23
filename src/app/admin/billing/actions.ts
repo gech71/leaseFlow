@@ -438,9 +438,13 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
             costForThisItem = utilTotalCost * prorationShare;
           }
         } else if (utilItem.appliesToScope === 'Floor' && utilItem.applicableFloor === space.floor) {
-           const spacesOnFloor = agreement.space.building.spaces.filter(s => s.floor === utilItem.applicableFloor);
-           if (spacesOnFloor.length > 0) {
-                costForThisItem = utilTotalCost / spacesOnFloor.length;
+           let percentages: Record<string, number> = {};
+           if (utilItem.perSpacePercentages && typeof utilItem.perSpacePercentages === 'string') {
+               try { percentages = JSON.parse(utilItem.perSpacePercentages); } catch(e) {}
+           }
+           const spacePercentage = percentages[space.id];
+           if(spacePercentage && spacePercentage > 0) {
+              costForThisItem = utilTotalCost * (spacePercentage / 100);
            }
         } else if (utilItem.appliesToScope === 'SpecificSpaces') {
           if (Array.isArray(utilItem.applicableSpaceIdNames) && utilItem.applicableSpaceIdNames.includes(space.spaceIdName)) {

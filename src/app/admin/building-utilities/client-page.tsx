@@ -61,6 +61,7 @@ export interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingM
     appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
     applicableFloor: string | null;
     applicableSpaceIdNames: string[];
+    perSpacePercentages?: Record<string, number> | null; // Added for floor scope
     monthlyUtilitiesId: string;
   }[]; 
 }
@@ -74,6 +75,7 @@ interface UIUtilityItem {
   totalCost?: number;
   applicableFloor?: string;
   perSpaceCosts?: { [spaceId: string]: number };
+  perSpacePercentages?: { [spaceId: string]: number };
 }
 
 
@@ -163,7 +165,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
   }, [selectedBuilding]);
 
   const createEmptyItem = (): UIUtilityItem => ({
-    uiId: crypto.randomUUID(), name: '', appliesToScope: 'Building', totalCost: undefined, perSpaceCosts: {}
+    uiId: crypto.randomUUID(), name: '', appliesToScope: 'Building', totalCost: undefined, perSpaceCosts: {}, perSpacePercentages: {}
   });
 
   useEffect(() => {
@@ -181,33 +183,34 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
         if (existingEntry?.utilities) {
-          // Group by name and scope to reconstruct UI items
-          const grouped: Record<string, UIUtilityItem> = {};
+          const uiItems: UIUtilityItem[] = existingEntry.utilities.map(dbItem => ({
+            uiId: crypto.randomUUID(),
+            id: dbItem.id,
+            name: dbItem.name,
+            appliesToScope: dbItem.appliesToScope,
+            totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
+            applicableFloor: dbItem.applicableFloor || undefined,
+            perSpaceCosts: dbItem.appliesToScope === 'SpecificSpaces' ? { [dbItem.applicableSpaceIdNames[0]]: Number(dbItem.totalCost) } : {},
+            perSpacePercentages: dbItem.appliesToScope === 'Floor' ? dbItem.perSpacePercentages || {} : {},
+          }));
 
-          existingEntry.utilities.forEach(dbItem => {
-              // For SpecificSpaces, we want one UI item per utility NAME, which holds multiple space costs
-              const key = dbItem.appliesToScope === 'SpecificSpaces' ? `${dbItem.name}-SpecificSpaces` : dbItem.id;
-              
-              if (!grouped[key]) {
-                  grouped[key] = {
-                      uiId: crypto.randomUUID(),
-                      id: dbItem.id, // Store original ID for updates
-                      name: dbItem.name,
-                      appliesToScope: dbItem.appliesToScope,
-                      totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
-                      applicableFloor: dbItem.applicableFloor || undefined,
-                      perSpaceCosts: {},
-                  };
-              }
+          // Group per-space-cost items by name
+           const groupedItems = uiItems.reduce((acc, item) => {
+                if (item.appliesToScope === 'SpecificSpaces') {
+                    const key = `${item.name}-SpecificSpaces`;
+                    if (!acc[key]) {
+                        acc[key] = { ...item, perSpaceCosts: {} };
+                    }
+                    acc[key].perSpaceCosts = { ...acc[key].perSpaceCosts, ...item.perSpaceCosts };
+                } else {
+                    // Use a unique key for non-grouped items
+                    acc[item.id || item.uiId] = item;
+                }
+                return acc;
+            }, {} as Record<string, UIUtilityItem>);
 
-              if (dbItem.appliesToScope === 'SpecificSpaces' && dbItem.applicableSpaceIdNames.length > 0) {
-                  const spaceName = dbItem.applicableSpaceIdNames[0];
-                  grouped[key].perSpaceCosts![spaceName] = Number(dbItem.totalCost);
-              }
-          });
 
-          const uiItems = Object.values(grouped);
-          setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
+          setCurrentUtilityItems(Object.values(groupedItems).length > 0 ? Object.values(groupedItems) : [createEmptyItem()]);
 
         } else {
           setCurrentUtilityItems([createEmptyItem()]);
@@ -260,6 +263,7 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         if (field === 'appliesToScope') {
             updatedItem.totalCost = undefined;
             updatedItem.perSpaceCosts = {};
+            updatedItem.perSpacePercentages = {};
             updatedItem.applicableFloor = '';
         }
         
@@ -267,16 +271,25 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
     }));
   };
 
-   const handlePerSpaceCostChange = (uiId: string, spaceId: string, costStr: string) => {
+   const handlePerSpaceCostChange = (uiId: string, spaceIdName: string, costStr: string) => {
         if (!canSaveUtilities) return;
         const cost = parseFloat(costStr);
         setCurrentUtilityItems(prev => prev.map(item => {
             if (item.uiId !== uiId) return item;
-            
-            const newPerSpaceCosts = { ...item.perSpaceCosts, [spaceId]: isNaN(cost) ? 0 : cost };
+            const newPerSpaceCosts = { ...item.perSpaceCosts, [spaceIdName]: isNaN(cost) ? 0 : cost };
             return { ...item, perSpaceCosts: newPerSpaceCosts };
         }));
    };
+
+    const handlePerSpacePercentageChange = (uiId: string, spaceId: string, percentageStr: string) => {
+      if (!canSaveUtilities) return;
+      const percentage = parseFloat(percentageStr);
+      setCurrentUtilityItems(prev => prev.map(item => {
+        if (item.uiId !== uiId) return item;
+        const newPerSpacePercentages = { ...item.perSpacePercentages, [spaceId]: isNaN(percentage) ? 0 : percentage };
+        return { ...item, perSpacePercentages: newPerSpacePercentages };
+      }));
+    };
 
 
   const handleSaveUtilities = async () => {
@@ -296,32 +309,44 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
       if (validationFailed) break;
 
       if (!item.name.trim()) {
-        if (currentUtilityItems.length > 1 || (item.appliesToScope === 'SpecificSpaces' ? Object.values(item.perSpaceCosts ?? {}).some(c => c > 0) : (item.totalCost && item.totalCost > 0))) {
+        const hasCost = item.appliesToScope === 'SpecificSpaces' ? Object.values(item.perSpaceCosts ?? {}).some(c => c > 0) : (item.totalCost && item.totalCost > 0);
+        if (currentUtilityItems.length > 1 || hasCost) {
             toast({ title: 'Validation Error', description: `An unnamed utility item cannot be saved.`, variant: 'destructive' });
             validationFailed = true;
         }
         continue; 
       }
       
-      if (item.appliesToScope === 'Building' || item.appliesToScope === 'Floor') {
-        const totalCostValue = item.totalCost;
-        if (totalCostValue === undefined || totalCostValue <= 0) {
-          toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
-          validationFailed = true;
-          continue;
-        }
-         if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
+      const totalCostValue = item.totalCost;
+      if ((item.appliesToScope === 'Building' || item.appliesToScope === 'Floor') && (totalCostValue === undefined || totalCostValue <= 0)) {
+        toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
+        validationFailed = true;
+        continue;
+      }
+      
+      if (item.appliesToScope === 'Floor') {
+        if (!item.applicableFloor) {
             toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
             validationFailed = true;
             continue;
         }
+
+        const percentageSum = Object.values(item.perSpacePercentages ?? {}).reduce((sum, p) => sum + p, 0);
+        if (percentageSum > 100) {
+            toast({ title: 'Validation Error', description: `Total percentage for "${item.name}" on floor ${item.applicableFloor} exceeds 100%.`, variant: 'destructive' });
+            validationFailed = true;
+            continue;
+        }
+
         finalUtilityItemsForDb.push({
-          id: item.id,
-          name: item.name,
-          totalCost: totalCostValue!,
-          appliesToScope: item.appliesToScope,
-          applicableFloor: item.applicableFloor
+            id: item.id,
+            name: item.name,
+            totalCost: totalCostValue!,
+            appliesToScope: item.appliesToScope,
+            applicableFloor: item.applicableFloor,
+            perSpacePercentages: item.perSpacePercentages
         });
+
       } else if (item.appliesToScope === 'SpecificSpaces') {
          const costs = item.perSpaceCosts || {};
          const costEntries = Object.entries(costs).filter(([, cost]) => cost > 0);
@@ -340,6 +365,13 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 applicableSpaceIdNames: [spaceIdName],
              });
          });
+      } else { // Building scope
+          finalUtilityItemsForDb.push({
+            id: item.id,
+            name: item.name,
+            totalCost: totalCostValue!,
+            appliesToScope: 'Building'
+        });
       }
     }
 
@@ -364,26 +396,32 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         // Refetch the data for the current view to get the new IDs
         const updatedEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         if (updatedEntry?.utilities) {
-             const grouped: Record<string, UIUtilityItem> = {};
-              updatedEntry.utilities.forEach(dbItem => {
-                const key = dbItem.appliesToScope === 'SpecificSpaces' ? `${dbItem.name}-SpecificSpaces` : dbItem.id;
-                if (!grouped[key]) {
-                  grouped[key] = {
-                    uiId: crypto.randomUUID(),
-                    id: dbItem.id,
-                    name: dbItem.name,
-                    appliesToScope: dbItem.appliesToScope,
-                    totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
-                    applicableFloor: dbItem.applicableFloor || undefined,
-                    perSpaceCosts: {},
-                  };
+             const uiItems: UIUtilityItem[] = updatedEntry.utilities.map(dbItem => ({
+                uiId: crypto.randomUUID(),
+                id: dbItem.id,
+                name: dbItem.name,
+                appliesToScope: dbItem.appliesToScope,
+                totalCost: dbItem.appliesToScope !== 'SpecificSpaces' ? Number(dbItem.totalCost) : undefined,
+                applicableFloor: dbItem.applicableFloor || undefined,
+                perSpaceCosts: dbItem.appliesToScope === 'SpecificSpaces' ? { [dbItem.applicableSpaceIdNames[0]]: Number(dbItem.totalCost) } : {},
+                perSpacePercentages: dbItem.appliesToScope === 'Floor' ? dbItem.perSpacePercentages || {} : {},
+             }));
+
+             const groupedItems = uiItems.reduce((acc, item) => {
+                if (item.appliesToScope === 'SpecificSpaces') {
+                    const key = `${item.name}-SpecificSpaces`;
+                    if (!acc[key]) {
+                        acc[key] = { ...item, perSpaceCosts: {} };
+                    }
+                    acc[key].perSpaceCosts = { ...acc[key].perSpaceCosts, ...item.perSpaceCosts };
+                } else {
+                    acc[item.id || item.uiId] = item;
                 }
-                if (dbItem.appliesToScope === 'SpecificSpaces' && dbItem.applicableSpaceIdNames.length > 0) {
-                  const spaceName = dbItem.applicableSpaceIdNames[0];
-                  grouped[key].perSpaceCosts![spaceName] = Number(dbItem.totalCost);
-                }
-              });
-              setCurrentUtilityItems(Object.values(grouped));
+                return acc;
+            }, {} as Record<string, UIUtilityItem>);
+
+
+          setCurrentUtilityItems(Object.values(groupedItems).length > 0 ? Object.values(groupedItems) : [createEmptyItem()]);
         }
 
       } else {
@@ -518,6 +556,9 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                 </div>
                 {isLoadingData && <div className="flex justify-center py-4"><Loader2 className="animate-spin h-6 w-6 text-primary"/></div>}
                 {!isLoadingData && currentUtilityItems.map((item, index) => {
+                  const spacesOnSelectedFloor = selectedBuilding?.spaces.filter(s => s.floor === item.applicableFloor) || [];
+                  const floorPercentageSum = Object.values(item.perSpacePercentages ?? {}).reduce((sum, p) => sum + p, 0);
+
                   return (
                   <Card key={item.uiId} className="p-4 bg-secondary/30 shadow-sm">
                     <CardContent className="p-0 space-y-4">
@@ -564,6 +605,40 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
                                     <SelectContent>{uniqueFloors.map(floor => (<SelectItem key={floor} value={floor}>{floor}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
+                            {item.applicableFloor && (
+                               <div className="space-y-2 pt-2">
+                                  <div className="flex justify-between items-center">
+                                    <Label className="flex items-center text-sm font-medium"><Percent className="mr-2 h-4 w-4 text-primary"/>Per-Space Percentage Allocation</Label>
+                                    <Badge variant={floorPercentageSum > 100 ? "destructive" : "secondary"}>{floorPercentageSum.toFixed(2)}% Total</Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">Assign a percentage of the floor's total cost to each space. The total cannot exceed 100%.</p>
+                                  <ScrollArea className="max-h-60 w-full rounded-md border p-2 bg-background">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 p-2">
+                                          {spacesOnSelectedFloor.length > 0 ? spacesOnSelectedFloor.map(space => (
+                                              <div key={space.id} className="flex items-center gap-2">
+                                                  <Label htmlFor={`space-percentage-${item.uiId}-${space.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={space.spaceIdName}>
+                                                      {space.spaceIdName}
+                                                  </Label>
+                                                  <Input
+                                                      id={`space-percentage-${item.uiId}-${space.id}`}
+                                                      type="number"
+                                                      placeholder="0"
+                                                      value={item.perSpacePercentages?.[space.id] || ''}
+                                                      onChange={(e) => handlePerSpacePercentageChange(item.uiId, space.id, e.target.value)}
+                                                      className="w-24 h-8"
+                                                      disabled={isSaving || !canSaveUtilities}
+                                                  />
+                                              </div>
+                                          )) : (
+                                              <p className="text-sm text-muted-foreground text-center col-span-2">No spaces found on this floor.</p>
+                                          )}
+                                      </div>
+                                  </ScrollArea>
+                                  {floorPercentageSum > 100 && (
+                                    <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3"/> Total percentage exceeds 100%. Please correct before saving.</p>
+                                  )}
+                              </div>
+                            )}
                           </div>
                       )}
                       

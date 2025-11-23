@@ -34,7 +34,7 @@ export async function getBuildingUtilitiesAction(
   buildingId: string,
   year: number,
   month: number
-): Promise<(BuildingMonthlyUtilities & { utilities: { totalCost: number }[] }) | null> {
+): Promise<(BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpacePercentages?: Record<string, number> | null })[] }) | null> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
@@ -48,16 +48,17 @@ export async function getBuildingUtilitiesAction(
 
     if (!utilities) return null;
 
-    // Serialize Decimal to number
+    // Serialize Decimal to number and parse JSON
     const serializableUtilities = {
       ...utilities,
       utilities: utilities.utilities.map(u => ({
         ...u,
-        totalCost: Number(u.totalCost)
+        totalCost: Number(u.totalCost),
+        perSpacePercentages: u.perSpacePercentages ? JSON.parse(u.perSpacePercentages as string) : null,
       }))
     };
     
-    return serializableUtilities;
+    return serializableUtilities as (BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpacePercentages?: Record<string, number> | null })[] });
 
   } catch (error: any) {
     console.error("Error fetching building utilities:", error);
@@ -72,6 +73,7 @@ export interface BuildingUtilityItemInput {
   appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces'; // Matches Prisma Enum
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
+  perSpacePercentages?: { [spaceId: string]: number };
 }
 
 export async function saveBuildingUtilitiesAction(
@@ -128,6 +130,7 @@ export async function saveBuildingUtilitiesAction(
             appliesToScope: item.appliesToScope,
             applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
             applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
+            perSpacePercentages: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : null,
         };
 
         if (item.id) { // If ID exists, it's an update
@@ -163,7 +166,8 @@ export async function saveBuildingUtilitiesAction(
       ...result,
       utilities: result.utilities.map(u => ({
         ...u,
-        totalCost: Number(u.totalCost)
+        totalCost: Number(u.totalCost),
+        perSpacePercentages: u.perSpacePercentages ? JSON.parse(u.perSpacePercentages as string) : null,
       }))
     };
 
@@ -180,7 +184,7 @@ export async function saveBuildingUtilitiesAction(
   }
 }
 
-export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingMonthlyUtilities & { utilities: { totalCost: number }[] })[]> {
+export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingMonthlyUtilities & { utilities: ({ totalCost: number; })[] })[]> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 

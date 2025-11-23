@@ -1,4 +1,5 @@
 
+
 export const dynamic = 'force-dynamic';
 
 // Main page.tsx is now a Server Component by default (no "use client" at the top)
