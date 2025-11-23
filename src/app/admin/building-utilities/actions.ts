@@ -130,7 +130,7 @@ export async function saveBuildingUtilitiesAction(
             appliesToScope: item.appliesToScope,
             applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
             applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-            perSpaceAllocation: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : Prisma.JsonNull,
+            perSpaceAllocation: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : null,
         };
 
         if (item.id && dbItemIds.has(item.id)) { // If ID exists and was in the DB, it's an update
