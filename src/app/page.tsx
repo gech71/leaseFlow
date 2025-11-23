@@ -44,14 +44,20 @@ export default function RootPage() {
       router.replace('/admin/dashboard');
     }
     
-    // Fetch the CSRF token when the component mounts
     const fetchCsrfToken = async () => {
         const token = await getCsrfToken();
         setCsrfToken(token);
     };
     fetchCsrfToken();
 
-  }, [status, router]);
+    // Check for error messages from NextAuth.js in URL query params
+    const authError = searchParams.get('error');
+    if (authError) {
+        // Decode and display the specific error message from the server
+        setError(decodeURIComponent(authError));
+    }
+
+  }, [status, router, searchParams]);
   
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -61,18 +67,20 @@ export default function RootPage() {
     const result = await signIn("credentials", {
       phone,
       password,
-      csrfToken, // Include the CSRF token in the sign-in request
-      redirect: false, // Prevent redirect to handle the response directly
+      csrfToken,
+      redirect: false,
     });
 
     setIsLoading(false);
 
     if (result?.error) {
-      // Directly display the error message from the authorize function
-      setError(result.error);
+      // The error is now caught by the useEffect hook from the URL,
+      // but we can set a generic one as a fallback.
+      // NextAuth.js will redirect back to this page with an error in the URL.
+      // We manually trigger a redirect to ensure the URL is updated.
+      router.push(`/login?error=${encodeURIComponent(result.error)}`);
     } else if (result?.ok) {
       // On success, manually redirect.
-      // A full page reload is good here to ensure all server-side contexts are fresh.
       window.location.href = '/admin/dashboard';
     } else {
       // Fallback for other unexpected errors
