@@ -1,19 +1,7 @@
+
 import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
 import type { User as AuthUser } from "next-auth";
-import { SignJWT, jwtVerify } from "jose";
-
-const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
-
-if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "NEXTAUTH_SECRET must be set and be at least 32 characters long in production.",
-    );
-  } else {
-    console.warn("WARN: NEXTAUTH_SECRET is not set.");
-  }
-}
 
 const ACCESS_TOKEN_EXPIRY = 15 * 60; // 15 minutes in seconds
 const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -36,8 +24,12 @@ export const {
         token.id = user.id;
         token.accessTokenExp = now + ACCESS_TOKEN_EXPIRY;
         token.refreshTokenExp = now + REFRESH_TOKEN_EXPIRY;
+        // Correctly carry over the forceChangePass flag from the user object to the token
         if ("forceChangePass" in user && user.forceChangePass) {
           token.forceChangePass = true;
+        } else {
+          // Ensure the flag is not present if not applicable
+          delete token.forceChangePass;
         }
         return token;
       }
@@ -61,10 +53,14 @@ export const {
       if (session.user && token.id) {
         session.user.id = token.id as string;
         
+        // Pass the forceChangePass flag from the token to the session
         if (token.forceChangePass) {
           session.user.forceChangePass = true;
         } else {
-          delete session.user.forceChangePass;
+          // Ensure the flag is not present if not applicable
+          if ('forceChangePass' in session.user) {
+            delete session.user.forceChangePass;
+          }
         }
 
         // Pass token expiry to the client session
