@@ -58,8 +58,14 @@ export default function RootPage() {
     setIsLoading(false);
 
     if (result?.error) {
-      // The `error` property now contains the exact message from our custom `authorize` function.
-      setError(result.error);
+      // NextAuth returns a generic error key "CredentialsSignin" for custom errors.
+      // We can map this to a user-friendly message.
+      if (result.error === "CredentialsSignin") {
+        setError("Invalid phone number or password.");
+      } else {
+        // For other errors like account lockout, the exact message is passed.
+        setError(result.error);
+      }
     } else if (result?.ok) {
       // On success, manually redirect.
       // A full page reload is good here to ensure all server-side contexts are fresh.
