@@ -57,95 +57,120 @@ export async function processImportAction(data: ImportData) {
     }
 
     // --- 1. Process Spaces ---
-    for (const [index, space] of data.spaces.entries()) {
+    for (const [index, rawSpace] of data.spaces.entries()) {
         const row = index + 2;
         try {
-            const buildingName = sanitizeString(space.buildingName);
-            const spaceIdName = sanitizeString(space.spaceIdName);
-            if (!buildingName || !spaceIdName) {
+            // Whitelisting and sanitizing fields
+            const space = {
+                buildingName: sanitizeString(rawSpace.buildingName),
+                spaceIdName: sanitizeString(rawSpace.spaceIdName),
+                floor: sanitizeString(rawSpace.floor),
+                area: sanitizeNumber(rawSpace.area),
+                monthlyRentalPrice: sanitizeNumber(rawSpace.monthlyRentalPrice),
+                prorationShare: sanitizeNumber(rawSpace.prorationShare),
+            };
+
+            if (!space.buildingName || !space.spaceIdName) {
                 errors.push(`Space Row ${row}: 'buildingName' and 'spaceIdName' are required.`);
                 continue;
             }
 
-            const buildingForSpace = await databaseService.getAllBuildings({ where: { name: buildingName }, take: 1 });
+            const buildingForSpace = await databaseService.getAllBuildings({ where: { name: space.buildingName }, take: 1 });
             if (buildingForSpace.length > 0) {
-                const existingSpace = await databaseService.getAllSpaces({ where: { buildingId: buildingForSpace[0].id, spaceIdName: spaceIdName }, take: 1 });
+                const existingSpace = await databaseService.getAllSpaces({ where: { buildingId: buildingForSpace[0].id, spaceIdName: space.spaceIdName }, take: 1 });
                 if (existingSpace.length === 0) {
                     await databaseService.createSpace({
                         building: { connect: { id: buildingForSpace[0].id } },
-                        buildingName: buildingName,
-                        spaceIdName: spaceIdName,
-                        floor: sanitizeString(space.floor),
-                        area: sanitizeNumber(space.area),
-                        monthlyRentalPrice: sanitizeNumber(space.monthlyRentalPrice),
-                        utilityProrationShare: sanitizeNumber(space.prorationShare) / 100,
+                        buildingName: space.buildingName,
+                        spaceIdName: space.spaceIdName,
+                        floor: space.floor,
+                        area: space.area,
+                        monthlyRentalPrice: space.monthlyRentalPrice,
+                        utilityProrationShare: space.prorationShare / 100,
                     });
                     createdCount.spaces++;
                 } else {
                     skippedCount.spaces++;
                 }
             } else {
-                errors.push(`Space Row ${row} (${spaceIdName}): Building "${buildingName}" not found.`);
+                errors.push(`Space Row ${row} (${space.spaceIdName}): Building "${space.buildingName}" not found.`);
             }
         } catch (e: any) {
-            errors.push(`Space Row ${row} (${space.spaceIdName || 'N/A'}): ${e.message}`);
+            errors.push(`Space Row ${row} (${rawSpace.spaceIdName || 'N/A'}): ${e.message}`);
         }
     }
     
     // --- 2. Process Tenants ---
-    for (const [index, tenant] of data.tenants.entries()) {
+    for (const [index, rawTenant] of data.tenants.entries()) {
         const row = index + 2;
-        const tenantName = sanitizeString(tenant.name);
+        // Whitelisting and sanitizing fields
+        const tenant = {
+            name: sanitizeString(rawTenant.name),
+            email: sanitizeString(rawTenant.email),
+            phone: normalizePhoneNumber(rawTenant.phone),
+            alternativePhone: normalizePhoneNumber(rawTenant['alternativePhone (Optional)']),
+            nationalId: sanitizeString(rawTenant.nationalId),
+            representativeName: sanitizeString(rawTenant['representativeName (Optional)']),
+            representativePhone: normalizePhoneNumber(rawTenant['representativePhone (Optional)']),
+        };
+
         try {
-            const normalizedPhone = normalizePhoneNumber(tenant.phone);
-            if (!normalizedPhone) {
-                errors.push(`Tenant Row ${row} (${tenantName}): Missing or invalid primary phone number.`);
+            if (!tenant.phone) {
+                errors.push(`Tenant Row ${row} (${tenant.name || 'N/A'}): Missing or invalid primary phone number.`);
                 continue;
             }
 
-            const existingTenant = await databaseService.findTenantByEmailOrPhone(sanitizeString(tenant.email), normalizedPhone);
+            const existingTenant = await databaseService.findTenantByEmailOrPhone(tenant.email, tenant.phone);
             if (!existingTenant) {
                 const tenantData = {
-                    name: tenantName,
-                    email: sanitizeString(tenant.email),
-                    phone: normalizedPhone,
-                    alternativePhone: normalizePhoneNumber(tenant['alternativePhone (Optional)']),
-                    nationalId: sanitizeString(tenant.nationalId) || undefined,
-                    representativeName: sanitizeString(tenant['representativeName (Optional)']) || undefined,
-                    representativePhone: normalizePhoneNumber(tenant['representativePhone (Optional)']),
+                    name: tenant.name,
+                    email: tenant.email,
+                    phone: tenant.phone,
+                    alternativePhone: tenant.alternativePhone,
+                    nationalId: tenant.nationalId || undefined,
+                    representativeName: tenant.representativeName || undefined,
+                    representativePhone: tenant.representativePhone,
                 };
                 
                 const result = await createTenantAction(tenantData);
                 if (result.success) {
                     createdCount.tenants++;
                 } else {
-                    errors.push(`Tenant Row ${row} (${tenantName}): ${result.error}`);
+                    errors.push(`Tenant Row ${row} (${tenant.name}): ${result.error}`);
                 }
             } else {
                 skippedCount.tenants++;
             }
         } catch (e: any) {
-            errors.push(`Tenant Row ${row} (${tenantName}): ${e.message}`);
+            errors.push(`Tenant Row ${row} (${tenant.name || 'N/A'}): ${e.message}`);
         }
     }
     
     // --- 3. Process Agreements ---
-    for (const [index, agreement] of data.agreements.entries()) {
+    for (const [index, rawAgreement] of data.agreements.entries()) {
         const row = index + 2;
-        const tenantEmail = sanitizeString(agreement.tenantEmail);
-        const buildingName = sanitizeString(agreement.buildingName);
-        const spaceIdName = sanitizeString(agreement.spaceIdName);
+        // Whitelisting and sanitizing fields
+        const agreement = {
+            tenantEmail: sanitizeString(rawAgreement.tenantEmail),
+            buildingName: sanitizeString(rawAgreement.buildingName),
+            spaceIdName: sanitizeString(rawAgreement.spaceIdName),
+            startDate: sanitizeString(rawAgreement.startDate),
+            termMonths: parseInt(String(rawAgreement.termMonths), 10) || 12,
+            initialPaymentMonths: parseInt(String(rawAgreement.initialPaymentMonths), 10) || 1,
+            additionalTerms: sanitizeString(rawAgreement['additionalTerms (Optional)']),
+        };
+
         try {
-            const tenantRecord = await databaseService.findTenantByEmailOrPhone(tenantEmail, null);
-            const buildingRecord = await databaseService.getAllBuildings({ where: { name: buildingName }, take: 1 });
+            const tenantRecord = await databaseService.findTenantByEmailOrPhone(agreement.tenantEmail, null);
+            const buildingRecord = await databaseService.getAllBuildings({ where: { name: agreement.buildingName }, take: 1 });
 
             if (tenantRecord && buildingRecord.length > 0) {
-                const spaceRecord = await databaseService.getAllSpaces({ where: { buildingId: buildingRecord[0].id, spaceIdName: spaceIdName }, take: 1 });
+                const spaceRecord = await databaseService.getAllSpaces({ where: { buildingId: buildingRecord[0].id, spaceIdName: agreement.spaceIdName }, take: 1 });
 
                 if (spaceRecord.length > 0) {
-                    const startDate = new Date(sanitizeString(agreement.startDate));
+                    const startDate = new Date(agreement.startDate);
                     if (isNaN(startDate.getTime())) {
-                        errors.push(`Agreement Row ${row}: Invalid start date for "${tenantEmail}".`);
+                        errors.push(`Agreement Row ${row}: Invalid start date for "${agreement.tenantEmail}".`);
                         continue;
                     }
                     
@@ -161,28 +186,28 @@ export async function processImportAction(data: ImportData) {
                             agreementText: "Agreement text generated via bulk import.", // Simplified text for import
                             startDate: startDate.toISOString(),
                             monthlyRentalPrice: sanitizeNumber(spaceRecord[0].monthlyRentalPrice),
-                            paymentTermMonths: parseInt(String(agreement.termMonths), 10) || 12,
-                            initialPaymentMonths: parseInt(String(agreement.initialPaymentMonths), 10) || 1,
-                            additionalTerms: sanitizeString(agreement['additionalTerms (Optional)']) || undefined,
+                            paymentTermMonths: agreement.termMonths,
+                            initialPaymentMonths: agreement.initialPaymentMonths,
+                            additionalTerms: agreement.additionalTerms || undefined,
                         };
                         const result = await createFullAgreementAction(agreementData);
                         if(result.success) {
                             createdCount.agreements++;
                         } else {
-                            errors.push(`Agreement Row ${row} ("${tenantEmail}" in "${spaceIdName}"): ${result.error}`);
+                            errors.push(`Agreement Row ${row} ("${agreement.tenantEmail}" in "${agreement.spaceIdName}"): ${result.error}`);
                         }
                     } else {
                         skippedCount.agreements++;
                     }
                 } else {
-                    errors.push(`Agreement Row ${row} ("${tenantEmail}"): Space "${spaceIdName}" in Building "${buildingName}" not found.`);
+                    errors.push(`Agreement Row ${row} ("${agreement.tenantEmail}"): Space "${agreement.spaceIdName}" in Building "${agreement.buildingName}" not found.`);
                 }
             } else {
-                 if (!tenantRecord) errors.push(`Agreement Row ${row}: Tenant with email "${tenantEmail}" not found.`);
-                 if (buildingRecord.length === 0) errors.push(`Agreement Row ${row}: Building "${buildingName}" not found.`);
+                 if (!tenantRecord) errors.push(`Agreement Row ${row}: Tenant with email "${agreement.tenantEmail}" not found.`);
+                 if (buildingRecord.length === 0) errors.push(`Agreement Row ${row}: Building "${agreement.buildingName}" not found.`);
             }
         } catch (e: any) {
-            errors.push(`Agreement Row ${row} ("${tenantEmail}"): ${e.message}`);
+            errors.push(`Agreement Row ${row} ("${agreement.tenantEmail}"): ${e.message}`);
         }
     }
 
