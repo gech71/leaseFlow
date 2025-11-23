@@ -67,6 +67,7 @@ export interface ClientBuildingMonthlyUtilitiesPrismaType extends Omit<BuildingM
 // Internal state type for a "logical" utility item in the UI
 interface UIUtilityItem {
   uiId: string;
+  id?: string; // DB id for updates
   name: string;
   appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
   totalCost?: number;
@@ -179,51 +180,24 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         setIsLoadingData(true);
         const existingEntry = await getBuildingUtilitiesAction(selectedBuildingId, selectedYear, selectedMonth);
         
-        if (existingEntry && existingEntry.utilities && selectedBuilding) {
-            // Group raw DB items by a logical key (e.g., "Building_Water", "Floor_5th Floor_Electricity")
-            const logicalGroups: Record<string, typeof existingEntry.utilities> = {};
+        if (existingEntry?.utilities) {
+          const uiItems: UIUtilityItem[] = existingEntry.utilities.map(item => {
+            const cost = Number(item.totalCost);
+            return {
+              uiId: crypto.randomUUID(),
+              id: item.id, // Keep the DB ID
+              name: item.name,
+              appliesToScope: item.appliesToScope,
+              totalCost: isNaN(cost) ? undefined : cost,
+              applicableFloor: item.applicableFloor || undefined,
+              // If it's a specific space, we just have one entry.
+              // We'll need to reconstruct grouping logic on save if needed, or change save logic.
+              perSpacePercentages: {},
+              perSpaceCosts: {},
+            };
+          });
 
-            for (const item of existingEntry.utilities) {
-                let groupKey: string;
-                if (item.appliesToScope === 'Building') {
-                    groupKey = `Building_${item.name}`;
-                } else if (item.appliesToScope === 'Floor' && item.applicableFloor) {
-                    groupKey = `Floor_${item.applicableFloor}_${item.name}`;
-                } else { // SpecificSpaces
-                    // Grouping specific spaces by name, assuming they were created as a logical group
-                    groupKey = `SpecificSpaces_${item.name}`;
-                }
-                
-                if (!logicalGroups[groupKey]) logicalGroups[groupKey] = [];
-                logicalGroups[groupKey].push(item);
-            }
-
-            const uiItems: UIUtilityItem[] = Object.values(logicalGroups).map(group => {
-                const firstItem = group[0];
-                const groupTotalCost = group.reduce((sum, i) => sum + i.totalCost, 0);
-                
-                const perSpacePercentages: { [spaceId: string]: number } = {};
-                if (groupTotalCost > 0) {
-                    group.forEach(item => {
-                        const space = selectedBuilding.spaces.find(s => item.applicableSpaceIdNames.includes(s.spaceIdName));
-                        if (space) {
-                            perSpacePercentages[space.id] = (item.totalCost / groupTotalCost) * 100;
-                        }
-                    });
-                }
-                
-                return {
-                    uiId: crypto.randomUUID(),
-                    name: firstItem.name,
-                    appliesToScope: firstItem.appliesToScope,
-                    totalCost: groupTotalCost > 0 ? parseFloat(groupTotalCost.toFixed(2)) : undefined,
-                    applicableFloor: firstItem.applicableFloor || undefined,
-                    perSpacePercentages: perSpacePercentages,
-                    perSpaceCosts: {},
-                };
-            });
-
-            setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
+          setCurrentUtilityItems(uiItems.length > 0 ? uiItems : [createEmptyItem()]);
         } else {
           setCurrentUtilityItems([createEmptyItem()]);
         }
@@ -329,48 +303,62 @@ export function BuildingUtilitiesClientPage({ initialBuildings, initialUtilityRe
         }
         continue;
       }
+      
+      const totalCostValue = item.totalCost;
+      if (totalCostValue === undefined || totalCostValue <= 0) {
+        toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
+        validationFailed = true;
+        continue;
+      }
 
       if (item.appliesToScope === 'Building') {
-        if (!item.totalCost || item.totalCost <= 0) {
-          toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost.`, variant: 'destructive' });
-          validationFailed = true;
-          continue;
-        }
         finalUtilityItemsForDb.push({
+          id: item.id,
           name: item.name,
-          totalCost: item.totalCost,
-          appliesToScope: item.appliesToScope,
+          totalCost: totalCostValue,
+          appliesToScope: 'Building',
         });
       } else if (item.appliesToScope === 'Floor' || item.appliesToScope === 'SpecificSpaces') {
-        const totalCostForAllocation = item.totalCost || 0;
-        if (totalCostForAllocation <= 0) {
-          toast({ title: 'Validation Error', description: `Utility "${item.name}" must have a positive Total Cost for allocation.`, variant: 'destructive' });
-          validationFailed = true;
-          continue;
-        }
-        if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
+         if (item.appliesToScope === 'Floor' && !item.applicableFloor) {
           toast({ title: 'Validation Error', description: `A floor must be selected for "${item.name}".`, variant: 'destructive' });
           validationFailed = true;
           continue;
         }
 
         const percentages = item.perSpacePercentages || {};
+        const totalPercentage = Object.values(percentages).reduce((sum, p) => sum + (p || 0), 0);
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+            // toast({ title: 'Validation Warning', description: `Percentages for "${item.name}" do not add up to 100%.`, variant: 'default' });
+        }
+
         const spacesToProcess = item.appliesToScope === 'Floor'
           ? selectedBuilding.spaces.filter(s => s.floor === item.applicableFloor)
           : selectedBuilding.spaces;
         
+        let costItemsForThisGroup: { name: string; totalCost: number; spaceIdName: string }[] = [];
+
         for (const space of spacesToProcess) {
           const percentageForSpace = percentages[space.id] || 0;
           if (percentageForSpace > 0) {
-            const costForSpace = totalCostForAllocation * (percentageForSpace / 100);
-            finalUtilityItemsForDb.push({
-              name: item.name,
-              totalCost: parseFloat(costForSpace.toFixed(2)),
-              appliesToScope: 'SpecificSpaces',
-              applicableSpaceIdNames: [space.spaceIdName],
+            const costForSpace = totalCostValue * (percentageForSpace / 100);
+            costItemsForThisGroup.push({
+                name: item.name,
+                totalCost: parseFloat(costForSpace.toFixed(2)),
+                spaceIdName: space.spaceIdName
             });
           }
         }
+        
+        // This is a simplification. We save one DB record per space for floor/space scoped items.
+        // A more complex approach might be needed if we want to retain the logical grouping.
+        costItemsForThisGroup.forEach(costItem => {
+             finalUtilityItemsForDb.push({
+              name: costItem.name,
+              totalCost: costItem.totalCost,
+              appliesToScope: 'SpecificSpaces',
+              applicableSpaceIdNames: [costItem.spaceIdName],
+            });
+        });
       }
     }
 
