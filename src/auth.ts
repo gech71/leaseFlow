@@ -15,7 +15,6 @@ if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   }
 }
 
-// Define token duration in seconds
 const SESSION_DURATION_IN_SECONDS = 15 * 60; // 15 minutes
 
 export const {
@@ -25,12 +24,24 @@ export const {
   signOut,
 } = NextAuth({
   ...authConfig,
+
+  cookies: {
+    sessionToken: {
+      name: "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production", // Secure cookie in production
+      },
+    },
+  },
+
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user }) {
       const now = Math.floor(Date.now() / 1000);
 
-      // On initial sign-in, add user details to the token.
       if (user) {
         token.id = user.id;
         if ("forceChangePass" in user && user.forceChangePass) {
@@ -39,14 +50,10 @@ export const {
         return token;
       }
 
-      // On subsequent requests, check if the token has expired.
-      // The `exp` claim is automatically set by the `encode` function.
       if (token.exp && now > (token.exp as number)) {
-        // If the token is expired, return an empty object to invalidate the session.
         return {};
       }
 
-      // If the token is still valid, return it as is.
       return token;
     },
     async session({ session, token }) {
@@ -58,38 +65,36 @@ export const {
           delete session.user.forceChangePass;
         }
       } else {
-        // If token is empty (due to expiration), invalidate the session
         return null;
       }
       return session;
     },
   },
+
   jwt: {
-    async encode({ token, maxAge }) {
+    async encode({ token }) {
       return await new SignJWT(token!)
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
-        .setExpirationTime(`${SESSION_DURATION_IN_SECONDS}s`) // Set JWT to expire in 15 minutes
+        .setExpirationTime(`${SESSION_DURATION_IN_SECONDS}s`)
         .sign(secret);
     },
     async decode({ token }) {
-      if (!token) {
-        return null;
-      }
+      if (!token) return null;
       try {
         const { payload } = await jwtVerify(token, secret, {
           algorithms: ["HS256"],
         });
         return payload;
       } catch (error) {
-        // This will be logged if the token is expired or invalid
         console.error("JWT Decode Error:", error);
         return null;
       }
     },
   },
+
   pages: {
     signIn: "/login",
-    error: "/login", // Redirect users to login page on any error
+    error: "/login",
   },
 });
