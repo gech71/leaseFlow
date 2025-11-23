@@ -9,7 +9,12 @@ import { getUserAndManagedIds, getUserAndPermissions } from '@/lib/actions/serve
 import type { Prisma } from '@prisma/client';
 
 export async function getAgreementTemplatesForImportAction(): Promise<{ id: string; name: string }[]> {
-  const { isSuperAdmin, currentUser } = await getUserAndManagedIds();
+  const { isSuperAdmin, currentUser, permissions } = await getUserAndPermissions();
+  
+  if (!isSuperAdmin && !permissions.has('import:manage')) {
+      // Secure this endpoint: only users who can import should see the templates.
+      return [];
+  }
   
   const where: Prisma.AgreementTemplateWhereInput = !isSuperAdmin 
     ? { createdById: currentUser.id }
@@ -40,11 +45,17 @@ const normalizePhoneNumber = (phone: any): string | undefined => {
 };
 
 const sanitizeString = (value: any): string => (value ? String(value).trim() : '');
+
 const sanitizeNumber = (value: any): number => {
-  const num = parseFloat(String(value));
-  return num; // Will return NaN if parsing fails, which we check for later
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return NaN; 
+  }
+  const num = Number(value);
+  return num;
 };
+
 const isValidEmail = (email: string): boolean => {
+  if (!email) return false;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
@@ -81,10 +92,12 @@ export async function processImportAction(data: ImportData) {
 
             if (!space.buildingName || !space.spaceIdName) {
                 errors.push(`Space Row ${row}: 'buildingName' and 'spaceIdName' are required.`);
+                skippedCount.spaces++;
                 continue;
             }
             if (isNaN(space.area) || isNaN(space.monthlyRentalPrice) || isNaN(space.prorationShare)) {
                 errors.push(`Space Row ${row} (${space.spaceIdName}): One or more numerical fields (area, price, proration) are invalid.`);
+                skippedCount.spaces++;
                 continue;
             }
 
@@ -108,9 +121,11 @@ export async function processImportAction(data: ImportData) {
                 }
             } else {
                 errors.push(`Space Row ${row} (${space.spaceIdName}): Building "${space.buildingName}" not found.`);
+                skippedCount.spaces++;
             }
         } catch (e: any) {
             errors.push(`Space Row ${row} (${rawSpace.spaceIdName || 'N/A'}): ${e.message}`);
+            skippedCount.spaces++;
         }
     }
     
@@ -131,10 +146,12 @@ export async function processImportAction(data: ImportData) {
 
             if (!tenant.phone) {
                 errors.push(`Tenant Row ${row} (${tenant.name || 'N/A'}): Missing or invalid primary phone number.`);
+                skippedCount.tenants++;
                 continue;
             }
              if (!tenant.email || !isValidEmail(tenant.email)) {
-                errors.push(`Tenant Row ${row} (${tenant.name}): Email "${tenant.email}" is not a valid format.`);
+                errors.push(`Tenant Row ${row} (${tenant.name || 'N/A'}): Email "${tenant.email}" is not a valid format.`);
+                skippedCount.tenants++;
                 continue;
             }
 
@@ -155,12 +172,14 @@ export async function processImportAction(data: ImportData) {
                     createdCount.tenants++;
                 } else {
                     errors.push(`Tenant Row ${row} (${tenant.name}): ${result.error}`);
+                    skippedCount.tenants++;
                 }
             } else {
                 skippedCount.tenants++;
             }
         } catch (e: any) {
-            errors.push(`Tenant Row ${row} (${tenant.name || 'N/A'}): ${e.message}`);
+            errors.push(`Tenant Row ${row} (${rawTenant.name || 'N/A'}): ${e.message}`);
+            skippedCount.tenants++;
         }
     }
     
@@ -182,10 +201,12 @@ export async function processImportAction(data: ImportData) {
             const startDate = new Date(agreement.startDate);
             if (isNaN(startDate.getTime())) {
                 errors.push(`Agreement Row ${row}: Invalid start date "${agreement.startDate}" for tenant "${agreement.tenantEmail}".`);
+                skippedCount.agreements++;
                 continue;
             }
             if (isNaN(agreement.termMonths) || isNaN(agreement.initialPaymentMonths) || agreement.termMonths <= 0) {
                 errors.push(`Agreement Row ${row} (${agreement.tenantEmail}): Invalid numerical value for 'termMonths' or 'initialPaymentMonths'.`);
+                skippedCount.agreements++;
                 continue;
             }
 
@@ -219,19 +240,23 @@ export async function processImportAction(data: ImportData) {
                             createdCount.agreements++;
                         } else {
                             errors.push(`Agreement Row ${row} ("${agreement.tenantEmail}" in "${agreement.spaceIdName}"): ${result.error}`);
+                            skippedCount.agreements++;
                         }
                     } else {
                         skippedCount.agreements++;
                     }
                 } else {
                     errors.push(`Agreement Row ${row} ("${agreement.tenantEmail}"): Space "${agreement.spaceIdName}" in Building "${agreement.buildingName}" not found.`);
+                    skippedCount.agreements++;
                 }
             } else {
                  if (!tenantRecord) errors.push(`Agreement Row ${row}: Tenant with email "${agreement.tenantEmail}" not found.`);
                  if (buildingRecord.length === 0) errors.push(`Agreement Row ${row}: Building "${agreement.buildingName}" not found.`);
+                 skippedCount.agreements++;
             }
         } catch (e: any) {
             errors.push(`Agreement Row ${row} ("${rawAgreement.tenantEmail}"): ${e.message}`);
+            skippedCount.agreements++;
         }
     }
 
