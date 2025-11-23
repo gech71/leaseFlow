@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
 import { createTenantAction } from '../tenants/actions';
 import { createFullAgreementAction } from '../agreements/actions';
-import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+import { getUserAndManagedIds, getUserAndPermissions } from '@/lib/actions/server-helpers';
 import type { Prisma } from '@prisma/client';
 
 export async function getAgreementTemplatesForImportAction(): Promise<{ id: string; name: string }[]> {
@@ -46,6 +46,11 @@ const sanitizeNumber = (value: any): number => {
 };
 
 export async function processImportAction(data: ImportData) {
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('import:manage')) {
+        return { success: false, createdCount: { spaces: 0, tenants: 0, agreements: 0 }, skippedCount: { spaces: 0, tenants: 0, agreements: 0 }, errors: ["Permission denied."] };
+    }
+
     let createdCount = { spaces: 0, tenants: 0, agreements: 0 };
     let skippedCount = { spaces: 0, tenants: 0, agreements: 0 };
     let errors: string[] = [];
