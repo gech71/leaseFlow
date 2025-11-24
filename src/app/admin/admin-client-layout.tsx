@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from 'next/link';
@@ -73,6 +74,7 @@ const allNavItems: NavItem[] = [
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, permission: 'building_utility:view' },
   { href: '/admin/billing', label: 'Billing', icon: Banknote, permission: 'billing:view' },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, permission: 'payment_overview:view' },
+  { href: '/admin/import', label: 'Import Data', icon: UploadCloud, permission: 'import:manage' },
   { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings:user_management:view' }, // Generic settings permission
 ];
 
@@ -232,7 +234,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminClientLayout({ children }: { children: React.ReactNode }) {
-  const { currentUser, isLoading, isAuthenticated } = usePermissions();
+  const { currentUser, isLoading, isAuthenticated, hasAnyPermission } = usePermissions();
   const router = useRouter();
 
   useEffect(() => {
@@ -253,11 +255,12 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
       
       const hasAnyAdminPermissions = currentUser.effectivePermissions && currentUser.effectivePermissions.some(p => p !== 'portal:view');
       if (!hasAnyAdminPermissions) {
+        // Instead of replacing, just log out the user, which will take them to login with an error
         router.replace('/login?error=' + encodeURIComponent('You do not have permissions to access the admin panel.'));
       }
     }
     
-  }, [isAuthenticated, isLoading, currentUser, router]);
+  }, [isAuthenticated, isLoading, currentUser, router, hasAnyPermission]);
 
   if (isLoading || !isAuthenticated) {
     return (

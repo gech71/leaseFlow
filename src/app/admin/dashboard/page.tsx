@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -17,6 +18,7 @@ import { getDashboardDataAction, type DashboardData } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Cookies from 'js-cookie';
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px]">
@@ -42,7 +44,7 @@ interface BuildingFinancialSummary {
 }
 
 export default function AdminDashboardPage() {
-    const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin } = usePermissions();
+    const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin, fetchWithAuth } = usePermissions();
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,21 @@ export default function AdminDashboardPage() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const data = await getDashboardDataAction();
+            // Server actions are POST requests, so we use fetchWithAuth
+            const response = await fetchWithAuth('/admin/dashboard?_action=getDashboardDataAction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            if (!response.ok) {
+                 const errorData = await response.json().catch(() => ({ message: "An unexpected response was received from the server." }));
+                 throw new Error(errorData.message || 'Failed to fetch dashboard data.');
+            }
+
+            const data = await response.json();
+
             if (data.error) {
                 setError(data.error);
             } else {
@@ -75,14 +91,10 @@ export default function AdminDashboardPage() {
                 });
             }
         } catch (e: any) {
-             if (e.message.includes('Invalid CSRF token')) {
-                 setError("Your session may have expired. Please try refreshing the page.");
-             } else {
-                setError((e as Error).message);
-             }
+             setError((e as Error).message);
         }
         setIsLoading(false);
-    }, []);
+    }, [fetchWithAuth]);
 
     useEffect(() => {
         if (!isUserLoading && currentUser) {

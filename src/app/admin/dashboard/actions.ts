@@ -1,10 +1,23 @@
 
+
 'use server';
 
 import { databaseService } from '@/lib/services/databaseService';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { getMonth, getYear, isAfter, addMonths } from 'date-fns';
 import type { Prisma, Building, Space, Agreement, Bill } from '@prisma/client';
+import { headers } from 'next/headers';
+
+// This is the new entry point for the dashboard data.
+// It will be called via a POST request from the client-side fetch.
+export async function POST(req: Request) {
+    if (new URL(req.url).searchParams.get('_action') === 'getDashboardDataAction') {
+        const data = await getDashboardData();
+        return Response.json(data);
+    }
+    return Response.json({ error: 'Invalid action' }, { status: 400 });
+}
+
 
 // Define the types that will be serialized and sent to the client.
 // This helps ensure data consistency and avoids sending oversized objects.
@@ -54,8 +67,8 @@ export interface DashboardData {
   error: string | null;
 }
 
-// This server action encapsulates all data fetching for the dashboard.
-export async function getDashboardDataAction(): Promise<DashboardData> {
+// This is the actual data-fetching function, kept private to this file.
+async function getDashboardData(): Promise<DashboardData> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
