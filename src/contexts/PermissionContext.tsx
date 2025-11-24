@@ -13,6 +13,7 @@ interface PermissionContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const PermissionContext = createContext<PermissionContextType>({
@@ -23,6 +24,7 @@ const PermissionContext = createContext<PermissionContextType>({
   isLoading: true,
   isAuthenticated: false,
   logout: async () => {},
+  refreshUser: async () => {},
 });
 
 export const usePermissions = () => useContext(PermissionContext);
@@ -31,20 +33,8 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const pathname = usePathname();
-  const router = useRouter();
 
-  const fetchUserPermissions = useCallback(async () => {
-    // Don't fetch on public pages where no session is expected.
-    const isPublicRoute = ['/login', '/'].includes(pathname) || pathname.startsWith('/portal/connect');
-    if (isPublicRoute) {
-      setIsLoading(false);
-      setIsAuthenticated(false);
-      setCurrentUser(null);
-      return;
-    }
-    
-    setIsLoading(true);
+  const fetchUser = useCallback(async () => {
     try {
       const response = await fetch('/api/user/me');
       if (response.ok) {
@@ -53,12 +43,10 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setCurrentUser(data.user);
           setIsAuthenticated(true);
         } else {
-          // This case handles a valid response that signals an error (e.g., user not in DB)
           setCurrentUser(null);
           setIsAuthenticated(false);
         }
       } else {
-        // Any non-200 response (e.g., 401 Unauthorized from middleware) means not authenticated
         setCurrentUser(null);
         setIsAuthenticated(false);
       }
@@ -69,11 +57,11 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
       setIsLoading(false);
     }
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
-    fetchUserPermissions();
-  }, [fetchUserPermissions]);
+    fetchUser();
+  }, [fetchUser]);
 
   const logout = async () => {
     try {
@@ -83,7 +71,6 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
-        // Use window.location to force a full page reload to clear all state
         window.location.href = '/login';
     }
   };
@@ -92,17 +79,17 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return currentUser?.roles?.some(role => role.name === 'SUPER_ADMIN') || false;
   }, [currentUser]);
 
-  const hasPermission = (permission: string): boolean => {
+  const hasPermission = useCallback((permission: string): boolean => {
     if (!currentUser || !permission) return false;
     if (isSuperAdmin) return true;
     return currentUser.effectivePermissions.includes(permission);
-  };
+  }, [currentUser, isSuperAdmin]);
 
-  const hasAnyPermission = (permissions: string[]): boolean => {
+  const hasAnyPermission = useCallback((permissions: string[]): boolean => {
     if (!currentUser || !permissions || permissions.length === 0) return false;
     if (isSuperAdmin) return true;
     return permissions.some(p => currentUser.effectivePermissions.includes(p));
-  };
+  }, [currentUser, isSuperAdmin]);
   
   const value = {
     currentUser,
@@ -112,6 +99,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     isLoading,
     isAuthenticated,
     logout,
+    refreshUser: fetchUser,
   };
 
   return (

@@ -13,24 +13,35 @@ import {
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePermissions } from '@/contexts/PermissionContext';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading } = usePermissions();
+    const { isAuthenticated, isLoading, currentUser } = usePermissions();
     const router = useRouter();
 
-    if (isLoading) {
+    useEffect(() => {
+        if (isLoading) return;
+
+        if (!isAuthenticated) {
+            router.replace('/login');
+            return;
+        }
+
+        if (currentUser) {
+            const isNotTenant = currentUser.roles.some(r => r.name !== 'TENANT');
+            if (isNotTenant) {
+                router.replace('/admin/dashboard');
+            }
+        }
+    }, [isLoading, isAuthenticated, currentUser, router]);
+
+    if (isLoading || !isAuthenticated || !currentUser) {
         return (
             <div className="flex justify-center items-center h-screen w-screen">
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
         );
-    }
-    
-    if (!isLoading && !isAuthenticated) {
-        router.replace('/login');
-        return null;
     }
     
     return (
@@ -83,7 +94,7 @@ function PortalHeader() {
             <LayoutDashboard size={18} /> Dashboard
           </Link>
           <Link
-            href="/portal/(app)/profile"
+            href="/portal/profile"
             className="text-sm font-medium hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/80"
           >
             <User size={18} /> My Account
@@ -130,7 +141,7 @@ function PortalHeader() {
                 </SheetClose>
                 <SheetClose asChild>
                   <Link
-                    href="/portal/(app)/profile"
+                    href="/portal/profile"
                     className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80"
                   >
                     <User size={20} /> My Account

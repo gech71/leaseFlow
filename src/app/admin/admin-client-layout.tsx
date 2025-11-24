@@ -238,33 +238,30 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading) return; // Wait until loading is complete
 
     if (!isAuthenticated) {
-        router.replace('/login');
-        return;
-    }
-    
-    // If user is authenticated but has no current user data yet (initial load), wait.
-    if (!currentUser) return;
-      
-    // If user is a tenant, redirect them immediately to the portal.
-    const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
-    if (isTenantOnly) {
-      router.replace('/portal/dashboard');
+      router.replace('/login');
       return;
     }
     
-    // If user has no admin permissions at all, redirect them away.
-    const hasAnyAdminPermissions = currentUser.effectivePermissions && currentUser.effectivePermissions.some(p => p !== 'portal:view');
-    if (!hasAnyAdminPermissions) {
-      router.replace('/login?error=' + encodeURIComponent('You do not have any assigned permissions to access the admin panel.'));
+    // Once authenticated, check roles
+    if (currentUser) {
+      const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
+      if (isTenantOnly) {
+        router.replace('/portal/dashboard');
+        return;
+      }
+      
+      const hasAnyAdminPermissions = currentUser.effectivePermissions && currentUser.effectivePermissions.some(p => p !== 'portal:view');
+      if (!hasAnyAdminPermissions) {
+        router.replace('/login?error=' + encodeURIComponent('You do not have permissions to access the admin panel.'));
+      }
     }
     
   }, [isAuthenticated, isLoading, currentUser, router]);
 
-  // Show a global loading spinner while session or permissions are loading.
-  if (isLoading || !currentUser || !isAuthenticated) {
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -272,11 +269,8 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     );
   }
 
-  // If user is authenticated but is a tenant (or has no permissions), show a loader during the redirect.
-  const isTenantOnly = currentUser?.roles?.length === 1 && currentUser.roles[0].name === 'TENANT';
-  const hasNoAdminPermissions = !isLoading && currentUser && !currentUser.effectivePermissions.some(p => p !== 'portal:view');
-
-  if (isTenantOnly || hasNoAdminPermissions) {
+  // If user is authenticated but doesn't have the final currentUser object yet, or is being redirected, show loader.
+  if (!currentUser) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
