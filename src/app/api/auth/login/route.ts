@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: `Invalid credentials. ${remainingAttempts} attempts remaining.` }, { status: 401 });
     }
 
-    // On successful login, create the session
+    // On successful login, create the session (both access and refresh tokens)
     const payload = createUserPayload(user);
     payload.forceChangePass = forceChangePass; // Ensure flag is set correctly
     await createSession(payload);

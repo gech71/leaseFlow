@@ -5,7 +5,11 @@ import { cookies } from 'next/headers';
 import type { User, Role } from '@prisma/client';
 
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
-const JWT_COOKIE_NAME = process.env.JWT_COOKIE_NAME || 'nibrental_session';
+
+// Define cookie names
+const ACCESS_TOKEN_COOKIE_NAME = 'nibrental_access_token';
+const REFRESH_TOKEN_COOKIE_NAME = 'nibrental_refresh_token';
+
 
 if (!JWT_SECRET_KEY || JWT_SECRET_KEY.length !== 64) {
   const errorMessage = 'JWT_SECRET_KEY is not set or is not a 64-character hex string.';
@@ -26,21 +30,45 @@ export interface SessionPayload extends JWTPayload {
   forceChangePass: boolean;
 }
 
+export interface RefreshTokenPayload extends JWTPayload {
+    userId: string;
+    // You can add a version/nonce here to invalidate all refresh tokens for a user if needed
+}
+
 /**
- * Encrypts a session payload and sets it as a secure, an HttpOnly cookie.
+ * Encrypts session payloads and sets them as secure, HttpOnly cookies.
  * @param payload - The user session data to encrypt.
  */
 export async function createSession(payload: SessionPayload) {
-  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
-  
-  const jwt = await new SignJWT(payload)
+  // 1. Create Access Token (short-lived)
+  const accessTokenExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  const accessToken = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(expires)
+    .setExpirationTime(accessTokenExpires)
     .sign(key);
 
-  cookies().set(JWT_COOKIE_NAME, jwt, {
-    expires,
+  cookies().set(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
+    expires: accessTokenExpires,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    sameSite: 'lax',
+  });
+
+  // 2. Create Refresh Token (long-lived)
+  const refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  const refreshTokenPayload: RefreshTokenPayload = {
+      userId: payload.userId,
+  };
+  const refreshToken = await new SignJWT(refreshTokenPayload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(refreshTokenExpires)
+    .sign(key);
+
+  cookies().set(REFRESH_TOKEN_COOKIE_NAME, refreshToken, {
+    expires: refreshTokenExpires,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     path: '/',
@@ -49,11 +77,11 @@ export async function createSession(payload: SessionPayload) {
 }
 
 /**
- * Verifies the session from the cookie and returns its payload.
+ * Verifies the access token from the cookie and returns its payload.
  * @returns {Promise<SessionPayload | null>} The session payload or null if invalid.
  */
 export async function verifySession(): Promise<SessionPayload | null> {
-  const cookie = cookies().get(JWT_COOKIE_NAME)?.value;
+  const cookie = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   if (!cookie) return null;
 
   try {
@@ -62,16 +90,37 @@ export async function verifySession(): Promise<SessionPayload | null> {
     });
     return payload as SessionPayload;
   } catch (error) {
-    console.log("Failed to verify session:", (error as Error).message);
+    console.log("Failed to verify session (access token). It may be expired.");
     return null;
   }
 }
 
 /**
- * Deletes the session cookie.
+ * Verifies the refresh token from the cookie and returns its payload.
+ * @returns {Promise<RefreshTokenPayload | null>} The refresh token payload or null if invalid.
+ */
+export async function verifyRefreshToken(): Promise<RefreshTokenPayload | null> {
+    const cookie = cookies().get(REFRESH_TOKEN_COOKIE_NAME)?.value;
+    if (!cookie) return null;
+    
+    try {
+        const { payload } = await jwtVerify(cookie, key, {
+            algorithms: ['HS256'],
+        });
+        return payload as RefreshTokenPayload;
+    } catch (error) {
+        console.log("Failed to verify refresh token.");
+        return null;
+    }
+}
+
+
+/**
+ * Deletes the session cookies (both access and refresh tokens).
  */
 export async function deleteSession() {
-  cookies().delete(JWT_COOKIE_NAME);
+  cookies().delete(ACCESS_TOKEN_COOKIE_NAME);
+  cookies().delete(REFRESH_TOKEN_COOKIE_NAME);
 }
 
 /**

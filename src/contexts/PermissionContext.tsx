@@ -29,14 +29,47 @@ const PermissionContext = createContext<PermissionContextType>({
 
 export const usePermissions = () => useContext(PermissionContext);
 
+// --- Interceptor for fetch ---
+// This will automatically handle token refreshes for API calls.
+const originalFetch = fetch;
+
+const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
+    let response = await originalFetch(url, options);
+
+    if (response.status === 401 && !url.toString().includes('/api/auth/refresh')) {
+        console.log("Access token expired, attempting to refresh...");
+        const refreshResponse = await originalFetch('/api/auth/refresh', {
+            method: 'POST',
+        });
+        
+        if (refreshResponse.ok) {
+            console.log("Token refreshed successfully. Retrying original request.");
+            response = await originalFetch(url, options); // Retry the original request
+        } else {
+            console.log("Refresh token failed. Logging out.");
+            // If refresh fails, log the user out
+            window.location.href = '/login?error=session_expired'; 
+        }
+    }
+
+    return response;
+};
+
+if (typeof window !== 'undefined') {
+    window.fetch = fetchWithAuth;
+}
+// --- End Interceptor ---
+
+
 export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const fetchUser = useCallback(async () => {
+    // No need to set loading to true here, only on initial load
     try {
-      const response = await fetch('/api/user/me');
+      const response = await fetch('/api/user/me'); // This will use the intercepted fetch
       if (response.ok) {
         const data = await response.json();
         if (data.isSuccess && data.user) {
@@ -55,7 +88,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCurrentUser(null);
       setIsAuthenticated(false);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only set loading to false after the first fetch attempt
     }
   }, []);
 
