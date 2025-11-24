@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -68,7 +69,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
   const router = useRouter();
   const searchParams = useSearchParams(); 
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin } = usePermissions(); 
+  const { hasPermission, isSuperAdmin, callServerAction } = usePermissions(); 
 
   const isViewOnlyMode = searchParams.get('view') === 'true';
   
@@ -155,8 +156,8 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       scope: 'Building',
       penaltyType: 'Fixed',
       frequency: 'OneTime',
-      feeValue: undefined,
-      fromDay: undefined,
+      feeValue: 0,
+      fromDay: 1,
       toDay: undefined,
     });
   };
@@ -197,7 +198,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
           connect: { id: currentUserId }
         }
       };
-      result = await createBuildingAction(buildingCreateInput);
+      result = await callServerAction(createBuildingAction, buildingCreateInput);
     } else {
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: values.name.trim(),
@@ -209,7 +210,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         },
       };
       const managerIds = Array.from(selectedManagerIds);
-      result = await updateBuildingAction(initialBuildingData?.id!, buildingUpdateInput, managerIds);
+      result = await callServerAction(updateBuildingAction, initialBuildingData?.id!, buildingUpdateInput, managerIds);
     }
 
     setIsSaving(false);
@@ -339,7 +340,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-xs flex items-center"><Clock className="mr-1 h-3 w-3"/>To Day</FormLabel>
-                                    <FormControl><Input type="number" min={form.getValues(`penaltyRules.${index}.fromDay`)} placeholder="e.g., 5" {...field} className="text-sm h-9" disabled={isSaving || !canManageThisForm}/></FormControl>
+                                    <FormControl><Input type="number" min={form.getValues(`penaltyRules.${index}.fromDay`)} placeholder="e.g., 5" {...field} value={field.value ?? ""} className="text-sm h-9" disabled={isSaving || !canManageThisForm}/></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -426,7 +427,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel className="text-xs">Floor Name<span className="text-destructive ml-1">*</span></FormLabel>
-                                    <FormControl><Input placeholder="Floor Name" {...field} className="h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
+                                    <FormControl><Input placeholder="Floor Name" {...field} value={field.value ?? ""} className="h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -440,7 +441,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs flex items-center"><HomeIcon className="mr-1 h-3 w-3"/>Space ID Names (comma-separated)<span className="text-destructive ml-1">*</span></FormLabel>
-                                <FormControl><Input placeholder="Space ID, e.g., Unit 10A, Office 202B" {...field} className="h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
+                                <FormControl><Input placeholder="Space ID, e.g., Unit 10A, Office 202B" {...field} value={field.value ?? ""} className="h-9" disabled={isSaving || !canManageThisForm} /></FormControl>
                                 <FormMessage />
                                 <p className="text-xs text-muted-foreground mt-0.5">Enter exact 'Space ID/Name' from Spaces page.</p>
                               </FormItem>

@@ -14,6 +14,10 @@ interface PermissionContextType {
   isAuthenticated: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  callServerAction: <T extends (...args: any[]) => Promise<any>>(
+    action: T,
+    ...args: Parameters<T>
+  ) => Promise<Awaited<ReturnType<T>> | { success: false; error: string; }>;
 }
 
 const PermissionContext = createContext<PermissionContextType>({
@@ -25,6 +29,7 @@ const PermissionContext = createContext<PermissionContextType>({
   isAuthenticated: false,
   logout: async () => {},
   refreshUser: async () => {},
+  callServerAction: async () => ({ success: false, error: 'Context not ready' }),
 });
 
 export const usePermissions = () => useContext(PermissionContext);
@@ -57,6 +62,25 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     // Kept for potential manual refresh scenarios.
   }, []);
 
+  const callServerAction = useCallback(async <T extends (...args: any[]) => Promise<any>>(
+    action: T,
+    ...args: Parameters<T>
+  ): Promise<Awaited<ReturnType<T>> | { success: false; error: string; }> => {
+    try {
+      const result = await action(...args);
+      return result;
+    } catch (error: any) {
+      console.error('Server action failed:', error);
+      // This is crucial for handling errors that happen *before* the action returns
+      // e.g., middleware errors, network errors.
+      return {
+        success: false,
+        error: error.message || 'An unexpected error occurred.',
+      };
+    }
+  }, []);
+
+
   const effectivePermissions = useMemo(() => {
     if (!currentUser) return new Set<string>();
     return new Set(currentUser.effectivePermissions);
@@ -88,6 +112,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     isAuthenticated,
     logout,
     refreshUser,
+    callServerAction,
   };
 
   return (

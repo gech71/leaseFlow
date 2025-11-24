@@ -17,8 +17,6 @@ import { getDashboardDataAction, type DashboardData } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Cookies from 'js-cookie';
-import { useServerAction } from '@/hooks/use-server-action';
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px]">
@@ -48,22 +46,10 @@ export default function AdminDashboardPage() {
     const router = useRouter();
     const [today] = useState(new Date());
 
-    const { execute: fetchDashboardData, data: allData, error, isLoading } = useServerAction(getDashboardDataAction, {
-      initialData: {
-        buildings: [],
-        spaces: [],
-        agreements: [],
-        allBills: [],
-        allUtilities: [],
-        error: null,
-      },
-      onSuccess: (data) => {
-        if(data.error) {
-          console.error(data.error);
-        }
-      }
-    });
-
+    const [allData, setAllData] = useState<DashboardData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    
     const [selectedYear, setSelectedYear] = useState(getYear(today));
     const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
 
@@ -80,9 +66,21 @@ export default function AdminDashboardPage() {
                 router.replace(firstAllowedPage || '/login'); 
                 return;
             }
-            fetchDashboardData();
+            
+            const fetchData = async () => {
+              setIsLoading(true);
+              const data = await getDashboardDataAction();
+              if (data.error) {
+                setError(data.error);
+              } else {
+                setAllData(data);
+              }
+              setIsLoading(false);
+            };
+
+            fetchData();
         }
-    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission, fetchDashboardData]);
+    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission]);
 
     const periodDescription = format(new Date(selectedYear, selectedMonth), "MMMM yyyy");
 
