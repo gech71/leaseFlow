@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { PermissionProvider } from "@/contexts/PermissionContext";
+import { getUserSessionAction } from "@/lib/actions/server-helpers";
 
 export const metadata: Metadata = {
   title: "Nib Building Management",
@@ -17,6 +18,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const nonce = headers().get("x-nonce") || undefined;
+  const { user } = await getUserSessionAction();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -43,7 +45,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <PermissionProvider>
+        <PermissionProvider initialUser={user}>
           {children}
           <Toaster />
         </PermissionProvider>
