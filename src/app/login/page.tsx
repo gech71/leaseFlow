@@ -41,7 +41,11 @@ export default function LoginPage() {
   useEffect(() => {
     const urlError = searchParams.get('error');
     if (urlError) {
-        setError(decodeURIComponent(urlError));
+      if (urlError === 'session_expired' && searchParams.get('from')) {
+          setError("Your session has expired. Please log in again.");
+      } else if (urlError !== 'session_expired') {
+          setError(decodeURIComponent(urlError));
+      }
     }
   }, [searchParams]);
 
