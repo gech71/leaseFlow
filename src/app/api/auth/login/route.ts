@@ -6,7 +6,7 @@ import { rateLimiter } from '@/lib/auth/rate-limiter';
 import type { User, Role } from '@prisma/client';
 
 async function checkRateLimit(identifier: string) {
-    const { success, limit, remaining, reset } = await rateLimiter.limit(identifier);
+    const { success, limit, remaining, reset } = await rateLimiter(identifier);
     return { success, limit, remaining, reset };
 }
 
