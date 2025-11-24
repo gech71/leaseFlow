@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { UserCircle, LogOut, Menu, Loader2, Building } from 'lucide-react';
+import { UserCircle, LogOut, Menu, Loader2, Building, LayoutDashboard, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -14,10 +14,25 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
-import { signOut } from 'next-auth/react'; // Import signOut from next-auth/react
+import { usePermissions } from '@/contexts/PermissionContext';
 
-// This is now a simple layout that delegates to a more complex client component
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
+    const { isAuthenticated, isLoading } = usePermissions();
+    const router = useRouter();
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-screen w-screen">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    if (!isLoading && !isAuthenticated) {
+        router.replace('/login');
+        return null;
+    }
+    
     return (
         <div className="min-h-screen flex flex-col bg-background">
             <PortalHeader />
@@ -31,16 +46,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     );
 }
 
-// The header is now its own component to manage its state
 function PortalHeader() {
-  const router = useRouter();
-  const { toast } = useToast();
+  const { logout } = usePermissions();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
       setIsLoggingOut(true);
-      await signOut({ redirect: true, callbackUrl: '/login' });
-      toast({ title: "Logged Out", description: "You have been successfully logged out." });
+      await logout();
+      // The logout function handles redirection
       setIsLoggingOut(false);
   };
 
@@ -57,7 +70,7 @@ function PortalHeader() {
             className="h-7 w-auto object-contain"
           />
           <span className="hidden sm:inline text-lg font-headline font-semibold">
-            NIB Building Management Solution
+            NIB Tenant Portal
           </span>
         </Link>
 
@@ -67,13 +80,13 @@ function PortalHeader() {
             href="/portal/dashboard"
             className="text-sm font-medium hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/80"
           >
-            <Building size={18} /> Dashboard
+            <LayoutDashboard size={18} /> Dashboard
           </Link>
           <Link
-            href="/portal/profile"
+            href="/portal/(app)/profile"
             className="text-sm font-medium hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/80"
           >
-            <UserCircle size={18} /> My Account
+            <User size={18} /> My Account
           </Link>
           <Button
             variant="ghost"
@@ -112,15 +125,15 @@ function PortalHeader() {
                     href="/portal/dashboard"
                     className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80"
                   >
-                    <Building size={20} /> Dashboard
+                    <LayoutDashboard size={20} /> Dashboard
                   </Link>
                 </SheetClose>
                 <SheetClose asChild>
                   <Link
-                    href="/portal/profile"
+                    href="/portal/(app)/profile"
                     className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80"
                   >
-                    <UserCircle size={20} /> My Account
+                    <User size={20} /> My Account
                   </Link>
                 </SheetClose>
               </nav>

@@ -2,7 +2,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifySession } from '@/lib/auth/jwt';
 import { PERMISSION_MAP } from '@/lib/auth-utils';
-import { redirectWithToast } from './lib/actions/server-helpers';
 
 const ORDERED_ADMIN_PAGES = [
   "/admin/dashboard",
@@ -24,7 +23,7 @@ export async function middleware(request: NextRequest) {
   const session = await verifySession();
 
   const isApiAuthRoute = pathname.startsWith('/api/auth');
-  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path));
+  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
 
   if (isPublicRoute || isApiAuthRoute) {
     if (session && (pathname === '/login' || pathname === '/')) {

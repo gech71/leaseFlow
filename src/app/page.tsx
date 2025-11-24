@@ -38,9 +38,9 @@ export default function RootPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If the user is already authenticated, redirect them.
+    // If auth status is checked and user is authenticated, redirect them.
     if (!isAuthLoading && isAuthenticated) {
-        router.replace('/admin/dashboard');
+      router.replace('/admin/dashboard');
     }
     
     // Display error messages from URL (e.g., from middleware redirects)
@@ -79,7 +79,8 @@ export default function RootPage() {
     }
   };
 
-  // While checking auth status, show a loader
+  // While checking auth status or if user is authenticated, show a loader.
+  // This prevents the login form from flashing for authenticated users before they are redirected.
   if (isAuthLoading || isAuthenticated) {
     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">
@@ -88,6 +89,7 @@ export default function RootPage() {
     );
   }
 
+  // Only render the login form if we are done loading and the user is not authenticated.
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
       <Card className="w-full max-w-sm shadow-2xl animate-fadeIn">
