@@ -27,10 +27,10 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path));
 
   if (isPublicRoute || isApiAuthRoute) {
-    if (session && pathname === '/login') {
-      const redirectUrl = session.permissions.includes('portal:view') && session.permissions.length === 1
-        ? '/portal/dashboard'
-        : '/admin/dashboard';
+    if (session && (pathname === '/login' || pathname === '/')) {
+      const userPermissions = new Set(session.permissions);
+      const isTenant = userPermissions.has('portal:view') && userPermissions.size === 1;
+      const redirectUrl = isTenant ? '/portal/dashboard' : '/admin/dashboard';
       return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
     return NextResponse.next();

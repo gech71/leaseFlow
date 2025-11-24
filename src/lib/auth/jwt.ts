@@ -1,3 +1,4 @@
+
 import 'server-only';
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { cookies } from 'next/headers';
@@ -6,8 +7,13 @@ import type { User, Role } from '@prisma/client';
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 const JWT_COOKIE_NAME = process.env.JWT_COOKIE_NAME || 'nibrental_session';
 
-if (!JWT_SECRET_KEY) {
-  throw new Error('FATAL: JWT_SECRET_KEY is not set in the environment variables.');
+if (!JWT_SECRET_KEY || JWT_SECRET_KEY.length !== 64) {
+  const errorMessage = 'JWT_SECRET_KEY is not set or is not a 64-character hex string.';
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`FATAL: ${errorMessage} This is required for production.`);
+  } else {
+    console.warn(`WARN: ${errorMessage} The application will not be secure. Please generate a key for development.`);
+  }
 }
 
 const key = new TextEncoder().encode(JWT_SECRET_KEY);
@@ -78,7 +84,7 @@ export function createUserPayload(user: User & { roles: Role[] }): Omit<SessionP
   
   let permissions: string[] = [];
   if (!isSuperAdmin) {
-    permissions = user.roles.flatMap(role => role.permissions);
+    permissions = Array.from(new Set(user.roles.flatMap(role => role.permissions)));
   }
 
   return {

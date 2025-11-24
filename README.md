@@ -1,3 +1,4 @@
+
 # LeaseFlow: Building Management Solution
 
 LeaseFlow is a comprehensive, modern web application designed to streamline property management. Built with Next.js, it provides a robust platform for managing buildings, spaces, tenants, and the entire billing lifecycle.
@@ -54,14 +55,13 @@ Create a `.env` file in the project root and populate it with the necessary vari
 # Database connection string for Prisma
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 
+# --- Security ---
+
 # Custom JWT Authentication - generate a secret using: `openssl rand -hex 32`
 # This key MUST be a 64-character hex string (32 bytes).
 JWT_SECRET_KEY=YOUR_64_CHARACTER_JWT_SECRET_KEY_HERE
 
-# Base URL of this application, used for constructing callback URLs
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
-
-# --- Security ---
+# Encryption key for sensitive data in the database (e.g., SMTP password).
 # This key MUST be a 64-character hex string (32 bytes) for AES-256 encryption.
 # Generate one from your terminal using: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ENCRYPTION_KEY=YOUR_64_CHARACTER_ENCRYPTION_KEY_HERE

@@ -36,7 +36,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const fetchUserPermissions = useCallback(async () => {
     // Don't fetch on public pages where no session is expected.
-    const isPublicRoute = ['/login'].includes(pathname) || pathname.startsWith('/portal/connect');
+    const isPublicRoute = ['/login', '/'].includes(pathname) || pathname.startsWith('/portal/connect');
     if (isPublicRoute) {
       setIsLoading(false);
       setIsAuthenticated(false);
@@ -53,12 +53,12 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setCurrentUser(data.user);
           setIsAuthenticated(true);
         } else {
-          console.error("Failed to fetch user permissions:", data.errors);
+          // This case handles a valid response that signals an error (e.g., user not in DB)
           setCurrentUser(null);
           setIsAuthenticated(false);
         }
       } else {
-        // Any non-200 response (e.g., 401 Unauthorized) means not authenticated
+        // Any non-200 response (e.g., 401 Unauthorized from middleware) means not authenticated
         setCurrentUser(null);
         setIsAuthenticated(false);
       }
@@ -83,7 +83,8 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
-        router.push('/login');
+        // Use window.location to force a full page reload to clear all state
+        window.location.href = '/login';
     }
   };
 

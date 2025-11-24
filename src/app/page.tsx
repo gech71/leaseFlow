@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession, getCsrfToken } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,74 +23,64 @@ import {
   EyeOff,
 } from "lucide-react";
 import Image from "next/image";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 export default function RootPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
   const { toast } = useToast();
-  
+  const { isAuthenticated, isLoading: isAuthLoading } = usePermissions();
+
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [csrfToken, setCsrfToken] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    // If the user is already authenticated, redirect them to the dashboard.
-    if (status === 'authenticated') {
-      router.replace('/admin/dashboard');
+    // If the user is already authenticated, redirect them.
+    if (!isAuthLoading && isAuthenticated) {
+        router.replace('/admin/dashboard');
     }
     
-    const fetchCsrfToken = async () => {
-        const token = await getCsrfToken();
-        setCsrfToken(token);
-    };
-    fetchCsrfToken();
-
-    // Check for error messages from NextAuth.js in URL query params
-    const authError = searchParams.get('error');
-    if (authError) {
-        // Decode and display the specific error message from the server
-        setError(decodeURIComponent(authError));
+    // Display error messages from URL (e.g., from middleware redirects)
+    const urlError = searchParams.get('error');
+    if (urlError) {
+        setError(decodeURIComponent(urlError));
     }
+  }, [isAuthenticated, isAuthLoading, router, searchParams]);
 
-  }, [status, router, searchParams]);
-  
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
-    const result = await signIn("credentials", {
-      phone,
-      password,
-      csrfToken,
-      redirect: false,
-    });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password }),
+      });
 
-    setIsLoading(false);
+      const data = await response.json();
 
-    if (result?.error) {
-      // The error is now caught by the useEffect hook from the URL,
-      // but we can set a generic one as a fallback.
-      // NextAuth.js will redirect back to this page with an error in the URL.
-      // We manually trigger a redirect to ensure the URL is updated.
-      router.push(`/login?error=${encodeURIComponent(result.error)}`);
-    } else if (result?.ok) {
-      // On success, manually redirect.
+      if (!response.ok) {
+        throw new Error(data.message || 'An unexpected error occurred.');
+      }
+      
+      toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
+      // Redirect to the dashboard. The middleware will handle routing to the correct portal (admin/tenant).
       window.location.href = '/admin/dashboard';
-    } else {
-      // Fallback for other unexpected errors
-      setError("An unknown error occurred during login. Please try again.");
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-
-  // If session status is loading or already authenticated, show a loading screen
-  // to prevent a flash of the login page.
-  if (status === 'loading' || status === 'authenticated') {
+  // While checking auth status, show a loader
+  if (isAuthLoading || isAuthenticated) {
     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -120,7 +109,6 @@ export default function RootPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input name="csrfToken" type="hidden" defaultValue={csrfToken} />
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive text-destructive text-sm rounded-md flex items-start">
                 <AlertCircle className="h-5 w-5 mr-2 shrink-0" />
