@@ -14,7 +14,7 @@ interface PermissionContextType {
   isAuthenticated: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
+  callServerAction: <T extends (...args: any[]) => Promise<any>>(action: T, ...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>;
 }
 
 const PermissionContext = createContext<PermissionContextType>({
@@ -26,7 +26,7 @@ const PermissionContext = createContext<PermissionContextType>({
   isAuthenticated: false,
   logout: async () => {},
   refreshUser: async () => {},
-  fetchWithAuth: async () => new Response(null, { status: 401 }),
+  callServerAction: async () => { throw new Error("PermissionContext not initialized"); },
 });
 
 export const usePermissions = () => useContext(PermissionContext);
@@ -44,49 +44,31 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
 
   const logout = async () => {
     try {
+        // We call the API route directly, no need for special wrappers here.
         await fetch('/api/auth/logout', { method: 'POST' });
     } catch (error) {
         console.error("Logout request failed:", error);
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
+        // Full page navigation to clear all state and re-trigger middleware.
         window.location.href = '/login';
     }
   };
-
-  const refreshUser = useCallback(async () => {
-    // This is now only used for manual refreshes if needed, not on initial load
+  
+  const callServerAction = useCallback(async <T extends (...args: any[]) => Promise<any>>(
+    action: T,
+    ...args: Parameters<T>
+  ): Promise<Awaited<ReturnType<T>>> => {
+      // This function is no longer needed with direct server action calls.
+      // We can just call the action directly.
+      return action(...args);
   }, []);
 
-  const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
-    // Attach CSRF token
-    const csrfToken = Cookies.get('nibrental_csrf_token');
-    const headers = new Headers(options.headers);
-    if (csrfToken) {
-      headers.set('x-csrf-token', csrfToken);
-    }
-     if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
-    options.headers = headers;
 
-    let response = await fetch(url, options);
-
-    if (response.status === 401) {
-      console.log('Access token expired, attempting to refresh...');
-      const refreshResponse = await fetch('/api/auth/refresh', { method: 'POST' });
-      
-      if (refreshResponse.ok) {
-        console.log('Session refreshed successfully. Retrying original request.');
-        // The refresh endpoint sets a new cookie, so we can just retry the original request.
-        response = await fetch(url, options);
-      } else {
-        console.log('Session refresh failed. Logging out.');
-        await logout();
-      }
-    }
-
-    return response;
+  const refreshUser = useCallback(async () => {
+    // This function is likely no longer needed as data is fetched on the server.
+    // Kept for potential manual refresh scenarios.
   }, []);
 
   const effectivePermissions = useMemo(() => {
@@ -120,7 +102,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     isAuthenticated,
     logout,
     refreshUser,
-    fetchWithAuth,
+    callServerAction, // Still providing it, though it's now a simple pass-through
   };
 
   return (
@@ -129,3 +111,5 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     </PermissionContext.Provider>
   );
 };
+
+    

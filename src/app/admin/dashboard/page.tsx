@@ -64,7 +64,6 @@ export default function AdminDashboardPage() {
         setIsLoading(true);
         try {
             const data = await getDashboardDataAction();
-
             if (data.error) {
                 setError(data.error);
             } else {
@@ -77,7 +76,7 @@ export default function AdminDashboardPage() {
                 });
             }
         } catch (e: any) {
-             setError((e as Error).message);
+             setError(e.message || "An unexpected response was received from the server.");
         }
         setIsLoading(false);
     }, []);
@@ -369,3 +368,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
