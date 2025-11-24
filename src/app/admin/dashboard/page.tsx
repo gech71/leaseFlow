@@ -18,6 +18,7 @@ import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Cookies from 'js-cookie';
+import { useServerAction } from '@/hooks/use-server-action';
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px]">
@@ -45,41 +46,26 @@ interface BuildingFinancialSummary {
 export default function AdminDashboardPage() {
     const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin } = usePermissions();
     const router = useRouter();
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [today, setToday] = useState(new Date());
+    const [today] = useState(new Date());
 
-    const [allData, setAllData] = useState<Omit<DashboardData, 'error'>>({
+    const { execute: fetchDashboardData, data: allData, error, isLoading } = useServerAction(getDashboardDataAction, {
+      initialData: {
         buildings: [],
         spaces: [],
         agreements: [],
         allBills: [],
         allUtilities: [],
+        error: null,
+      },
+      onSuccess: (data) => {
+        if(data.error) {
+          console.error(data.error);
+        }
+      }
     });
 
     const [selectedYear, setSelectedYear] = useState(getYear(today));
     const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
-
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const data = await getDashboardDataAction();
-            if (data.error) {
-                setError(data.error);
-            } else {
-                setAllData({
-                    buildings: data.buildings,
-                    spaces: data.spaces,
-                    agreements: data.agreements,
-                    allBills: data.allBills,
-                    allUtilities: data.allUtilities,
-                });
-            }
-        } catch (e: any) {
-             setError(e.message || "An unexpected response was received from the server.");
-        }
-        setIsLoading(false);
-    }, []);
 
     useEffect(() => {
         if (!isUserLoading && currentUser) {
@@ -94,13 +80,20 @@ export default function AdminDashboardPage() {
                 router.replace(firstAllowedPage || '/login'); 
                 return;
             }
-            fetchData();
+            fetchDashboardData();
         }
-    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission, fetchData]);
+    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission, fetchDashboardData]);
 
     const periodDescription = format(new Date(selectedYear, selectedMonth), "MMMM yyyy");
 
     const filteredData = useMemo(() => {
+        if (!allData) {
+            return {
+                stats: { totalBuildings: 0, totalSpaces: 0, totalTenants: 0, totalRevenueThisPeriod: '0.00 Birr', activeAgreements: 0 },
+                financials: []
+            };
+        }
+
         const activeAgreements = allData.agreements.filter(ag => {
             const agreementEndDate = addMonths(parseISO(ag.startDate), ag.paymentTermMonths);
             return isAfter(agreementEndDate, today);
@@ -154,6 +147,7 @@ export default function AdminDashboardPage() {
     }, [allData, selectedYear, selectedMonth, today]);
 
     const chartData = useMemo(() => {
+        if (!allData) return [];
         const data = [];
         const allPaidBills = allData.allBills.filter(bill => bill.status === 'Paid');
 
@@ -182,6 +176,7 @@ export default function AdminDashboardPage() {
     }, [allData, selectedYear, selectedMonth]);
 
     const recentActivities = useMemo(() => {
+        if (!allData) return [];
         return [...allData.allBills] // Create a mutable copy
             .sort((a, b) => parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime())
             .slice(0, 5)
@@ -210,10 +205,11 @@ export default function AdminDashboardPage() {
     }, [allData]);
     
     const availableYears = useMemo(() => {
+        if (!allData) return [getYear(new Date())];
         const years = new Set(allData.allBills.map(b => getYear(parseISO(b.billDate))));
         if (years.size === 0) return [getYear(new Date())];
         return Array.from(years).sort((a,b) => b - a);
-    }, [allData.allBills]);
+    }, [allData]);
 
     if (isLoading || isUserLoading) {
       return (
@@ -237,6 +233,8 @@ export default function AdminDashboardPage() {
         </div>
       )
     }
+    
+    if (!allData) return null;
 
   return (
     <div className="animate-fadeIn">
@@ -368,5 +366,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-    

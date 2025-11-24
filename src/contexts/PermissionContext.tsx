@@ -14,7 +14,6 @@ interface PermissionContextType {
   isAuthenticated: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  callServerAction: <T extends (...args: any[]) => Promise<any>>(action: T, ...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>;
 }
 
 const PermissionContext = createContext<PermissionContextType>({
@@ -26,7 +25,6 @@ const PermissionContext = createContext<PermissionContextType>({
   isAuthenticated: false,
   logout: async () => {},
   refreshUser: async () => {},
-  callServerAction: async () => { throw new Error("PermissionContext not initialized"); },
 });
 
 export const usePermissions = () => useContext(PermissionContext);
@@ -44,28 +42,16 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
 
   const logout = async () => {
     try {
-        // We call the API route directly, no need for special wrappers here.
         await fetch('/api/auth/logout', { method: 'POST' });
     } catch (error) {
         console.error("Logout request failed:", error);
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
-        // Full page navigation to clear all state and re-trigger middleware.
         window.location.href = '/login';
     }
   };
   
-  const callServerAction = useCallback(async <T extends (...args: any[]) => Promise<any>>(
-    action: T,
-    ...args: Parameters<T>
-  ): Promise<Awaited<ReturnType<T>>> => {
-      // This function is no longer needed with direct server action calls.
-      // We can just call the action directly.
-      return action(...args);
-  }, []);
-
-
   const refreshUser = useCallback(async () => {
     // This function is likely no longer needed as data is fetched on the server.
     // Kept for potential manual refresh scenarios.
@@ -102,7 +88,6 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     isAuthenticated,
     logout,
     refreshUser,
-    callServerAction, // Still providing it, though it's now a simple pass-through
   };
 
   return (
@@ -111,5 +96,3 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     </PermissionContext.Provider>
   );
 };
-
-    
