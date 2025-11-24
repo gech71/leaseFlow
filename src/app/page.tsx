@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { usePermissions } from "@/contexts/PermissionContext";
+import Cookies from 'js-cookie';
 
 export default function RootPage() {
   const router = useRouter();
@@ -50,9 +50,13 @@ export default function RootPage() {
     setError(null);
 
     try {
+      const csrfToken = Cookies.get('nibrental_csrf_token');
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken || '',
+        },
         body: JSON.stringify({ phone, password }),
       });
 

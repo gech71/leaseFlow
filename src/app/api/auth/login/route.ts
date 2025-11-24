@@ -1,4 +1,3 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { databaseService } from '@/lib/services/databaseService';
 import bcrypt from 'bcryptjs';
