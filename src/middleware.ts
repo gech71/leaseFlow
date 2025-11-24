@@ -1,7 +1,7 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifySession } from '@/lib/auth/jwt';
 import { PERMISSION_MAP } from '@/lib/auth-utils';
-import crypto from 'crypto';
 
 const ORDERED_ADMIN_PAGES = [
   "/admin/dashboard",
@@ -31,7 +31,11 @@ export async function middleware(request: NextRequest) {
   const isGetRequest = request.method === 'GET';
   let csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
   if (isGetRequest && !csrfToken) {
-    csrfToken = crypto.randomBytes(32).toString('hex');
+    // Use Web Crypto API for Edge Runtime compatibility
+    const randomValues = new Uint8Array(32);
+    crypto.getRandomValues(randomValues);
+    csrfToken = Array.from(randomValues).map(b => b.toString(16).padStart(2, '0')).join('');
+    
     response.cookies.set(CSRF_TOKEN_COOKIE_NAME, csrfToken, {
       httpOnly: false, // Must be readable by client script
       secure: process.env.NODE_ENV === 'production',

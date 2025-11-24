@@ -1,3 +1,4 @@
+
 # LeaseFlow: Building Management Solution
 
 LeaseFlow is a comprehensive, modern web application designed to streamline property management. Built with Next.js, it provides a robust platform for managing buildings, spaces, tenants, and the entire billing lifecycle.
@@ -60,11 +61,6 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 # This key MUST be a 64-character hex string (32 bytes).
 JWT_SECRET_KEY=YOUR_64_CHARACTER_JWT_SECRET_KEY_HERE
 
-# Encryption key for sensitive data in the database (e.g., SMTP password).
-# This key MUST be a 64-character hex string (32 bytes) for AES-256 encryption.
-# Generate one from your terminal using: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-ENCRYPTION_KEY=YOUR_64_CHARACTER_ENCRYPTION_KEY_HERE
-
 # --- General ---
 # Base URL of this application, used for constructing callback URLs
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
@@ -91,11 +87,11 @@ NIB_COMPANY_NAME=BUILDING
 # For Gmail, use smtp.gmail.com and port 587.
 # IMPORTANT: You must generate an "App Password" for your Google Account.
 # See: https://support.google.com/accounts/answer/185833
-# The App Password can be set via the Admin UI, but the user and host must be set here.
 SMTP_HOST="smtp.gmail.com"
 SMTP_PORT=587
 SMTP_USER="your-email@gmail.com"
 SMTP_FROM="Your Company Name <your-email@example.com>"
+SMTP_PASS="your-16-character-gmail-app-password"
 
 ```
 

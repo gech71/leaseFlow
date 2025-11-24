@@ -39,16 +39,12 @@ export function EmailConfigurationClientPage({ initialSmtpUser, initialIsSmtpPas
   });
 
   const handlePasswordSubmit = async (values: PasswordFormValues) => {
-    setIsSaving(true);
-    const result = await updateSmtpPasswordAction(values.newPassword);
-    setIsSaving(false);
-    if (result.success) {
-      toast({ title: "Success", description: "App Password has been updated securely." });
-      form.reset();
-      setIsSmtpPassSet(true);
-    } else {
-      toast({ title: "Error", description: result.error, variant: "destructive" });
-    }
+    toast({
+        title: "Manual Update Required",
+        description: "For security, the SMTP password must be updated directly in the server's .env file.",
+        variant: "default",
+        duration: 8000,
+    });
   };
 
   if (error) {
@@ -66,59 +62,22 @@ export function EmailConfigurationClientPage({ initialSmtpUser, initialIsSmtpPas
         <CardHeader>
           <CardTitle>Email Setup Used by Your System</CardTitle>
           <CardDescription>
-            These are the settings the application is currently using.
+            These are the settings the application is currently using. They are set in the server's environment file.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1">
-            <Label htmlFor="smtpUser">Email Address</Label>
+            <Label htmlFor="smtpUser">Email Address (SMTP_USER)</Label>
             <Input id="smtpUser" value={initialSmtpUser || 'Not Set'} readOnly disabled />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="smtpPass">App Password Status</Label>
-            <Input id="smtpPass" value={isSmtpPassSet ? 'Set & Encrypted' : 'Not Set'} readOnly disabled />
+            <Label htmlFor="smtpPass">App Password Status (SMTP_PASS)</Label>
+            <Input id="smtpPass" value={isSmtpPassSet ? 'Set in Environment' : 'Not Set'} readOnly disabled />
           </div>
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handlePasswordSubmit)} className="space-y-4 pt-4 border-t">
-              <FormField
-                control={form.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center">
-                      <KeyRound className="mr-2 h-4 w-4" /> New App Password
-                    </FormLabel>
-                    <div className="relative">
-                      <FormControl>
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Enter new 16-character App Password"
-                          {...field}
-                          disabled={!isSuperAdmin || isSaving}
-                        />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </Button>
-                    </div>
-                    {!isSuperAdmin && <p className="text-xs text-muted-foreground">Only a Super Admin can change the password.</p>}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={!isSuperAdmin || isSaving}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save New Password
-              </Button>
-            </form>
-          </Form>
+          <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800">
+            <h4 className="font-bold">Manual Update Required</h4>
+            <p className="text-sm">For security reasons, email credentials can only be changed by editing the `.env` file on the server and restarting the application.</p>
+          </div>
         </CardContent>
       </Card>
 
@@ -146,9 +105,9 @@ export function EmailConfigurationClientPage({ initialSmtpUser, initialIsSmtpPas
               </ol>
             </div>
              <div>
-              <h4 className="font-semibold mb-1">Step 2: Update Password Above</h4>
+              <h4 className="font-semibold mb-1">Step 2: Update Server Environment</h4>
               <p className="text-muted-foreground">
-                Paste the 16-character password into the "New App Password" field on the left and click "Save".
+                Open the `.env` file on the application server and replace the value of `SMTP_PASS` with your new 16-character password. Then, restart the application for the change to take effect.
               </p>
             </div>
           </CardContent>

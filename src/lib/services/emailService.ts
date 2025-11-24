@@ -1,8 +1,7 @@
+
 "use server";
 
 import nodemailer from "nodemailer";
-import { prisma } from "@/lib/prisma";
-import { encryptionService } from "./encryptionService";
 
 interface EmailOptions {
   to: string;
@@ -14,18 +13,14 @@ interface EmailOptions {
 // SMTP configuration is now built dynamically
 async function getTransporter() {
   const smtpUser = process.env.SMTP_USER;
-  const encryptedPassword = await prisma.secret.findUnique({
-    where: { key: "SMTP_PASS" },
-  });
+  const smtpPass = process.env.SMTP_PASS;
 
-  if (!smtpUser || !encryptedPassword) {
-    console.error("❌ SMTP user or password is not configured in the system.");
+  if (!smtpUser || !smtpPass) {
+    console.error("❌ SMTP user or password is not configured in environment variables.");
     return null;
   }
 
   try {
-    const smtpPass = encryptionService.decrypt(encryptedPassword.value);
-
     const smtpConfig = {
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: Number(process.env.SMTP_PORT || 587),
@@ -39,7 +34,7 @@ async function getTransporter() {
     return nodemailer.createTransport(smtpConfig);
   } catch (error) {
     console.error(
-      "❌ Failed to create transporter due to decryption error:",
+      "❌ Failed to create transporter:",
       error,
     );
     return null;
@@ -56,7 +51,7 @@ export async function sendEmail({
 
   if (!transporter) {
     const errorMsg =
-      "Email service is not configured correctly (check user, password, and encryption key).";
+      "Email service is not configured correctly (check SMTP environment variables).";
     console.error(errorMsg);
     return { success: false, error: errorMsg };
   }
