@@ -1,9 +1,12 @@
 
+'use server';
+import 'server-only';
 import { verifySession } from '@/lib/auth/jwt';
 import { databaseService } from '@/lib/services/databaseService';
 import type { User, Role } from '@prisma/client';
 import { redirect } from 'next/navigation';
 import type { CurrentUser } from '@/lib/types';
+import Cookies from 'js-cookie';
 
 /**
  * A server-side helper to get the fully authenticated user object, their permissions,
@@ -69,7 +72,7 @@ export async function getUserAndManagedIds() {
  * @param {string} url - The URL to redirect to.
  * @param {string} message - The error message to display.
  */
-export function redirectWithToast(url: string, message: string) {
+export async function redirectWithToast(url: string, message: string) {
   const finalUrl = `${url}?error=${encodeURIComponent(message)}`;
   return redirect(finalUrl);
 }

@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Building, Building2, FileText, Banknote, LayoutGrid, AlertCircle, User, Loader2 } from 'lucide-react';
@@ -12,11 +13,10 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { OccupancyCard } from '@/components/custom/OccupancyCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { getDashboardDataAction, type DashboardData, type ClientAgreement, type ClientBill, type ClientUtility, type ClientBuilding, type ClientSpace } from './actions';
+import { getDashboardDataAction, type DashboardData } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-
 
 const StatCard = ({ title, value, icon: Icon, description, trend, trendColor }: { title: string, value: string, icon: React.ElementType, description?: string, trend?: string, trendColor?: string }) => (
   <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col min-h-[140px]">
@@ -41,7 +41,6 @@ interface BuildingFinancialSummary {
   currentMonthIncomeToBeCollected: number;
 }
 
-
 export default function AdminDashboardPage() {
     const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin } = usePermissions();
     const router = useRouter();
@@ -49,7 +48,6 @@ export default function AdminDashboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [today, setToday] = useState(new Date());
 
-    // State for all fetched data
     const [allData, setAllData] = useState<Omit<DashboardData, 'error'>>({
         buildings: [],
         spaces: [],
@@ -58,9 +56,33 @@ export default function AdminDashboardPage() {
         allUtilities: [],
     });
 
-    // State for filters
     const [selectedYear, setSelectedYear] = useState(getYear(today));
     const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
+
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const data = await getDashboardDataAction();
+            if (data.error) {
+                setError(data.error);
+            } else {
+                setAllData({
+                    buildings: data.buildings,
+                    spaces: data.spaces,
+                    agreements: data.agreements,
+                    allBills: data.allBills,
+                    allUtilities: data.allUtilities,
+                });
+            }
+        } catch (e: any) {
+             if (e.message.includes('Invalid CSRF token')) {
+                 setError("Your session may have expired. Please try refreshing the page.");
+             } else {
+                setError((e as Error).message);
+             }
+        }
+        setIsLoading(false);
+    }, []);
 
     useEffect(() => {
         if (!isUserLoading && currentUser) {
@@ -70,39 +92,14 @@ export default function AdminDashboardPage() {
                 return;
             }
             if (!isSuperAdmin && !hasPermission('dashboard:view')) {
-                // If they don't have dashboard access, try to find the first page they DO have access to
                 const navItems = ['/admin/buildings', '/admin/spaces', '/admin/tenants', '/admin/agreements', '/admin/billing'];
                 const firstAllowedPage = navItems.find(p => hasPermission(p.replace('/admin/', '') + ':view' as any));
-                router.replace(firstAllowedPage || '/login'); // fallback to login if no permissions found
+                router.replace(firstAllowedPage || '/login'); 
                 return;
             }
-        }
-
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                const data = await getDashboardDataAction();
-                if (data.error) {
-                    setError(data.error);
-                } else {
-                    setAllData({
-                        buildings: data.buildings,
-                        spaces: data.spaces,
-                        agreements: data.agreements,
-                        allBills: data.allBills,
-                        allUtilities: data.allUtilities,
-                    });
-                }
-            } catch (e) {
-                setError((e as Error).message);
-            }
-            setIsLoading(false);
-        };
-
-        if (!isUserLoading) {
             fetchData();
         }
-    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission]);
+    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission, fetchData]);
 
     const periodDescription = format(new Date(selectedYear, selectedMonth), "MMMM yyyy");
 
