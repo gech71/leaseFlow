@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -44,7 +43,7 @@ interface BuildingFinancialSummary {
 }
 
 export default function AdminDashboardPage() {
-    const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin, fetchWithAuth } = usePermissions();
+    const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin } = usePermissions();
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -64,20 +63,7 @@ export default function AdminDashboardPage() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            // Server actions are POST requests, so we use fetchWithAuth
-            const response = await fetchWithAuth('/admin/dashboard?_action=getDashboardDataAction', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            
-            if (!response.ok) {
-                 const errorData = await response.json().catch(() => ({ message: "An unexpected response was received from the server." }));
-                 throw new Error(errorData.message || 'Failed to fetch dashboard data.');
-            }
-
-            const data = await response.json();
+            const data = await getDashboardDataAction();
 
             if (data.error) {
                 setError(data.error);
@@ -94,7 +80,7 @@ export default function AdminDashboardPage() {
              setError((e as Error).message);
         }
         setIsLoading(false);
-    }, [fetchWithAuth]);
+    }, []);
 
     useEffect(() => {
         if (!isUserLoading && currentUser) {

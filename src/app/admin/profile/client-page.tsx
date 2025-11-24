@@ -44,16 +44,21 @@ export function AdminProfileClientPage() {
   
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
-    const result = await changePassword(values);
+    try {
+      const result = await changePassword(values);
 
-    if (result.success) {
-        toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
-        form.reset();
-        await logout(); // Use the logout function from context
-    } else {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+      if (result.success) {
+          toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
+          form.reset();
+          await logout(); // Use the logout function from context
+      } else {
+          toast({ title: "Error", description: result.error, variant: "destructive" });
+      }
+    } catch (e: any) {
+       toast({ title: "Error", description: e.message || "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
 

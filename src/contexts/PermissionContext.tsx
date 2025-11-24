@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -66,6 +65,9 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     if (csrfToken) {
       headers.set('x-csrf-token', csrfToken);
     }
+     if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
     options.headers = headers;
 
     let response = await fetch(url, options);
@@ -87,22 +89,28 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     return response;
   }, []);
 
+  const effectivePermissions = useMemo(() => {
+    if (!currentUser) return new Set<string>();
+    return new Set(currentUser.effectivePermissions);
+  }, [currentUser]);
+
   const isSuperAdmin = useMemo(() => {
-    return currentUser?.roles?.some(role => role.name === 'SUPER_ADMIN') || false;
+    if (!currentUser) return false;
+    return currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
   }, [currentUser]);
 
   const hasPermission = useCallback((permission: string): boolean => {
-    if (!currentUser || !permission) return false;
+    if (!currentUser) return false;
     if (isSuperAdmin) return true;
-    return currentUser.effectivePermissions.includes(permission);
-  }, [currentUser, isSuperAdmin]);
+    return effectivePermissions.has(permission);
+  }, [currentUser, isSuperAdmin, effectivePermissions]);
 
   const hasAnyPermission = useCallback((permissions: string[]): boolean => {
-    if (!currentUser || !permissions || permissions.length === 0) return false;
+    if (!currentUser) return false;
     if (isSuperAdmin) return true;
-    return permissions.some(p => currentUser.effectivePermissions.includes(p));
-  }, [currentUser, isSuperAdmin]);
-  
+    return permissions.some(p => effectivePermissions.has(p));
+  }, [currentUser, isSuperAdmin, effectivePermissions]);
+
   const value = {
     currentUser,
     hasPermission,
