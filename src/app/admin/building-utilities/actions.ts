@@ -1,28 +1,35 @@
-
-
 "use server";
 
-import { revalidatePath } from 'next/cache';
-import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type Building, type BuildingMonthlyUtilities, type User, type Role, type BuildingUtilityItem } from '@prisma/client';
-import { cookies } from 'next/headers';
-import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
-import { prisma } from '@/lib/prisma';
+import { revalidatePath } from "next/cache";
+import { databaseService } from "@/lib/services/databaseService";
+import {
+  Prisma,
+  type Building,
+  type BuildingMonthlyUtilities,
+  type User,
+  type Role,
+  type BuildingUtilityItem,
+} from "@prisma/client";
+import { cookies } from "next/headers";
+import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
+import { prisma } from "@/lib/prisma";
 
 export async function getRegisteredBuildingsAction(): Promise<Building[]> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
-    
+
     if (!isSuperAdmin && managedBuildingIds?.length === 0) {
-        return [];
+      return [];
     }
 
-    const whereClause = !isSuperAdmin ? { id: { in: managedBuildingIds! } } : {};
+    const whereClause = !isSuperAdmin
+      ? { id: { in: managedBuildingIds! } }
+      : {};
 
-    return await databaseService.getAllBuildings({ 
+    return await databaseService.getAllBuildings({
       where: whereClause,
-      orderBy: { name: 'asc' },
-      include: { spaces: { orderBy: { spaceIdName: 'asc' } } }
+      orderBy: { name: "asc" },
+      include: { spaces: { orderBy: { spaceIdName: "asc" } } },
     });
   } catch (error: any) {
     console.error("Error fetching buildings:", error);
@@ -33,33 +40,56 @@ export async function getRegisteredBuildingsAction(): Promise<Building[]> {
 export async function getBuildingUtilitiesAction(
   buildingId: string,
   year: number,
-  month: number
-): Promise<(BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpaceAllocation?: Record<string, number> | null })[] }) | null> {
+  month: number,
+): Promise<
+  | (BuildingMonthlyUtilities & {
+      utilities: {
+        totalCost: number;
+        perSpaceAllocation?: Record<string, number> | null;
+      }[];
+    })
+  | null
+> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
-        console.warn(`Permission denied: User tried to access utilities for unmanaged building ${buildingId}`);
-        return null; // Don't return data user can't access
+      console.warn(
+        `Permission denied: User tried to access utilities for unmanaged building ${buildingId}`,
+      );
+      return null; // Don't return data user can't access
     }
 
-    const utilities = await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(buildingId, month, year, {
-      utilities: true,
-    });
+    const utilities =
+      await databaseService.getBuildingMonthlyUtilitiesByBuildingMonthYear(
+        buildingId,
+        month,
+        year,
+        {
+          utilities: true,
+        },
+      );
 
     if (!utilities) return null;
 
     // Serialize Decimal to number and parse JSON
     const serializableUtilities = {
       ...utilities,
-      utilities: utilities.utilities.map(u => ({
+      utilities: utilities.utilities.map((u) => ({
         ...u,
         totalCost: Number(u.totalCost),
-        perSpaceAllocation: u.perSpaceAllocation && typeof u.perSpaceAllocation === 'string' ? JSON.parse(u.perSpaceAllocation) : null,
-      }))
+        perSpaceAllocation:
+          u.perSpaceAllocation && typeof u.perSpaceAllocation === "string"
+            ? JSON.parse(u.perSpaceAllocation)
+            : null,
+      })),
     };
-    
-    return serializableUtilities as (BuildingMonthlyUtilities & { utilities: ({ totalCost: number; perSpaceAllocation?: Record<string, number> | null })[] });
 
+    return serializableUtilities as BuildingMonthlyUtilities & {
+      utilities: {
+        totalCost: number;
+        perSpaceAllocation?: Record<string, number> | null;
+      }[];
+    };
   } catch (error: any) {
     console.error("Error fetching building utilities:", error);
     return null; // Return null on error
@@ -70,7 +100,7 @@ export interface BuildingUtilityItemInput {
   id?: string; // Add optional ID for updates
   name: string;
   totalCost: number;
-  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces'; // Matches Prisma Enum
+  appliesToScope: "Building" | "Floor" | "SpecificSpaces"; // Matches Prisma Enum
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
   perSpacePercentages?: { [spaceId: string]: number };
@@ -78,23 +108,21 @@ export interface BuildingUtilityItemInput {
 
 export async function saveBuildingUtilitiesAction(
   buildingId: string,
-  buildingName: string, // Denormalized name
+  buildingName: string,
   year: number,
   month: number,
-  utilityItems: BuildingUtilityItemInput[]
+  utilityItems: BuildingUtilityItemInput[],
 ) {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
-        return { success: false, error: "Permission denied." };
+      return { success: false, error: "Permission denied." };
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // Step 1: Find or create the parent BuildingMonthlyUtilities record
+      // 1️⃣ Find existing parent or create it
       let monthlyUtil = await tx.buildingMonthlyUtilities.findUnique({
-        where: {
-          buildingId_year_month: { buildingId, year, month },
-        },
+        where: { buildingId_year_month: { buildingId, year, month } },
         include: { utilities: true },
       });
 
@@ -110,106 +138,124 @@ export async function saveBuildingUtilitiesAction(
         });
       }
 
-      // Step 2: Process items
-      const clientItemIds = new Set(utilityItems.filter(item => item.id).map(item => item.id!));
-      const dbItemIds = new Set(monthlyUtil.utilities.map(item => item.id));
-      const itemIdsToDelete = [...dbItemIds].filter(id => !clientItemIds.has(id));
+      const clientItemIds = new Set(
+        utilityItems.filter((i) => i.id).map((i) => i.id!),
+      );
+      const dbItemIds = new Set(monthlyUtil.utilities.map((i) => i.id));
+      const itemIdsToDelete = [...dbItemIds].filter(
+        (id) => !clientItemIds.has(id),
+      );
 
-      // Delete items that are no longer in the submission
+      // 2️⃣ Delete removed items
       if (itemIdsToDelete.length > 0) {
         await tx.buildingUtilityItem.deleteMany({
           where: { id: { in: itemIdsToDelete } },
         });
       }
 
-      // Upsert items from the submission
+      // 3️⃣ Upsert utility items
       for (const item of utilityItems) {
-        const dataPayload: Omit<Prisma.BuildingUtilityItemUncheckedCreateInput, 'monthlyUtilitiesId'> = {
-            name: item.name,
-            totalCost: item.totalCost,
-            appliesToScope: item.appliesToScope,
-            applicableFloor: item.appliesToScope === 'Floor' ? item.applicableFloor : null,
-            applicableSpaceIdNames: item.appliesToScope === 'SpecificSpaces' ? (item.applicableSpaceIdNames || []) : [],
-            perSpaceAllocation: item.appliesToScope === 'Floor' && item.perSpacePercentages ? JSON.stringify(item.perSpacePercentages) : null,
+        const dataPayload: Omit<
+          Prisma.BuildingUtilityItemUncheckedCreateInput,
+          "monthlyUtilitiesId"
+        > = {
+          name: item.name,
+          totalCost: item.totalCost,
+          appliesToScope: item.appliesToScope,
+          applicableFloor:
+            item.appliesToScope === "Floor" ? item.applicableFloor : null,
+          applicableSpaceIdNames:
+            item.appliesToScope === "SpecificSpaces"
+              ? item.applicableSpaceIdNames || []
+              : [],
+          perSpaceAllocation: item.perSpacePercentages
+            ? JSON.stringify(item.perSpacePercentages)
+            : "",
         };
 
-        if (item.id && dbItemIds.has(item.id)) { // If ID exists and was in the DB, it's an update
+        if (item.id && dbItemIds.has(item.id)) {
+          // Update existing
           await tx.buildingUtilityItem.update({
             where: { id: item.id },
             data: dataPayload,
           });
-        } else { // No ID or ID not in DB, it's a new item
+        } else {
+          // Create new with nested connect
           await tx.buildingUtilityItem.create({
             data: {
               ...dataPayload,
-              monthlyUtilitiesId: monthlyUtil!.id,
+              monthlyUtilities: {
+                connect: { id: monthlyUtil.id },
+              },
             },
           });
         }
       }
 
-      // Step 4: Fetch the final state of the record to return
+      // 4️⃣ Return final state
       return tx.buildingMonthlyUtilities.findUnique({
         where: { id: monthlyUtil.id },
         include: { utilities: true },
       });
     });
 
-    revalidatePath('/admin/building-utilities');
-    revalidatePath('/admin/billing');
-    
-    if (!result) {
-        throw new Error("Transaction failed and did not return a result.");
-    }
-    
+    revalidatePath("/admin/building-utilities");
+    revalidatePath("/admin/billing");
+
+    if (!result) throw new Error("Transaction failed.");
+
+    // 5️⃣ Serialize decimals
     const serializableResult = {
       ...result,
-      utilities: result.utilities.map(u => ({
+      utilities: result.utilities.map((u) => ({
         ...u,
         totalCost: Number(u.totalCost),
-        perSpaceAllocation: u.perSpaceAllocation && typeof u.perSpaceAllocation === 'string' ? JSON.parse(u.perSpaceAllocation) : null,
-      }))
+        perSpaceAllocation: u.perSpaceAllocation
+          ? JSON.parse(u.perSpaceAllocation)
+          : null,
+      })),
     };
 
     return { success: true, data: serializableResult };
   } catch (error: any) {
     console.error("Error saving building utilities:", error);
-    let errorMessage = "Failed to save utility data.";
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      errorMessage = `Database error: ${error.message}`;
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-    return { success: false, error: errorMessage };
+    return {
+      success: false,
+      error: error.message || "Failed to save utilities.",
+    };
   }
 }
-
-export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingMonthlyUtilities & { utilities: ({ totalCost: number; })[] })[]> {
+export async function getAllBuildingUtilitiesForListAction(): Promise<
+  (BuildingMonthlyUtilities & { utilities: { totalCost: number }[] })[]
+> {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 
     if (!isSuperAdmin && managedBuildingIds?.length === 0) {
-       return []; // No buildings, so no utility records
+      return []; // No buildings, so no utility records
     }
-    const whereClause = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
+    const whereClause = !isSuperAdmin
+      ? { buildingId: { in: managedBuildingIds! } }
+      : {};
 
     const records = await databaseService.getAllBuildingMonthlyUtilities({
       where: whereClause,
-      include: { utilities: true, building: { select: { name: true }} },
-      orderBy: { createdAt: 'desc' },
+      include: { utilities: true, building: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
     });
-    
-    // Correctly serialize the Decimal values to numbers before returning
-    const serializedRecords = records.map(record => ({
-      ...record,
-      utilities: record.utilities.map(util => ({
-        ...util,
-        totalCost: Number(util.totalCost)
-      }))
-    }));
-    
-    return serializedRecords as (BuildingMonthlyUtilities & { utilities: { totalCost: number }[] })[];
 
+    // Correctly serialize the Decimal values to numbers before returning
+    const serializedRecords = records.map((record) => ({
+      ...record,
+      utilities: record.utilities.map((util) => ({
+        ...util,
+        totalCost: Number(util.totalCost),
+      })),
+    }));
+
+    return serializedRecords as (BuildingMonthlyUtilities & {
+      utilities: { totalCost: number }[];
+    })[];
   } catch (error: any) {
     console.error("Error fetching all building utilities:", error);
     return [];
@@ -219,27 +265,42 @@ export async function getAllBuildingUtilitiesForListAction(): Promise<(BuildingM
 export async function deleteBuildingUtilitiesAction(id: string) {
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
-    
+
     // Fetch the record first to check for ownership
-    const recordToDelete = await databaseService.getBuildingMonthlyUtilitiesById(id);
+    const recordToDelete =
+      await databaseService.getBuildingMonthlyUtilitiesById(id);
     if (!recordToDelete) {
-        return { success: false, error: "Utility record not found for deletion." };
+      return {
+        success: false,
+        error: "Utility record not found for deletion.",
+      };
     }
 
-    if (!isSuperAdmin && !managedBuildingIds?.includes(recordToDelete.buildingId)) {
-        return { success: false, error: "Permission denied." };
+    if (
+      !isSuperAdmin &&
+      !managedBuildingIds?.includes(recordToDelete.buildingId)
+    ) {
+      return { success: false, error: "Permission denied." };
     }
 
     await databaseService.deleteBuildingMonthlyUtilities(id);
-    revalidatePath('/admin/building-utilities');
-    revalidatePath('/admin/billing');
+    revalidatePath("/admin/building-utilities");
+    revalidatePath("/admin/billing");
     return { success: true };
-  } catch (error: any)
- {
+  } catch (error: any) {
     console.error("Error deleting building utilities:", error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      return { success: false, error: "Utility record not found for deletion." };
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return {
+        success: false,
+        error: "Utility record not found for deletion.",
+      };
     }
-    return { success: false, error: error.message || "Failed to delete utility record." };
+    return {
+      success: false,
+      error: error.message || "Failed to delete utility record.",
+    };
   }
 }
