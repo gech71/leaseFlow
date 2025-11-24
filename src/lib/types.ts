@@ -1,4 +1,5 @@
 
+
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
@@ -272,14 +273,6 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: 'Settings: Agreement Templates',
     permissions: [
       { id: 'settings:agreement_templates:manage', label: 'Manage' },
-    ],
-  },
-   {
-    resourceId: 'settings:email_configuration',
-    resourceLabel: 'Settings: Email Configuration',
-    permissions: [
-        { id: 'settings:email_configuration:view', label: 'View' },
-        { id: 'settings:email_configuration:manage', label: 'Manage' },
     ],
   },
   {

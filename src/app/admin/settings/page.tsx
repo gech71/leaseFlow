@@ -18,10 +18,9 @@ export default function SettingsPage() {
   const canManageUserManagement = isSuperAdmin || hasAnyPermission(['settings:user_management:view', 'settings:user_management:assign']);
   const canManageRoleManagement = isSuperAdmin || hasAnyPermission(['settings:role_management:view', 'settings:role_management:manage']);
   const canManageAgreementTemplates = isSuperAdmin || hasAnyPermission(['settings:agreement_templates:manage']);
-  const canManageEmailConfig = isSuperAdmin || hasAnyPermission(['settings:email_configuration:view', 'settings:email_configuration:manage']);
   const canManageImport = isSuperAdmin || hasAnyPermission(['import:manage']);
 
-  const canViewAnySettings = canManageUserRegistration || canManageUserManagement || canManageRoleManagement || canManageAgreementTemplates || canManageEmailConfig || canManageImport;
+  const canViewAnySettings = canManageUserRegistration || canManageUserManagement || canManageRoleManagement || canManageAgreementTemplates || canManageImport;
 
   useEffect(() => {
     if (!canViewAnySettings) {
@@ -65,15 +64,6 @@ export default function SettingsPage() {
       details: "Create and edit standard agreement text. Use placeholders to automatically insert details during generation.",
       icon: FileText,
       buttonText: "Manage Templates",
-    },
-    {
-      show: canManageEmailConfig,
-      href: "/admin/settings/email-configuration",
-      title: "Email Configuration",
-      description: "View current Email setup settings used for sending system emails.",
-      details: "check which email account is used for system notifications",
-      icon: Mail,
-      buttonText: "View Configuration",
     },
     {
       show: canManageImport,

@@ -110,7 +110,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const availableNavItems = allNavItems.filter(item => {
     // A special check for the generic settings link
     if (item.href === '/admin/settings') {
-      return isSuperAdmin || hasPermission('settings:user_management:view') || hasPermission('settings:role_management:view') || hasPermission('settings:agreement_templates:manage') || hasPermission('settings:email_configuration:view');
+      return isSuperAdmin || hasPermission('settings:user_management:view') || hasPermission('settings:role_management:view') || hasPermission('settings:agreement_templates:manage');
     }
     return isSuperAdmin || hasPermission(item.permission);
   });
