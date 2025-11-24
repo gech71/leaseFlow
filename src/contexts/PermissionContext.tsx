@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { CurrentUser } from '@/lib/types';
-import { usePathname, useRouter } from 'next/navigation';
+import Cookies from 'js-cookie'; // Using a library for easier cookie handling on client
 
 interface PermissionContextType {
   currentUser: CurrentUser | null;
@@ -30,11 +30,27 @@ const PermissionContext = createContext<PermissionContextType>({
 export const usePermissions = () => useContext(PermissionContext);
 
 // --- Interceptor for fetch ---
-// This will automatically handle token refreshes for API calls.
+// This will automatically handle token refreshes and CSRF tokens for API calls.
 const originalFetch = fetch;
 
 const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
-    let response = await originalFetch(url, options);
+    // Add CSRF token to state-changing requests
+    const method = options?.method?.toUpperCase() || 'GET';
+    const newOptions = { ...options };
+
+    if (method !== 'GET' && method !== 'HEAD') {
+        const csrfToken = Cookies.get('nibrental_csrf_token');
+        if (csrfToken) {
+            newOptions.headers = {
+                ...newOptions.headers,
+                'x-csrf-token': csrfToken,
+            };
+        } else {
+            console.warn('CSRF token not found for a state-changing request.');
+        }
+    }
+
+    let response = await originalFetch(url, newOptions);
 
     if (response.status === 401 && !url.toString().includes('/api/auth/refresh')) {
         console.log("Access token expired, attempting to refresh...");
@@ -44,10 +60,9 @@ const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestInit): Pro
         
         if (refreshResponse.ok) {
             console.log("Token refreshed successfully. Retrying original request.");
-            response = await originalFetch(url, options); // Retry the original request
+            response = await originalFetch(url, newOptions); // Retry the original request
         } else {
             console.log("Refresh token failed. Logging out.");
-            // If refresh fails, log the user out
             window.location.href = '/login?error=session_expired'; 
         }
     }
@@ -60,22 +75,21 @@ if (typeof window !== 'undefined') {
 }
 // --- End Interceptor ---
 
-
 export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const fetchUser = useCallback(async () => {
-    // No need to set loading to true here, only on initial load
     try {
-      const response = await fetch('/api/user/me'); // This will use the intercepted fetch
+      const response = await fetch('/api/user/me');
       if (response.ok) {
         const data = await response.json();
         if (data.isSuccess && data.user) {
           setCurrentUser(data.user);
           setIsAuthenticated(true);
         } else {
+          // If fetching user fails but we thought we were authenticated, clear it
           setCurrentUser(null);
           setIsAuthenticated(false);
         }
@@ -88,11 +102,19 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCurrentUser(null);
       setIsAuthenticated(false);
     } finally {
-      setIsLoading(false); // Only set loading to false after the first fetch attempt
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    // Initial check for access token to reduce initial loading time
+    // If the access token exists, we are likely authenticated. The fetchUser will confirm.
+    if (typeof window !== 'undefined') {
+        const hasAccessToken = !!Cookies.get('nibrental_access_token');
+        if(hasAccessToken) {
+            setIsAuthenticated(true);
+        }
+    }
     fetchUser();
   }, [fetchUser]);
 
@@ -104,6 +126,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
+        // Use a full page navigation to ensure all state is cleared
         window.location.href = '/login';
     }
   };

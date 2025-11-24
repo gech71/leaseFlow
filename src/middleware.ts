@@ -21,17 +21,17 @@ const PUBLIC_ROUTES = ['/login', '/portal/connect', '/portal/cancel', '/portal/e
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  // 1. Allow public routes and auth API routes to pass through early
   const isApiAuthRoute = pathname.startsWith('/api/auth');
   const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
   
-  // Allow public routes and auth API routes to be accessed without a session
-  if (isPublicRoute || isApiAuthRoute) {
+  if (isPublicRoute && !isApiAuthRoute) { // Auth routes need session check later
     // If user is already logged in and tries to access login page, redirect them
     if (pathname === '/login' || pathname === '/') {
-        const session = await verifySession(); // Still need to check for a valid session here
+        const session = await verifySession();
         if (session) {
           const userPermissions = new Set(session.permissions);
-          const isTenant = userPermissions.has('portal:view') && userPermissions.size === 1;
+          const isTenant = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
           const redirectUrl = isTenant ? '/portal/dashboard' : '/admin/dashboard';
           return NextResponse.redirect(new URL(redirectUrl, request.url));
         }
@@ -39,33 +39,55 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // For all other routes, a session is required
+  // 2. For all other routes, a session is required
   const session = await verifySession();
+  
+  // 3. CSRF Protection for state-changing requests
+  const isStateChangingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
+  if (isStateChangingMethod) {
+    if (!session) {
+      // Don't reveal CSRF failure for unauthenticated users, just deny access.
+      return NextResponse.json({ message: "Authentication required." }, { status: 401 });
+    }
+    const requestCsrfToken = request.headers.get('x-csrf-token');
+    const sessionCsrfToken = session.csrfToken;
+
+    if (!requestCsrfToken || !sessionCsrfToken || requestCsrfToken !== sessionCsrfToken) {
+      console.warn(`CSRF token mismatch. Path: ${pathname}, Method: ${request.method}`);
+      return NextResponse.json({ message: 'Invalid CSRF token.' }, { status: 403 });
+    }
+  }
+
+
+  // 4. Handle authentication and token refresh
+  if (isApiAuthRoute) {
+    if (pathname.startsWith('/api/auth/refresh')) {
+      // The refresh logic is handled in the route itself.
+      return NextResponse.next();
+    }
+  }
 
   if (!session) {
-    // If no access token, try to refresh it silently.
-    const refreshResponse = await fetch(new URL('/api/auth/refresh', request.url), {
-        method: 'POST',
-        headers: {
-            'Cookie': request.headers.get('Cookie') || '',
-        }
-    });
+    // Attempt to refresh only if it's not an auth API call
+    if (!isApiAuthRoute) {
+        const refreshResponse = await fetch(new URL('/api/auth/refresh', request.url), {
+            method: 'POST',
+            headers: {
+                'Cookie': request.headers.get('Cookie') || '',
+            }
+        });
 
-    if (refreshResponse.ok) {
-        // If refresh is successful, the new token is set in cookies.
-        // We can just proceed with the request, and the new cookie will be sent along.
-        // The `NextResponse.next()` will have the `set-cookie` header from the refresh response.
-        const response = NextResponse.next();
-
-        // Forward the new cookies from the refresh response to the client browser
-        const newAccessToken = refreshResponse.headers.get('set-cookie');
-        if (newAccessToken) {
-            response.headers.set('set-cookie', newAccessToken);
+        if (refreshResponse.ok) {
+            const response = NextResponse.next();
+            const newAccessToken = refreshResponse.headers.get('set-cookie');
+            if (newAccessToken) {
+                response.headers.set('set-cookie', newAccessToken);
+            }
+            return response;
         }
-        return response;
     }
-
-    // If refresh fails, then redirect to login.
+    
+    // If no session and refresh fails, redirect to login
     let from = pathname;
     if (request.nextUrl.search) {
       from += request.nextUrl.search;
@@ -76,6 +98,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
   
+  // 5. Handle forced password change
   if (session.forceChangePass && !pathname.startsWith('/portal/change-password')) {
     return NextResponse.redirect(new URL('/portal/change-password', request.url));
   }
@@ -83,7 +106,7 @@ export async function middleware(request: NextRequest) {
      return NextResponse.redirect(new URL('/portal/dashboard', request.url));
   }
 
-
+  // 6. Handle role-based authorization for admin routes
   if (pathname.startsWith('/admin')) {
     if (session.isSuperAdmin) {
       return NextResponse.next();
@@ -91,7 +114,8 @@ export async function middleware(request: NextRequest) {
 
     const userPermissions = new Set(session.permissions);
     
-    if (userPermissions.size === 1 && userPermissions.has('portal:view')) {
+    const isTenantOnly = userPermissions.has('portal:view') && userPermissions.size === 1;
+    if (isTenantOnly) {
       return NextResponse.redirect(new URL('/portal/dashboard', request.url));
     }
 
@@ -114,9 +138,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // 7. If all checks pass, allow the request
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|images).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images).*)'],
 };
