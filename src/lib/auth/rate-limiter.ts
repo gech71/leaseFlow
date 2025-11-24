@@ -1,3 +1,4 @@
+
 import 'server-only';
 import { Ratelimit } from "@upstash/ratelimit";
 
@@ -7,8 +8,8 @@ import { Ratelimit } from "@upstash/ratelimit";
 const cache = new Map();
 
 export const rateLimiter = new Ratelimit({
-  // Allow 5 requests from the same IP in a 10-second window.
-  limiter: Ratelimit.slidingWindow(5, "10 s"),
+  // Allow 5 requests in a 60-second window.
+  limiter: Ratelimit.slidingWindow(5, "60 s"),
   // Use the in-memory cache for tracking requests.
   ephemeralCache: cache,
   analytics: false,

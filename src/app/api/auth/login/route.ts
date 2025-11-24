@@ -5,6 +5,11 @@ import { createSession, createUserPayload } from '@/lib/auth/jwt';
 import { rateLimiter } from '@/lib/auth/rate-limiter';
 import type { User, Role } from '@prisma/client';
 
+async function checkRateLimit(identifier: string) {
+    const { success, limit, remaining, reset } = await rateLimiter.limit(identifier);
+    return { success, limit, remaining, reset };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -15,17 +20,24 @@ export async function POST(request: NextRequest) {
     }
 
     const ip = request.ip ?? request.headers.get('x-forwarded-for') ?? '127.0.0.1';
-    const { success, limit, remaining, reset } = await rateLimiter.limit(ip);
 
-    if (!success) {
-      const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+    // Rate limit by both IP and phone number
+    const [ipLimit, phoneLimit] = await Promise.all([
+      checkRateLimit(ip),
+      checkRateLimit(phone),
+    ]);
+
+    if (!ipLimit.success || !phoneLimit.success) {
+      const retryAfter = Math.ceil((Math.max(ipLimit.reset, phoneLimit.reset) - Date.now()) / 1000);
       return NextResponse.json({ message: `Too many requests. Try again in ${retryAfter} seconds.` }, { status: 429 });
     }
+    
+    const remainingAttempts = Math.min(ipLimit.remaining, phoneLimit.remaining);
 
     const user = await databaseService.findUserByPhoneNumber(phone, { roles: true });
     
     if (!user) {
-      return NextResponse.json({ message: `Invalid credentials. ${remaining} attempts remaining.` }, { status: 401 });
+      return NextResponse.json({ message: `Invalid credentials. ${remainingAttempts} attempts remaining.` }, { status: 401 });
     }
 
     let isValidPassword = false;
@@ -45,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (!isValidPassword) {
-      return NextResponse.json({ message: `Invalid credentials. ${remaining} attempts remaining.` }, { status: 401 });
+      return NextResponse.json({ message: `Invalid credentials. ${remainingAttempts} attempts remaining.` }, { status: 401 });
     }
 
     // On successful login, create the session
