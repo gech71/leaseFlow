@@ -439,8 +439,8 @@ export async function generateBillAndUpdateAgreementAction(agreementId: string, 
           }
         } else if (utilItem.appliesToScope === 'Floor' && utilItem.applicableFloor === space.floor) {
            let percentages: Record<string, number> = {};
-           if (utilItem.perSpacePercentages && typeof utilItem.perSpacePercentages === 'string') {
-               try { percentages = JSON.parse(utilItem.perSpacePercentages); } catch(e) {}
+           if (utilItem.perSpaceAllocation && typeof utilItem.perSpaceAllocation === 'string') {
+               try { percentages = JSON.parse(utilItem.perSpaceAllocation); } catch(e) {}
            }
            const spacePercentage = percentages[space.id];
            if(spacePercentage && spacePercentage > 0) {
