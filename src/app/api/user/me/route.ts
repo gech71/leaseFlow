@@ -1,27 +1,27 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { auth } from '@/auth';
+import { verifySession } from '@/lib/auth/jwt';
 import { databaseService } from '@/lib/services/databaseService';
 import type { CurrentUser } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
+  const session = await verifySession();
 
-  if (!session?.user?.id) {
+  if (!session?.userId) {
     return NextResponse.json({ isSuccess: false, errors: ["Authentication required."] }, { status: 401 });
   }
 
   try {
-    const localUser = await databaseService.getUserById(session.user.id, { roles: true });
+    const localUser = await databaseService.getUserById(session.userId, { roles: true });
 
     if (!localUser) {
-      console.warn(`User with internal ID ${session.user.id} not found in database during /api/user/me call.`);
+      console.warn(`User with internal ID ${session.userId} not found in database during /api/user/me call.`);
       return NextResponse.json({ isSuccess: false, errors: ["User not found in the system."] }, { status: 404 });
     }
 
-    const effectivePermissions = session.user.permissions ?? [];
+    const effectivePermissions = session.permissions ?? [];
     
     const currentUserData: CurrentUser = {
       id: localUser.id,
