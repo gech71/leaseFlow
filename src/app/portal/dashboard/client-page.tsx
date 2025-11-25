@@ -187,12 +187,12 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                 <h3 className="font-semibold mb-2">Billing History</h3>
                 {agreement.bills.length > 0 ? (
                   <>
-                    <div className="border rounded-lg overflow-hidden">
+                    <div className="border rounded-lg overflow-hidden md:block hidden">
                         <Table>
                         <TableHeader>
                             <TableRow>
                             <TableHead>Bill Period</TableHead>
-                            <TableHead className="hidden sm:table-cell">Due Date</TableHead>
+                            <TableHead>Due Date</TableHead>
                             <TableHead className="text-center">Status</TableHead>
                             <TableHead className="text-right">Amount (Birr)</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
@@ -204,7 +204,7 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                                return (
                                 <TableRow key={bill.id}>
                                     <TableCell className="font-medium">{format(parseISO(bill.billDate), 'MMMM yyyy')}</TableCell>
-                                    <TableCell className="hidden sm:table-cell">{format(parseISO(bill.dueDate), 'PP')}</TableCell>
+                                    <TableCell>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
                                     <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
                                     <TableCell className="text-right text-xs">
                                       <div className="font-semibold text-sm text-foreground">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
@@ -225,6 +225,37 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                         </TableBody>
                         </Table>
                     </div>
+
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-4">
+                        {paginatedBills.map(bill => {
+                            const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                            return (
+                                <Card key={bill.id} className="border bg-secondary/30">
+                                    <CardContent className="p-4">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <div className="font-bold">{format(parseISO(bill.billDate), 'MMMM yyyy')}</div>
+                                            {getStatusBadge(bill.status)}
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between"><span className="text-muted-foreground">Due Date:</span> <span>{format(parseISO(bill.dueDate), 'PP')}</span></div>
+                                            <div className="flex justify-between"><span className="text-muted-foreground">Rent:</span> <span>{Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+                                            {utilityTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Utilities:</span> <span>{utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
+                                            {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="flex justify-between text-destructive"><span className="font-medium">Penalty:</span> <span className="font-medium">{Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
+                                            <div className="border-t my-2"></div>
+                                            <div className="flex justify-between font-bold text-base"><span className="text-foreground">Total Due:</span> <span className="text-primary">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})} Birr</span></div>
+                                        </div>
+                                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                                            <Button size="sm" variant="outline" className="w-full mt-4" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
+                                                <Upload className="mr-2 h-4 w-4"/> Submit Payment Proof
+                                            </Button>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                    
                     <PaginationControls
                       currentPage={currentPage}
                       totalPages={totalPages}
