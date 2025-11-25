@@ -114,26 +114,6 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
         setIsSubmitting(false);
     };
   };
-  
-  const handleDownloadAgreement = (agreement: PortalAgreementWithRelations) => {
-    if (!agreement || !agreement.agreementText) {
-      toast({ title: "Cannot Download", description: "Agreement text is not available.", variant: "destructive"});
-      return;
-    }
-    
-    const doc = new jsPDF();
-    doc.html(agreement.agreementText, {
-      callback: function (doc) {
-        const safeTenantName = sanitizeFilename(agreement.tenant.name || 'Tenant');
-        doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
-        toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
-      },
-      x: 15,
-      y: 15,
-      width: 170, // A4 width in mm minus margins
-      windowWidth: 650 // An arbitrary number that works well for scaling
-    });
-  };
 
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
@@ -203,10 +183,11 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                         Building: {agreement.space.building.name}
                         </CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => handleDownloadAgreement(agreement)}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </Button>
+                     <Link href={`/portal/agreements/${agreement.id}`} passHref>
+                        <Button variant="outline" size="sm">
+                          <FileText className="mr-2 h-4 w-4"/> View Details
+                        </Button>
+                      </Link>
                 </div>
               </CardHeader>
               <CardContent>
@@ -321,15 +302,6 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                   <p className="text-muted-foreground text-sm">No bills have been generated for this agreement yet.</p>
                 )}
               </CardContent>
-              <CardFooter className="border-t pt-4">
-                  <div className="flex justify-end w-full">
-                      <Link href={`/portal/agreements/${agreement.id}`} passHref>
-                        <Button>
-                          <FileText className="mr-2 h-4 w-4"/> View Agreement Details
-                        </Button>
-                      </Link>
-                  </div>
-              </CardFooter>
             </Card>
           )
       })}
