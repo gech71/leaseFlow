@@ -160,7 +160,7 @@ function BuildingCard({ building, onStatusToggle, canEdit, canApprove, canViewDe
               </>
             )}
 
-            { (building.status === 'Active' || building.status === 'Inactive') && (
+            { (building.status === 'Active' || building.status === 'Inactive' || building.status === 'Rejected') && (
               canEdit ? (
                 <Tooltip>
                     <TooltipTrigger asChild>
