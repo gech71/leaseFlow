@@ -52,7 +52,7 @@ import {
 } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
 import { Label } from "@/components/ui/label";
-import { cancelAgreementAction } from "../actions";
+import { cancelAgreementAction } from "./actions";
 import {
   AlertDialog,
   AlertDialogAction,
