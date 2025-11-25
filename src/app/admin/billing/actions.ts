@@ -313,7 +313,7 @@ function calculateIndividualPenalty(
 
   // Iterate through each overdue day
   for (let day = 1; day <= daysOverdue; day++) {
-    // Find the tier that applies to the current day
+    // Find the tier that applies to the current day. If `toDay` is null, it applies indefinitely.
     const tierForDay = sortedTiers.find(tier => 
       day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
     );
@@ -742,3 +742,4 @@ export async function updateBillAdminDetailsAction(
     return { success: false, error: error.message || "Failed to update bill details." };
   }
 }
+
