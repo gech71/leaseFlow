@@ -27,7 +27,6 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next();
 
   // --- CSRF Token Generation ---
-  // Generate a CSRF token if one doesn't exist. This will be attached to every response.
   const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
   if (!csrfToken) {
     response.cookies.set(CSRF_TOKEN_COOKIE_NAME, nanoid(32), {
@@ -38,36 +37,24 @@ export async function middleware(request: NextRequest) {
     });
   }
   // --- End CSRF Token Generation ---
-
-  // Allow public routes and auth API routes to pass through early
-  const isApiAuthRoute = pathname.startsWith('/api/auth');
+  
+  const isApiRoute = pathname.startsWith('/api/');
   const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
   
-  if (isPublicRoute && !isApiAuthRoute) { // Auth routes need session check later
-    if (pathname === '/login' || pathname === '/') {
-        const session = await verifySession();
-        if (session) {
-          const userPermissions = new Set(session.permissions);
-          const isTenant = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
-          const redirectUrl = isTenant ? '/portal/dashboard' : '/admin/dashboard';
-          return NextResponse.redirect(new URL(redirectUrl, request.url));
-        }
-    }
+  // If it's a public file, let it go
+  if (pathname.includes('.')) {
     return response;
   }
-
-  // Handle authentication and token refresh
-  if (isApiAuthRoute) {
-    // CSRF check for login is handled inside the route. Other auth routes are protected by HttpOnly cookies.
-    if (pathname.startsWith('/api/auth/refresh') || pathname.startsWith('/api/auth/login') || pathname.startsWith('/api/auth/logout')) {
-      // The logic is handled in the route itself.
-      return response; // Return response with CSRF cookie if it was set
-    }
-  }
-
+  
+  // Verify session for all non-public routes
   const session = await verifySession();
-
+  
   if (!session) {
+    if (isPublicRoute) {
+      return response; // Allow access to public routes
+    }
+    
+    // For protected routes, redirect to login
     let from = pathname;
     if (request.nextUrl.search) {
       from += request.nextUrl.search;
@@ -80,6 +67,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
   
+  // --- If session exists ---
+
+  // If user is authenticated and tries to access login page, redirect them
+  if (pathname === '/login' || pathname === '/') {
+      const userPermissions = new Set(session.permissions);
+      const isTenant = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
+      const redirectUrl = isTenant ? '/portal/dashboard' : '/admin/dashboard';
+      return NextResponse.redirect(new URL(redirectUrl, request.url));
+  }
+
   // Handle forced password change
   if (session.forceChangePass && !pathname.startsWith('/portal/change-password')) {
     return NextResponse.redirect(new URL('/portal/change-password', request.url));

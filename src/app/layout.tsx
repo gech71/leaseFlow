@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { PermissionProvider } from "@/contexts/PermissionContext";
-import { getUserSessionAction } from "@/lib/actions/server-helpers";
 
 export const metadata: Metadata = {
   title: "Nib Building Management",
@@ -12,13 +11,12 @@ export const metadata: Metadata = {
   icons: { icon: "/images/Nibtera.png" },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const nonce = headers().get("x-nonce") || undefined;
-  const { user } = await getUserSessionAction();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -45,7 +43,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <PermissionProvider initialUser={user}>
+        <PermissionProvider>
           {children}
           <Toaster />
         </PermissionProvider>

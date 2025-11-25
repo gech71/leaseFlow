@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { CurrentUser } from '@/lib/types';
 import Cookies from 'js-cookie'; 
+import { getUserSessionAction } from '@/lib/actions/server-helpers';
 
 interface PermissionContextType {
   currentUser: CurrentUser | null;
@@ -30,17 +31,11 @@ const PermissionContext = createContext<PermissionContextType>({
 
 export const usePermissions = () => useContext(PermissionContext);
 
-export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUser: CurrentUser | null }> = ({ children, initialUser }) => {
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(initialUser);
-  const [isLoading, setIsLoading] = useState(!initialUser);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!initialUser);
+export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
-  useEffect(() => {
-    setCurrentUser(initialUser);
-    setIsAuthenticated(!!initialUser);
-    setIsLoading(false);
-  }, [initialUser]);
-
   const logout = useCallback(async (sessionExpired = false) => {
     try {
         const csrfToken = Cookies.get('nibrental_csrf_token');
@@ -56,19 +51,42 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
+        setIsLoading(false);
         const loginUrl = new URL('/login', window.location.origin);
         if (sessionExpired) {
           loginUrl.searchParams.set('error', 'session_expired');
-          loginUrl.searchParams.set('from', window.location.pathname);
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+            loginUrl.searchParams.set('from', window.location.pathname);
+          }
         }
         window.location.href = loginUrl.toString();
     }
   }, []);
-  
+
   const refreshUser = useCallback(async () => {
-    // This function is likely no longer needed as data is fetched on the server.
-    // Kept for potential manual refresh scenarios.
+    setIsLoading(true);
+    try {
+      const { isSuccess, user } = await getUserSessionAction();
+      if (isSuccess && user) {
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+      } else {
+        // If the session fetch fails, it means the user is not authenticated.
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error("Error refreshing user session:", error);
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+  
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
 
   const effectivePermissions = useMemo(() => {
     if (!currentUser) return new Set<string>();
