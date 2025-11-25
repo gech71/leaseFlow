@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { submitPaymentProofAction, sendContactEmailAction } from './actions';
+import { submitPaymentProofAction } from './actions';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -45,14 +45,11 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
   const [error, setError] = useState(initialData.error || null);
 
   const [isProofDialogOpen, setIsProofDialogOpen] = useState(false);
-  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [selectedBillForProof, setSelectedBillForProof] = useState<any | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [contactSubject, setContactSubject] = useState('');
-  const [contactBody, setContactBody] = useState('');
 
   const onDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -108,25 +105,6 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
         setIsSubmitting(false);
     };
   };
-  
-  const handleSubmitContact = async () => {
-    if (!contactSubject || !contactBody) {
-      toast({ title: "Missing Information", description: "Please provide both a subject and a message.", variant: "destructive" });
-      return;
-    }
-    setIsSubmitting(true);
-    const result = await sendContactEmailAction({ subject: contactSubject, body: contactBody });
-    setIsSubmitting(false);
-    if(result.success) {
-        toast({ title: "Message Sent", description: "Your message has been sent to the property manager."});
-        setIsContactDialogOpen(false);
-        setContactSubject('');
-        setContactBody('');
-    } else {
-        toast({ title: "Error", description: result.error, variant: "destructive"});
-    }
-  }
-
 
   if (error) {
     return (
@@ -235,11 +213,6 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                 <p className="text-muted-foreground text-sm">No bills have been generated for this agreement yet.</p>
               )}
             </CardContent>
-            <CardFooter>
-                 <Button variant="secondary" onClick={() => setIsContactDialogOpen(true)}>
-                    <MessageSquare className="mr-2 h-4 w-4"/> Contact Manager
-                 </Button>
-            </CardFooter>
           </Card>
       ))}
 
@@ -274,28 +247,6 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
           </DialogContent>
       </Dialog>
       
-      {/* Contact Manager Dialog */}
-      <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>Contact Property Manager</DialogTitle>
-                  <DialogDescription>
-                      Send a message directly to your building manager.
-                  </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                  <Input placeholder="Subject" value={contactSubject} onChange={e => setContactSubject(e.target.value)} disabled={isSubmitting}/>
-                  <Textarea placeholder="Your message..." rows={6} value={contactBody} onChange={e => setContactBody(e.target.value)} disabled={isSubmitting}/>
-              </div>
-              <DialogFooter>
-                  <DialogClose asChild><Button variant="outline" disabled={isSubmitting}>Cancel</Button></DialogClose>
-                  <Button onClick={handleSubmitContact} disabled={isSubmitting || !contactSubject || !contactBody}>
-                      {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Send Message
-                  </Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { UserCircle, LogOut, Menu, Loader2, Building, LayoutDashboard, User } from 'lucide-react';
+import { UserCircle, LogOut, Menu, Loader2, Building, LayoutDashboard, User, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -15,6 +15,11 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { usePermissions } from '@/contexts/PermissionContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { sendContactEmailAction } from '../dashboard/actions';
+
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading, currentUser } = usePermissions();
@@ -59,7 +64,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
 function PortalHeader() {
   const { logout } = usePermissions();
+  const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactBody, setContactBody] = useState('');
 
   const handleLogout = async () => {
       setIsLoggingOut(true);
@@ -67,9 +77,28 @@ function PortalHeader() {
       // The logout function handles redirection
       setIsLoggingOut(false);
   };
+  
+  const handleSubmitContact = async () => {
+    if (!contactSubject || !contactBody) {
+      toast({ title: "Missing Information", description: "Please provide both a subject and a message.", variant: "destructive" });
+      return;
+    }
+    setIsSubmittingContact(true);
+    const result = await sendContactEmailAction({ subject: contactSubject, body: contactBody });
+    setIsSubmittingContact(false);
+    if(result.success) {
+        toast({ title: "Message Sent", description: "Your message has been sent to the property manager."});
+        setIsContactDialogOpen(false);
+        setContactSubject('');
+        setContactBody('');
+    } else {
+        toast({ title: "Error", description: result.error, variant: "destructive"});
+    }
+  }
 
 
   return (
+    <>
     <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <Link href="/portal/dashboard" className="flex items-center gap-3">
@@ -99,6 +128,15 @@ function PortalHeader() {
           >
             <User size={18} /> My Account
           </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsContactDialogOpen(true)}
+            className="text-sm font-medium hover:underline flex items-center gap-1 p-2 h-auto text-primary-foreground hover:bg-primary/80"
+          >
+            <MessageSquare size={18} />
+            <span className="ml-1">Contact Manager</span>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -147,6 +185,16 @@ function PortalHeader() {
                     <User size={20} /> My Account
                   </Link>
                 </SheetClose>
+                 <SheetClose asChild>
+                   <Button
+                      variant="ghost"
+                      onClick={() => setIsContactDialogOpen(true)}
+                      className="text-base font-medium hover:underline flex items-center justify-start gap-2 p-2 rounded-md hover:bg-primary/80 w-full"
+                    >
+                      <MessageSquare size={20} />
+                      <span className="ml-1">Contact Manager</span>
+                    </Button>
+                </SheetClose>
               </nav>
               <SheetClose asChild>
                 <Button
@@ -170,5 +218,29 @@ function PortalHeader() {
         </div>
       </div>
     </header>
+    
+    {/* Contact Manager Dialog */}
+    <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Contact Property Manager</DialogTitle>
+                <DialogDescription>
+                    Send a message directly to your building manager.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <Input placeholder="Subject" value={contactSubject} onChange={e => setContactSubject(e.target.value)} disabled={isSubmittingContact}/>
+                <Textarea placeholder="Your message..." rows={6} value={contactBody} onChange={e => setContactBody(e.target.value)} disabled={isSubmittingContact}/>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="outline" disabled={isSubmittingContact}>Cancel</Button></DialogClose>
+                <Button onClick={handleSubmitContact} disabled={isSubmittingContact || !contactSubject || !contactBody}>
+                    {isSubmittingContact && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Send Message
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
