@@ -18,6 +18,7 @@ import { submitPaymentProofAction } from '../actions';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { PaginationControls } from '@/components/custom/PaginationControls';
 
 interface TenantDashboardClientPageProps {
   initialData: TenantPortalData;
@@ -50,6 +51,8 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   const onDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -106,6 +109,11 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
     };
   };
 
+  const handleItemsPerPageChange = (newSize: number) => {
+    setItemsPerPage(newSize);
+    setCurrentPage(1); // Reset to first page when items per page changes
+  };
+
   if (error) {
     return (
       <Card className="w-full text-center py-10 border-destructive">
@@ -148,73 +156,91 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
         </Card>
       )}
 
-      {agreements.map(agreement => (
-          <Card key={agreement.id} className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="font-headline text-xl flex items-center gap-3">
-                <Home className="text-primary"/>
-                Agreement for {agreement.space.spaceIdName}
-              </CardTitle>
-              <CardDescription>
-                Building: {agreement.space.building.name} | 
-                Start Date: {format(parseISO(agreement.startDate), 'PP')} | 
-                Term: {agreement.paymentTermMonths} months
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-                <StatCard title="Total Due" value={`${totalDue.toLocaleString()} Birr`} icon={Banknote} description="Pending and overdue bills" />
-                <StatCard title="Overdue Bills" value={overdueBills.length} icon={AlertCircle} description="Require immediate attention" />
-                <StatCard title="Upcoming Bills" value={pendingBills.length} icon={Clock} description="Not yet overdue" />
-                <StatCard title="Total Agreements" value={agreements.length} icon={FileText} description="Active agreements" />
-              </div>
-              
-              <h3 className="font-semibold mb-2">Billing History</h3>
-              {agreement.bills.length > 0 ? (
-                <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                    <TableHeader>
-                        <TableRow>
-                        <TableHead>Bill Period</TableHead>
-                        <TableHead className="hidden sm:table-cell">Due Date</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
-                        <TableHead className="text-right">Amount (Birr)</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {agreement.bills.map(bill => {
-                           const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
-                           return (
-                            <TableRow key={bill.id}>
-                                <TableCell className="font-medium">{format(parseISO(bill.billDate), 'MMMM yyyy')}</TableCell>
-                                <TableCell className="hidden sm:table-cell">{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                                <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
-                                <TableCell className="text-right text-xs">
-                                  <div className="font-semibold text-sm text-foreground">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                  <div className="text-muted-foreground">Rent: {Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                  {utilityTotal > 0 && <div className="text-muted-foreground">Utility: {utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
-                                  {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="text-destructive font-medium">Penalty: {Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {(bill.status === 'Pending' || bill.status === 'Overdue') && (
-                                        <Button size="sm" variant="outline" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
-                                        <Upload className="mr-2 h-4 w-4"/> Submit Proof
-                                        </Button>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                           )
-                        })}
-                    </TableBody>
-                    </Table>
+      {agreements.map(agreement => {
+          const totalPages = Math.ceil(agreement.bills.length / itemsPerPage);
+          const paginatedBills = agreement.bills.slice(
+            (currentPage - 1) * itemsPerPage,
+            currentPage * itemsPerPage
+          );
+
+          return (
+            <Card key={agreement.id} className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="font-headline text-xl flex items-center gap-3">
+                  <Home className="text-primary"/>
+                  Agreement for {agreement.space.spaceIdName}
+                </CardTitle>
+                <CardDescription>
+                  Building: {agreement.space.building.name} | 
+                  Start Date: {format(parseISO(agreement.startDate), 'PP')} | 
+                  Term: {agreement.paymentTermMonths} months
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+                  <StatCard title="Total Due" value={`${totalDue.toLocaleString()} Birr`} icon={Banknote} description="Pending and overdue bills" />
+                  <StatCard title="Overdue Bills" value={overdueBills.length} icon={AlertCircle} description="Require immediate attention" />
+                  <StatCard title="Upcoming Bills" value={pendingBills.length} icon={Clock} description="Not yet overdue" />
+                  <StatCard title="Total Agreements" value={agreements.length} icon={FileText} description="Active agreements" />
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No bills have been generated for this agreement yet.</p>
-              )}
-            </CardContent>
-          </Card>
-      ))}
+                
+                <h3 className="font-semibold mb-2">Billing History</h3>
+                {agreement.bills.length > 0 ? (
+                  <>
+                    <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Bill Period</TableHead>
+                            <TableHead className="hidden sm:table-cell">Due Date</TableHead>
+                            <TableHead className="text-center">Status</TableHead>
+                            <TableHead className="text-right">Amount (Birr)</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {paginatedBills.map(bill => {
+                               const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                               return (
+                                <TableRow key={bill.id}>
+                                    <TableCell className="font-medium">{format(parseISO(bill.billDate), 'MMMM yyyy')}</TableCell>
+                                    <TableCell className="hidden sm:table-cell">{format(parseISO(bill.dueDate), 'PP')}</TableCell>
+                                    <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
+                                    <TableCell className="text-right text-xs">
+                                      <div className="font-semibold text-sm text-foreground">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                      <div className="text-muted-foreground">Rent: {Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                      {utilityTotal > 0 && <div className="text-muted-foreground">Utility: {utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
+                                      {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="text-destructive font-medium">Penalty: {Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                                            <Button size="sm" variant="outline" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
+                                            <Upload className="mr-2 h-4 w-4"/> Submit Proof
+                                            </Button>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                               )
+                            })}
+                        </TableBody>
+                        </Table>
+                    </div>
+                    <PaginationControls
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      itemsPerPage={itemsPerPage}
+                      onItemsPerPageChange={handleItemsPerPageChange}
+                      className="mt-4"
+                    />
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-sm">No bills have been generated for this agreement yet.</p>
+                )}
+              </CardContent>
+            </Card>
+          )
+      })}
 
       {/* Submit Proof Dialog */}
       <Dialog open={isProofDialogOpen} onOpenChange={setIsProofDialogOpen}>
