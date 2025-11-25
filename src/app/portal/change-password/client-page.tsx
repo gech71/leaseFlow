@@ -15,7 +15,6 @@ import { Loader2, KeyRound, Lock, Eye, EyeOff } from 'lucide-react';
 import { changePassword } from './actions';
 
 const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, { message: "Temporary password is required." }),
   newPassword: z.string().min(6, { message: "New password must be at least 6 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.newPassword === data.confirmPassword, {
@@ -34,19 +33,18 @@ export function ChangePasswordClientPage({ isForcedChange }: ChangePasswordClien
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const form = useForm<ChangePasswordValues>({
     resolver: zodResolver(changePasswordSchema),
-    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
+    defaultValues: { newPassword: "", confirmPassword: "" }
   });
 
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
     try {
-      const result = await changePassword(values);
+      const result = await changePassword({ newPassword: values.newPassword });
       if (result.success) {
         toast({ title: "Success", description: "Your password has been changed. Please log in with your new password." });
         await logout();
@@ -74,24 +72,6 @@ export function ChangePasswordClientPage({ isForcedChange }: ChangePasswordClien
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleChangePasswordSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="currentPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Temporary Password</FormLabel>
-                  <div className="relative">
-                    <FormControl>
-                      <Input type={showCurrentPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
-                      {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </Button>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="newPassword"
