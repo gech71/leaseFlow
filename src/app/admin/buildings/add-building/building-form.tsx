@@ -1,6 +1,5 @@
 
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -198,7 +197,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
           connect: { id: currentUserId }
         }
       };
-      result = await callServerAction(createBuildingAction, buildingCreateInput);
+      result = await callServerAction('createBuildingAction', buildingCreateInput);
     } else {
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: values.name.trim(),
@@ -210,7 +209,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         },
       };
       const managerIds = Array.from(selectedManagerIds);
-      result = await callServerAction(updateBuildingAction, initialBuildingData?.id!, buildingUpdateInput, managerIds);
+      result = await callServerAction('updateBuildingAction', initialBuildingData?.id!, buildingUpdateInput, managerIds);
     }
 
     setIsSaving(false);

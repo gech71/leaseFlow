@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -84,13 +85,13 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
         body: JSON.stringify({ action: actionName, args: args }),
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
+        const result = await response.json().catch(() => ({ error: 'An unexpected server error occurred.' }));
         throw new Error(result.error || 'An unexpected server error occurred.');
       }
       
-      return result;
+      return await response.json();
+
     } catch (error: any) {
       console.error(`Client-side error calling server action '${actionName}':`, error);
       return {

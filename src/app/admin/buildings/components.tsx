@@ -1,6 +1,5 @@
 
 
-
 "use client"; 
 
 import { useState, useEffect } from 'react';
@@ -213,7 +212,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           return;
       }
       
-      const result = await callServerAction(toggleBuildingStatusAction, buildingId, newStatus);
+      const result = await callServerAction('toggleBuildingStatusAction', buildingId, newStatus);
       if (result.success) {
           toast({ title: "Status Updated", description: `Building status set to ${newStatus}.` });
           router.refresh();
