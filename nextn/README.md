@@ -61,6 +61,7 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
 # This key MUST be a 64-character hex string (32 bytes).
 JWT_SECRET_KEY=YOUR_64_CHARACTER_JWT_SECRET_KEY_HERE
 
+
 # --- General ---
 # Base URL of this application, used for constructing callback URLs
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
