@@ -15,10 +15,6 @@ interface PermissionContextType {
   isAuthenticated: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  callServerAction: <T extends (...args: any[]) => Promise<any>>(
-    actionName: string,
-    ...args: Parameters<T>
-  ) => Promise<Awaited<ReturnType<T>> | { success: false; error: string; }>;
 }
 
 const PermissionContext = createContext<PermissionContextType>({
@@ -30,7 +26,6 @@ const PermissionContext = createContext<PermissionContextType>({
   isAuthenticated: false,
   logout: async () => {},
   refreshUser: async () => {},
-  callServerAction: async () => ({ success: false, error: 'Context not ready' }),
 });
 
 export const usePermissions = () => useContext(PermissionContext);
@@ -51,7 +46,8 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
         const csrfToken = Cookies.get('nibrental_csrf_token');
         await fetch('/api/auth/logout', { 
             method: 'POST',
-            headers: {
+             headers: {
+                'Content-Type': 'application/json',
                 'x-csrf-token': csrfToken || '',
             }
         });
@@ -68,39 +64,6 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     // This function is likely no longer needed as data is fetched on the server.
     // Kept for potential manual refresh scenarios.
   }, []);
-
-  const callServerAction = useCallback(async <T extends (...args: any[]) => Promise<any>>(
-    actionName: string,
-    ...args: Parameters<T>
-  ): Promise<Awaited<ReturnType<T>> | { success: false; error: string; }> => {
-    const csrfToken = Cookies.get('nibrental_csrf_token');
-    
-    try {
-      const response = await fetch('/api/actions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrfToken || '',
-        },
-        body: JSON.stringify({ action: actionName, args: args }),
-      });
-
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({ error: 'An unexpected server error occurred.' }));
-        throw new Error(result.error || 'An unexpected server error occurred.');
-      }
-      
-      return await response.json();
-
-    } catch (error: any) {
-      console.error(`Client-side error calling server action '${actionName}':`, error);
-      return {
-        success: false,
-        error: error.message || 'An unexpected error occurred while communicating with the server.',
-      };
-    }
-  }, []);
-
 
   const effectivePermissions = useMemo(() => {
     if (!currentUser) return new Set<string>();
@@ -133,7 +96,6 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     isAuthenticated,
     logout,
     refreshUser,
-    callServerAction,
   };
 
   return (

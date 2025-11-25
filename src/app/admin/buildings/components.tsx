@@ -158,7 +158,7 @@ function BuildingCard({ building, onStatusToggle, canEdit, canViewDetails }: Bui
 export function BuildingsClientPage({ initialBuildings }: { initialBuildings: BuildingWithPenaltyTiers[] }) {
   const [buildings, setBuildings] = useState<BuildingWithPenaltyTiers[]>(initialBuildings);
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin, callServerAction } = usePermissions(); 
+  const { hasPermission, isSuperAdmin } = usePermissions(); 
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -212,7 +212,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           return;
       }
       
-      const result = await callServerAction('toggleBuildingStatusAction', buildingId, newStatus);
+      const result = await toggleBuildingStatusAction(buildingId, newStatus);
       if (result.success) {
           toast({ title: "Status Updated", description: `Building status set to ${newStatus}.` });
           router.refresh();

@@ -68,7 +68,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
   const router = useRouter();
   const searchParams = useSearchParams(); 
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin, callServerAction } = usePermissions(); 
+  const { hasPermission, isSuperAdmin } = usePermissions(); 
 
   const isViewOnlyMode = searchParams.get('view') === 'true';
   
@@ -181,11 +181,6 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
 
     let result;
     if (formMode === 'add') {
-      if (!currentUserId) {
-        toast({ title: "Error", description: "Could not identify the current user to assign as manager.", variant: "destructive" });
-        setIsSaving(false);
-        return;
-      }
       const buildingCreateInput: Prisma.BuildingCreateInput = {
         name: values.name.trim(),
         address: values.address.trim(),
@@ -193,11 +188,8 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
         },
-        managers: {
-          connect: { id: currentUserId }
-        }
       };
-      result = await callServerAction('createBuildingAction', buildingCreateInput);
+      result = await createBuildingAction(buildingCreateInput);
     } else {
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: values.name.trim(),
@@ -209,7 +201,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         },
       };
       const managerIds = Array.from(selectedManagerIds);
-      result = await callServerAction('updateBuildingAction', initialBuildingData?.id!, buildingUpdateInput, managerIds);
+      result = await updateBuildingAction(initialBuildingData?.id!, buildingUpdateInput, managerIds);
     }
 
     setIsSaving(false);
