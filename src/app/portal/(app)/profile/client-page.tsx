@@ -1,10 +1,9 @@
 
-
 "use client";
 
 import React, { useState } from 'react';
 import { usePermissions } from '@/contexts/PermissionContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,9 +12,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { changePassword } from './actions';
-import { useRouter } from 'next/navigation';
+import type { Tenant } from '@prisma/client';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
@@ -28,11 +27,18 @@ const changePasswordSchema = z.object({
 
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
-export function AdminProfileClientPage() {
-  const { currentUser, isLoading: isUserLoading, logout, handleApiCall } = usePermissions();
+interface TenantProfileClientPageProps {
+    initialTenant: (Omit<Tenant, "createdAt" | "updatedAt"> & {
+        createdAt: string;
+        updatedAt: string;
+    }) | null;
+    error?: string | null;
+}
+
+export function TenantProfileClientPage({ initialTenant, error }: TenantProfileClientPageProps) {
+  const { logout, handleApiCall } = usePermissions();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  const router = useRouter();
 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -52,7 +58,7 @@ export function AdminProfileClientPage() {
       if (result.success) {
           toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
           form.reset();
-          await logout(); // Use the logout function from context
+          await logout();
       } else {
           toast({ title: "Error", description: result.error, variant: "destructive" });
       }
@@ -63,15 +69,20 @@ export function AdminProfileClientPage() {
   };
 
 
-  if (isUserLoading || !currentUser) {
+  if (error) {
+    return <Card><CardContent><p className='text-destructive p-4'>{error}</p></CardContent></Card>
+  }
+  
+  if (!initialTenant) {
     return (
       <Card>
         <CardContent className="p-6 flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className='flex items-center gap-2'><AlertCircle className='text-destructive'/>Could not load tenant information.</p>
         </CardContent>
       </Card>
     );
   }
+
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -83,19 +94,15 @@ export function AdminProfileClientPage() {
         <CardContent className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
-            <Input id="name" value={currentUser.name || ''} readOnly disabled />
+            <Input id="name" value={initialTenant.name || ''} readOnly disabled />
           </div>
           <div className="space-y-1">
             <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
-            <Input id="email" value={currentUser.email || ''} readOnly disabled />
+            <Input id="email" value={initialTenant.email || ''} readOnly disabled />
           </div>
            <div className="space-y-1">
             <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>
-            <Input id="phone" value={currentUser.phoneNumber || 'N/A'} readOnly disabled />
-          </div>
-           <div className="space-y-1">
-            <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
-            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
+            <Input id="phone" value={initialTenant.phone || 'N/A'} readOnly disabled />
           </div>
         </CardContent>
       </Card>
