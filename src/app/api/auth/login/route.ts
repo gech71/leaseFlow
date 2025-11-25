@@ -1,8 +1,7 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { databaseService } from '@/lib/services/databaseService';
 import bcrypt from 'bcryptjs';
-import { createSession, createUserPayload } from '@/lib/auth/jwt';
+import { createSession, createUserPayload, CSRF_TOKEN_COOKIE_NAME, ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
 import { rateLimiter } from '@/lib/auth/rate-limiter';
 import type { User, Role, Building } from '@prisma/client';
 
@@ -14,7 +13,7 @@ async function checkRateLimit(identifier: string) {
 export async function POST(request: NextRequest) {
   // --- CSRF Protection ---
   const csrfTokenFromHeader = request.headers.get('x-csrf-token');
-  const csrfTokenFromCookie = request.cookies.get('nibrental_csrf_token')?.value;
+  const csrfTokenFromCookie = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
 
   if (!csrfTokenFromHeader || !csrfTokenFromCookie || csrfTokenFromHeader !== csrfTokenFromCookie) {
     return NextResponse.json({ message: "Invalid CSRF token." }, { status: 403 });
@@ -86,9 +85,15 @@ export async function POST(request: NextRequest) {
     // On successful login, create the session (both access and refresh tokens)
     const payload = createUserPayload(user as User & { roles: Role[] });
     payload.forceChangePass = forceChangePass; // Ensure flag is set correctly
-    await createSession(payload);
+    const { accessToken, refreshToken } = await createSession(payload);
 
-    return NextResponse.json({ message: "Login successful" }, { status: 200 });
+    const response = NextResponse.json({ message: "Login successful" }, { status: 200 });
+
+    // Set cookies on the response
+    response.cookies.set(accessToken.name, accessToken.value, accessToken.options);
+    response.cookies.set(refreshToken.name, refreshToken.value, refreshToken.options);
+
+    return response;
 
   } catch (error) {
     console.error("Login API Error:", error);

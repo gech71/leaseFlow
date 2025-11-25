@@ -1,6 +1,5 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
-import { verifySession } from '@/lib/auth/jwt';
+import { verifySession, ACCESS_TOKEN_COOKIE_NAME, CSRF_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
 import { PERMISSION_MAP } from '@/lib/auth-utils';
 import { nanoid } from 'nanoid';
 
@@ -18,8 +17,6 @@ const ORDERED_ADMIN_PAGES = [
 ];
 
 const PUBLIC_ROUTES = ['/login', '/portal/connect', '/portal/cancel', '/portal/error', '/api/portal/payment-callback', '/api/portal/Arifcallback' ];
-const CSRF_TOKEN_COOKIE_NAME = 'nibrental_csrf_token';
-
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -52,7 +49,8 @@ export async function middleware(request: NextRequest) {
   }
   
   // Verify session for all other routes
-  const session = await verifySession();
+  const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(accessToken);
   
   if (!session) {
     // For protected routes, redirect to login

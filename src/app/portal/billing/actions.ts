@@ -1,4 +1,3 @@
-
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -9,11 +8,13 @@ import type {
   Role,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { verifySession } from "@/lib/auth/jwt";
+import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
 import crypto from "crypto";
+import { cookies } from "next/headers";
 
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const session = await verifySession();
+  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(token);
   if (session?.userId) {
     const user = await databaseService.getUserById(session.userId, {
       roles: true,

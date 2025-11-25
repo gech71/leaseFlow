@@ -1,12 +1,11 @@
-
 'use server';
 import 'server-only';
-import { verifySession } from '@/lib/auth/jwt';
+import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
 import { databaseService } from '@/lib/services/databaseService';
 import type { User, Role } from '@prisma/client';
 import { redirect } from 'next/navigation';
 import type { CurrentUser } from '@/lib/types';
-import Cookies from 'js-cookie';
+import { cookies } from 'next/headers';
 
 /**
  * A server-side helper to get the fully authenticated user object, their permissions,
@@ -14,9 +13,11 @@ import Cookies from 'js-cookie';
  * @returns {Promise<{currentUser: User & { roles: Role[] }, isSuperAdmin: boolean, permissions: Set<string>}>}
  */
 export async function getUserAndPermissions() {
-    const session = await verifySession();
+    const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+    const session = await verifySession(token);
     if (!session?.userId) {
-        redirect('/login');
+        // Instead of redirecting, which causes issues with server actions, we throw a specific error.
+        throw new Error("Authentication required. Please log in again.");
     }
 
     const currentUser = await databaseService.getUserById(session.userId, {
@@ -25,7 +26,7 @@ export async function getUserAndPermissions() {
     
     if (!currentUser) {
         console.error(`CRITICAL: Authenticated user with id ${session.userId} not found in the database.`);
-        redirect('/login');
+        throw new Error("Authentication failed: User not found.");
     }
 
     const isSuperAdmin = session.isSuperAdmin;
@@ -41,9 +42,10 @@ export async function getUserAndPermissions() {
  * @returns {Promise<{currentUser: User, isSuperAdmin: boolean, managedBuildingIds: string[] | null}>}
  */
 export async function getUserAndManagedIds() {
-    const session = await verifySession();
-    if (!session?.userId) {
-        redirect('/login');
+    const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+    const session = await verifySession(token);
+     if (!session?.userId) {
+        throw new Error("Authentication required. Please log in again.");
     }
 
     const currentUser = await databaseService.getUserById(session.userId, {
@@ -53,7 +55,7 @@ export async function getUserAndManagedIds() {
 
     if (!currentUser) {
         console.error(`CRITICAL: Authenticated user with id ${session.userId} not found in the database.`);
-        redirect('/login');
+        throw new Error("Authentication failed: User not found.");
     }
 
     const isSuperAdmin = session.isSuperAdmin;
@@ -83,7 +85,8 @@ export async function getUserSessionAction(): Promise<{
   user: CurrentUser | null;
 }> {
   try {
-    const session = await verifySession();
+    const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+    const session = await verifySession(token);
 
     if (!session?.userId) {
       return { isSuccess: false, user: null };

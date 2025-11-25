@@ -1,33 +1,23 @@
-
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
 import type {
-  Agreement as AgreementPrisma,
   User,
   Role,
-  Prisma,
-  Building,
-  Space,
-  Tenant,
-  Bill,
-  BuildingMonthlyUtilities,
-  PenaltyTier,
-  AgreementTemplate,
-  ArifPayment
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
-import { verifySession, createSession } from '@/lib/auth/jwt';
+import { verifySession, createSession, ACCESS_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
 import { revalidatePath } from 'next/cache';
 import { nanoid } from "nanoid";
-import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import type { PortalAgreementWithRelations } from './dashboard/actions';
 
 
 // --- User Authentication Helper ---
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const session = await verifySession();
+  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(token);
   if (session?.userId) {
     const user = await databaseService.getUserById(session.userId, {
       roles: true,
@@ -47,7 +37,12 @@ export async function setPortalSessionAction(token: string) {
       permissions: ['portal:view'],
       forceChangePass: false,
     };
-    await createSession(payload);
+    
+    const { accessToken, refreshToken } = await createSession(payload);
+
+    cookies().set(accessToken.name, accessToken.value, accessToken.options);
+    cookies().set(refreshToken.name, refreshToken.value, refreshToken.options);
+
     return { success: true };
   } catch (error) {
     console.error("Error creating portal session:", error);

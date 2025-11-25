@@ -1,13 +1,14 @@
 import 'server-only';
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
-import { cookies } from 'next/headers';
+import type { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 import type { User, Role } from '@prisma/client';
 
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 // Define cookie names
-const ACCESS_TOKEN_COOKIE_NAME = 'nibrental_access_token';
-const REFRESH_TOKEN_COOKIE_NAME = 'nibrental_refresh_token';
+export const ACCESS_TOKEN_COOKIE_NAME = 'nibrental_access_token';
+export const REFRESH_TOKEN_COOKIE_NAME = 'nibrental_refresh_token';
+export const CSRF_TOKEN_COOKIE_NAME = 'nibrental_csrf_token';
 
 
 if (!JWT_SECRET_KEY || JWT_SECRET_KEY.length !== 64) {
@@ -33,11 +34,25 @@ export interface RefreshTokenPayload extends JWTPayload {
     userId: string;
 }
 
+interface GeneratedTokens {
+  accessToken: {
+    name: string;
+    value: string;
+    options: Omit<ResponseCookie, 'name' | 'value'>;
+  };
+  refreshToken: {
+    name: string;
+    value: string;
+    options: Omit<ResponseCookie, 'name' | 'value'>;
+  };
+}
+
 /**
- * Encrypts session payloads and sets them as secure, HttpOnly cookies.
+ * Encrypts session payloads and returns the tokens and their cookie options.
  * @param payload - The user session data to encrypt.
+ * @returns {Promise<GeneratedTokens>} An object containing access and refresh tokens and their respective cookie options.
  */
-export async function createSession(payload: Omit<SessionPayload, keyof JWTPayload>) {
+export async function createSession(payload: Omit<SessionPayload, keyof JWTPayload>): Promise<GeneratedTokens> {
   // Create Access Token (short-lived)
   const accessTokenExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
   const accessToken = await new SignJWT(payload)
@@ -45,14 +60,6 @@ export async function createSession(payload: Omit<SessionPayload, keyof JWTPaylo
     .setIssuedAt()
     .setExpirationTime(accessTokenExpires)
     .sign(key);
-
-  cookies().set(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
-    expires: accessTokenExpires,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    sameSite: 'lax',
-  });
 
   // Create Refresh Token (long-lived)
   const refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -65,25 +72,37 @@ export async function createSession(payload: Omit<SessionPayload, keyof JWTPaylo
     .setExpirationTime(refreshTokenExpires)
     .sign(key);
 
-  cookies().set(REFRESH_TOKEN_COOKIE_NAME, refreshToken, {
-    expires: refreshTokenExpires,
+  const commonCookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    sameSite: 'lax',
-  });
+    sameSite: 'lax' as const,
+  };
+
+  return {
+    accessToken: {
+      name: ACCESS_TOKEN_COOKIE_NAME,
+      value: accessToken,
+      options: { ...commonCookieOptions, expires: accessTokenExpires },
+    },
+    refreshToken: {
+      name: REFRESH_TOKEN_COOKIE_NAME,
+      value: refreshToken,
+      options: { ...commonCookieOptions, expires: refreshTokenExpires },
+    },
+  };
 }
+
 
 /**
  * Verifies the access token from the cookie and returns its payload.
  * @returns {Promise<SessionPayload | null>} The session payload or null if invalid.
  */
-export async function verifySession(): Promise<SessionPayload | null> {
-  const cookie = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
-  if (!cookie) return null;
+export async function verifySession(token: string | undefined): Promise<SessionPayload | null> {
+  if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(cookie, key, {
+    const { payload } = await jwtVerify(token, key, {
       algorithms: ['HS256'],
     });
     return payload as SessionPayload;
@@ -97,12 +116,11 @@ export async function verifySession(): Promise<SessionPayload | null> {
  * Verifies the refresh token from the cookie and returns its payload.
  * @returns {Promise<RefreshTokenPayload | null>} The refresh token payload or null if invalid.
  */
-export async function verifyRefreshToken(): Promise<RefreshTokenPayload | null> {
-    const cookie = cookies().get(REFRESH_TOKEN_COOKIE_NAME)?.value;
-    if (!cookie) return null;
+export async function verifyRefreshToken(token: string | undefined): Promise<RefreshTokenPayload | null> {
+    if (!token) return null;
     
     try {
-        const { payload } = await jwtVerify(cookie, key, {
+        const { payload } = await jwtVerify(token, key, {
             algorithms: ['HS256'],
         });
         return payload as RefreshTokenPayload;
@@ -114,12 +132,11 @@ export async function verifyRefreshToken(): Promise<RefreshTokenPayload | null> 
 
 
 /**
- * Deletes the session cookies.
+ * Returns an array of cookie names that should be deleted for logout.
+ * @returns {string[]}
  */
-export async function deleteSession() {
-  cookies().delete(ACCESS_TOKEN_COOKIE_NAME);
-  cookies().delete(REFRESH_TOKEN_COOKIE_NAME);
-  cookies().delete('nibrental_csrf_token'); // Also clear the CSRF token
+export function getSessionCookieNames(): string[] {
+  return [ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME, CSRF_TOKEN_COOKIE_NAME];
 }
 
 /**

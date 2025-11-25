@@ -1,10 +1,10 @@
-
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { verifySession, deleteSession } from '@/lib/auth/jwt';
+import { verifySession, getSessionCookieNames, ACCESS_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
+import { cookies } from "next/headers";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string(),
@@ -12,7 +12,8 @@ const changePasswordSchema = z.object({
 });
 
 export async function changePassword(values: z.infer<typeof changePasswordSchema>): Promise<{ success: boolean; error?: string }> {
-  const sessionUser = await verifySession();
+  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const sessionUser = await verifySession(token);
   if (!sessionUser) {
     throw new Error("Authentication required.");
   }
@@ -40,7 +41,10 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
   });
 
   // Invalidate the user's session by deleting the cookie
-  await deleteSession();
+  const cookieNames = getSessionCookieNames();
+  cookieNames.forEach(name => {
+      cookies().set(name, '', { expires: new Date(0), path: '/' });
+  });
 
   return { success: true };
 }
