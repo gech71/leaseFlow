@@ -47,7 +47,13 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
 
   const logout = async () => {
     try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        const csrfToken = Cookies.get('nibrental_csrf_token');
+        await fetch('/api/auth/logout', { 
+            method: 'POST',
+            headers: {
+                'x-csrf-token': csrfToken || '',
+            }
+        });
     } catch (error) {
         console.error("Logout request failed:", error);
     } finally {
