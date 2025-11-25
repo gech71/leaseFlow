@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -36,7 +37,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createTenantAction, updateTenantAction, toggleTenantStatusAction, findUserByPhoneAction } from './actions';
+import { createTenantAction, updateTenantAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
@@ -141,8 +142,8 @@ export function TenantsClientPage({
   });
 
   const filteredTenants = tenants.map(tenant => {
-    // A tenant is considered "Active" if they have at least one agreement that is not 'Canceled'.
-    const isTenantActive = tenant.agreements.some(ag => ag.status !== 'Canceled');
+    // A tenant is considered "Active" if they have no agreements OR at least one agreement that is not 'Canceled'.
+    const isTenantActive = tenant.agreements.length === 0 || tenant.agreements.some(ag => ag.status !== 'Canceled');
 
     return { ...tenant, isTenantActive };
   }).filter(tenant => {
