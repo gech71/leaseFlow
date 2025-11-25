@@ -212,7 +212,7 @@ export class DatabaseService {
     month: number, 
     year: number, 
     include?: Prisma.BuildingMonthlyUtilitiesInclude
-  ): Promise<BuildingMonthlyUtilities | null> {
+  ): Promise<(BuildingMonthlyUtilities & { utilities: any[] }) | null> {
     return prisma.buildingMonthlyUtilities.findFirst({ 
       where: { buildingId, month, year }, 
       include 
@@ -414,7 +414,7 @@ export class DatabaseService {
     where?: Prisma.AgreementTemplateWhereInput;
     orderBy?: Prisma.AgreementTemplateOrderByWithRelationInput | Prisma.AgreementTemplateOrderByWithRelationInput[];
     select?: Prisma.AgreementTemplateSelect;
-  }): Promise<AgreementTemplate[]> {
+  }): Promise<any[]> {
     return prisma.agreementTemplate.findMany(params as any);
   }
 
