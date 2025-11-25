@@ -34,10 +34,18 @@ const penaltyRuleSchema = z.object({
   scope: z.enum(['Building', 'Floor', 'SpecificSpaces']),
   applicableFloor: z.string().optional().nullable(),
   applicableSpaceIdNamesStr: z.string().optional().nullable(),
-}).refine(data => data.toDay === null || data.toDay === undefined || data.fromDay <= data.toDay, {
+}).refine(data => {
+    // If toDay is not provided (null, undefined, or empty string from coerce), the rule is valid.
+    if (data.toDay == null || isNaN(data.toDay)) {
+        return true;
+    }
+    // If toDay is provided, it must be greater than or equal to fromDay.
+    return data.fromDay <= data.toDay;
+}, {
   message: "'To Day' must be greater than or equal to 'From Day'",
   path: ['toDay'],
 });
+
 
 const buildingFormSchema = z.object({
   name: z.string().min(2, "Building name must be at least 2 characters."),
