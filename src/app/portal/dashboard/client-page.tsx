@@ -205,21 +205,29 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {agreement.bills.map(bill => (
-                        <TableRow key={bill.id}>
-                            <TableCell className="font-medium">{format(parseISO(bill.billDate), 'MMMM yyyy')}</TableCell>
-                            <TableCell className="hidden sm:table-cell">{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                            <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
-                            <TableCell className="text-right font-mono">{Number(bill.totalAmount).toLocaleString()}</TableCell>
-                            <TableCell className="text-right">
-                                {(bill.status === 'Pending' || bill.status === 'Overdue') && (
-                                    <Button size="sm" variant="outline" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
-                                    <Upload className="mr-2 h-4 w-4"/> Submit Proof
-                                    </Button>
-                                )}
-                            </TableCell>
-                        </TableRow>
-                        ))}
+                        {agreement.bills.map(bill => {
+                           const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                           return (
+                            <TableRow key={bill.id}>
+                                <TableCell className="font-medium">{format(parseISO(bill.billDate), 'MMMM yyyy')}</TableCell>
+                                <TableCell className="hidden sm:table-cell">{format(parseISO(bill.dueDate), 'PP')}</TableCell>
+                                <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
+                                <TableCell className="text-right text-xs">
+                                  <div className="font-semibold text-sm text-foreground">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                  <div className="text-muted-foreground">Rent: {Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                  {utilityTotal > 0 && <div className="text-muted-foreground">Utility: {utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
+                                  {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="text-destructive font-medium">Penalty: {Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                                        <Button size="sm" variant="outline" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
+                                        <Upload className="mr-2 h-4 w-4"/> Submit Proof
+                                        </Button>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                           )
+                        })}
                     </TableBody>
                     </Table>
                 </div>
