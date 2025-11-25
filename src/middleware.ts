@@ -38,22 +38,23 @@ export async function middleware(request: NextRequest) {
   }
   // --- End CSRF Token Generation ---
   
-  const isApiRoute = pathname.startsWith('/api/');
-  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
-  
-  // If it's a public file, let it go
-  if (pathname.includes('.')) {
+  // Public files, such as images, should be ignored.
+  if (pathname.includes('.') && !pathname.startsWith('/api')) {
     return response;
   }
   
-  // Verify session for all non-public routes
+  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
+  const isApiAuthRoute = pathname.startsWith('/api/auth');
+
+  // Let public routes and API auth routes pass through without a session check.
+  if (isPublicRoute || isApiAuthRoute) {
+    return response;
+  }
+  
+  // Verify session for all other routes
   const session = await verifySession();
   
   if (!session) {
-    if (isPublicRoute) {
-      return response; // Allow access to public routes
-    }
-    
     // For protected routes, redirect to login
     let from = pathname;
     if (request.nextUrl.search) {
@@ -68,14 +69,6 @@ export async function middleware(request: NextRequest) {
   }
   
   // --- If session exists ---
-
-  // If user is authenticated and tries to access login page, redirect them
-  if (pathname === '/login' || pathname === '/') {
-      const userPermissions = new Set(session.permissions);
-      const isTenant = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
-      const redirectUrl = isTenant ? '/portal/dashboard' : '/admin/dashboard';
-      return NextResponse.redirect(new URL(redirectUrl, request.url));
-  }
 
   // Handle forced password change
   if (session.forceChangePass && !pathname.startsWith('/portal/change-password')) {
