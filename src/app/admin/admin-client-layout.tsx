@@ -75,6 +75,7 @@ const allNavItems: NavItem[] = [
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, permission: 'building_utility:view' },
   { href: '/admin/billing', label: 'Billing', icon: Banknote, permission: 'billing:view' },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, permission: 'payment_overview:view' },
+  { href: '/admin/import', label: 'Import Data', icon: UploadCloud, permission: 'import:manage' },
   { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings:user_management:view' }, // Generic settings permission
 ];
 
@@ -112,7 +113,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const availableNavItems = allNavItems.filter(item => {
     // A special check for the generic settings link
     if (item.href === '/admin/settings') {
-      return isSuperAdmin || hasPermission('settings:user_management:view') || hasPermission('settings:role_management:view') || hasPermission('settings:agreement_templates:manage');
+      return isSuperAdmin || hasPermission('settings:user_management:view') || hasPermission('settings:role_management:view') || hasPermission('settings:agreement_templates:manage') || hasPermission('import:manage');
     }
     return isSuperAdmin || hasPermission(item.permission);
   });
@@ -234,44 +235,18 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
 }
 
 export default function AdminClientLayout({ children }: { children: React.ReactNode }) {
-  const { currentUser, isLoading, isAuthenticated, hasAnyPermission } = usePermissions();
+  const { isLoading, isAuthenticated } = usePermissions();
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return; // Wait until loading is complete
+    if (isLoading) return;
 
     if (!isAuthenticated) {
       router.replace('/login');
-      return;
     }
-    
-    // Once authenticated, check roles
-    if (currentUser) {
-      const isTenantOnly = currentUser.roles.length === 1 && currentUser.roles[0].name === 'TENANT';
-      if (isTenantOnly) {
-        router.replace('/portal/dashboard');
-        return;
-      }
-      
-      const hasAnyAdminPermissions = currentUser.effectivePermissions && currentUser.effectivePermissions.some(p => p !== 'portal:view');
-      if (!hasAnyAdminPermissions) {
-        // Instead of replacing, just log out the user, which will take them to login with an error
-        router.replace('/login?error=' + encodeURIComponent('You do not have permissions to access the admin panel.'));
-      }
-    }
-    
-  }, [isAuthenticated, isLoading, currentUser, router, hasAnyPermission]);
+  }, [isAuthenticated, isLoading, router]);
 
   if (isLoading || !isAuthenticated) {
-    return (
-      <div className="flex justify-center items-center h-screen w-screen">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // If user is authenticated but doesn't have the final currentUser object yet, or is being redirected, show loader.
-  if (!currentUser) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
