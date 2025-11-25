@@ -8,6 +8,7 @@ import type {
   Prisma,
   User,
   Role,
+  AgreementStatus,
 } from "@prisma/client";
 import { SpacesClientPage, type SpaceWithBuildingName } from "./components";
 import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
@@ -34,33 +35,43 @@ export default async function SpacesPage() {
       startDate: true,
       paymentTermMonths: true,
       spaceId: true,
+      tenantId: true, // Fetch tenantId to disconnect it
     },
   });
 
-  const spaceIdsToVacate: string[] = [];
+  const relationsToUpdate: { spaceId: string; tenantId: string }[] = [];
   for (const agreement of expiredAgreementsOnOccupiedSpaces) {
-    if (agreement.spaceId) {
+    if (agreement.spaceId && agreement.tenantId) {
       const agreementEndDate = addMonths(
         agreement.startDate,
         agreement.paymentTermMonths,
       );
       if (isBefore(agreementEndDate, today)) {
-        spaceIdsToVacate.push(agreement.spaceId);
+        relationsToUpdate.push({
+          spaceId: agreement.spaceId,
+          tenantId: agreement.tenantId,
+        });
       }
     }
   }
 
   // If we found any spaces to vacate, update them in a batch transaction.
-  if (spaceIdsToVacate.length > 0) {
-    await prisma.space.updateMany({
-      where: {
-        id: { in: spaceIdsToVacate },
-      },
-      data: {
-        isOccupied: false,
-        tenantId: null, // Disconnect the tenant from the space
-      },
-    });
+  if (relationsToUpdate.length > 0) {
+    const spaceIdsToVacate = relationsToUpdate.map(r => r.spaceId);
+    const tenantIdsToUpdate = relationsToUpdate.map(r => r.tenantId);
+
+    await prisma.$transaction([
+      // Set the space as not occupied
+      prisma.space.updateMany({
+        where: { id: { in: spaceIdsToVacate } },
+        data: { isOccupied: false },
+      }),
+      // Disconnect the tenant from their rented space
+      prisma.tenant.updateMany({
+        where: { id: { in: tenantIdsToUpdate } },
+        data: { rentedSpaceId: null },
+      }),
+    ]);
   }
   // --- End Automatic Logic ---
 
