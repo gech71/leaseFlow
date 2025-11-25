@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from 'next/cache';
@@ -23,10 +24,13 @@ export async function getAllRolesAction(): Promise<{ success: boolean, roles?: R
     // Non-super-admins only see roles they have created, and not the system defaults.
     if (!isSuperAdmin) {
       whereClause = { 
+        OR: [
+          { name: 'TENANT' },
+          { createdById: currentUser.id }
+        ],
         name: {
-            notIn: ['SUPER_ADMIN', 'TENANT']
-        },
-        createdById: currentUser.id 
+          not: 'SUPER_ADMIN'
+        }
       };
     }
     
