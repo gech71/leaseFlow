@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import jsPDF from 'jspdf';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface TenantDashboardClientPageProps {
   initialData: TenantPortalData;
@@ -148,6 +149,27 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
       default: return <Badge variant="secondary">{status}</Badge>;
     }
   };
+  
+  const handleDownloadAgreement = (agreement: PortalAgreementWithRelations) => {
+    if (!agreement || !agreement.agreementText) {
+      toast({ title: "Cannot Download", description: "Agreement text is empty or not available.", variant: "destructive"});
+      return;
+    }
+    
+    const doc = new jsPDF();
+    doc.html(agreement.agreementText, {
+      callback: function (doc) {
+        const tenantName = agreement.tenant?.name || 'UnknownTenant';
+        const safeTenantName = sanitizeFilename(tenantName);
+        doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+        toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
+      },
+      x: 15,
+      y: 15,
+      width: 170, // A4 width in mm minus margins
+      windowWidth: 650 // An arbitrary number that works well for scaling
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -183,11 +205,9 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                         Building: {agreement.space.building.name}
                         </CardDescription>
                     </div>
-                     <Link href={`/portal/agreements/${agreement.id}`} passHref>
-                        <Button variant="outline" size="sm">
-                          <FileText className="mr-2 h-4 w-4"/> View Details
-                        </Button>
-                      </Link>
+                     <Button variant="outline" size="sm" onClick={() => handleDownloadAgreement(agreement)}>
+                          <Download className="mr-2 h-4 w-4"/> Download Agreement
+                      </Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -210,14 +230,17 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                     </div>
                 </div>
 
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-                  <StatCard title="Total Due" value={`${totalDue.toLocaleString()} Birr`} icon={Banknote} description="Pending and overdue bills" />
-                  <StatCard title="Overdue Bills" value={overdueBills.length} icon={AlertCircle} description="Require immediate attention" />
-                  <StatCard title="Upcoming Bills" value={pendingBills.length} icon={Clock} description="Not yet overdue" />
-                  <StatCard title="Total Agreements" value={agreements.length} icon={FileText} description="Active agreements" />
+                <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Full Agreement Text</h3>
+                    <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-secondary/30"> 
+                        <div 
+                            className="prose prose-sm dark:prose-invert max-w-none" 
+                            dangerouslySetInnerHTML={{ __html: agreement.agreementText }} 
+                        />
+                    </ScrollArea>
                 </div>
-                
-                <h3 className="font-semibold mb-2">Billing History</h3>
+
+                <h3 className="font-semibold mb-2 mt-8 border-t pt-6">Billing History</h3>
                 {agreement.bills.length > 0 ? (
                   <>
                     <div className="border rounded-lg overflow-hidden md:block hidden">
