@@ -20,6 +20,7 @@ export default async function SpacesPage() {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
   
   // --- Automatic Space Vacating Logic ---
+  // This logic now runs first to prevent race conditions.
   const today = startOfDay(new Date());
   // Find agreements that are now expired but their spaces are still marked as occupied.
   const expiredAgreementsOnOccupiedSpaces = await prisma.agreement.findMany({
@@ -58,21 +59,26 @@ export default async function SpacesPage() {
 
   // If we found any spaces to vacate, update them in a batch transaction.
   if (relationsToUpdate.length > 0) {
-    const spaceIdsToVacate = relationsToUpdate.map(r => r.spaceId);
-    const tenantIdsToUpdate = relationsToUpdate.map(r => r.tenantId);
+    const spaceIdsToVacate = [...new Set(relationsToUpdate.map(r => r.spaceId))];
+    const tenantIdsToUpdate = [...new Set(relationsToUpdate.map(r => r.tenantId))];
 
-    await prisma.$transaction([
-      // Set the space as not occupied
-      prisma.space.updateMany({
-        where: { id: { in: spaceIdsToVacate } },
-        data: { isOccupied: false },
-      }),
-      // Disconnect the tenant from their rented space
-      prisma.tenant.updateMany({
-        where: { id: { in: tenantIdsToUpdate } },
-        data: { rentedSpaceId: null },
-      }),
-    ]);
+    try {
+        await prisma.$transaction([
+          // Set the space as not occupied
+          prisma.space.updateMany({
+            where: { id: { in: spaceIdsToVacate } },
+            data: { isOccupied: false },
+          }),
+          // Disconnect the tenant from their rented space
+          prisma.tenant.updateMany({
+            where: { id: { in: tenantIdsToUpdate }, rentedSpaceId: { in: spaceIdsToVacate } },
+            data: { rentedSpaceId: null },
+          }),
+        ]);
+    } catch(e) {
+        console.error("Error during automatic space vacating transaction:", e);
+        // Log the error but don't block page render.
+    }
   }
   // --- End Automatic Logic ---
 
