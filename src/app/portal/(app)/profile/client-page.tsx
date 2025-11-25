@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -28,7 +29,7 @@ const changePasswordSchema = z.object({
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
 export function AdminProfileClientPage() {
-  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
+  const { currentUser, isLoading: isUserLoading, logout, handleApiCall } = usePermissions();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
@@ -45,8 +46,9 @@ export function AdminProfileClientPage() {
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
     try {
-      const result = await changePassword(values);
-
+      const result = await handleApiCall(() => changePassword(values));
+      if (!result) return;
+      
       if (result.success) {
           toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
           form.reset();

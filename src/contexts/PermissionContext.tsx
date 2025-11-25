@@ -6,6 +6,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import type { CurrentUser } from '@/lib/types';
 import Cookies from 'js-cookie'; 
 import { getUserSessionAction } from '@/lib/actions/server-helpers';
+import { useToast } from '@/hooks/use-toast';
 
 interface PermissionContextType {
   currentUser: CurrentUser | null;
@@ -16,6 +17,7 @@ interface PermissionContextType {
   isAuthenticated: boolean;
   logout: (sessionExpired?: boolean) => Promise<void>;
   refreshUser: () => Promise<void>;
+  handleApiCall: <T>(apiCall: () => Promise<T>) => Promise<T | undefined>;
 }
 
 const PermissionContext = createContext<PermissionContextType>({
@@ -27,6 +29,7 @@ const PermissionContext = createContext<PermissionContextType>({
   isAuthenticated: false,
   logout: async () => {},
   refreshUser: async () => {},
+  handleApiCall: async (apiCall) => apiCall(),
 });
 
 export const usePermissions = () => useContext(PermissionContext);
@@ -35,6 +38,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { toast } = useToast();
   
   const logout = useCallback(async (sessionExpired = false) => {
     try {
@@ -63,15 +67,29 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, []);
 
+  const handleApiCall = useCallback(async <T>(apiCall: () => Promise<T>): Promise<T | undefined> => {
+    try {
+      return await apiCall();
+    } catch (error: any) {
+      if (error.message?.includes("Authentication required") || error.message?.includes("Session expired")) {
+        await logout(true);
+        return undefined;
+      }
+      // Re-throw other errors to be handled by the component
+      throw error;
+    }
+  }, [logout]);
+
+
   const refreshUser = useCallback(async () => {
-    setIsLoading(true);
+    // No need to set loading to true here, as it's for background refreshes or initial load.
+    // The initial `isLoading` state is true by default.
     try {
       const { isSuccess, user } = await getUserSessionAction();
       if (isSuccess && user) {
         setCurrentUser(user);
         setIsAuthenticated(true);
       } else {
-        // If the session fetch fails, it means the user is not authenticated.
         setCurrentUser(null);
         setIsAuthenticated(false);
       }
@@ -119,6 +137,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     isAuthenticated,
     logout,
     refreshUser,
+    handleApiCall,
   };
 
   return (

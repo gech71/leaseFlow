@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -29,7 +30,7 @@ interface ChangePasswordClientPageProps {
 }
 
 export function ChangePasswordClientPage({ isForcedChange }: ChangePasswordClientPageProps) {
-  const { logout } = usePermissions();
+  const { logout, handleApiCall } = usePermissions();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -44,7 +45,9 @@ export function ChangePasswordClientPage({ isForcedChange }: ChangePasswordClien
   const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
     setIsSaving(true);
     try {
-      const result = await changePassword({ newPassword: values.newPassword });
+      const result = await handleApiCall(() => changePassword({ newPassword: values.newPassword }));
+      if (!result) return;
+      
       if (result.success) {
         toast({ title: "Success", description: "Your password has been changed. Please log in with your new password." });
         await logout();
