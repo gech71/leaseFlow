@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { submitPaymentProofAction, sendContactEmailAction } from './actions';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
 
 interface TenantDashboardClientPageProps {
   initialData: TenantPortalData;
