@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { TenantPortalData, PortalAgreementWithRelations } from './actions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,23 +21,12 @@ import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import jsPDF from 'jspdf';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 interface TenantDashboardClientPageProps {
   initialData: TenantPortalData;
 }
-
-const StatCard = ({ title, value, icon: Icon, description }: { title: string, value: string | number, icon: React.ElementType, description: string }) => (
-    <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-            <Icon className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-            <div className="text-2xl font-bold">{value}</div>
-            <p className="text-xs text-muted-foreground">{description}</p>
-        </CardContent>
-    </Card>
-);
 
 const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
@@ -51,6 +40,7 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
 
   const [agreements, setAgreements] = useState(initialData.agreements || []);
   const [error, setError] = useState(initialData.error || null);
+  const [selectedAgreementId, setSelectedAgreementId] = useState<string | null>(null);
 
   const [isProofDialogOpen, setIsProofDialogOpen] = useState(false);
   const [selectedBillForProof, setSelectedBillForProof] = useState<any | null>(null);
@@ -60,6 +50,14 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  
+  useEffect(() => {
+      if (initialData.agreements && initialData.agreements.length > 0) {
+        setSelectedAgreementId(initialData.agreements[0].id);
+      }
+  }, [initialData.agreements]);
+  
+  const selectedAgreement = agreements.find(ag => ag.id === selectedAgreementId);
 
   const onDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -121,25 +119,6 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
     setCurrentPage(1); // Reset to first page when items per page changes
   };
 
-  if (error) {
-    return (
-      <Card className="w-full text-center py-10 border-destructive">
-        <CardHeader>
-          <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
-          <CardTitle className="mt-4">An Error Occurred</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-destructive-foreground">{error}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const allBills = agreements.flatMap(ag => ag.bills.map(b => ({ ...b, agreement: ag })));
-  const pendingBills = allBills.filter(b => b.status === 'Pending' && !isBefore(parseISO(b.dueDate), startOfDay(new Date())));
-  const overdueBills = allBills.filter(b => b.status === 'Overdue' || (b.status === 'Pending' && isBefore(parseISO(b.dueDate), startOfDay(new Date()))));
-  const totalDue = [...pendingBills, ...overdueBills].reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Paid': return <Badge variant="secondary"><CheckCircle className="mr-1 h-3 w-3 text-green-600"/>Paid</Badge>;
@@ -170,11 +149,23 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
       windowWidth: 650 // An arbitrary number that works well for scaling
     });
   };
+  
+  if (error) {
+    return (
+      <Card className="w-full text-center py-10 border-destructive">
+        <CardHeader>
+          <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
+          <CardTitle className="mt-4">An Error Occurred</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-destructive-foreground">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  return (
-    <div className="space-y-8">
-      
-      {agreements.length === 0 && !error && (
+  if (agreements.length === 0) {
+      return (
          <Card className="text-center py-10 shadow-sm">
           <CardContent>
             <Info className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
@@ -182,152 +173,175 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
             <p className="text-muted-foreground">There are no active agreements to display for your account.</p>
           </CardContent>
         </Card>
-      )}
+      );
+  }
+  
+  const paginatedBills = selectedAgreement?.bills.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+  ) || [];
+  const totalPages = selectedAgreement ? Math.ceil(selectedAgreement.bills.length / itemsPerPage) : 0;
 
-      {agreements.map(agreement => {
-          const totalPages = Math.ceil(agreement.bills.length / itemsPerPage);
-          const paginatedBills = agreement.bills.slice(
-            (currentPage - 1) * itemsPerPage,
-            currentPage * itemsPerPage
-          );
-          const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
 
-          return (
-            <Card key={agreement.id} className="shadow-lg">
-              <CardHeader>
-                <div className="flex justify-between items-start gap-4">
-                    <div>
-                        <CardTitle className="font-headline text-xl flex items-center gap-3">
-                        <Home className="text-primary"/>
-                        Agreement for {agreement.space.spaceIdName}
-                        </CardTitle>
-                        <CardDescription>
-                        Building: {agreement.space.building.name}
-                        </CardDescription>
-                    </div>
-                     <Button variant="outline" size="sm" onClick={() => handleDownloadAgreement(agreement)}>
-                          <Download className="mr-2 h-4 w-4"/> Download Agreement
-                      </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
-                    <div className="p-3 bg-secondary/30 rounded-md">
-                        <p className="text-xs font-medium text-muted-foreground">Start Date</p>
-                        <p className="font-semibold">{format(parseISO(agreement.startDate), 'PP')}</p>
-                    </div>
-                     <div className="p-3 bg-secondary/30 rounded-md">
-                        <p className="text-xs font-medium text-muted-foreground">End Date</p>
-                        <p className="font-semibold">{format(agreementEndDate, 'PP')}</p>
-                    </div>
-                     <div className="p-3 bg-secondary/30 rounded-md">
-                        <p className="text-xs font-medium text-muted-foreground">Term</p>
-                        <p className="font-semibold">{agreement.paymentTermMonths} months</p>
-                    </div>
-                    <div className="p-3 bg-secondary/30 rounded-md">
-                        <p className="text-xs font-medium text-muted-foreground">Monthly Rent</p>
-                        <p className="font-semibold">{Number(agreement.monthlyRentalPrice).toLocaleString()} Birr</p>
-                    </div>
-                </div>
+  return (
+    <div className="space-y-8">
+        <Card className="shadow-lg">
+            <CardHeader>
+                <Label htmlFor="agreement-select">Select an Agreement</Label>
+                 <Select value={selectedAgreementId || ''} onValueChange={setSelectedAgreementId}>
+                    <SelectTrigger id="agreement-select" className="w-full md:w-1/2 lg:w-1/3">
+                        <SelectValue placeholder="Choose an agreement..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {agreements.map(ag => (
+                            <SelectItem key={ag.id} value={ag.id}>
+                                Agreement for {ag.space.spaceIdName} ({ag.space.building.name})
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </CardHeader>
+        </Card>
 
-                <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Full Agreement Text</h3>
-                    <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-secondary/30"> 
-                        <div 
-                            className="prose prose-sm dark:prose-invert max-w-none" 
-                            dangerouslySetInnerHTML={{ __html: agreement.agreementText }} 
-                        />
-                    </ScrollArea>
-                </div>
+      {selectedAgreement ? (
+          <Card className="shadow-lg animate-fadeIn">
+            <CardHeader>
+              <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+                  <div>
+                      <CardTitle className="font-headline text-xl flex items-center gap-3">
+                      <Home className="text-primary"/>
+                      Agreement for {selectedAgreement.space.spaceIdName}
+                      </CardTitle>
+                      <CardDescription>
+                      Building: {selectedAgreement.space.building.name}
+                      </CardDescription>
+                  </div>
+                   <Button variant="outline" size="sm" onClick={() => handleDownloadAgreement(selectedAgreement)}>
+                        <Download className="mr-2 h-4 w-4"/> Download Agreement
+                    </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
+                  <div className="p-3 bg-secondary/30 rounded-md">
+                      <p className="text-xs font-medium text-muted-foreground">Start Date</p>
+                      <p className="font-semibold">{format(parseISO(selectedAgreement.startDate), 'PP')}</p>
+                  </div>
+                   <div className="p-3 bg-secondary/30 rounded-md">
+                      <p className="text-xs font-medium text-muted-foreground">End Date</p>
+                      <p className="font-semibold">{format(addMonths(parseISO(selectedAgreement.startDate), selectedAgreement.paymentTermMonths), 'PP')}</p>
+                  </div>
+                   <div className="p-3 bg-secondary/30 rounded-md">
+                      <p className="text-xs font-medium text-muted-foreground">Term</p>
+                      <p className="font-semibold">{selectedAgreement.paymentTermMonths} months</p>
+                  </div>
+                  <div className="p-3 bg-secondary/30 rounded-md">
+                      <p className="text-xs font-medium text-muted-foreground">Monthly Rent</p>
+                      <p className="font-semibold">{Number(selectedAgreement.monthlyRentalPrice).toLocaleString()} Birr</p>
+                  </div>
+              </div>
 
-                <h3 className="font-semibold mb-2 mt-8 border-t pt-6">Billing History</h3>
-                {agreement.bills.length > 0 ? (
-                  <>
-                    <div className="border rounded-lg overflow-hidden md:block hidden">
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                            <TableHead>Bill Period</TableHead>
-                            <TableHead>Due Date</TableHead>
-                            <TableHead className="text-center">Status</TableHead>
-                            <TableHead className="text-right">Amount (Birr)</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginatedBills.map(bill => {
-                               const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
-                               return (
-                                <TableRow key={bill.id}>
-                                    <TableCell className="font-medium">{format(parseISO(bill.billDate), 'MMMM yyyy')}</TableCell>
-                                    <TableCell>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
-                                    <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
-                                    <TableCell className="text-right text-xs">
-                                      <div className="font-semibold text-sm text-foreground">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                      <div className="text-muted-foreground">Rent: {Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                      {utilityTotal > 0 && <div className="text-muted-foreground">Utility: {utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
-                                      {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="text-destructive font-medium">Penalty: {Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
-                                            <Button size="sm" variant="outline" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
-                                            <Upload className="mr-2 h-4 w-4"/> Submit Proof
-                                            </Button>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                               )
-                            })}
-                        </TableBody>
-                        </Table>
-                    </div>
+              <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2 font-headline mt-4 border-t pt-4">Full Agreement Text</h3>
+                  <ScrollArea className="h-[250px] w-full rounded-md border p-4 bg-secondary/30"> 
+                      <div 
+                          className="prose prose-sm dark:prose-invert max-w-none" 
+                          dangerouslySetInnerHTML={{ __html: selectedAgreement.agreementText }} 
+                      />
+                  </ScrollArea>
+              </div>
 
-                    {/* Mobile Card View */}
-                    <div className="md:hidden space-y-4">
-                        {paginatedBills.map(bill => {
-                            const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
-                            return (
-                                <Card key={bill.id} className="border bg-secondary/30">
-                                    <CardContent className="p-4">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <div className="font-bold">{format(parseISO(bill.billDate), 'MMMM yyyy')}</div>
-                                            {getStatusBadge(bill.status)}
-                                        </div>
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between"><span className="text-muted-foreground">Due Date:</span> <span>{format(parseISO(bill.dueDate), 'PP')}</span></div>
-                                            {Number(bill.rentAmount) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Rent:</span> <span>{Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
-                                            {utilityTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Utilities:</span> <span>{utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
-                                            {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="flex justify-between text-destructive"><span className="font-medium">Penalty:</span> <span className="font-medium">{Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
-                                            <div className="border-t my-2"></div>
-                                            <div className="flex justify-between font-bold text-base"><span className="text-foreground">Total Due:</span> <span className="text-primary">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})} Birr</span></div>
-                                        </div>
-                                        {(bill.status === 'Pending' || bill.status === 'Overdue') && (
-                                            <Button size="sm" variant="outline" className="w-full mt-4" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
-                                                <Upload className="mr-2 h-4 w-4"/> Submit Payment Proof
-                                            </Button>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
-                    </div>
-                    
-                    <PaginationControls
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                      itemsPerPage={itemsPerPage}
-                      onItemsPerPageChange={handleItemsPerPageChange}
-                      className="mt-4"
-                    />
-                  </>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No bills have been generated for this agreement yet.</p>
-                )}
-              </CardContent>
-            </Card>
-          )
-      })}
+              <h3 className="font-semibold mb-2 mt-8 border-t pt-6">Billing History</h3>
+              {selectedAgreement.bills.length > 0 ? (
+                <>
+                  <div className="border rounded-lg overflow-hidden md:block hidden">
+                      <Table>
+                      <TableHeader>
+                          <TableRow>
+                          <TableHead>Bill Period</TableHead>
+                          <TableHead>Due Date</TableHead>
+                          <TableHead className="text-center">Status</TableHead>
+                          <TableHead className="text-right">Amount (Birr)</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {paginatedBills.map(bill => {
+                             const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                             return (
+                              <TableRow key={bill.id}>
+                                  <TableCell className="font-medium">{format(parseISO(bill.billDate), 'MMMM yyyy')}</TableCell>
+                                  <TableCell>{format(parseISO(bill.dueDate), 'PP')}</TableCell>
+                                  <TableCell className="text-center">{getStatusBadge(bill.status)}</TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    <div className="font-semibold text-sm text-foreground">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                    <div className="text-muted-foreground">Rent: {Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                    {utilityTotal > 0 && <div className="text-muted-foreground">Utility: {utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
+                                    {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="text-destructive font-medium">Penalty: {Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                      {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                                          <Button size="sm" variant="outline" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
+                                          <Upload className="mr-2 h-4 w-4"/> Submit Proof
+                                          </Button>
+                                      )}
+                                  </TableCell>
+                              </TableRow>
+                             )
+                          })}
+                      </TableBody>
+                      </Table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-4">
+                      {paginatedBills.map(bill => {
+                          const utilityTotal = bill.utilityBreakdown?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                          return (
+                              <Card key={bill.id} className="border bg-secondary/30">
+                                  <CardContent className="p-4">
+                                      <div className="flex justify-between items-center mb-3">
+                                          <div className="font-bold">{format(parseISO(bill.billDate), 'MMMM yyyy')}</div>
+                                          {getStatusBadge(bill.status)}
+                                      </div>
+                                      <div className="space-y-2 text-sm">
+                                          <div className="flex justify-between"><span className="text-muted-foreground">Due Date:</span> <span>{format(parseISO(bill.dueDate), 'PP')}</span></div>
+                                          {Number(bill.rentAmount) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Rent:</span> <span>{Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
+                                          {utilityTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Utilities:</span> <span>{utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
+                                          {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="flex justify-between text-destructive"><span className="font-medium">Penalty:</span> <span className="font-medium">{Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
+                                          <div className="border-t my-2"></div>
+                                          <div className="flex justify-between font-bold text-base"><span className="text-foreground">Total Due:</span> <span className="text-primary">{Number(bill.totalAmount).toLocaleString(undefined, {minimumFractionDigits: 2})} Birr</span></div>
+                                      </div>
+                                      {(bill.status === 'Pending' || bill.status === 'Overdue') && (
+                                          <Button size="sm" variant="outline" className="w-full mt-4" onClick={() => { setSelectedBillForProof(bill); setIsProofDialogOpen(true); }}>
+                                              <Upload className="mr-2 h-4 w-4"/> Submit Payment Proof
+                                          </Button>
+                                      )}
+                                  </CardContent>
+                              </Card>
+                          )
+                      })}
+                  </div>
+                  
+                  <PaginationControls
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                    className="mt-4"
+                  />
+                </>
+              ) : (
+                <p className="text-muted-foreground text-sm">No bills have been generated for this agreement yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+             <div className="flex justify-center items-center h-64">
+                <p className="text-muted-foreground">Please select an agreement to view details.</p>
+            </div>
+        )}
 
       {/* Submit Proof Dialog */}
       <Dialog open={isProofDialogOpen} onOpenChange={setIsProofDialogOpen}>
