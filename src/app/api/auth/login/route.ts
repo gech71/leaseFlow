@@ -11,6 +11,15 @@ async function checkRateLimit(identifier: string) {
 }
 
 export async function POST(request: NextRequest) {
+  // --- CSRF Protection ---
+  const csrfTokenFromHeader = request.headers.get('x-csrf-token');
+  const csrfTokenFromCookie = request.cookies.get('nibrental_csrf_token')?.value;
+
+  if (!csrfTokenFromHeader || !csrfTokenFromCookie || csrfTokenFromHeader !== csrfTokenFromCookie) {
+    return NextResponse.json({ message: "Invalid CSRF token." }, { status: 403 });
+  }
+  // --- End CSRF Protection ---
+
   try {
     const body = await request.json();
     const { phone, password } = body;

@@ -1,8 +1,7 @@
-
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifySession } from '@/lib/auth/jwt';
 import { PERMISSION_MAP } from '@/lib/auth-utils';
+import { nanoid } from 'nanoid';
 
 const ORDERED_ADMIN_PAGES = [
   "/admin/dashboard",
@@ -26,6 +25,19 @@ export async function middleware(request: NextRequest) {
   
   let response = NextResponse.next();
 
+  // --- CSRF Token Generation ---
+  // Generate a CSRF token if one doesn't exist. This will be attached to every response.
+  const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
+  if (!csrfToken) {
+    response.cookies.set(CSRF_TOKEN_COOKIE_NAME, nanoid(32), {
+      httpOnly: false, // Must be readable by client script
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
+    });
+  }
+  // --- End CSRF Token Generation ---
+
   // Allow public routes and auth API routes to pass through early
   const isApiAuthRoute = pathname.startsWith('/api/auth');
   const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
@@ -45,9 +57,10 @@ export async function middleware(request: NextRequest) {
 
   // Handle authentication and token refresh
   if (isApiAuthRoute) {
+    // CSRF check for login is handled inside the route. Other auth routes are protected by HttpOnly cookies.
     if (pathname.startsWith('/api/auth/refresh') || pathname.startsWith('/api/auth/login') || pathname.startsWith('/api/auth/logout')) {
       // The logic is handled in the route itself.
-      return NextResponse.next();
+      return response; // Return response with CSRF cookie if it was set
     }
   }
 
