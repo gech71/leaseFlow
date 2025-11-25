@@ -128,8 +128,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   return (
     <div className="flex justify-center items-start min-h-[80vh] bg-background pt-8 sm:pt-16">
       <Card
-        className="w-full max-w-lg shadow-2xl animate-fadeIn border-t-4"
-        style={{ borderColor: '#fdb913' }}
+        className="w-full max-w-lg shadow-2xl animate-fadeIn border-t-4 border-primary"
       >
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 text-green-600">
@@ -161,8 +160,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                 <Button
                   onClick={handleGetBillingAmount}
                   disabled={isLoading || !phone}
-                  className="h-12 text-base px-6 text-white"
-                  style={{ backgroundColor: '#fdb913' }}
+                  className="h-12 text-base px-6"
                 >
                   {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Get Bill'}
                 </Button>
@@ -195,7 +193,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                       {billingInfo.bills.map(bill => (
                         <div key={bill.id} className="p-3 bg-background/50 rounded-md border text-sm">
                           <div className="flex justify-between items-start">
-                            <div className="font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary"/> Bill for {format(parseISO(bill.billDate), 'MMM yyyy')}</div>
+                            <div className="font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary"/> Bill for {format(parseISO(bill.billDate as unknown as string), 'MMM yyyy')}</div>
                             <div className="font-bold text-lg">{Number(bill.totalAmount).toFixed(2)}</div>
                           </div>
                            <div className="text-xs text-muted-foreground pl-6 space-y-0.5 mt-1">
@@ -221,9 +219,8 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                   </div>
                   <Button
                     onClick={handlePayNow}
-                    className="w-full h-12 text-lg text-white"
+                    className="w-full h-12 text-lg"
                     disabled={isLoading}
-                    style={{ backgroundColor: '#fdb913' }}
                   >
                     {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                     Pay Total Amount
