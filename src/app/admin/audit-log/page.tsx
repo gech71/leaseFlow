@@ -12,8 +12,8 @@ import { redirect } from 'next/navigation';
 export const dynamic = 'force-dynamic';
 
 async function AuditLogDataFetcher() {
-    const { hasPermission } = await getUserAndPermissions();
-    if (!hasPermission('audit:view')) {
+    const { permissions, isSuperAdmin } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has('audit:view')) {
       redirect('/admin/dashboard?error=' + encodeURIComponent('You do not have permission to view the audit log.'));
     }
   
