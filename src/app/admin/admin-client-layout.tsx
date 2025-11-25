@@ -75,7 +75,6 @@ const allNavItems: NavItem[] = [
   { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, permission: 'building_utility:view' },
   { href: '/admin/billing', label: 'Billing', icon: Banknote, permission: 'billing:view' },
   { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, permission: 'payment_overview:view' },
-  { href: '/admin/import', label: 'Import Data', icon: UploadCloud, permission: 'import:manage' },
   { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings:user_management:view' }, // Generic settings permission
 ];
 
@@ -124,7 +123,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         <SidebarHeader className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
             <AppLogo />
-            <SidebarTrigger className="md:group-data-[state=collapsed]/sidebar-wrapper:hidden" />
+            <SidebarTrigger className="md:group-data-[state=expanded]/sidebar-wrapper:hidden" />
           </div>
         </SidebarHeader>
         <SidebarContent className="p-2">
