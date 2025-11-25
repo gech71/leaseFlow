@@ -1,168 +1,78 @@
-"use client";
 
-import React, { useState } from 'react';
-import { usePermissions } from '@/contexts/PermissionContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
-import { changePassword } from './actions';
-import { useRouter } from 'next/navigation';
+import { NextResponse, type NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import crypto from 'crypto';
 
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, { message: "Current password is required." }),
-  newPassword: z.string().min(6, { message: "New password must be at least 6 characters." }),
-  confirmPassword: z.string()
-}).refine(data => data.newPassword === data.confirmPassword, {
-  message: "New passwords do not match.",
-  path: ["confirmPassword"]
-});
+// This is a webhook to receive payment status updates from Arif-Birr.
+export async function POST(request: NextRequest) {
+    try {
+        const body = await request.json();
 
-type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
+        // According to Arif-Birr documentation, we should validate the hash.
+        const { data, hash } = body;
 
-export function AdminProfileClientPage() {
-  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
-  const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
-  const router = useRouter();
+        if (!data || !hash) {
+            console.error("ArifCallback Error: Missing data or hash in request body.");
+            return NextResponse.json({ message: "Invalid request payload." }, { status: 400 });
+        }
 
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+        const arifpayPublicKey = process.env.ARIFPAY_PUBLIC_KEY;
+        if (!arifpayPublicKey) {
+            console.error("ArifCallback Error: ARIFPAY_PUBLIC_KEY is not set.");
+            return NextResponse.json({ message: "Server configuration error." }, { status: 500 });
+        }
 
-  const form = useForm<ChangePasswordValues>({
-    resolver: zodResolver(changePasswordSchema),
-    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
-  });
-  
-  const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
-    setIsSaving(true);
-    const result = await changePassword(values);
+        const verifier = crypto.createVerify('SHA256');
+        verifier.update(JSON.stringify(data));
+        const isSignatureValid = verifier.verify(arifpayPublicKey, hash, 'base64');
 
-    if (result.success) {
-        toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
-        form.reset();
-        await logout(); // Use the logout function from context
-    } else {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        if (!isSignatureValid) {
+            console.error("ArifCallback Error: Invalid signature.");
+            return NextResponse.json({ message: "Invalid signature." }, { status: 403 });
+        }
+
+        // The signature is valid, now process the payment data.
+        const { sessionId, status } = data;
+
+        if (status === 'SUCCESS') {
+            const arifPaymentRecord = await prisma.arifPayment.findUnique({
+                where: { sessionId },
+                include: { bills: true }
+            });
+
+            if (!arifPaymentRecord) {
+                console.warn(`ArifCallback: Received valid callback for session ${sessionId}, but no matching payment record found.`);
+                return NextResponse.json({ message: "Acknowledged, but no session found." }, { status: 200 });
+            }
+
+            // Update the associated bills to 'Paid'.
+            await prisma.bill.updateMany({
+                where: {
+                    id: { in: arifPaymentRecord.bills.map(b => b.id) }
+                },
+                data: {
+                    status: 'Paid',
+                    paymentDate: new Date(),
+                    paymentReference: `Arifpay: ${sessionId}`,
+                    adminVerifiedPayment: true,
+                    adminVerificationNotes: "Payment confirmed via Arifpay callback.",
+                }
+            });
+            
+             // Update the ArifPayment record itself to confirm processing
+            await prisma.arifPayment.update({
+                where: { id: arifPaymentRecord.id },
+                data: { isProcessed: true }
+            });
+
+        } else {
+            console.log(`ArifCallback: Received a non-success status '${status}' for session ${sessionId}.`);
+        }
+
+        return NextResponse.json({ message: "Callback received successfully." }, { status: 200 });
+
+    } catch (error) {
+        console.error("ArifCallback Error: An unexpected error occurred.", error);
+        return NextResponse.json({ message: "Internal server error." }, { status: 500 });
     }
-    setIsSaving(false);
-  };
-
-
-  if (isUserLoading || !currentUser) {
-    return (
-      <Card>
-        <CardContent className="p-6 flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="font-headline text-xl">Your Information</CardTitle>
-          <CardDescription>This is the information associated with your account.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
-            <Input id="name" value={currentUser.name || ''} readOnly disabled />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
-            <Input id="email" value={currentUser.email || ''} readOnly disabled />
-          </div>
-           <div className="space-y-1">
-            <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>
-            <Input id="phone" value={currentUser.phoneNumber || 'N/A'} readOnly disabled />
-          </div>
-           <div className="space-y-1">
-            <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
-            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="font-headline text-xl">Change Password</CardTitle>
-          <CardDescription>Update your password for security.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleChangePasswordSubmit)} className="space-y-4">
-                <FormField
-                    control={form.control}
-                    name="currentPassword"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Current Password</FormLabel>
-                            <div className="relative">
-                                <FormControl>
-                                    <Input type={showCurrentPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
-                                  {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </Button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="newPassword"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />New Password</FormLabel>
-                            <div className="relative">
-                                <FormControl>
-                                    <Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowNewPassword(!showNewPassword)}>
-                                  {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </Button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Confirm New Password</FormLabel>
-                            <div className="relative">
-                                <FormControl>
-                                    <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </Button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <Button type="submit" disabled={isSaving} className="w-full">
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Update Password
-                </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
-  );
 }
