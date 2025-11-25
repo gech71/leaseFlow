@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -178,7 +179,8 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
     
     const finalPenaltyTiersCreateInput: Prisma.PenaltyTierCreateWithoutBuildingInput[] = (values.penaltyRules || []).map(uiRule => ({
         fromDay: uiRule.fromDay!,
-        toDay: uiRule.toDay,
+        // This is the fix: if toDay is 0 (from empty input), send null to the DB.
+        toDay: uiRule.toDay === 0 ? null : uiRule.toDay,
         penaltyType: uiRule.penaltyType,
         frequency: uiRule.frequency,
         feeValue: Number(uiRule.feeValue!), 

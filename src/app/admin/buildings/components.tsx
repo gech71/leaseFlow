@@ -1,4 +1,5 @@
 
+
 "use client"; 
 
 import { useState, useEffect } from 'react';
@@ -112,7 +113,7 @@ function BuildingCard({ building, onStatusToggle, canEdit, canApprove, canViewDe
                         </p>
                         {tiersInGroup.sort((a,b)=>a.fromDay - b.fromDay).map((tier, index) => {
                             let tierDurationDesc = `Days ${tier.fromDay}`;
-                            if (tier.toDay !== null && tier.toDay !== undefined) {
+                            if (tier.toDay !== null && tier.toDay !== undefined && tier.toDay > 0) {
                                 tierDurationDesc += ` - ${tier.toDay}`;
                             } else {
                                 tierDurationDesc += ` onwards`;
@@ -417,3 +418,4 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     </div>
   );
 }
+
