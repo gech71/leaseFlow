@@ -14,6 +14,7 @@ import { OccupancyCard } from '@/components/custom/OccupancyCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import type { DashboardData } from './actions';
+import { getDashboardDataAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -42,7 +43,7 @@ interface BuildingFinancialSummary {
 }
 
 export default function AdminDashboardPage() {
-    const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin, callServerAction } = usePermissions();
+    const { currentUser, isLoading: isUserLoading, hasPermission, isSuperAdmin } = usePermissions();
     const router = useRouter();
     const [today] = useState(new Date());
 
@@ -69,24 +70,19 @@ export default function AdminDashboardPage() {
             
             const fetchData = async () => {
               setIsLoading(true);
-              const result = await callServerAction('getDashboardDataAction');
+              const data = await getDashboardDataAction();
               
-              if ('success' in result && !result.success) {
-                  setError(result.error);
+              if (data.error) {
+                setError(data.error);
               } else {
-                  const data = result as DashboardData;
-                  if (data.error) {
-                    setError(data.error);
-                  } else {
-                    setAllData(data);
-                  }
+                setAllData(data);
               }
               setIsLoading(false);
             };
 
             fetchData();
         }
-    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission, callServerAction]);
+    }, [isUserLoading, currentUser, router, isSuperAdmin, hasPermission]);
 
     const periodDescription = format(new Date(selectedYear, selectedMonth), "MMMM yyyy");
 
