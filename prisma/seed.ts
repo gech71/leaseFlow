@@ -12,8 +12,6 @@ async function main() {
   try {
     await prisma.arifPayment.deleteMany({});
     console.log("Deleted ArifPayments");
-    await prisma.disabledAgreement.deleteMany({});
-    console.log("Deleted DisabledAgreements");
     await prisma.bill.deleteMany({});
     console.log("Deleted Bills");
     await prisma.agreement.deleteMany({});
@@ -54,6 +52,7 @@ async function main() {
         "dashboard:view",
         "building:view",
         "building:create",
+        "building:approve",
         "building:edit",
         "building:delete",
         "space:view",

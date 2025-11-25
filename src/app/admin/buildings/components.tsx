@@ -1,5 +1,4 @@
 
-
 "use client"; 
 
 import { useState, useEffect } from 'react';
@@ -8,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search, Hash, UserX, UserCheck } from 'lucide-react';
+import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search, Hash, CheckCircle, XCircle } from 'lucide-react';
 import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, BuildingStatus } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -30,6 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 
 export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
@@ -38,12 +38,16 @@ export interface BuildingWithPenaltyTiers extends BuildingTypePrisma {
 
 interface BuildingCardProps {
   building: BuildingWithPenaltyTiers;
-  onStatusToggle: (buildingId: string, newStatus: BuildingStatus) => void;
+  onStatusToggle: (buildingId: string, newStatus: BuildingStatus, rejectionReason?: string) => void;
   canEdit: boolean;
-  canViewDetails: boolean; // To determine if "View Details" or "Edit" should be shown
+  canApprove: boolean;
+  canViewDetails: boolean;
 }
 
-function BuildingCard({ building, onStatusToggle, canEdit, canViewDetails }: BuildingCardProps) {
+function BuildingCard({ building, onStatusToggle, canEdit, canApprove, canViewDetails }: BuildingCardProps) {
+  const [showRejectionDialog, setShowRejectionDialog] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  
   const policiesByScopeGroup: Record<string, PenaltyTierTypePrisma[]> = {};
   (building.penaltyPolicyTiers || []).forEach(tier => {
     let key = tier.scope;
@@ -54,14 +58,28 @@ function BuildingCard({ building, onStatusToggle, canEdit, canViewDetails }: Bui
     policiesByScopeGroup[key].push(tier);
   });
 
-  const isActive = building.status === 'Active';
+  const getStatusBadgeVariant = (status: BuildingStatus) => {
+    switch (status) {
+      case 'Active': return 'secondary';
+      case 'Pending': return 'default';
+      case 'Rejected': return 'destructive';
+      case 'Inactive': return 'outline';
+      default: return 'outline';
+    }
+  };
 
+  const handleReject = () => {
+    onStatusToggle(building.id, 'Rejected', rejectionReason);
+    setShowRejectionDialog(false);
+  };
+  
   return (
+    <>
     <Card key={building.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
       <CardHeader>
         <div className="flex justify-between items-start gap-2">
             <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
-            <Badge variant={isActive ? 'secondary' : 'destructive'} className="capitalize">{building.status}</Badge>
+            <Badge variant={getStatusBadgeVariant(building.status)} className="capitalize">{building.status}</Badge>
         </div>
         <CardDescription className="text-sm flex flex-col gap-1">
           {building.address && <span className="flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</span>}
@@ -70,6 +88,11 @@ function BuildingCard({ building, onStatusToggle, canEdit, canViewDetails }: Bui
       </CardHeader>
       <CardContent className="text-sm space-y-2 flex-grow">
            <p className="text-xs text-muted-foreground">Registered: {building.createdAt ? format(new Date(building.createdAt), 'PP') : 'N/A'}</p>
+           {building.status === 'Rejected' && building.rejectionReason && (
+            <div className="p-2 bg-destructive/10 border border-destructive/20 rounded-md text-xs text-destructive">
+              <strong>Reason:</strong> {building.rejectionReason}
+            </div>
+           )}
            {Object.keys(policiesByScopeGroup).length > 0 ? (
               <div className="mt-2 pt-2 border-t border-border/50 space-y-2.5">
                   <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policies:</h5>
@@ -104,18 +127,18 @@ function BuildingCard({ building, onStatusToggle, canEdit, canViewDetails }: Bui
         </CardContent>
       <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-2">
-           {canEdit && (
+           {canEdit && building.status === 'Active' && (
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <div className="flex items-center space-x-2">
                             <Switch
                                 id={`status-switch-${building.id}`}
-                                checked={isActive}
+                                checked={building.status === 'Active'}
                                 onCheckedChange={(checked) => onStatusToggle(building.id, checked ? 'Active' : 'Inactive')}
                                 aria-label="Toggle building status"
                             />
                              <Label htmlFor={`status-switch-${building.id}`} className="text-xs text-muted-foreground">
-                                {isActive ? 'Active' : 'Inactive'}
+                                Active
                             </Label>
                         </div>
                     </TooltipTrigger>
@@ -124,34 +147,61 @@ function BuildingCard({ building, onStatusToggle, canEdit, canViewDetails }: Bui
            )}
         </div>
         <div className="flex items-center gap-1">
-            {canEdit ? (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                <Link href={`/admin/buildings/add-building?id=${building.id}`} passHref>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Edit3 className="h-4 w-4 text-blue-600" />
-                    <span className="sr-only">Edit Building</span>
-                    </Button>
-                </Link>
-                </TooltipTrigger>
-                <TooltipContent><p>Edit Building</p></TooltipContent>
-            </Tooltip>
-            ) : canViewDetails ? (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                <Link href={`/admin/buildings/add-building?id=${building.id}&view=true`} passHref>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Eye className="h-4 w-4 text-blue-600" />
-                    <span className="sr-only">View Building</span>
-                    </Button>
-                </Link>
-                </TooltipTrigger>
-                <TooltipContent><p>View Building</p></TooltipContent>
-            </Tooltip>
-            ) : null }
+            {building.status === 'Pending' && canApprove && (
+              <>
+                <Button size="sm" variant="destructive" onClick={() => setShowRejectionDialog(true)}><XCircle className="mr-1.5 h-4 w-4"/> Reject</Button>
+                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onStatusToggle(building.id, 'Active')}><CheckCircle className="mr-1.5 h-4 w-4"/> Approve</Button>
+              </>
+            )}
+
+            { (building.status === 'Active' || building.status === 'Inactive') && (
+              canEdit ? (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                    <Link href={`/admin/buildings/add-building?id=${building.id}`} passHref>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Edit3 className="h-4 w-4 text-blue-600" />
+                        <span className="sr-only">Edit Building</span>
+                        </Button>
+                    </Link>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Edit Building</p></TooltipContent>
+                </Tooltip>
+              ) : canViewDetails ? (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                    <Link href={`/admin/buildings/add-building?id=${building.id}&view=true`} passHref>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Eye className="h-4 w-4 text-blue-600" />
+                        <span className="sr-only">View Building</span>
+                        </Button>
+                    </Link>
+                    </TooltipTrigger>
+                    <TooltipContent><p>View Building</p></TooltipContent>
+                </Tooltip>
+              ) : null)
+            }
         </div>
       </CardFooter>
     </Card>
+    <AlertDialog open={showRejectionDialog} onOpenChange={setShowRejectionDialog}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Reject Building</AlertDialogTitle>
+                <AlertDialogDescription>Please provide a reason for rejecting this building. This will be visible to the creator.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <Textarea 
+                placeholder="Reason for rejection..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+            />
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReject} disabled={!rejectionReason}>Confirm Rejection</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
@@ -164,13 +214,14 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
-  const [filterStatus, setFilterStatus] = useState<'Active' | 'Inactive' | 'All'>('All');
+  const [filterStatus, setFilterStatus] = useState<BuildingStatus | 'All'>('All');
 
 
   const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
   const canEditBuildings = isSuperAdmin || hasPermission('building:edit');
+  const canApproveBuildings = isSuperAdmin || hasPermission('building:approve');
   const canDeleteBuildings = isSuperAdmin || hasPermission('building:delete');
-  const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings;
+  const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings || canApproveBuildings;
 
   const filteredBuildings = buildings.filter(building => {
       const statusMatch = filterStatus === 'All' || building.status === filterStatus;
@@ -206,13 +257,8 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     setCurrentPage(1);
   };
   
-  const handleToggleStatus = async (buildingId: string, newStatus: BuildingStatus) => {
-      if (!canEditBuildings) {
-          toast({ title: "Permission Denied", description: "You do not have permission to change building status.", variant: "destructive" });
-          return;
-      }
-      
-      const result = await toggleBuildingStatusAction(buildingId, newStatus);
+  const handleToggleStatus = async (buildingId: string, newStatus: BuildingStatus, rejectionReason?: string) => {
+      const result = await toggleBuildingStatusAction(buildingId, newStatus, rejectionReason);
       if (result.success) {
           toast({ title: "Status Updated", description: `Building status set to ${newStatus}.` });
           router.refresh();
@@ -263,6 +309,8 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
             <div className="flex items-center space-x-2">
                 <Button variant={filterStatus === 'All' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('All')}>All</Button>
                 <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
+                <Button variant={filterStatus === 'Pending' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Pending')}>Pending</Button>
+                <Button variant={filterStatus === 'Rejected' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Rejected')}>Rejected</Button>
                 <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
             </div>
           </div>
@@ -293,6 +341,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
                 building={building} 
                 onStatusToggle={handleToggleStatus} 
                 canEdit={canEditBuildings}
+                canApprove={canApproveBuildings}
                 canViewDetails={canViewBuildings}
               />
             ))}

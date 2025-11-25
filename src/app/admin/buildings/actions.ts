@@ -7,18 +7,20 @@ import { Prisma, type User, type Role, BuildingStatus } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
-export async function createBuildingAction(data: Omit<Prisma.BuildingCreateInput, 'createdBy'>) {
+export async function createBuildingAction(data: Omit<Prisma.BuildingCreateInput, 'createdBy' | 'approvedBy'>) {
   try {
-    const { currentUser } = await getUserAndPermissions();
+    const { currentUser, isSuperAdmin } = await getUserAndPermissions();
     if (!currentUser) {
         return { success: false, error: "User session not found." };
     }
 
     const buildingCreateInput: Prisma.BuildingCreateInput = {
       ...data,
+      status: isSuperAdmin ? 'Active' : 'Pending', // Auto-approve for Super Admins
       createdBy: {
         connect: { id: currentUser.id }
-      }
+      },
+      ...(isSuperAdmin && { approvedBy: { connect: { id: currentUser.id } } }),
     };
 
     const newBuilding = await databaseService.createBuilding(buildingCreateInput);
@@ -75,21 +77,35 @@ export async function updateBuildingAction(
   }
 }
 
-export async function toggleBuildingStatusAction(buildingId: string, newStatus: BuildingStatus) {
+export async function toggleBuildingStatusAction(buildingId: string, newStatus: BuildingStatus, rejectionReason?: string) {
     try {
-        const { permissions, isSuperAdmin } = await getUserAndPermissions();
-        if (!isSuperAdmin && !permissions.has('building:edit')) {
-            return { success: false, error: "You do not have permission to change a building's status." };
+        const { permissions, isSuperAdmin, currentUser } = await getUserAndPermissions();
+        if (newStatus === 'Active' || newStatus === 'Rejected') {
+            if (!isSuperAdmin && !permissions.has('building:approve')) {
+                return { success: false, error: "You do not have permission to approve or reject buildings." };
+            }
         }
-
+        
         if (newStatus === 'Inactive') {
+             if (!isSuperAdmin && !permissions.has('building:edit')) {
+                return { success: false, error: "You do not have permission to change a building's status." };
+            }
             const buildingWithSpaces = await databaseService.getBuildingById(buildingId, { spaces: { where: { isOccupied: true }, take: 1 } });
             if (buildingWithSpaces && buildingWithSpaces.spaces.length > 0) {
                 return { success: false, error: "Cannot deactivate a building with occupied spaces. Please ensure all spaces are vacant first." };
             }
         }
+        
+        const updateData: Prisma.BuildingUpdateInput = { status: newStatus };
+        if (newStatus === 'Active') {
+            updateData.approvedBy = { connect: { id: currentUser.id } };
+            updateData.rejectionReason = null;
+        }
+        if (newStatus === 'Rejected') {
+            updateData.rejectionReason = rejectionReason;
+        }
 
-        const updatedBuilding = await databaseService.updateBuilding(buildingId, { status: newStatus });
+        const updatedBuilding = await databaseService.updateBuilding(buildingId, updateData);
         revalidatePath('/admin/buildings');
         return { success: true, building: updatedBuilding };
 

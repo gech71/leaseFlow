@@ -20,7 +20,8 @@ export interface Building {
   id: string;
   name: string;
   address?: string | null;
-  status: 'Active' | 'Inactive'; // Added status
+  status: 'Pending' | 'Active' | 'Rejected'; // Updated status
+  rejectionReason?: string | null;
   penaltyPolicyTiers: PenaltyTier[];
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
@@ -67,6 +68,7 @@ export interface Agreement {
   id:string;
   tenantId: string;
   spaceId: string;
+  agreementTemplateId: string;
   agreementText: string;
   startDate: string; // ISO Date String
   monthlyRentalPrice: number;
@@ -134,7 +136,7 @@ export interface Bill {
   paymentMethod?: string | null;
   paymentReference?: string | null;
   bankOrWalletName?: string | null;
-  paymentProofUrl?: string | null;
+  paymentProofDataUri?: string | null;
   adminVerifiedPayment?: boolean | null;
   tenantPaymentNotes?: string | null;
   adminVerificationNotes?: string | null;
@@ -188,7 +190,8 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: 'Buildings',
     permissions: [
       { id: 'building:view', label: 'View' },
-      { id: 'building:create', label: 'Create' },
+      { id: 'building:create', label: 'Create (Maker)' },
+      { id: 'building:approve', label: 'Approve (Checker)' },
       { id: 'building:edit', label: 'Edit' },
       { id: 'building:delete', label: 'Delete' },
     ],
@@ -209,7 +212,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     permissions: [
       { id: 'tenant:view', label: 'View' },
       { id: 'tenant:create', label: 'Create' },
-      { id: 'tenant:edit', label: 'Edit' }, 
+      { id: 'tenant:edit', label: 'Edit' },
       { id: 'tenant:status', label: 'Change Status' },
     ],
   },
