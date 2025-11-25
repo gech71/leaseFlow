@@ -18,12 +18,13 @@ import { prisma } from "@/lib/prisma";
 // This is the main Server Component for the page
 export default async function SpacesPage() {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
-
+  
   // --- Automatic Space Vacating Logic ---
   const today = startOfDay(new Date());
   // Find agreements that are now expired but their spaces are still marked as occupied.
   const expiredAgreementsOnOccupiedSpaces = await prisma.agreement.findMany({
     where: {
+      status: { not: 'Canceled' }, // Exclude canceled agreements from this check
       space: {
         isOccupied: true,
         // Limit the check to buildings managed by the current user if not super admin
