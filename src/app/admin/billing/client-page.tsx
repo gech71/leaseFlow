@@ -2,6 +2,7 @@
 
 
 
+
 "use client";
 
 import React, {
@@ -198,7 +199,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
-  const { hasPermission, isSuperAdmin, callServerAction } = usePermissions();
+  const { hasPermission, isSuperAdmin } = usePermissions();
   const canGenerateBills = isSuperAdmin || hasPermission("billing:generate");
   const canManagePayments =
     isSuperAdmin || hasPermission("billing:manage_payments");
@@ -251,21 +252,21 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
   const refreshBillingData = useCallback(async () => {
     setIsLoading(true);
-    const result = await callServerAction(getBillingPageDataAction);
-    if ('success' in result && !result.success) { // This is an error from our wrapper
+    try {
+      const result = await getBillingPageDataAction();
+      setAgreements(result.agreements);
+      setBills(result.bills);
+      setAllBuildings(result.buildings);
+    } catch (e: any) {
       toast({
         title: "Error Refreshing Data",
-        description: result.error,
+        description: e.message || "An unknown error occurred.",
         variant: "destructive",
       });
-    } else if ('agreements' in result) { // This is the expected data
-        const serializedNewData = result as SerializedBillingPageData;
-        setAgreements(serializedNewData.agreements);
-        setBills(serializedNewData.bills);
-        setAllBuildings(serializedNewData.buildings);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [toast, callServerAction]);
+  }, [toast]);
 
   const calculatePenalty = useCallback(
     (bill: ClientBill, currentStatus: ClientBill["status"]): number => {
@@ -533,7 +534,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
 
     setIsLoading(true);
-    const result = await callServerAction(generateBillAndUpdateAgreementAction, agreementId, nextDueDateString);
+    const result = await generateBillAndUpdateAgreementAction(agreementId, nextDueDateString);
     setIsLoading(false);
 
     if (result.success && result.bill) {
@@ -597,7 +598,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           continue;
         }
 
-        const result = await callServerAction(generateBillAndUpdateAgreementAction, agreement.id, nextDueDateString);
+        const result = await generateBillAndUpdateAgreementAction(agreement.id, nextDueDateString);
 
         if (result.success && result.bill) {
           totalGenerated++;
@@ -656,8 +657,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setIsLoading(true);
     
     const verificationValues = verificationForm.getValues();
-    const result = await callServerAction(
-      recordPaymentOrVerificationAction,
+    const result = await recordPaymentOrVerificationAction(
       billForPayment.id,
       {
         paymentDate: billForPayment.paymentDate || new Date().toISOString(),
@@ -688,8 +688,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     }
     setIsLoading(true);
 
-    const result = await callServerAction(
-      recordPaymentOrVerificationAction,
+    const result = await recordPaymentOrVerificationAction(
       billForPayment.id,
       {
         ...values,
