@@ -14,26 +14,22 @@ import type {
   Role,
 } from "@prisma/client";
 import { addMonths, isAfter, format } from "date-fns";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
 import crypto from "crypto";
 import { revalidatePath } from 'next/cache';
-import { auth } from '@/auth'; // Import the main auth helper
+import { verifySession } from '@/lib/auth/jwt'; // Correctly import verifySession
 
 // --- User Authentication Helper ---
-// This function now handles both NextAuth sessions and the Mini App token.
+// This function uses the project's custom JWT session verification.
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  // 1. Try to get the user from the standard NextAuth session first.
-  const session = await auth();
-  if (session?.user?.id) {
-    const user = await databaseService.getUserById(session.user.id, {
+  const session = await verifySession();
+  if (session?.userId) {
+    const user = await databaseService.getUserById(session.userId, {
       roles: true,
     });
     if (user) return user;
   }
-  
-  // No other fallback methods are currently supported for portal login.
   return null;
 }
 
