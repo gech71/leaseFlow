@@ -78,7 +78,6 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
         where: { id: input.spaceId },
         data: {
           isOccupied: true,
-          tenant: { connect: { id: input.tenantId } },
         },
       });
 
@@ -159,7 +158,7 @@ export async function cancelAgreementAction(agreementId: string): Promise<{ succ
             if (agreement.spaceId) {
                 await tx.space.update({
                     where: { id: agreement.spaceId },
-                    data: { isOccupied: false, tenantId: null },
+                    data: { isOccupied: false },
                 });
             }
 
@@ -167,7 +166,7 @@ export async function cancelAgreementAction(agreementId: string): Promise<{ succ
             if (agreement.tenantId) {
                 await tx.tenant.update({
                     where: { id: agreement.tenantId },
-                    data: { rentedSpace: { disconnect: true } },
+                    data: { rentedSpaceId: null },
                 });
             }
 
