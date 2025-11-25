@@ -238,13 +238,13 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return;
-
-    if (!isAuthenticated) {
-      router.replace('/login');
+    // Only check for redirection when loading is finished
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login?error=session_expired');
     }
   }, [isAuthenticated, isLoading, router]);
 
+  // While loading, or if not authenticated (and waiting for redirect), show a loader.
   if (isLoading || !isAuthenticated) {
     return (
       <div className="flex justify-center items-center h-screen w-screen">
@@ -253,6 +253,7 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
     );
   }
 
+  // If authenticated, render the main layout
   return (
       <SidebarProvider defaultOpen>
         <TooltipProvider>

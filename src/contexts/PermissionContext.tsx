@@ -51,7 +51,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
-        setIsLoading(false);
+        setIsLoading(false); // Stop loading on logout
         const loginUrl = new URL('/login', window.location.origin);
         if (sessionExpired) {
           loginUrl.searchParams.set('error', 'session_expired');
