@@ -1,48 +1,126 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
-import * as dashboardActions from '@/app/admin/dashboard/actions';
-import * as billingActions from '@/app/admin/billing/actions';
-import * as buildingActions from '@/app/admin/buildings/actions';
-import * as spaceActions from '@/app/admin/spaces/actions';
-import * as tenantActions from '@/app/admin/tenants/actions';
-import * as agreementActions from '@/app/admin/agreements/actions';
-import * as templateActions from '@/app/admin/settings/agreement-template/actions';
-import * as userManagementActions from '@/app/admin/settings/user-management/actions';
-import * as roleManagementActions from '@/app/admin/settings/role-management/actions';
-import * as profileActions from '@/app/admin/profile/actions';
-import * as importActions from '@/app/admin/import/actions';
+import { verifySession } from '@/lib/auth/jwt';
+import { PERMISSION_MAP } from '@/lib/auth-utils';
+import { nanoid } from 'nanoid';
 
-const actions: { [key: string]: Function } = {
-  ...dashboardActions,
-  ...billingActions,
-  ...buildingActions,
-  ...spaceActions,
-  ...tenantActions,
-  ...agreementActions,
-  ...templateActions,
-  ...userManagementActions,
-  ...roleManagementActions,
-  ...profileActions,
-  ...importActions,
-};
+const ORDERED_ADMIN_PAGES = [
+  "/admin/dashboard",
+  "/admin/buildings",
+  "/admin/spaces",
+  "/admin/tenants",
+  "/admin/agreements",
+  "/admin/billing",
+  "/admin/payments-overview",
+  "/admin/building-utilities",
+  "/admin/settings/user-management",
+  "/admin/import",
+];
 
-export async function POST(request: NextRequest) {
-  try {
-    const { action, args } = await request.json();
-    
-    if (typeof action !== 'string' || !actions[action]) {
-      return NextResponse.json({ error: `Action '${action}' not found.` }, { status: 400 });
+const PUBLIC_ROUTES = ['/login', '/portal/connect', '/portal/cancel', '/portal/error', '/api/portal/payment-callback', '/api/portal/Arifcallback' ];
+const CSRF_TOKEN_COOKIE_NAME = 'nibrental_csrf_token';
+
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  
+  let response = NextResponse.next();
+
+  // --- CSRF Token Generation ---
+  const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
+  if (!csrfToken) {
+    response.cookies.set(CSRF_TOKEN_COOKIE_NAME, nanoid(32), {
+      httpOnly: false, // Must be readable by client script
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      sameSite: 'lax',
+    });
+  }
+  // --- End CSRF Token Generation ---
+  
+  // Public files, such as images, should be ignored.
+  if (pathname.includes('.') && !pathname.startsWith('/api')) {
+    return response;
+  }
+  
+  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
+  const isApiAuthRoute = pathname.startsWith('/api/auth');
+
+  // Let public routes and API auth routes pass through without a session check.
+  if (isPublicRoute || isApiAuthRoute) {
+    return response;
+  }
+  
+  // Verify session for all other routes
+  const session = await verifySession();
+  
+  if (!session) {
+    // For protected routes, redirect to login
+    let from = pathname;
+    if (request.nextUrl.search) {
+      from += request.nextUrl.search;
+    }
+    const loginUrl = new URL('/login', request.url);
+    if (pathname !== '/login' && pathname !== '/') {
+        loginUrl.searchParams.set('from', from);
+    }
+    loginUrl.searchParams.set('error', 'session_expired');
+    return NextResponse.redirect(loginUrl);
+  }
+  
+  // --- If session exists ---
+
+  // Handle forced password change
+  if (session.forceChangePass && !pathname.startsWith('/portal/change-password')) {
+    return NextResponse.redirect(new URL('/portal/change-password', request.url));
+  }
+  if (!session.forceChangePass && pathname.startsWith('/portal/change-password')) {
+     return NextResponse.redirect(new URL('/portal/dashboard', request.url));
+  }
+
+  const userPermissions = new Set(session.permissions);
+  const isTenantOnly = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
+
+  // Handle role-based authorization for admin routes
+  if (pathname.startsWith('/admin')) {
+    if (isTenantOnly) {
+      return NextResponse.redirect(new URL('/portal/dashboard', request.url));
     }
 
-    const actionFn = actions[action];
-    const result = await actionFn(...(args || []));
+    if (session.isSuperAdmin) {
+      return response;
+    }
     
-    return NextResponse.json(result);
-  } catch (error: any) {
-    console.error(`API action route error:`, error);
-    return NextResponse.json(
-      { error: error.message || 'An unexpected error occurred in the action handler.' }, 
-      { status: 500 }
-    );
+    const requiredPermission = Object.entries(PERMISSION_MAP).find(([pathPrefix]) => 
+      pathname.startsWith(pathPrefix)
+    )?.[1];
+    
+    if (requiredPermission && !userPermissions.has(requiredPermission)) {
+      const firstAllowedPage = ORDERED_ADMIN_PAGES.find(page => {
+        const permission = PERMISSION_MAP[page];
+        return permission && userPermissions.has(permission);
+      });
+
+      const redirectUrl = new URL(firstAllowedPage || '/login', request.url);
+      const errorMessage = firstAllowedPage 
+        ? "You do not have permission to access the requested page."
+        : "You do not have any assigned permissions to access the admin panel.";
+      redirectUrl.searchParams.set("error", errorMessage);
+      return NextResponse.redirect(redirectUrl);
+    }
   }
+  
+  // Handle role-based authorization for portal routes
+  if (pathname.startsWith('/portal/') && !isPublicRoute) {
+    if (!isTenantOnly) {
+      // Any user who is NOT a tenant (e.g., an admin) trying to access the tenant portal is redirected.
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    }
+  }
+
+  // If all checks pass, allow the request
+  return response;
 }
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images).*)'],
+};
