@@ -39,6 +39,8 @@ model User {
   // Relations managed by this user
   managedBuildings Building[] @relation("BuildingManagers")
 
+  approvedBuildings Building[] @relation("ApprovedBuildings")
+
   // Tenant-specific relation
   tenantProfile Tenant? @relation("TenantProfile")
 }
@@ -76,6 +78,9 @@ model Building {
   managers    User[] @relation("BuildingManagers")
   createdById String
   createdBy   User   @relation("CreatedBuildings", fields: [createdById], references: [id])
+
+  approvedById String?
+  approvedBy   User?   @relation("ApprovedBuildings", fields: [approvedById], references: [id])
 }
 
 model Space {
