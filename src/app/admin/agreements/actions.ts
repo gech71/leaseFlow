@@ -3,9 +3,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { databaseService } from '@/lib/services/databaseService';
-import { Prisma, type Agreement } from '@prisma/client';
+import { Prisma, type Agreement, AgreementStatus } from '@prisma/client';
 import { addMonths, parseISO, isSameDay } from 'date-fns';
 import { prisma } from '@/lib/prisma';
+import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 
 export interface CreateFullAgreementData {
   // IDs for relations
@@ -40,6 +41,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
           initialPaymentMonths: input.initialPaymentMonths,
           nextPaymentDueDate: nextPaymentDueDateObj,
           additionalTerms: input.additionalTerms,
+          status: 'Active', // Set initial status to Active
           
           initialPaymentAmount: initialPaymentAmount,
           initialPaymentDate: startDateObj,
@@ -128,4 +130,65 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
     }
     return { success: false, error: errorMessage };
   }
+}
+
+export async function cancelAgreementAction(agreementId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { isSuperAdmin, permissions } = await getUserAndPermissions();
+        if (!isSuperAdmin && !permissions.has('agreement:edit')) { // Using 'edit' as a proxy for cancellation
+            return { success: false, error: "You do not have permission to cancel agreements." };
+        }
+
+        const agreement = await databaseService.getAgreementById(agreementId);
+        if (!agreement) {
+            return { success: false, error: "Agreement not found." };
+        }
+
+        if (agreement.status === 'Canceled') {
+            return { success: false, error: "This agreement has already been canceled." };
+        }
+
+        await prisma.$transaction(async (tx) => {
+            // 1. Update the agreement status to 'Canceled'
+            await tx.agreement.update({
+                where: { id: agreementId },
+                data: { status: 'Canceled' },
+            });
+
+            // 2. Free up the space
+            if (agreement.spaceId) {
+                await tx.space.update({
+                    where: { id: agreement.spaceId },
+                    data: { isOccupied: false, tenantId: null },
+                });
+            }
+
+            // 3. Disconnect tenant from the space
+            if (agreement.tenantId) {
+                await tx.tenant.update({
+                    where: { id: agreement.tenantId },
+                    data: { rentedSpaceId: null },
+                });
+            }
+
+            // 4. Delete all non-paid bills for this agreement
+            await tx.bill.deleteMany({
+                where: {
+                    agreementId: agreementId,
+                    status: { not: 'Paid' },
+                },
+            });
+        });
+
+        revalidatePath('/admin/agreements');
+        revalidatePath('/admin/spaces');
+        revalidatePath('/admin/tenants');
+        revalidatePath('/admin/billing');
+        revalidatePath('/admin/dashboard');
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error cancelling agreement:", error);
+        return { success: false, error: error.message || "Failed to cancel agreement." };
+    }
 }

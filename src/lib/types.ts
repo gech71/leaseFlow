@@ -76,6 +76,7 @@ export interface Agreement {
   paymentTermMonths: number;
   initialPaymentMonths: number;
   nextPaymentDueDate: string; // ISO Date String
+  status: 'Active' | 'Canceled';
 
   initialPaymentAmount?: number | null;
   initialPaymentMethod?: string | null;

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -8,7 +7,7 @@ import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle, SearchCheck, UserCheck, UserX } from 'lucide-react';
-import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, TenantStatus } from '@prisma/client';
+import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, TenantStatus, AgreementStatus } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
@@ -61,7 +60,7 @@ export interface ClientAgreement extends Omit<AgreementTypePrisma, 'startDate' |
   updatedAt: string;
   initialPaymentDate?: string | null;
   space: ClientSpace | null;
-  disabledAgreements: { disabledById: string }[];
+  status: AgreementStatus;
 }
 
 export interface TenantWithRelations extends Omit<TenantTypePrisma, 'createdAt' | 'updatedAt' | 'rentedSpace' | 'agreements'> {
@@ -116,7 +115,6 @@ export function TenantsClientPage({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [currentTenantForForm, setCurrentTenantForForm] = useState<TenantWithRelations | null>(null);
-  const [tenantToToggle, setTenantToToggle] = useState<TenantWithRelations | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [searchPhone, setSearchPhone] = useState('');
@@ -143,16 +141,12 @@ export function TenantsClientPage({
   });
 
   const filteredTenants = tenants.map(tenant => {
-    // An admin can disable agreements. An agreement is disabled for an admin if there is a record for it in `disabledAgreements`
-    // with that admin's ID.
-    const isTenantActiveForCurrentUser = tenant.agreements.length === 0 || // A tenant with no agreements is always "active"
-        tenant.agreements.every(ag => {
-            // It's active if the agreement itself isn't disabled by the current user
-            return !ag.disabledAgreements.some(da => da.disabledById === currentUser?.id);
-        });
-    return { ...tenant, isTenantActiveForCurrentUser };
+    // A tenant is considered "Active" if they have at least one agreement that is not 'Canceled'.
+    const isTenantActive = tenant.agreements.some(ag => ag.status !== 'Canceled');
+
+    return { ...tenant, isTenantActive };
   }).filter(tenant => {
-    const statusMatch = filterStatus === 'Active' ? tenant.isTenantActiveForCurrentUser : !tenant.isTenantActiveForCurrentUser;
+    const statusMatch = filterStatus === 'Active' ? tenant.isTenantActive : !tenant.isTenantActive;
     if (!statusMatch) return false;
     
     const searchMatch = !searchTerm ||
@@ -306,39 +300,6 @@ export function TenantsClientPage({
     });
   };
 
-  const handleToggleStatus = async () => {
-    if (!tenantToToggle) return;
-    if (!canChangeStatus) { 
-      toast({ title: "Permission Denied", description: "You do not have permission to change tenant status.", variant: "destructive" });
-      return;
-    }
-    setIsSaving(true);
-
-    const activeAgreements = tenantToToggle.agreements.filter(ag => {
-        const agreementEndDate = addMonths(parseISO(ag.startDate), ag.paymentTermMonths);
-        return isAfter(agreementEndDate, new Date());
-    });
-    
-    // Determine current status based on agreements relevant to the current admin
-    const isActiveForCurrentUser = activeAgreements.length === 0 || activeAgreements.every(ag => 
-        !ag.disabledAgreements.some(da => da.disabledById === currentUser?.id)
-    );
-
-    const newStatus = isActiveForCurrentUser ? 'Inactive' : 'Active';
-    
-    const result = await toggleTenantStatusAction(tenantToToggle.id, newStatus);
-    
-    setIsSaving(false);
-    if (result.success) {
-      toast({ title: "Status Updated", description: `${tenantToToggle.name}'s agreements in your buildings are now marked as ${newStatus}.`});
-      setTenantToToggle(null); 
-      router.refresh(); 
-    } else {
-      toast({ title: "Error Updating Status", description: result.error, variant: "destructive" });
-    }
-  };
-
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied!", description: "Password copied to clipboard." });
@@ -458,25 +419,6 @@ export function TenantsClientPage({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!tenantToToggle} onOpenChange={(open) => { if(!open) setTenantToToggle(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Confirm Status Change</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to change the status for tenant "{tenantToToggle?.name}"?
-              This will either disable or enable all agreements for this tenant within your managed buildings.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setTenantToToggle(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleToggleStatus} className={tenantToToggle?.status === 'Active' ? "bg-destructive hover:bg-destructive/90" : "bg-green-600 hover:bg-green-700"} disabled={isSaving || !canChangeStatus}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Yes, Change Status
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <Card className="mb-6 shadow-sm">
         <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
           <div className="relative flex-grow">
@@ -541,7 +483,7 @@ export function TenantsClientPage({
                           <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
                         </div>
                       </div>
-                      <Badge variant={tenant.isTenantActiveForCurrentUser ? 'secondary' : 'destructive'} className="capitalize">{tenant.isTenantActiveForCurrentUser ? 'Active' : 'Inactive'}</Badge>
+                      <Badge variant={tenant.isTenantActive ? 'secondary' : 'destructive'} className="capitalize">{tenant.isTenantActive ? 'Active' : 'Inactive'}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm flex-grow">
@@ -597,17 +539,6 @@ export function TenantsClientPage({
                             <TooltipContent><p>{canEditTenants ? 'Edit Tenant' : 'View Tenant'}</p></TooltipContent>
                           </Tooltip>
                         )}
-                        {canChangeStatus && (
-                           <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setTenantToToggle(tenant)}>
-                                {tenant.isTenantActiveForCurrentUser ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4 text-green-600"/>}
-                                <span className="sr-only">{tenant.isTenantActiveForCurrentUser ? 'Deactivate' : 'Activate'}</span>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>{tenant.isTenantActiveForCurrentUser ? 'Deactivate Tenant' : 'Activate Tenant'}</p></TooltipContent>
-                          </Tooltip>
-                        )}
                       </div>
                     </div>
                   </CardFooter>
@@ -628,4 +559,3 @@ export function TenantsClientPage({
     </div>
   );
 }
-

@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { databaseService } from '@/lib/services/databaseService';
-import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, User, Role } from '@prisma/client';
+import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, User, Role, AgreementStatus } from '@prisma/client';
 import { TenantsClientPage, type TenantWithRelations, type SpaceWithTenant, type ClientAgreement } from './components';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 import { addMonths, isAfter } from 'date-fns'; // Import date-fns functions
@@ -26,9 +26,6 @@ export default async function TenantsPage() {
   const agreementsInclude = {
     include: {
       space: true,
-      disabledAgreements: {
-          select: { disabledById: true }
-      }
     }
   };
   
@@ -52,7 +49,6 @@ export default async function TenantsPage() {
     where: agreementWhere,
     include: {
         space: true,
-        disabledAgreements: true
     }
   });
 
@@ -89,8 +85,6 @@ export default async function TenantsPage() {
         createdAt: ag.space.createdAt?.toISOString() || fallbackDate,
         updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt?.toISOString() || fallbackDate
       } : null,
-      // Pass disabled info to client
-      disabledAgreements: (ag as any).disabledAgreements || [],
     })),
   }));
 
@@ -127,7 +121,6 @@ export default async function TenantsPage() {
         createdAt: ag.space.createdAt?.toISOString() || fallbackDate,
         updatedAt: ag.space.updatedAt?.toISOString() || ag.space.createdAt?.toISOString() || fallbackDate
       } : null,
-      disabledAgreements: (ag as any).disabledAgreements || []
   }));
 
 

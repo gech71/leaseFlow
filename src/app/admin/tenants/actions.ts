@@ -8,6 +8,7 @@ import {
   type User as PrismaUser,
   type Role as PrismaRole,
   TenantStatus,
+  AgreementStatus,
 } from "@prisma/client";
 import { addMonths, isAfter } from "date-fns";
 import { prisma } from "@/lib/prisma";
@@ -190,70 +191,6 @@ export async function updateTenantAction(
   }
 }
 
-export async function toggleTenantStatusAction(
-  tenantId: string,
-  newStatus: "Active" | "Inactive",
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const { currentUser, isSuperAdmin, permissions } =
-      await getUserAndPermissions();
-    const { managedBuildingIds } = await getUserAndManagedIds();
-
-    if (!isSuperAdmin && !permissions.has("tenant:status")) {
-      return {
-        success: false,
-        error: "You do not have permission to change a tenant's status.",
-      };
-    }
-
-    const agreements = await prisma.agreement.findMany({
-      where: {
-        tenantId: tenantId,
-        space: {
-          buildingId: { in: managedBuildingIds ?? undefined },
-        },
-      },
-      select: { id: true },
-    });
-
-    const agreementIds = agreements.map((a) => a.id);
-
-    if (newStatus === "Inactive") {
-      if (agreementIds.length > 0) {
-        await prisma.disabledAgreement.createMany({
-          data: agreementIds.map((agreementId) => ({
-            agreementId: agreementId,
-            disabledById: currentUser.id,
-          })),
-          skipDuplicates: true,
-        });
-      }
-    } else {
-      if (agreementIds.length > 0) {
-        await prisma.disabledAgreement.deleteMany({
-          where: {
-            agreementId: { in: agreementIds },
-            disabledById: currentUser.id,
-          },
-        });
-      }
-    }
-
-    revalidatePath("/admin/tenants");
-    return { success: true };
-  } catch (error: any) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2025"
-    ) {
-      return { success: false, error: "Tenant not found." };
-    }
-    return {
-      success: false,
-      error: `Failed to set tenant status to ${newStatus}.`,
-    };
-  }
-}
 
 export async function findUserByPhoneAction(
   phone: string,

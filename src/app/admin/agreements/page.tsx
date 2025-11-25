@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { FileText, Loader2 } from 'lucide-react';
 import { databaseService } from '@/lib/services/databaseService';
-import type { Agreement as AgreementPrisma, Tenant, Space, User, Role, Prisma } from '@prisma/client';
+import type { Agreement as AgreementPrisma, Tenant, Space, User, Role, Prisma, AgreementStatus } from '@prisma/client';
 import { AgreementsListClientPage, type AgreementWithRelations } from './components'; // Import from new components file
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
 
@@ -20,11 +20,6 @@ export default async function AgreementsListPage() {
     include: { 
       tenant: true, 
       space: true,
-      disabledAgreements: {
-        select: {
-          disabledById: true
-        }
-      }
     },
     orderBy: { createdAt: 'desc' }
   });
@@ -38,7 +33,6 @@ export default async function AgreementsListPage() {
     createdAt: ag.createdAt.toISOString(),
     updatedAt: ag.updatedAt?.toISOString() || ag.createdAt.toISOString(), // Safe serialization
     initialPaymentDate: ag.initialPaymentDate?.toISOString() || undefined,
-    disabledAgreements: ag.disabledAgreements, // Pass this through
     tenant: ag.tenant ? { 
       ...ag.tenant, 
       createdAt: ag.tenant.createdAt.toISOString(), 
@@ -58,7 +52,6 @@ export default async function AgreementsListPage() {
     <Suspense fallback={<div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>}>
       <AgreementsListClientPage 
         initialAgreements={serializableAgreements} 
-        currentUserId={currentUser.id}
       />
     </Suspense>
   );

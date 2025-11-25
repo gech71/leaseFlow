@@ -23,11 +23,13 @@ import {
   AlertTriangle,
   Loader2,
   EyeOff,
+  XCircle,
 } from "lucide-react";
 import type {
   Agreement as AgreementPrisma,
   Tenant,
   Space,
+  AgreementStatus,
 } from "@prisma/client";
 import { Input } from "@/components/ui/input";
 import {
@@ -50,6 +52,17 @@ import {
 } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
 import { Label } from "@/components/ui/label";
+import { cancelAgreementAction } from "../actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -63,17 +76,15 @@ export interface AgreementWithRelations extends AgreementPrisma {
   startDate: string;
   nextPaymentDueDate: string;
   initialPaymentDate?: string;
-  disabledAgreements: { disabledById: string }[];
+  status: AgreementStatus;
 }
 
 interface AgreementsListClientPageProps {
   initialAgreements: AgreementWithRelations[];
-  currentUserId: string;
 }
 
 export function AgreementsListClientPage({
   initialAgreements,
-  currentUserId,
 }: AgreementsListClientPageProps) {
   const [agreements, setAgreements] =
     useState<AgreementWithRelations[]>(initialAgreements);
@@ -83,9 +94,12 @@ export function AgreementsListClientPage({
   const { toast } = useToast();
   const router = useRouter();
 
+  const [agreementToCancel, setAgreementToCancel] = useState<AgreementWithRelations | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
-  const [filterStatus, setFilterStatus] = useState<"Active" | "Inactive" | "Expired">("Active");
+  const [filterStatus, setFilterStatus] = useState<"Active" | "Expired" | "Canceled">("Active");
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
@@ -112,13 +126,12 @@ export function AgreementsListClientPage({
       // Status filter logic
       const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
       const isChronologicallyExpired = isBefore(agreementEndDate, today);
-      const isManuallyDisabled = agreement.disabledAgreements.some(da => da.disabledById === currentUserId);
       
-      let status: 'Active' | 'Inactive' | 'Expired';
-      if (isChronologicallyExpired) {
+      let status: 'Active' | 'Expired' | 'Canceled';
+      if (agreement.status === 'Canceled') {
+        status = 'Canceled';
+      } else if (isChronologicallyExpired) {
         status = 'Expired';
-      } else if (isManuallyDisabled) {
-        status = 'Inactive';
       } else {
         status = 'Active';
       }
@@ -164,7 +177,7 @@ export function AgreementsListClientPage({
   }, [agreements.length, itemsPerPage, currentPage]);
 
   const isPaymentOverdue = (agreement: AgreementWithRelations): boolean => {
-    if (!agreement.nextPaymentDueDate) return false;
+    if (!agreement.nextPaymentDueDate || agreement.status !== 'Active') return false;
     const nextPaymentDate = startOfDay(parseISO(agreement.nextPaymentDueDate));
     const leaseEndDate = addMonths(
       parseISO(agreement.startDate),
@@ -210,6 +223,20 @@ export function AgreementsListClientPage({
       width: 170,
       windowWidth: 650,
     });
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!agreementToCancel || !canEditAgreements) return;
+    setIsSaving(true);
+    const result = await cancelAgreementAction(agreementToCancel.id);
+    setIsSaving(false);
+    if (result.success) {
+        toast({ title: 'Agreement Canceled', description: `The agreement for ${agreementToCancel.tenant?.name} has been successfully canceled.` });
+        setAgreementToCancel(null);
+        router.refresh();
+    } else {
+        toast({ title: 'Error', description: result.error, variant: 'destructive' });
+    }
   };
 
   if (!isMounted) {
@@ -268,12 +295,30 @@ export function AgreementsListClientPage({
             <Label htmlFor="status-filter">Status:</Label>
              <div className="flex items-center space-x-2">
                 <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
-                <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
                 <Button variant={filterStatus === 'Expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Expired')}>Expired</Button>
+                <Button variant={filterStatus === 'Canceled' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Canceled')}>Canceled</Button>
             </div>
           </div>
         </CardContent>
       </Card>
+      
+      <AlertDialog open={!!agreementToCancel} onOpenChange={(open) => !open && setAgreementToCancel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to cancel this agreement?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will set the agreement status to 'Canceled', make the space vacant, and delete all unpaid bills. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>No, keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmCancel} disabled={isSaving} className="bg-destructive hover:bg-destructive/80">
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+              Yes, Cancel Agreement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {filteredAgreements.length === 0 ? (
         <Card className="text-center py-12 shadow-sm">
@@ -303,16 +348,15 @@ export function AgreementsListClientPage({
               const overdue = isPaymentOverdue(agreement);
               const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
               const isChronologicallyExpired = isBefore(agreementEndDate, today);
-              const isManuallyDisabled = agreement.disabledAgreements.some(da => da.disabledById === currentUserId);
               
-              let status: 'Active' | 'Inactive' | 'Expired';
-              let statusBadgeVariant: 'secondary' | 'outline' | 'destructive' = 'secondary';
-              if (isChronologicallyExpired) {
+              let status: 'Active' | 'Expired' | 'Canceled';
+              let statusBadgeVariant: 'secondary' | 'destructive' | 'outline' = 'secondary';
+              if (agreement.status === 'Canceled') {
+                status = 'Canceled';
+                statusBadgeVariant = 'outline';
+              } else if (isChronologicallyExpired) {
                 status = 'Expired';
                 statusBadgeVariant = 'destructive';
-              } else if (isManuallyDisabled) {
-                status = 'Inactive';
-                statusBadgeVariant = 'outline';
               } else {
                 status = 'Active';
               }
@@ -329,12 +373,10 @@ export function AgreementsListClientPage({
                 >
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                      {" "}
                       <CardTitle className="font-headline text-lg">
                         {agreement.tenant?.name || "N/A"}
                       </CardTitle>
                       <div className="flex flex-col items-end space-y-1">
-                        {" "}
                         {overdue && status === 'Active' && (
                           <Badge
                             variant="destructive"
@@ -343,10 +385,10 @@ export function AgreementsListClientPage({
                             <AlertTriangle className="mr-1 h-3 w-3" /> Payment
                             Overdue
                           </Badge>
-                        )}{" "}
+                        )}
                         <Badge variant={statusBadgeVariant} className="capitalize">{status}</Badge>
                       </div>
-                    </div>{" "}
+                    </div>
                     <CardDescription>{spaceDesc}</CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm space-y-1.5">
@@ -373,11 +415,10 @@ export function AgreementsListClientPage({
                           overdue ? "text-destructive font-semibold" : ""
                         }`}
                       >
-                        {" "}
                         <strong>Next Lease Payment:</strong>{" "}
                         {agreement.nextPaymentDueDate
                           ? format(parseISO(agreement.nextPaymentDueDate), "PP")
-                          : "N/A"}{" "}
+                          : "N/A"}
                       </p>
                     )}
                      <p className="text-xs text-muted-foreground pt-1">
@@ -424,6 +465,25 @@ export function AgreementsListClientPage({
                           <p>Download Agreement</p>
                         </TooltipContent>
                       </Tooltip>
+                      {canEditAgreements && agreement.status === 'Active' && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => setAgreementToCancel(agreement)}
+                              disabled={isSaving}
+                            >
+                              <XCircle className="h-4 w-4" />
+                              <span className="sr-only">Cancel Agreement</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Cancel Agreement</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </CardFooter>
                 </Card>
