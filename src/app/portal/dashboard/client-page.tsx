@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -7,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertCircle, CheckCircle, Clock, Info, Home, FileText, Banknote, Calendar, MessageSquare, Upload, Loader2, Paperclip, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Info, Home, FileText, Banknote, Calendar, MessageSquare, Upload, Loader2, Paperclip, Eye, EyeOff, Download } from 'lucide-react';
 import { format, parseISO, isBefore, startOfDay, addMonths, isAfter } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
@@ -19,6 +20,7 @@ import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { PaginationControls } from '@/components/custom/PaginationControls';
+import jsPDF from 'jspdf';
 
 interface TenantDashboardClientPageProps {
   initialData: TenantPortalData;
@@ -36,6 +38,11 @@ const StatCard = ({ title, value, icon: Icon, description }: { title: string, va
         </CardContent>
     </Card>
 );
+
+const sanitizeFilename = (name: string) => {
+  return name.replace(/[^a-z0-9_.-]/gi, '_').replace(/_{2,}/g, '_');
+};
+
 
 export function TenantDashboardClientPage({ initialData }: TenantDashboardClientPageProps) {
   const { currentUser } = usePermissions();
@@ -108,6 +115,26 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
         setIsSubmitting(false);
     };
   };
+  
+  const handleDownloadAgreement = (agreement: PortalAgreementWithRelations) => {
+    if (!agreement || !agreement.agreementText) {
+      toast({ title: "Cannot Download", description: "Agreement text is not available.", variant: "destructive"});
+      return;
+    }
+    
+    const doc = new jsPDF();
+    doc.html(agreement.agreementText, {
+      callback: function (doc) {
+        const safeTenantName = sanitizeFilename(agreement.tenant.name || 'Tenant');
+        doc.save(`Agreement-${safeTenantName}-${agreement.id}.pdf`);
+        toast({ title: "Download Started", description: "Your agreement PDF is downloading." });
+      },
+      x: 15,
+      y: 15,
+      width: 170, // A4 width in mm minus margins
+      windowWidth: 650 // An arbitrary number that works well for scaling
+    });
+  };
 
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
@@ -162,6 +189,7 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
             (currentPage - 1) * itemsPerPage,
             currentPage * itemsPerPage
           );
+          const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
 
           return (
             <Card key={agreement.id} className="shadow-lg">
@@ -171,12 +199,29 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                   Agreement for {agreement.space.spaceIdName}
                 </CardTitle>
                 <CardDescription>
-                  Building: {agreement.space.building.name} | 
-                  Start Date: {format(parseISO(agreement.startDate), 'PP')} | 
-                  Term: {agreement.paymentTermMonths} months
+                  Building: {agreement.space.building.name}
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
+                    <div className="p-3 bg-secondary/30 rounded-md">
+                        <p className="text-xs font-medium text-muted-foreground">Start Date</p>
+                        <p className="font-semibold">{format(parseISO(agreement.startDate), 'PP')}</p>
+                    </div>
+                     <div className="p-3 bg-secondary/30 rounded-md">
+                        <p className="text-xs font-medium text-muted-foreground">End Date</p>
+                        <p className="font-semibold">{format(agreementEndDate, 'PP')}</p>
+                    </div>
+                     <div className="p-3 bg-secondary/30 rounded-md">
+                        <p className="text-xs font-medium text-muted-foreground">Term</p>
+                        <p className="font-semibold">{agreement.paymentTermMonths} months</p>
+                    </div>
+                    <div className="p-3 bg-secondary/30 rounded-md">
+                        <p className="text-xs font-medium text-muted-foreground">Monthly Rent</p>
+                        <p className="font-semibold">{Number(agreement.monthlyRentalPrice).toLocaleString()} Birr</p>
+                    </div>
+                </div>
+
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6">
                   <StatCard title="Total Due" value={`${totalDue.toLocaleString()} Birr`} icon={Banknote} description="Pending and overdue bills" />
                   <StatCard title="Overdue Bills" value={overdueBills.length} icon={AlertCircle} description="Require immediate attention" />
@@ -269,6 +314,12 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                   <p className="text-muted-foreground text-sm">No bills have been generated for this agreement yet.</p>
                 )}
               </CardContent>
+              <CardFooter className="border-t pt-4">
+                  <Button variant="outline" onClick={() => handleDownloadAgreement(agreement)}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Agreement
+                  </Button>
+              </CardFooter>
             </Card>
           )
       })}
@@ -307,3 +358,6 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
     </div>
   );
 }
+
+
+    
