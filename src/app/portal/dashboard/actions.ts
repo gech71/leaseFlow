@@ -136,7 +136,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
                 )
                 .map((item) => ({
                   name: item.name,
-                  amount: item.amount,
+                  amount: Number(item.amount), // Ensure number
                   id: typeof item.id === "string" ? item.id : undefined,
                 }));
             }
@@ -155,16 +155,44 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
             )
             .map((item) => ({
               name: item.name,
-              amount: item.amount,
+              amount: Number(item.amount), // Ensure number
               id: typeof item.id === "string" ? item.id : undefined,
             }));
         }
 
         const { utilityBreakdown: _originalScalarUtilityData, ...billData } =
           rawBill;
-        return { ...billData, utilityBreakdown: parsedItems };
+        
+        // Serialize Decimal fields in the bill
+        return { 
+          ...billData, 
+          utilityBreakdown: parsedItems,
+          rentAmount: Number(billData.rentAmount),
+          penaltyAmount: billData.penaltyAmount ? Number(billData.penaltyAmount) : null,
+          totalAmount: Number(billData.totalAmount)
+        };
       });
-      return { ...ag, bills: processedBills };
+
+      // Serialize Decimal fields in the agreement and its relations
+      return { 
+          ...ag, 
+          bills: processedBills,
+          monthlyRentalPrice: Number(ag.monthlyRentalPrice),
+          initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
+          space: {
+              ...ag.space,
+              area: Number(ag.space.area),
+              monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
+              utilityProrationShare: Number(ag.space.utilityProrationShare),
+              building: {
+                ...ag.space.building,
+                penaltyPolicyTiers: ag.space.building.penaltyPolicyTiers.map(tier => ({
+                    ...tier,
+                    feeValue: Number(tier.feeValue)
+                }))
+              }
+          }
+      };
     });
 
     const activeAgreements = processedAgreements.filter(ag => {
