@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -40,8 +41,6 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 import * as XLSX from "xlsx-js-style";
 
 const spaceFormSchema = z.object({
@@ -262,29 +261,6 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     toast({ title: "Exporting", description: "Excel file download has started." });
   };
   
-  const exportToPdf = () => {
-    const doc = new jsPDF();
-    const tableColumn = ["Space ID", "Building", "Floor", "Area (m²)", "Monthly Rent", "Status"];
-    const tableRows: any[][] = [];
-
-    filteredSpaces.forEach(s => {
-      const spaceData = [
-        s.spaceIdName,
-        s.buildingName,
-        s.floor,
-        s.area,
-        Number(s.monthlyRentalPrice).toLocaleString(),
-        s.isOccupied ? 'Occupied' : 'Vacant',
-      ];
-      tableRows.push(spaceData);
-    });
-
-    (doc as any).autoTable(tableColumn, tableRows, { startY: 20 });
-    doc.text("Spaces Data Export", 14, 15);
-    doc.save("Spaces_Export.pdf");
-    toast({ title: "Exporting", description: "PDF file download has started." });
-  };
-
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
   }
@@ -310,8 +286,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
           <div className="flex flex-col sm:flex-row gap-2">
             {isSuperAdmin && (
               <>
-                <Button onClick={exportToPdf} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>PDF</Button>
-                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Excel</Button>
+                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Export Excel</Button>
               </>
             )}
             {canCreateSpaces && (

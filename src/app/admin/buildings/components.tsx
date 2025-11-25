@@ -31,8 +31,6 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 import * as XLSX from "xlsx-js-style";
 
 
@@ -294,30 +292,6 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     toast({ title: "Exporting", description: "Excel file download has started." });
   };
   
-  const exportToPdf = () => {
-    const doc = new jsPDF();
-    const tableColumn = ["Name", "Address", "Account Number", "Status", "Created At", "Created By", "Approved By"];
-    const tableRows: any[][] = [];
-
-    filteredBuildings.forEach(b => {
-      const buildingData = [
-        b.name,
-        b.address || "N/A",
-        b.accountNumber,
-        b.status,
-        format(new Date(b.createdAt), "yyyy-MM-dd"),
-        b.createdBy?.name || "N/A",
-        b.approvedBy?.name || "N/A",
-      ];
-      tableRows.push(buildingData);
-    });
-
-    (doc as any).autoTable(tableColumn, tableRows, { startY: 20 });
-    doc.text("Building Data Export", 14, 15);
-    doc.save("Buildings_Export.pdf");
-    toast({ title: "Exporting", description: "PDF file download has started." });
-  };
-
   if (!canViewBuildings) {
      return (
       <Card className="shadow-lg text-center py-12">
@@ -337,8 +311,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           <div className="flex flex-col sm:flex-row gap-2">
             {isSuperAdmin && (
               <>
-                <Button onClick={exportToPdf} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>PDF</Button>
-                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Excel</Button>
+                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Export Excel</Button>
               </>
             )}
             {canCreateBuildings && (
@@ -418,4 +391,3 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     </div>
   );
 }
-

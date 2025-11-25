@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -43,8 +44,6 @@ import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 import * as XLSX from "xlsx-js-style";
 
 
@@ -362,33 +361,6 @@ export function TenantsClientPage({
     toast({ title: "Exporting", description: "Excel file download has started." });
   };
   
-  const exportToPdf = () => {
-    const doc = new jsPDF();
-    const tableColumn = ["Name", "Email", "Phone", "Status", "Rented Spaces"];
-    const tableRows: any[][] = [];
-
-    filteredTenants.forEach(t => {
-      const rentedSpaces = t.agreements
-        .filter(ag => ag.status === 'Active' && isAfter(addMonths(parseISO(ag.startDate), ag.paymentTermMonths), new Date()))
-        .map(ag => ag.space?.spaceIdName)
-        .join(', ') || 'None';
-        
-      const tenantData = [
-        t.name,
-        t.email,
-        t.phone,
-        t.isTenantActive ? 'Active' : 'Inactive',
-        rentedSpaces,
-      ];
-      tableRows.push(tenantData);
-    });
-
-    (doc as any).autoTable(tableColumn, tableRows, { startY: 20 });
-    doc.text("Tenants Data Export", 14, 15);
-    doc.save("Tenants_Export.pdf");
-    toast({ title: "Exporting", description: "PDF file download has started." });
-  };
-
   if (!isMounted) {
      return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
   }
@@ -413,8 +385,7 @@ export function TenantsClientPage({
           <div className="flex flex-col sm:flex-row gap-2">
             {isSuperAdmin && (
               <>
-                <Button onClick={exportToPdf} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>PDF</Button>
-                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Excel</Button>
+                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Export Excel</Button>
               </>
             )}
             {canCreateTenants && (
