@@ -167,7 +167,7 @@ export async function cancelAgreementAction(agreementId: string): Promise<{ succ
             if (agreement.tenantId) {
                 await tx.tenant.update({
                     where: { id: agreement.tenantId },
-                    data: { rentedSpaceId: null },
+                    data: { rentedSpace: { disconnect: true } },
                 });
             }
 
