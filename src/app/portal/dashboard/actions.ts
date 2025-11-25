@@ -163,20 +163,31 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         const { utilityBreakdown: _originalScalarUtilityData, ...billData } =
           rawBill;
         
-        // Serialize Decimal fields in the bill
+        // Serialize Decimal and Date fields in the bill
         return { 
           ...billData, 
           utilityBreakdown: parsedItems,
           rentAmount: Number(billData.rentAmount),
           penaltyAmount: billData.penaltyAmount ? Number(billData.penaltyAmount) : null,
-          totalAmount: Number(billData.totalAmount)
+          totalAmount: Number(billData.totalAmount),
+          billDate: billData.billDate.toISOString(),
+          dueDate: billData.dueDate.toISOString(),
+          createdAt: billData.createdAt.toISOString(),
+          updatedAt: billData.updatedAt.toISOString(),
+          paymentDate: billData.paymentDate ? billData.paymentDate.toISOString() : null,
         };
       });
 
-      // Serialize Decimal fields in the agreement and its relations
+      // Serialize Decimal and Date fields in the agreement and its relations
       return { 
           ...ag, 
           bills: processedBills,
+          startDate: ag.startDate.toISOString(),
+          createdAt: ag.createdAt.toISOString(),
+          updatedAt: ag.updatedAt.toISOString(),
+          nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
+          initialPaymentDate: ag.initialPaymentDate ? ag.initialPaymentDate.toISOString() : null,
+          endDate: ag.endDate ? ag.endDate.toISOString() : null,
           monthlyRentalPrice: Number(ag.monthlyRentalPrice),
           initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
           space: {
@@ -184,13 +195,22 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
               area: Number(ag.space.area),
               monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
               utilityProrationShare: Number(ag.space.utilityProrationShare),
+              createdAt: ag.space.createdAt.toISOString(),
+              updatedAt: ag.space.updatedAt.toISOString(),
               building: {
                 ...ag.space.building,
+                createdAt: ag.space.building.createdAt.toISOString(),
+                updatedAt: ag.space.building.updatedAt.toISOString(),
                 penaltyPolicyTiers: ag.space.building.penaltyPolicyTiers.map(tier => ({
                     ...tier,
                     feeValue: Number(tier.feeValue)
                 }))
               }
+          },
+          tenant: {
+            ...ag.tenant,
+            createdAt: ag.tenant.createdAt.toISOString(),
+            updatedAt: ag.tenant.updatedAt.toISOString(),
           }
       };
     });
@@ -209,7 +229,7 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
 
     return {
-      agreements: activeAgreements as PortalAgreementWithRelations[],
+      agreements: activeAgreements as unknown as PortalAgreementWithRelations[],
       error: undefined,
     };
   } catch (error: any) {
