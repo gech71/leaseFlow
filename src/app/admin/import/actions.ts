@@ -269,6 +269,7 @@ export async function processImportAction(data: ImportData) {
                         const agreementData = {
                             tenantId: tenantRecord.id,
                             spaceId: spaceRecord[0].id,
+                            agreementTemplateId: data.agreementTemplateId, // Pass the ID
                             agreementText: "Agreement text generated via bulk import.",
                             startDate: startDate.toISOString(),
                             monthlyRentalPrice: sanitizeNumber(spaceRecord[0].monthlyRentalPrice),
