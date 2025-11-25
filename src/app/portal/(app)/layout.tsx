@@ -18,7 +18,7 @@ import { usePermissions } from '@/contexts/PermissionContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { sendContactEmailAction } from '../dashboard/actions';
+import { sendContactEmailAction } from '../actions';
 
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {

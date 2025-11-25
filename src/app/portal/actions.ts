@@ -1,168 +1,105 @@
-"use client";
 
-import React, { useState } from 'react';
-import { usePermissions } from '@/contexts/PermissionContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
-import { changePassword } from './actions';
-import { useRouter } from 'next/navigation';
+"use server";
 
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, { message: "Current password is required." }),
-  newPassword: z.string().min(6, { message: "New password must be at least 6 characters." }),
-  confirmPassword: z.string()
-}).refine(data => data.newPassword === data.confirmPassword, {
-  message: "New passwords do not match.",
-  path: ["confirmPassword"]
-});
+import { databaseService } from "@/lib/services/databaseService";
+import type {
+  Agreement as AgreementPrisma,
+  User,
+  Role,
+} from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { sendEmail } from "@/lib/services/emailService";
+import { verifySession } from '@/lib/auth/jwt';
 
-type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
-
-export function AdminProfileClientPage() {
-  const { currentUser, isLoading: isUserLoading, logout } = usePermissions();
-  const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
-  const router = useRouter();
-
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const form = useForm<ChangePasswordValues>({
-    resolver: zodResolver(changePasswordSchema),
-    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" }
-  });
-  
-  const handleChangePasswordSubmit = async (values: ChangePasswordValues) => {
-    setIsSaving(true);
-    const result = await changePassword(values);
-
-    if (result.success) {
-        toast({ title: "Success", description: "Your password has been changed successfully. Please log in again." });
-        form.reset();
-        await logout(); // Use the logout function from context
-    } else {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
-    }
-    setIsSaving(false);
-  };
-
-
-  if (isUserLoading || !currentUser) {
-    return (
-      <Card>
-        <CardContent className="p-6 flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
-    );
+// --- User Authentication Helper ---
+async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+  const session = await verifySession();
+  if (session?.userId) {
+    const user = await databaseService.getUserById(session.userId, {
+      roles: true,
+    });
+    if (user) return user;
   }
+  return null;
+}
 
-  return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="font-headline text-xl">Your Information</CardTitle>
-          <CardDescription>This is the information associated with your account.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1">
-            <Label htmlFor="name" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Name</Label>
-            <Input id="name" value={currentUser.name || ''} readOnly disabled />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> Email</Label>
-            <Input id="email" value={currentUser.email || ''} readOnly disabled />
-          </div>
-           <div className="space-y-1">
-            <Label htmlFor="phone" className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> Phone Number</Label>
-            <Input id="phone" value={currentUser.phoneNumber || 'N/A'} readOnly disabled />
-          </div>
-           <div className="space-y-1">
-            <Label className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Role</Label>
-            <Input value={currentUser.roles?.map(r => r.name).join(', ') || 'N/A'} readOnly disabled />
-          </div>
-        </CardContent>
-      </Card>
+export async function sendContactEmailAction(formData: {
+  subject: string;
+  body: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: "Authentication required." };
+    }
 
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="font-headline text-xl">Change Password</CardTitle>
-          <CardDescription>Update your password for security.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleChangePasswordSubmit)} className="space-y-4">
-                <FormField
-                    control={form.control}
-                    name="currentPassword"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Current Password</FormLabel>
-                            <div className="relative">
-                                <FormControl>
-                                    <Input type={showCurrentPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
-                                  {showCurrentPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </Button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="newPassword"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />New Password</FormLabel>
-                            <div className="relative">
-                                <FormControl>
-                                    <Input type={showNewPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowNewPassword(!showNewPassword)}>
-                                  {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </Button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center"><Lock className="mr-2 h-4 w-4 text-primary" />Confirm New Password</FormLabel>
-                            <div className="relative">
-                                <FormControl>
-                                    <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </Button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <Button type="submit" disabled={isSaving} className="w-full">
-                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Update Password
-                </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
-  );
+    const tenant = await databaseService.findTenantByEmailOrPhone(
+      currentUser.email,
+      currentUser.phoneNumber,
+    );
+    if (!tenant) {
+      return {
+        success: false,
+        error: "No tenant profile associated with your user account.",
+      };
+    }
+
+    const agreement = await prisma.agreement.findFirst({
+      where: { tenantId: tenant.id },
+      include: {
+        space: { include: { building: { include: { managers: true } } } },
+      },
+      orderBy: { startDate: "desc" },
+    });
+
+    if (
+      !agreement?.space?.building?.managers ||
+      agreement.space.building.managers.length === 0
+    ) {
+      return {
+        success: false,
+        error: "No manager is assigned to your building. Cannot send email.",
+      };
+    }
+
+    const managerEmails = agreement.space.building.managers
+      .map((m) => m.email)
+      .filter((email): email is string => !!email);
+
+    if (managerEmails.length === 0) {
+      return {
+        success: false,
+        error: "Building manager(s) do not have an email address configured.",
+      };
+    }
+
+    const emailHtml = `
+      <h1>Contact Form Submission from Tenant Portal</h1>
+      <p><strong>From Tenant:</strong> ${tenant.name} (${tenant.email})</p>
+      <p><strong>Building:</strong> ${agreement.space.building.name}</p>
+      <p><strong>Space:</strong> ${agreement.space.spaceIdName}</p>
+      <hr>
+      <h2>Subject: ${formData.subject}</h2>
+      <p>${formData.body.replace(/\n/g, "<br>")}</p>
+    `;
+
+    const result = await sendEmail({
+      from: `"${tenant.name}" <${tenant.email}>`,
+      to: managerEmails.join(", "),
+      subject: `[Tenant Portal] ${formData.subject}`,
+      html: emailHtml,
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || "Email service failed.");
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in sendContactEmailAction:", error);
+    return {
+      success: false,
+      error: `Failed to send message: ${error.message}`,
+    };
+  }
 }
