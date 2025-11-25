@@ -79,8 +79,6 @@ async function main() {
         "settings:role_management:view",
         "settings:role_management:manage",
         "settings:agreement_templates:manage",
-        "settings:email_configuration:view",
-        "settings:email_configuration:manage",
         "import:manage",
         "portal:view",
       ],

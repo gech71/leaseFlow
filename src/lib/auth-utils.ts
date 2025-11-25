@@ -30,7 +30,6 @@ export const PERMISSION_MAP: Record<string, string> = {
   "/admin/settings/user-management": "settings:user_management:view",
   "/admin/settings/role-management": "settings:role_management:view",
   "/admin/settings/agreement-template": "settings:agreement_templates:manage",
-  "/admin/settings/email-configuration": "settings:email_configuration:view",
   "/admin/settings": "settings:user_management:view", // Fallback for the main settings page
   "/admin/import": "import:manage",
   "/admin/buildings": "building:view",
