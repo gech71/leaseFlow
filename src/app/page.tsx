@@ -49,6 +49,12 @@ export default function RootPage() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.replace('/admin/dashboard');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -81,17 +87,8 @@ export default function RootPage() {
     }
   };
 
-  if (isAuthLoading) {
+  if (isAuthLoading || isAuthenticated) {
     return (
-      <div className="flex justify-center items-center h-screen w-screen bg-background">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-      </div>
-    );
-  }
-  
-  if (isAuthenticated) {
-     router.replace('/admin/dashboard');
-     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>
