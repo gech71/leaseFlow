@@ -68,7 +68,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
   const router = useRouter();
   const searchParams = useSearchParams(); 
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin } = usePermissions(); 
+  const { hasPermission, isSuperAdmin, handleApiCall } = usePermissions(); 
 
   const isViewOnlyMode = searchParams.get('view') === 'true';
   
@@ -189,7 +189,7 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
           create: finalPenaltyTiersCreateInput,
         },
       };
-      result = await createBuildingAction(buildingCreateInput);
+      result = await handleApiCall(() => createBuildingAction(buildingCreateInput));
     } else {
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: values.name.trim(),
@@ -201,7 +201,12 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
         },
       };
       const managerIds = Array.from(selectedManagerIds);
-      result = await updateBuildingAction(initialBuildingData?.id!, buildingUpdateInput, managerIds);
+      result = await handleApiCall(() => updateBuildingAction(initialBuildingData?.id!, buildingUpdateInput, managerIds));
+    }
+
+    if (!result) { // API call was handled by context
+        setIsSaving(false);
+        return;
     }
 
     setIsSaving(false);
