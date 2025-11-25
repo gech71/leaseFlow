@@ -6,6 +6,7 @@ import { databaseService } from '@/lib/services/databaseService';
 import { getUserAndPermissions } from '@/lib/actions/server-helpers';
 import { AgreementTemplate, Prisma } from '@prisma/client';
 import { redirect } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
 
 export async function getAllAgreementTemplatesAction(): Promise<{
   success: boolean;
@@ -88,6 +89,16 @@ export async function deleteAgreementTemplateAction(id: string): Promise<{ succe
         if (!isSuperAdmin && !permissions.has('settings:agreement_templates:manage')) {
             return { success: false, error: "Permission denied. You do not have permission to delete agreement templates." };
         }
+
+        // Check if the template is used in any agreements
+        const agreementCount = await prisma.agreement.count({
+            where: { agreementTemplateId: id }
+        });
+
+        if (agreementCount > 0) {
+            return { success: false, error: `Cannot delete template. It is currently in use by ${agreementCount} agreement(s).` };
+        }
+
         await databaseService.deleteAgreementTemplate(id);
         revalidatePath('/admin/agreements/generate');
         revalidatePath('/admin/settings/agreement-template');

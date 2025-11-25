@@ -11,6 +11,7 @@ export interface CreateFullAgreementData {
   // IDs for relations
   tenantId: string;
   spaceId: string;
+  agreementTemplateId: string;
   
   // Details for the agreement itself, often from form + AI
   agreementText: string;
@@ -45,6 +46,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
 
           tenant: { connect: { id: input.tenantId } },
           space: { connect: { id: input.spaceId } },
+          agreementTemplate: { connect: { id: input.agreementTemplateId } },
         }
       });
 
@@ -119,7 +121,7 @@ export async function createFullAgreementAction(input: CreateFullAgreementData) 
       if (error.code === 'P2002') { 
         errorMessage = "Failed to create agreement. A similar agreement might already exist or related data conflict (e.g. space already linked).";
       } else if (error.code === 'P2025') {
-        errorMessage = "Failed to create agreement. Tenant or Space not found.";
+        errorMessage = "Failed to create agreement. Tenant, Space, or Template not found.";
       }
     } else if (error.message) {
       errorMessage = error.message;

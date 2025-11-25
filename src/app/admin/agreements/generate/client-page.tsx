@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -363,6 +364,7 @@ export function GenerateAgreementClientPage({
     const agreementDataForDb: CreateFullAgreementData = {
       tenantId: selectedTenant.id,
       spaceId: selectedSpace.id,
+      agreementTemplateId: formValues.templateId,
       agreementText: generatedAgreementText,
       startDate: formValues.startDate.toISOString(),
       monthlyRentalPrice: Number(selectedSpace.monthlyRentalPrice),
