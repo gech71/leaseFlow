@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -35,11 +34,12 @@ const penaltyRuleSchema = z.object({
   applicableFloor: z.string().optional().nullable(),
   applicableSpaceIdNamesStr: z.string().optional().nullable(),
 }).refine(data => {
-    // If toDay is not provided (null, undefined, or empty string from coerce), the rule is valid.
-    if (data.toDay == null || isNaN(data.toDay)) {
+    // If 'To Day' is left empty, it coerces to 0. Treat this as valid (ongoing).
+    // Also check for null/undefined for programmatic cases.
+    if (data.toDay === 0 || data.toDay == null) {
         return true;
     }
-    // If toDay is provided, it must be greater than or equal to fromDay.
+    // If 'To Day' has a value, it must be greater than or equal to 'From Day'.
     return data.fromDay <= data.toDay;
 }, {
   message: "'To Day' must be greater than or equal to 'From Day'",
@@ -120,8 +120,8 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
           frequency: tier.frequency as 'OneTime' | 'Daily',
           feeValue: Number(tier.feeValue),
           scope: tier.scope as 'Building' | 'Floor' | 'SpecificSpaces',
-          applicableFloor: tier.applicableFloor || undefined,
-          applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || undefined,
+          applicableFloor: tier.applicableFloor || '',
+          applicableSpaceIdNamesStr: tier.applicableSpaceIdNames?.join(', ') || '',
       })).sort((a,b) => a.fromDay - b.fromDay);
       
       form.reset({
@@ -474,3 +474,5 @@ export function BuildingUpsertFormInternal({ initialBuildingData, allUsers = [],
       </Card>
   );
 }
+
+    
