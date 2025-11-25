@@ -1,5 +1,7 @@
 
 import 'server-only';
+export const runtime = "nodejs";
+
 import { prisma } from '@/lib/prisma';
 import { differenceInMinutes } from 'date-fns';
 

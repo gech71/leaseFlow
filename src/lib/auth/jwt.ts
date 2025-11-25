@@ -1,4 +1,7 @@
+
 import 'server-only';
+export const runtime = "nodejs";
+
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import type { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 import type { User, Role } from '@prisma/client';
