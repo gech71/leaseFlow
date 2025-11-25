@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState } from 'react';
@@ -292,7 +291,7 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                                         </div>
                                         <div className="space-y-2 text-sm">
                                             <div className="flex justify-between"><span className="text-muted-foreground">Due Date:</span> <span>{format(parseISO(bill.dueDate), 'PP')}</span></div>
-                                            <div className="flex justify-between"><span className="text-muted-foreground">Rent:</span> <span>{Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+                                            {Number(bill.rentAmount) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Rent:</span> <span>{Number(bill.rentAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
                                             {utilityTotal > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Utilities:</span> <span>{utilityTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
                                             {bill.penaltyAmount && bill.penaltyAmount > 0 && <div className="flex justify-between text-destructive"><span className="font-medium">Penalty:</span> <span className="font-medium">{Number(bill.penaltyAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>}
                                             <div className="border-t my-2"></div>
@@ -323,7 +322,13 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                 )}
               </CardContent>
               <CardFooter className="border-t pt-4">
-                  {/* Footer can be used for actions if needed */}
+                  <div className="flex justify-end w-full">
+                      <Link href={`/portal/agreements/${agreement.id}`} passHref>
+                        <Button>
+                          <FileText className="mr-2 h-4 w-4"/> View Agreement Details
+                        </Button>
+                      </Link>
+                  </div>
               </CardFooter>
             </Card>
           )
@@ -363,6 +368,3 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
     </div>
   );
 }
-
-
-    
