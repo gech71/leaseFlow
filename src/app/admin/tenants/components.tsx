@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/custom/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle, SearchCheck, UserCheck, UserX } from 'lucide-react';
+import { Users, PlusCircle, Mail, Phone, BedDouble, Trash2, Edit3, AlertTriangle, UserSquare, Hash, PhoneIncoming, Contact, Eye, Loader2, EyeOff, Search, Lock, Info, Clipboard, CheckCircle, SearchCheck, UserCheck, UserX, Download } from 'lucide-react';
 import type { Tenant as TenantTypePrisma, Space as SpaceTypePrisma, Agreement as AgreementTypePrisma, Prisma, TenantStatus, AgreementStatus } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -37,13 +36,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createTenantAction, updateTenantAction } from './actions';
+import { createTenantAction, updateTenantAction, findUserByPhoneAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx-js-style";
 
 
 // Client-side specific types ensuring dates are strings
@@ -86,7 +88,7 @@ const tenantFormSchema = z.object({
   alternativePhone: z.string().optional().or(z.literal('')).refine(val => !val || phoneRegex.test(val), {
     message: phoneErrorMessage
   }),
-  nationalId: z.string().length(12, { message: "National ID must be exactly 12 digits." }).regex(/^\d+$/, { message: "National ID must only contain digits." }),
+  nationalId: z.string().length(16, { message: "National ID must be exactly 16 digits." }).regex(/^\d+$/, { message: "National ID must only contain digits." }),
   representativeName: z.string().optional().or(z.literal('')),
   representativePhone: z.string().optional().or(z.literal('')).refine(val => !val || phoneRegex.test(val), {
     message: phoneErrorMessage
@@ -127,7 +129,7 @@ export function TenantsClientPage({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
-  const { hasPermission, isSuperAdmin, currentUser } = usePermissions();
+  const { hasPermission, isSuperAdmin, currentUser, handleApiCall } = usePermissions();
   const canCreateTenants = isSuperAdmin || hasPermission('tenant:create');
   const canEditTenants = isSuperAdmin || hasPermission('tenant:edit');
   const canChangeStatus = isSuperAdmin || hasPermission('tenant:status');
@@ -142,7 +144,6 @@ export function TenantsClientPage({
   });
 
   const filteredTenants = tenants.map(tenant => {
-    // A tenant is considered "Active" if they have no agreements OR at least one agreement that is not 'Canceled'.
     const isTenantActive = tenant.agreements.length === 0 || tenant.agreements.some(ag => ag.status !== 'Canceled');
 
     return { ...tenant, isTenantActive };
@@ -249,7 +250,7 @@ export function TenantsClientPage({
         representativeName: values.representativeName || undefined,
         representativePhone: values.representativePhone || undefined,
       };
-      result = await createTenantAction(createData);
+      result = await handleApiCall(() => createTenantAction(createData));
     } else if (currentTenantForForm?.id) {
       const updateData = {
         name: values.name,
@@ -260,12 +261,17 @@ export function TenantsClientPage({
         representativeName: values.representativeName || undefined,
         representativePhone: values.representativePhone || undefined,
       };
-      result = await updateTenantAction(
+      result = await handleApiCall(() => updateTenantAction(
         currentTenantForForm.id, 
         updateData as Prisma.TenantUpdateInput
-      );
+      ));
     } else {
       toast({ title: "Error", description: "Tenant ID missing for update.", variant: "destructive"});
+      setIsSaving(false);
+      return;
+    }
+    
+    if (!result) { // API call was handled by context
       setIsSaving(false);
       return;
     }
@@ -309,7 +315,11 @@ export function TenantsClientPage({
   const handleFindUser = async () => {
     if (!searchPhone) return;
     setIsSaving(true);
-    const result = await findUserByPhoneAction(searchPhone);
+    const result = await handleApiCall(() => findUserByPhoneAction(searchPhone));
+    if (!result) {
+        setIsSaving(false);
+        return;
+    }
     setIsSaving(false);
 
     if (result.success && result.user) {
@@ -328,6 +338,55 @@ export function TenantsClientPage({
         toast({ title: "Not Found", description: result.error, variant: "destructive" });
         setIsUserFound(false);
     }
+  };
+  
+  const exportToExcel = () => {
+    const dataToExport = filteredTenants.map(t => ({
+      "Name": t.name,
+      "Email": t.email,
+      "Phone": t.phone,
+      "National ID": t.nationalId,
+      "Status": t.isTenantActive ? 'Active' : 'Inactive',
+      "Rented Spaces": t.agreements
+        .filter(ag => ag.status === 'Active' && isAfter(addMonths(parseISO(ag.startDate), ag.paymentTermMonths), new Date()))
+        .map(ag => ag.space?.spaceIdName)
+        .join(', ') || 'None',
+      "Representative": t.representativeName || 'N/A',
+      "Rep. Phone": t.representativePhone || 'N/A',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tenants");
+    XLSX.writeFile(workbook, "Tenants_Export.xlsx");
+    toast({ title: "Exporting", description: "Excel file download has started." });
+  };
+  
+  const exportToPdf = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Name", "Email", "Phone", "Status", "Rented Spaces"];
+    const tableRows: any[][] = [];
+
+    filteredTenants.forEach(t => {
+      const rentedSpaces = t.agreements
+        .filter(ag => ag.status === 'Active' && isAfter(addMonths(parseISO(ag.startDate), ag.paymentTermMonths), new Date()))
+        .map(ag => ag.space?.spaceIdName)
+        .join(', ') || 'None';
+        
+      const tenantData = [
+        t.name,
+        t.email,
+        t.phone,
+        t.isTenantActive ? 'Active' : 'Inactive',
+        rentedSpaces,
+      ];
+      tableRows.push(tenantData);
+    });
+
+    (doc as any).autoTable(tableColumn, tableRows, { startY: 20 });
+    doc.text("Tenants Data Export", 14, 15);
+    doc.save("Tenants_Export.pdf");
+    toast({ title: "Exporting", description: "PDF file download has started." });
   };
 
   if (!isMounted) {
@@ -351,11 +410,19 @@ export function TenantsClientPage({
         icon={Users}
         description="Add, view, and manage tenant information and their assigned spaces."
         actions={
-          canCreateTenants && (
-            <Button onClick={handleOpenAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSaving}>
-              <PlusCircle className="mr-2 h-5 w-5" /> Add New Tenant
-            </Button>
-          )
+          <div className="flex flex-col sm:flex-row gap-2">
+            {isSuperAdmin && (
+              <>
+                <Button onClick={exportToPdf} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>PDF</Button>
+                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Excel</Button>
+              </>
+            )}
+            {canCreateTenants && (
+              <Button onClick={handleOpenAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" size="sm" disabled={isSaving}>
+                <PlusCircle className="mr-2 h-5 w-5" /> Add New Tenant
+              </Button>
+            )}
+          </div>
         }
       />
 

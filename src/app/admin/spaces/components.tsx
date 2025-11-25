@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, PlusCircle, MapPin, Maximize, Percent, Banknote, Trash2, Edit3, Loader2, EyeOff, Eye, Clock, Search } from 'lucide-react';
+import { Building2, PlusCircle, MapPin, Maximize, Percent, Banknote, Trash2, Edit3, Loader2, EyeOff, Eye, Clock, Search, Download } from 'lucide-react';
 import type { Building as BuildingTypePrisma, Space as SpaceTypePrisma, Prisma } from '@prisma/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -34,12 +34,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createSpaceAction, updateSpaceAction, deleteSpaceAction } from './actions';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
-import { formatDistanceToNow, parseISO } from 'date-fns';
+import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx-js-style";
 
 const spaceFormSchema = z.object({
   buildingId: z.string().min(1, "Building is required."),
@@ -241,6 +244,47 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     }
   };
 
+  const exportToExcel = () => {
+    const dataToExport = filteredSpaces.map(s => ({
+      "Space ID": s.spaceIdName,
+      "Building": s.buildingName,
+      "Floor": s.floor,
+      "Area (m²)": s.area,
+      "Monthly Rent (Birr)": s.monthlyRentalPrice,
+      "Status": s.isOccupied ? 'Occupied' : 'Vacant',
+      "Proration Share (%)": Number(s.utilityProrationShare) * 100,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Spaces");
+    XLSX.writeFile(workbook, "Spaces_Export.xlsx");
+    toast({ title: "Exporting", description: "Excel file download has started." });
+  };
+  
+  const exportToPdf = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Space ID", "Building", "Floor", "Area (m²)", "Monthly Rent", "Status"];
+    const tableRows: any[][] = [];
+
+    filteredSpaces.forEach(s => {
+      const spaceData = [
+        s.spaceIdName,
+        s.buildingName,
+        s.floor,
+        s.area,
+        Number(s.monthlyRentalPrice).toLocaleString(),
+        s.isOccupied ? 'Occupied' : 'Vacant',
+      ];
+      tableRows.push(spaceData);
+    });
+
+    (doc as any).autoTable(tableColumn, tableRows, { startY: 20 });
+    doc.text("Spaces Data Export", 14, 15);
+    doc.save("Spaces_Export.pdf");
+    toast({ title: "Exporting", description: "PDF file download has started." });
+  };
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"/></div>;
   }
@@ -263,11 +307,19 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
         icon={Building2}
         description="Add, view, and manage rental spaces."
         actions={
-          canCreateSpaces && (
-            <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={buildings.length === 0 || isSaving}>
-              <PlusCircle className="mr-2 h-5 w-5" /> Add New Space
-            </Button>
-          )
+          <div className="flex flex-col sm:flex-row gap-2">
+            {isSuperAdmin && (
+              <>
+                <Button onClick={exportToPdf} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>PDF</Button>
+                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Excel</Button>
+              </>
+            )}
+            {canCreateSpaces && (
+              <Button onClick={openAddForm} className="bg-primary hover:bg-primary/90 text-primary-foreground" size="sm" disabled={buildings.length === 0 || isSaving}>
+                <PlusCircle className="mr-2 h-5 w-5" /> Add New Space
+              </Button>
+            )}
+          </div>
         }
       />
        {activeBuildings.length === 0 && isMounted && (
