@@ -1,8 +1,4 @@
 
-
-
-
-
 "use client";
 
 import React, {
@@ -441,16 +437,21 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const todayUtcDateString = new Date().toISOString().substring(0, 10);
     return agreements.filter((agreement) => {
       if (!agreement.tenant || !agreement.space) return false;
+      
+      // Only include active agreements
+      if (agreement.status !== 'Active') return false;
 
       const agreementStartDate = startOfDay(parseISO(agreement.startDate));
       const agreementEndDate = addMonths(
         agreementStartDate,
         agreement.paymentTermMonths,
       );
-      const isAgreementActive =
+      
+      const isWithinDateRange =
         !isBefore(today, agreementStartDate) &&
         !isAfter(today, agreementEndDate);
-      if (!isAgreementActive) return false;
+
+      if (!isWithinDateRange) return false;
 
       const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
       const isDueForGeneration = nextDueDateString <= todayUtcDateString;
@@ -573,6 +574,12 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const todayUtcDateString = new Date().toISOString().substring(0, 10);
 
     for (const agreement of agreements) {
+      // Only process active agreements
+      if (agreement.status !== 'Active') {
+        totalSkipped++;
+        continue;
+      }
+      
       let currentNextDueDate = agreement.nextPaymentDueDate;
       let generatedForThisAgreement = false;
       let stopProcessing = false;
