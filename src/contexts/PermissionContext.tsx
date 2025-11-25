@@ -15,7 +15,7 @@ interface PermissionContextType {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   callServerAction: <T extends (...args: any[]) => Promise<any>>(
-    action: T,
+    actionName: string,
     ...args: Parameters<T>
   ) => Promise<Awaited<ReturnType<T>> | { success: false; error: string; }>;
 }
@@ -63,19 +63,33 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
   }, []);
 
   const callServerAction = useCallback(async <T extends (...args: any[]) => Promise<any>>(
-    action: T,
+    actionName: string,
     ...args: Parameters<T>
   ): Promise<Awaited<ReturnType<T>> | { success: false; error: string; }> => {
+    const csrfToken = Cookies.get('nibrental_csrf_token');
+    
     try {
-      const result = await action(...args);
+      const response = await fetch('/api/actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': csrfToken || '',
+        },
+        body: JSON.stringify({ action: actionName, args: args }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'An unexpected server error occurred.');
+      }
+      
       return result;
     } catch (error: any) {
-      console.error('Server action failed:', error);
-      // This is crucial for handling errors that happen *before* the action returns
-      // e.g., middleware errors, network errors.
+      console.error(`Client-side error calling server action '${actionName}':`, error);
       return {
         success: false,
-        error: error.message || 'An unexpected error occurred.',
+        error: error.message || 'An unexpected error occurred while communicating with the server.',
       };
     }
   }, []);
