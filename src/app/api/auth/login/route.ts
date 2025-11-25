@@ -1,9 +1,10 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { databaseService } from '@/lib/services/databaseService';
 import bcrypt from 'bcryptjs';
 import { createSession, createUserPayload } from '@/lib/auth/jwt';
 import { rateLimiter } from '@/lib/auth/rate-limiter';
-import type { User, Role } from '@prisma/client';
+import type { User, Role, Building } from '@prisma/client';
 
 async function checkRateLimit(identifier: string) {
     const { success, limit, remaining, reset } = await rateLimiter(identifier);
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     
     const remainingAttempts = Math.min(ipLimit.remaining, phoneLimit.remaining);
 
-    const user = await databaseService.findUserByPhoneNumber(phone, { roles: true });
+    const user = await databaseService.findUserByPhoneNumber(phone, { roles: true, managedBuildings: true });
     
     if (!user) {
       return NextResponse.json({ message: `Invalid credentials. ${remainingAttempts} attempts remaining.` }, { status: 401 });
@@ -69,8 +70,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: `Invalid credentials. ${remainingAttempts} attempts remaining.` }, { status: 401 });
     }
 
+    // --- Building Status Check ---
+    const isSuperAdmin = user.roles.some(role => role.name === 'SUPER_ADMIN');
+    const isTenant = user.roles.some(role => role.name === 'TENANT');
+    
+    if (!isSuperAdmin && !isTenant && user.managedBuildings && user.managedBuildings.length > 0) {
+        const allManagedBuildingsAreInactive = user.managedBuildings.every(b => b.status === 'Inactive');
+        if (allManagedBuildingsAreInactive) {
+            return NextResponse.json({ message: "Login failed. All buildings you manage are currently inactive." }, { status: 403 });
+        }
+    }
+    // --- End Building Status Check ---
+
+
     // On successful login, create the session (both access and refresh tokens)
-    const payload = createUserPayload(user);
+    const payload = createUserPayload(user as User & { roles: Role[] });
     payload.forceChangePass = forceChangePass; // Ensure flag is set correctly
     await createSession(payload);
 

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -78,7 +77,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
-  const { hasPermission, isSuperAdmin } = usePermissions();
+  const { hasPermission, isSuperAdmin, handleApiCall } = usePermissions();
   const canCreateSpaces = isSuperAdmin || hasPermission('space:create');
   const canEditSpaces = isSuperAdmin || hasPermission('space:edit');
   const canDeleteSpaces = isSuperAdmin || hasPermission('space:delete');
@@ -158,15 +157,21 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
 
     let result;
     if (formMode === 'add') {
-      result = await createSpaceAction(spaceInputData);
+      result = await handleApiCall(() => createSpaceAction(spaceInputData as Prisma.SpaceCreateInput));
     } else {
       if (!currentSpaceId) {
         toast({ title: "Error", description: "Space ID is missing for update.", variant: "destructive" });
         setIsSaving(false);
         return;
       }
-      result = await updateSpaceAction(currentSpaceId, spaceInputData);
+      result = await handleApiCall(() => updateSpaceAction(currentSpaceId, spaceInputData as Prisma.SpaceUpdateInput));
     }
+    
+    if (!result) { // API call was handled by context (e.g. auth error)
+        setIsSaving(false);
+        return;
+    }
+
     setIsSaving(false);
 
     if (result.success) {
@@ -184,13 +189,14 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
        toast({ title: "Permission Denied", description: "You do not have permission to add spaces.", variant: "destructive" });
        return;
     }
-    if (buildings.length === 0) {
-      toast({ title: "No Buildings Found", description: "Please add a building first before adding spaces.", variant: "destructive"});
+    const activeBuildings = buildings.filter(b => b.status === 'Active');
+    if (activeBuildings.length === 0) {
+      toast({ title: "No Active Buildings", description: "Please add and activate a building first before adding spaces.", variant: "destructive"});
       return;
     }
     setFormMode('add');
     setCurrentSpaceId(null);
-    form.reset({ buildingId: buildings[0]?.id || "" });
+    form.reset({ buildingId: activeBuildings[0]?.id || "" });
     setIsFormOpen(true);
   };
 
@@ -219,7 +225,12 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
       return;
     }
     setIsSaving(true);
-    const result = await deleteSpaceAction(spaceToDelete.id);
+    const result = await handleApiCall(() => deleteSpaceAction(spaceToDelete.id));
+    if (!result) { // API call was handled by context
+        setIsSaving(false);
+        setSpaceToDelete(null);
+        return;
+    }
     setIsSaving(false);
     if (result.success) {
       toast({ title: "Space Deleted", description: "The space has been removed."});
@@ -243,6 +254,8 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
     );
   }
 
+  const activeBuildings = buildings.filter(b => b.status === 'Active');
+
   return (
     <div className="animate-fadeIn">
       <PageHeader
@@ -257,12 +270,12 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
           )
         }
       />
-       {buildings.length === 0 && isMounted && (
+       {activeBuildings.length === 0 && isMounted && (
         <Card className="mb-6 bg-yellow-50 border-yellow-300">
           <CardHeader>
-            <CardTitle className="text-yellow-700">No Buildings Found</CardTitle>
+            <CardTitle className="text-yellow-700">No Active Buildings Found</CardTitle>
             <CardDescription className="text-yellow-600">
-              You need to add buildings before you can add spaces. Please go to the "Buildings" page to register a building.
+              You need at least one active building before you can add spaces. Please go to the "Buildings" page to register or activate a building.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -293,7 +306,7 @@ export function SpacesClientPage({ initialSpaces, initialBuildings }: { initialS
                           <SelectTrigger><SelectValue placeholder="Select a building" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {buildings.map(building => (<SelectItem key={building.id} value={building.id}>{building.name}</SelectItem>))}
+                          {activeBuildings.map(building => (<SelectItem key={building.id} value={building.id}>{building.name}</SelectItem>))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

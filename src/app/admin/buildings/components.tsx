@@ -127,7 +127,7 @@ function BuildingCard({ building, onStatusToggle, canEdit, canApprove, canViewDe
         </CardContent>
       <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-2">
-           {canEdit && building.status === 'Active' && (
+           {canEdit && (building.status === 'Active' || building.status === 'Inactive') && (
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <div className="flex items-center space-x-2">
@@ -138,7 +138,7 @@ function BuildingCard({ building, onStatusToggle, canEdit, canApprove, canViewDe
                                 aria-label="Toggle building status"
                             />
                              <Label htmlFor={`status-switch-${building.id}`} className="text-xs text-muted-foreground">
-                                Active
+                                {building.status === 'Active' ? 'Active' : 'Inactive'}
                             </Label>
                         </div>
                     </TooltipTrigger>
@@ -208,7 +208,7 @@ function BuildingCard({ building, onStatusToggle, canEdit, canApprove, canViewDe
 export function BuildingsClientPage({ initialBuildings }: { initialBuildings: BuildingWithPenaltyTiers[] }) {
   const [buildings, setBuildings] = useState<BuildingWithPenaltyTiers[]>(initialBuildings);
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin } = usePermissions(); 
+  const { hasPermission, isSuperAdmin, handleApiCall } = usePermissions(); 
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -258,7 +258,9 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
   };
   
   const handleToggleStatus = async (buildingId: string, newStatus: BuildingStatus, rejectionReason?: string) => {
-      const result = await toggleBuildingStatusAction(buildingId, newStatus, rejectionReason);
+      const result = await handleApiCall(() => toggleBuildingStatusAction(buildingId, newStatus, rejectionReason));
+      if (!result) return;
+      
       if (result.success) {
           toast({ title: "Status Updated", description: `Building status set to ${newStatus}.` });
           router.refresh();

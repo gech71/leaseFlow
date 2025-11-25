@@ -131,6 +131,12 @@ export async function processImportAction(data: ImportData) {
 
             const buildingForSpace = await databaseService.getAllBuildings({ where: { name: space.buildingName }, take: 1 });
             if (buildingForSpace.length > 0) {
+                if (buildingForSpace[0].status !== 'Active') {
+                    errors.push(`Space Row ${row} (${space.spaceIdName}): Cannot import space into inactive building "${space.buildingName}".`);
+                    skippedCount.spaces++;
+                    continue;
+                }
+                
                 const existingSpace = await databaseService.getAllSpaces({ where: { buildingId: buildingForSpace[0].id, spaceIdName: space.spaceIdName }, take: 1 });
                 if (existingSpace.length === 0) {
                     await databaseService.createSpace({
@@ -256,6 +262,11 @@ export async function processImportAction(data: ImportData) {
             const buildingRecord = await databaseService.getAllBuildings({ where: { name: agreement.buildingName }, take: 1 });
 
             if (tenantRecord && buildingRecord.length > 0) {
+                if (buildingRecord[0].status !== 'Active') {
+                    errors.push(`Agreement Row ${row} ("${agreement.tenantEmail}"): Cannot create agreement in inactive building "${agreement.buildingName}".`);
+                    skippedCount.agreements++;
+                    continue;
+                }
                 const spaceRecord = await databaseService.getAllSpaces({ where: { buildingId: buildingRecord[0].id, spaceIdName: agreement.spaceIdName }, take: 1 });
 
                 if (spaceRecord.length > 0) {
@@ -269,7 +280,7 @@ export async function processImportAction(data: ImportData) {
                         const agreementData = {
                             tenantId: tenantRecord.id,
                             spaceId: spaceRecord[0].id,
-                            agreementTemplateId: data.agreementTemplateId, // Pass the ID
+                            agreementTemplateId: data.agreementTemplateId,
                             agreementText: "Agreement text generated via bulk import.",
                             startDate: startDate.toISOString(),
                             monthlyRentalPrice: sanitizeNumber(spaceRecord[0].monthlyRentalPrice),
