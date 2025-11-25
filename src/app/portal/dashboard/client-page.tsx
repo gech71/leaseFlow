@@ -194,13 +194,21 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
           return (
             <Card key={agreement.id} className="shadow-lg">
               <CardHeader>
-                <CardTitle className="font-headline text-xl flex items-center gap-3">
-                  <Home className="text-primary"/>
-                  Agreement for {agreement.space.spaceIdName}
-                </CardTitle>
-                <CardDescription>
-                  Building: {agreement.space.building.name}
-                </CardDescription>
+                <div className="flex justify-between items-start gap-4">
+                    <div>
+                        <CardTitle className="font-headline text-xl flex items-center gap-3">
+                        <Home className="text-primary"/>
+                        Agreement for {agreement.space.spaceIdName}
+                        </CardTitle>
+                        <CardDescription>
+                        Building: {agreement.space.building.name}
+                        </CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => handleDownloadAgreement(agreement)}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                </div>
               </CardHeader>
               <CardContent>
                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
@@ -315,10 +323,7 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
                 )}
               </CardContent>
               <CardFooter className="border-t pt-4">
-                  <Button variant="outline" onClick={() => handleDownloadAgreement(agreement)}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download Agreement
-                  </Button>
+                  {/* Footer can be used for actions if needed */}
               </CardFooter>
             </Card>
           )
