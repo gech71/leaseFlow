@@ -20,6 +20,7 @@ export interface Building {
   id: string;
   name: string;
   address?: string | null;
+  status: 'Active' | 'Inactive'; // Added status
   penaltyPolicyTiers: PenaltyTier[];
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
@@ -75,6 +76,7 @@ export interface Agreement {
   paymentTermMonths: number;
   initialPaymentMonths: number;
   nextPaymentDueDate: string; // ISO Date String
+  status: 'Active' | 'Canceled';
 
   initialPaymentAmount?: number | null;
   initialPaymentMethod?: string | null;
@@ -127,12 +129,13 @@ export interface Bill {
   utilityBreakdown: UtilityBreakdownItem[];
   penaltyAmount?: number | null;
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue';
+  status: 'Pending' | 'Paid' | 'Overdue' | 'PendingVerification';
   paymentDate?: string | null; // ISO Date String
   paymentMethod?: string | null;
   paymentReference?: string | null;
   bankOrWalletName?: string | null;
   paymentProofUrl?: string | null;
+  paymentProofDataUri?: string | null; // For tenant uploads
   adminVerifiedPayment?: boolean | null;
   tenantPaymentNotes?: string | null;
   adminVerificationNotes?: string | null;
@@ -151,7 +154,6 @@ export interface UserRole {
 
 export interface CurrentUser {
   id: string;
-  userId: string; // External ID
   email: string;
   name: string;
   firstName?: string | null;
@@ -208,8 +210,8 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     permissions: [
       { id: 'tenant:view', label: 'View' },
       { id: 'tenant:create', label: 'Create' },
-      { id: 'tenant:edit', label: 'Edit' }, 
-      { id: 'tenant:delete', label: 'Delete' },
+      { id: 'tenant:edit', label: 'Edit' },
+      { id: 'tenant:status', label: 'Change Status' },
     ],
   },
   {
@@ -218,8 +220,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     permissions: [
       { id: 'agreement:view', label: 'View' },
       { id: 'agreement:create', label: 'Create' },
-      { id: 'agreement:edit', label: 'Edit' }, 
-      { id: 'agreement:delete', label: 'Delete' },
+      { id: 'agreement:edit', label: 'Edit' },
     ],
   },
   {
@@ -237,7 +238,6 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: 'billing:view', label: 'View' },
       { id: 'billing:generate', label: 'Generate' },
       { id: 'billing:manage_payments', label: 'Manage Payments' },
-      { id: 'billing:delete', label: 'Delete' },
     ],
   },
   {
@@ -275,6 +275,13 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: 'Settings: Agreement Templates',
     permissions: [
       { id: 'settings:agreement_templates:manage', label: 'Manage' },
+    ],
+  },
+  {
+    resourceId: 'import',
+    resourceLabel: 'Data Import',
+    permissions: [
+      { id: 'import:manage', label: 'Manage' },
     ],
   },
    {

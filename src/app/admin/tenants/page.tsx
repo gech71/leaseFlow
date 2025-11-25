@@ -1,4 +1,5 @@
 
+
 export const dynamic = 'force-dynamic';
 
 import { databaseService } from '@/lib/services/databaseService';

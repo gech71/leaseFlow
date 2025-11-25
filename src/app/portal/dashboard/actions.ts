@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -112,17 +113,12 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
         bills: {
           orderBy: { billDate: "desc" },
         },
-        disabledAgreements: { // Fetch the disabled status
-            select: {
-                disabledById: true
-            }
-        }
       },
       orderBy: { createdAt: "asc" },
     });
 
     // Filter out disabled agreements before processing
-    const enabledAgreements = allAgreementsRaw.filter(ag => ag.disabledAgreements.length === 0);
+    const enabledAgreements = allAgreementsRaw.filter(ag => ag.status !== 'Canceled');
 
     const processedAgreements = enabledAgreements.map((ag) => {
       const processedBills = ag.bills.map((rawBill) => {

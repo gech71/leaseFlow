@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -230,5 +231,30 @@ export async function findUserByPhoneAction(
     return { success: false, error: "Tenant not found." };
   } catch (error: any) {
     return { success: false, error: "An internal error occurred." };
+  }
+}
+
+export async function toggleTenantStatusAction(
+  tenantId: string,
+  isActive: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { isSuperAdmin, currentUser } = await getUserAndManagedIds();
+    if (!isSuperAdmin) {
+      return { success: false, error: "Permission denied." };
+    }
+
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { status: isActive ? TenantStatus.Active : TenantStatus.Inactive },
+    });
+
+    revalidatePath("/admin/tenants");
+    return { success: true };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || "Failed to toggle tenant status.",
+    };
   }
 }

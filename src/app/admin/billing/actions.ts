@@ -23,9 +23,6 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
   // Define where clauses
   const agreementWhere: Prisma.AgreementWhereInput = {
     ...(!isSuperAdmin ? { space: { buildingId: { in: managedBuildingIds! } } } : {}),
-    disabledAgreements: {
-        none: { disabledById: currentUser.id }
-    }
   };
 
   const spaceWhere: Prisma.SpaceWhereInput = !isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {};
@@ -33,11 +30,6 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
   
   const billWhere: Prisma.BillWhereInput = {
     ...(!isSuperAdmin ? { agreement: { space: { buildingId: { in: managedBuildingIds! } } } } : {}),
-    agreement: {
-        disabledAgreements: {
-            none: { disabledById: currentUser.id }
-        }
-    }
   };
   
   const today = new Date();
@@ -67,7 +59,6 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
             building: { include: { penaltyPolicyTiers: true, spaces: true } } 
           }
         },
-        disabledAgreements: true
       },
       orderBy: { tenant: { name: 'asc' } }
     }),
@@ -89,7 +80,6 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
                 building: { include: { penaltyPolicyTiers: true, spaces: true } } 
               }
             },
-            disabledAgreements: true
           }
         }
       },
@@ -139,7 +129,6 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
             }))
         } : null
     } : null,
-    disabledAgreements: (ag.disabledAgreements || []).map(da => ({disabledById: da.disabledById}))
   })) as SerializedBillingPageData['agreements']; // Cast to ensure type match
 
   const serializedSpaces = spacesData.map(s => ({
@@ -262,7 +251,6 @@ export async function getBillingPageDataAction(): Promise<SerializedBillingPageD
                   }))
               } : null
           } : null,
-          disabledAgreements: (agreementForBill as any).disabledAgreements?.map((da: any) => ({disabledById: da.disabledById})) || []
       } : null,
     };
   }) as SerializedBillingPageData['bills'];
@@ -524,7 +512,7 @@ export async function recordPaymentOrVerificationAction(
     paymentDate: string; 
     paymentReference?: string | null;
     adminVerificationNotes?: string | null;
-    paymentProofUrl?: string | null; // Renamed from adminProofUrl for clarity
+    paymentProofDataUri?: string | null; 
   },
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
@@ -603,8 +591,8 @@ export async function recordPaymentOrVerificationAction(
       billUpdateData.paymentDate = finalPaymentDate;
       billUpdateData.adminVerifiedPayment = true;
       billUpdateData.paymentMethod = actionType === 'recordPayment' ? 'Manual' : bill.paymentMethod;
-      if (paymentData.paymentProofUrl) { // Use the renamed prop
-        billUpdateData.paymentProofUrl = paymentData.paymentProofUrl;
+      if (paymentData.paymentProofDataUri) { 
+        billUpdateData.paymentProofDataUri = paymentData.paymentProofDataUri;
       }
     } else if (actionType === 'rejectVerification') {
       newStatus = isBefore(parseISO(bill.dueDate.toISOString()), today) ? 'Overdue' : 'Pending';
@@ -667,7 +655,7 @@ export async function updateBillAdminDetailsAction(
   billId: string,
   data: {
     paymentReference?: string | null;
-    paymentProofUrl?: string | null;
+    paymentProofDataUri?: string | null;
     adminVerificationNotes?: string | null;
   }
 ) {
@@ -689,8 +677,8 @@ export async function updateBillAdminDetailsAction(
     if (data.paymentReference !== undefined) {
       updateData.paymentReference = data.paymentReference;
     }
-    if (data.paymentProofUrl !== undefined) {
-      updateData.paymentProofUrl = data.paymentProofUrl;
+    if (data.paymentProofDataUri !== undefined) {
+      updateData.paymentProofDataUri = data.paymentProofDataUri;
     }
     if (data.adminVerificationNotes !== undefined) {
       updateData.adminVerificationNotes = data.adminVerificationNotes;
