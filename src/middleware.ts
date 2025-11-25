@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifySession } from '@/lib/auth/jwt';
 import { PERMISSION_MAP } from '@/lib/auth-utils';
@@ -87,19 +88,19 @@ export async function middleware(request: NextRequest) {
      return NextResponse.redirect(new URL('/portal/dashboard', request.url));
   }
 
+  const userPermissions = new Set(session.permissions);
+  const isTenantOnly = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
+
   // Handle role-based authorization for admin routes
   if (pathname.startsWith('/admin')) {
-    if (session.isSuperAdmin) {
-      return response;
-    }
-
-    const userPermissions = new Set(session.permissions);
-    
-    const isTenantOnly = userPermissions.has('portal:view') && userPermissions.size === 1;
     if (isTenantOnly) {
       return NextResponse.redirect(new URL('/portal/dashboard', request.url));
     }
 
+    if (session.isSuperAdmin) {
+      return response;
+    }
+    
     const requiredPermission = Object.entries(PERMISSION_MAP).find(([pathPrefix]) => 
       pathname.startsWith(pathPrefix)
     )?.[1];
@@ -116,6 +117,14 @@ export async function middleware(request: NextRequest) {
         : "You do not have any assigned permissions to access the admin panel.";
       redirectUrl.searchParams.set("error", errorMessage);
       return NextResponse.redirect(redirectUrl);
+    }
+  }
+  
+  // Handle role-based authorization for portal routes
+  if (pathname.startsWith('/portal/') && !isPublicRoute) {
+    if (!isTenantOnly) {
+      // Any user who is NOT a tenant (e.g., an admin) trying to access the tenant portal is redirected.
+      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
     }
   }
 

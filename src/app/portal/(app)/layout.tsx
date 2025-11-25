@@ -30,16 +30,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
         if (!isAuthenticated) {
             router.replace('/login');
-            return;
         }
+        // Redirection logic for incorrect roles is now handled by the server-side middleware.
+        // This useEffect hook is now only responsible for handling unauthenticated users.
 
-        if (currentUser) {
-            const isNotTenant = currentUser.roles.some(r => r.name !== 'TENANT');
-            if (isNotTenant) {
-                router.replace('/admin/dashboard');
-            }
-        }
-    }, [isLoading, isAuthenticated, currentUser, router]);
+    }, [isLoading, isAuthenticated, router]);
 
     if (isLoading || !isAuthenticated || !currentUser) {
         return (
