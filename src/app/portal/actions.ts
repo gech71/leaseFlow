@@ -10,6 +10,8 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
 import { verifySession } from '@/lib/auth/jwt';
+import { revalidatePath } from 'next/cache';
+
 
 // --- User Authentication Helper ---
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
@@ -101,5 +103,52 @@ export async function sendContactEmailAction(formData: {
       success: false,
       error: `Failed to send message: ${error.message}`,
     };
+  }
+}
+
+export async function submitPaymentProofAction(data: {
+  billId: string;
+  paymentProofDataUri: string; // Changed from paymentProofUrl to accept data URI
+  notes?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: "Authentication required." };
+    }
+    
+    const bill = await prisma.bill.findUnique({
+      where: { id: data.billId },
+      include: { agreement: { include: { tenant: true } } }
+    });
+
+    if (!bill || bill.agreement?.tenant?.userId !== currentUser.id) {
+      return { success: false, error: "Bill not found or you do not have permission to modify it." };
+    }
+    
+    if (bill.status !== 'Pending' && bill.status !== 'Overdue') {
+      return { success: false, error: `Cannot submit proof for a bill with status "${bill.status}".` };
+    }
+    
+    // Check data URI size before saving
+    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) { // 2MB limit
+      return { success: false, error: "The uploaded PDF file is too large. Please upload a file smaller than 2MB." };
+    }
+
+    await databaseService.updateBill(data.billId, {
+      status: 'PendingVerification',
+      paymentProofDataUri: data.paymentProofDataUri, // Save the data URI
+      tenantPaymentNotes: data.notes,
+      paymentDate: new Date(), // Set payment date to when proof is submitted
+    });
+    
+    revalidatePath('/portal/dashboard');
+    revalidatePath('/admin/billing'); // Also revalidate admin page
+
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error submitting payment proof:", error);
+    return { success: false, error: "Failed to submit payment proof." };
   }
 }

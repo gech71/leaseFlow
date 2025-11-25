@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { submitPaymentProofAction } from './actions';
+import { submitPaymentProofAction } from '../actions';
 import { useDropzone } from 'react-dropzone';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
