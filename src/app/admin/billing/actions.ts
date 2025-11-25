@@ -9,6 +9,7 @@ import { addMonths, getMonth, getYear, startOfDay, differenceInDays, isBefore, s
 import type { SerializedBillingPageData, SerializedParsedUtilityItem } from './page'; // Import serialized types from page.tsx for return type
 import { cookies } from 'next/headers';
 import { getUserAndManagedIds } from '@/lib/actions/server-helpers';
+import { prisma } from '@/lib/prisma';
 
 const EPOCH_ISO_STRING = new Date(0).toISOString();
 
@@ -517,7 +518,7 @@ export async function recordPaymentOrVerificationAction(
   actionType: 'recordPayment' | 'confirmVerification' | 'rejectVerification'
 ) {
   try {
-    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
     const bill = await databaseService.getBillById(billId, { 
       agreement: {                                       
         include: {                                       
@@ -619,8 +620,32 @@ export async function recordPaymentOrVerificationAction(
 
     billUpdateData.status = newStatus;
     const updatedBill = await databaseService.updateBill(billId, billUpdateData);
+    
+    // --- Create Audit Log Entry on successful payment ---
+    if (newStatus === 'Paid' && bill.agreement?.space) {
+        await prisma.auditLog.create({
+            data: {
+                actorId: currentUser.id,
+                actorName: currentUser.name || currentUser.email,
+                action: actionType,
+                tenantId: bill.tenantId,
+                tenantName: bill.agreement.tenant?.name || 'N/A',
+                buildingId: bill.agreement.space.buildingId,
+                buildingName: bill.agreement.space.buildingName,
+                spaceName: bill.agreement.space.spaceIdName,
+                paymentDate: finalPaymentDate,
+                rentAmount: bill.rentAmount,
+                utilityAmount: utilityBreakdownItems.reduce((sum, util) => sum + util.amount, 0),
+                penaltyAmount: currentPenalty,
+                totalAmount: billUpdateData.totalAmount as number,
+                transactionId: paymentData.paymentReference || bill.paymentReference,
+                toAccountNumber: bill.agreement.space.building.accountNumber,
+            }
+        });
+    }
 
     revalidatePath('/admin/billing');
+    revalidatePath('/admin/audit-log');
     
     let parsedUtilityBreakdown: any[] = [];
     if (typeof updatedBill.utilityBreakdown === 'string') {

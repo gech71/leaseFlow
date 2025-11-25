@@ -14,6 +14,8 @@ async function main() {
     console.log("Deleted ArifPayments");
     await prisma.bill.deleteMany({});
     console.log("Deleted Bills");
+    await prisma.auditLog.deleteMany({});
+    console.log("Deleted AuditLogs");
     await prisma.agreement.deleteMany({});
     console.log("Deleted Agreements");
     await prisma.buildingUtilityItem.deleteMany({});
@@ -72,6 +74,7 @@ async function main() {
         "payment_overview:view",
         "building_utility:view",
         "building_utility:save",
+        "audit:view",
         "settings:user_registration:manage",
         "settings:user_management:view",
         "settings:user_management:assign",

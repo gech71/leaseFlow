@@ -13,7 +13,8 @@ import type {
   User, 
   Role,
   AgreementTemplate,
-  ArifPayment
+  ArifPayment,
+  AuditLog
 } from '@prisma/client';
 
 export class DatabaseService {
@@ -436,6 +437,15 @@ export class DatabaseService {
   
   async updateArifPayment(id: string, data: Prisma.ArifPaymentUpdateInput): Promise<ArifPayment> {
     return prisma.arifPayment.update({ where: { id }, data });
+  }
+  
+  // --- AuditLog ---
+  async createAuditLog(data: Prisma.AuditLogCreateInput): Promise<AuditLog> {
+    return prisma.auditLog.create({ data });
+  }
+
+  async getAllAuditLogs(params?: Prisma.AuditLogFindManyArgs): Promise<AuditLog[]> {
+    return prisma.auditLog.findMany(params);
   }
 }
 

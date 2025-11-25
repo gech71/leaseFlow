@@ -1,3 +1,4 @@
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -6,13 +7,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
-
-// ==============================================================
-// Models
-// ==============================================================
 
 enum BuildingStatus {
   Pending
@@ -22,41 +20,41 @@ enum BuildingStatus {
 }
 
 model Building {
-  id                      String                     @id @default(cuid())
-  name                    String                     @unique
+  id                      String                    @id @default(cuid())
+  name                    String                    @unique
   address                 String?
   accountNumber           String
-  status                  BuildingStatus             @default(Pending)
+  status                  BuildingStatus            @default(Active)
   rejectionReason         String?
-  createdAt               DateTime                   @default(now())
-  updatedAt               DateTime                   @updatedAt
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime?                 @updatedAt
   spaces                  Space[]
   buildingMonthlyUtilities BuildingMonthlyUtilities[]
   penaltyPolicyTiers      PenaltyTier[]
+  managers                User[]                    @relation("ManagedBuildings")
   createdById             String?
-  createdBy               User?                      @relation("CreatedBuildings", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy               User?                     @relation("CreatedBuildings", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
   approvedById            String?
-  approvedBy              User?                      @relation("ApprovedBuildings", fields: [approvedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  managers                User[]                     @relation("ManagedBuildings")
+  approvedBy              User?                     @relation("ApprovedBuildings", fields: [approvedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  auditLogs               AuditLog[]
 }
-
 
 model Space {
   id                    String      @id @default(cuid())
   buildingId            String
   buildingName          String
   spaceIdName           String
-  area                  Decimal     @db.Decimal(10, 2)
+  area                  Decimal
   floor                 String
-  utilityProrationShare Decimal     @db.Decimal(5, 4) // e.g., 0.05 for 5%
-  monthlyRentalPrice    Decimal     @db.Decimal(12, 2)
+  utilityProrationShare Decimal     @default(0)
+  monthlyRentalPrice    Decimal
   isOccupied            Boolean     @default(false)
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  building              Building    @relation(fields: [buildingId], references: [id], onDelete: Restrict)
-  agreements            Agreement[]
   tenantId              String?     @unique
   tenant                Tenant?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime?   @updatedAt
+  building              Building    @relation(fields: [buildingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  agreements            Agreement[]
 
   @@unique([buildingId, spaceIdName])
 }
@@ -72,20 +70,20 @@ model Tenant {
   email               String       @unique
   phone               String       @unique
   alternativePhone    String?
-  nationalId          String?
+  nationalId          String?      @unique
   representativeName  String?
   representativePhone String?
   status              TenantStatus @default(Active)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
   userId              String?      @unique
-  user                User?        @relation("TenantProfile", fields: [userId], references: [id], onDelete: SetNull)
-  agreements          Agreement[]
-  bills               Bill[]
+  user                User?        @relation("TenantProfile", fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   rentedSpaceId       String?      @unique
   rentedSpace         Space?       @relation(fields: [rentedSpaceId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   createdById         String?
-  createdBy           User?        @relation("CreatedTenants", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy           User?        @relation("CreatedTenants", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime?    @updatedAt
+  agreements          Agreement[]
+  bills               Bill[]
 }
 
 enum AgreementStatus {
@@ -94,37 +92,36 @@ enum AgreementStatus {
 }
 
 model Agreement {
-  id                   String            @id @default(cuid())
-  tenantId             String
-  spaceId              String
-  agreementTemplateId  String
-  agreementText        String            @db.Text
-  startDate            DateTime
-  monthlyRentalPrice   Decimal           @db.Decimal(12, 2)
-  additionalTerms      String?           @db.Text
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  paymentTermMonths    Int
-  initialPaymentMonths Int
-  nextPaymentDueDate   DateTime
-  status               AgreementStatus   @default(Active)
-  initialPaymentAmount Decimal?          @db.Decimal(12, 2)
-  initialPaymentDate   DateTime?
-  endDate              DateTime?
-  tenant               Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  space                Space             @relation(fields: [spaceId], references: [id], onDelete: Restrict)
-  agreementTemplate    AgreementTemplate @relation(fields: [agreementTemplateId], references: [id], onDelete: Restrict)
-  bills                Bill[]
-  arifPayments         ArifPayment[]
+  id                          String             @id @default(cuid())
+  tenantId                    String
+  spaceId                     String
+  agreementTemplateId         String
+  agreementText               String             @db.Text
+  startDate                   DateTime
+  monthlyRentalPrice            Decimal
+  additionalTerms             String?            @db.Text
+  createdAt                   DateTime           @default(now())
+  updatedAt                   DateTime?          @updatedAt
+  paymentTermMonths           Int
+  initialPaymentMonths        Int
+  nextPaymentDueDate          DateTime
+  status                      AgreementStatus    @default(Active)
+  initialPaymentAmount        Decimal?
+  initialPaymentDate          DateTime?
+  endDate                     DateTime?
+  tenant                      Tenant             @relation(fields: [tenantId], references: [id], onUpdate: NoAction)
+  space                       Space              @relation(fields: [spaceId], references: [id], onUpdate: NoAction)
+  agreementTemplate           AgreementTemplate  @relation(fields: [agreementTemplateId], references: [id], onUpdate: NoAction)
+  bills                       Bill[]
+  arifPayments                ArifPayment[]
 }
-
 
 model AgreementTemplate {
   id          String      @id @default(cuid())
   name        String      @unique
   content     String      @db.Text
   createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  updatedAt   DateTime?   @updatedAt
   createdById String?
   createdBy   User?       @relation("CreatedTemplates", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: NoAction)
   Agreement   Agreement[]
@@ -138,32 +135,27 @@ enum BillStatus {
 }
 
 model Bill {
-  id                      String      @id @default(cuid())
-  agreementId             String
-  tenantId                String
-  billDate                DateTime
-  dueDate                 DateTime
-  rentAmount              Decimal     @db.Decimal(12, 2)
-  utilityBreakdown        Json?
-  penaltyAmount           Decimal?    @db.Decimal(12, 2)
-  totalAmount             Decimal     @db.Decimal(12, 2)
-  status                  BillStatus  @default(Pending)
-  paymentDate             DateTime?
-  paymentMethod           String?
-  paymentReference        String?
-  paymentProofDataUri     String?
-  tenantPaymentNotes      String?
-  adminVerifiedPayment    Boolean?    @default(false)
-  adminVerificationNotes  String?
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
-  arifPaymentId           String?
-  agreement               Agreement   @relation(fields: [agreementId], references: [id], onDelete: Cascade)
-  tenant                  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  ArifPayment             ArifPayment? @relation(fields: [arifPaymentId], references: [id])
-
-  @@index([agreementId])
-  @@index([tenantId])
+  id                       String      @id @default(cuid())
+  agreementId              String
+  tenantId                 String
+  billDate                 DateTime
+  dueDate                  DateTime
+  rentAmount               Decimal
+  utilityBreakdown         Json?
+  penaltyAmount            Decimal?
+  totalAmount              Decimal
+  status                   BillStatus  @default(Pending)
+  paymentDate              DateTime?
+  paymentMethod            String? // "Cash", "Check", "NIB", "Arif"
+  paymentReference         String?
+  paymentProofDataUri      String?     @db.Text
+  tenantPaymentNotes       String?     @db.Text
+  adminVerifiedPayment     Boolean?
+  adminVerificationNotes   String?     @db.Text
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime?   @updatedAt
+  agreement                Agreement   @relation(fields: [agreementId], references: [id], onUpdate: NoAction)
+  tenant                   Tenant      @relation(fields: [tenantId], references: [id], onUpdate: NoAction)
 }
 
 model BuildingMonthlyUtilities {
@@ -173,8 +165,8 @@ model BuildingMonthlyUtilities {
   year         Int
   month        Int // 0-11 for Jan-Dec
   createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
-  building     Building              @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  updatedAt    DateTime?             @updatedAt
+  building     Building              @relation(fields: [buildingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   utilities    BuildingUtilityItem[]
 
   @@unique([buildingId, year, month])
@@ -183,56 +175,52 @@ model BuildingMonthlyUtilities {
 model BuildingUtilityItem {
   id                      String                    @id @default(cuid())
   name                    String
-  totalCost               Decimal                   @db.Decimal(12, 2)
-  appliesToScope          String // Building, Floor, SpecificSpaces
+  totalCost               Decimal
+  appliesToScope          String // "Building", "Floor", "SpecificSpaces"
   applicableFloor         String?
   applicableSpaceIdNames  String[]
-  perSpaceAllocation      String?
+  perSpaceAllocation      String? // JSON string for floor scope, e.g., {"spaceId1": 50, "spaceId2": 50}
   monthlyUtilitiesId      String?
   monthlyUtilities        BuildingMonthlyUtilities? @relation(fields: [monthlyUtilitiesId], references: [id], onDelete: Cascade)
 }
 
-enum PenaltyFrequency {
-  OneTime
-  Daily
-}
-
 model PenaltyTier {
-  id                   String           @id @default(cuid())
-  fromDay              Int
-  toDay                Int?
-  penaltyType          String // Fixed, Percentage
-  feeValue             Decimal          @db.Decimal(12, 2)
-  scope                String // Building, Floor, SpecificSpaces
-  applicableFloor      String?
+  id                     String    @id @default(cuid())
+  buildingId             String?
+  fromDay                Int
+  toDay                  Int?
+  penaltyType            String // "Fixed" or "Percentage"
+  frequency              String // "OneTime" or "Daily"
+  feeValue               Decimal
+  scope                  String // "Building", "Floor", "SpecificSpaces"
+  applicableFloor        String?
   applicableSpaceIdNames String[]
-  buildingId           String?
-  building             Building?        @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  frequency            PenaltyFrequency @default(OneTime)
+  building               Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 }
 
 model User {
-  id               String              @id @default(cuid())
-  email            String              @unique
-  name             String?
-  firstName        String?
-  lastName         String?
-  phoneNumber      String              @unique
-  password         String?
-  tempPassword     String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  createdById      String?
-  createdBy        User?               @relation("CreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  createdUsers     User[]              @relation("CreatedBy")
-  roles            Role[]
-  managedBuildings Building[]          @relation("ManagedBuildings")
-  createdBuildings Building[]          @relation("CreatedBuildings")
-  approvedBuildings Building[]          @relation("ApprovedBuildings")
-  createdTenants   Tenant[]            @relation("CreatedTenants")
-  tenantProfile    Tenant?             @relation("TenantProfile")
-  createdRoles     Role[]              @relation("CreatedRoles")
-  createdTemplates AgreementTemplate[] @relation("CreatedTemplates")
+  id                  String              @id @default(cuid())
+  email               String              @unique
+  name                String?
+  firstName           String?
+  lastName            String?
+  phoneNumber         String              @unique
+  password            String?
+  tempPassword        String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime?           @updatedAt
+  createdById         String?
+  createdBy           User?               @relation("CreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdUsers        User[]              @relation("CreatedBy")
+  roles               Role[]              @relation("UserRoles")
+  managedBuildings    Building[]          @relation("ManagedBuildings")
+  createdBuildings    Building[]          @relation("CreatedBuildings")
+  approvedBuildings   Building[]          @relation("ApprovedBuildings")
+  createdTenants      Tenant[]            @relation("CreatedTenants")
+  createdRoles        Role[]              @relation("CreatedRoles")
+  createdTemplates    AgreementTemplate[] @relation("CreatedTemplates")
+  tenantProfile       Tenant?             @relation("TenantProfile")
+  auditLogs           AuditLog[]
 }
 
 model Role {
@@ -242,31 +230,49 @@ model Role {
   permissions String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  users       User[]
   createdById String?
-  createdBy   User?    @relation("CreatedRoles", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy   User?    @relation("CreatedRoles", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  users       User[]   @relation("UserRoles")
+}
+
+model ArifPayment {
+  id             String     @id @default(cuid())
+  sessionId      String     @unique
+  billId         String
+  amount         Decimal
+  status         String     @default("Pending")
+  paymentDetails Json?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime?  @updatedAt
+  agreement      Agreement? @relation(fields: [agreementId], references: [id])
+  agreementId    String?
 }
 
 model RateLimit {
   identifier     String   @id
-  attempts       Int      @default(1)
-  firstAttemptAt DateTime @default(now())
+  attempts       Int
+  firstAttemptAt DateTime
 }
 
-
-model ArifPayment {
-  id               String    @id @default(cuid())
-  sessionId        String    @unique
-  checkoutUrl      String
-  totalAmount      Decimal
-  status           String    @default("PENDING")
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  agreementId      String
-  billIds          String[]
-  arifTransactionId String?
-  agreement        Agreement @relation(fields: [agreementId], references: [id], onDelete: Restrict)
-  bills            Bill[]
-
-  @@index([sessionId])
+model AuditLog {
+  id              String   @id @default(cuid())
+  actorId         String
+  actorName       String
+  action          String // e.g., "confirmVerification", "recordPayment"
+  tenantId        String
+  tenantName      String
+  buildingId      String
+  buildingName    String
+  spaceName       String
+  paymentDate     DateTime
+  rentAmount      Decimal
+  utilityAmount   Decimal
+  penaltyAmount   Decimal
+  totalAmount     Decimal
+  transactionId   String?
+  toAccountNumber String?
+  createdAt       DateTime @default(now())
+  
+  building Building @relation(fields: [buildingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  actor    User     @relation(fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

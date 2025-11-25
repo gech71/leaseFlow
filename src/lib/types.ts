@@ -20,7 +20,7 @@ export interface Building {
   id: string;
   name: string;
   address?: string | null;
-  status: 'Pending' | 'Active' | 'Rejected'; // Updated status
+  status: 'Pending' | 'Active' | 'Rejected' | 'Inactive';
   rejectionReason?: string | null;
   penaltyPolicyTiers: PenaltyTier[];
   createdAt: string; // ISO Date String
@@ -247,6 +247,13 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: 'Payments Overview',
     permissions: [
       { id: 'payment_overview:view', label: 'View' },
+    ],
+  },
+  {
+    resourceId: 'audit',
+    resourceLabel: 'Audit Log',
+    permissions: [
+      { id: 'audit:view', label: 'View' },
     ],
   },
   {

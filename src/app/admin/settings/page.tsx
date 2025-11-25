@@ -4,7 +4,7 @@
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Users, ShieldCheck, Mail, KeyRound, FileText, UploadCloud } from 'lucide-react';
+import { UserPlus, Users, ShieldCheck, Mail, KeyRound, FileText, UploadCloud, History } from 'lucide-react';
 import Link from 'next/link';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { useRouter } from 'next/navigation';
@@ -19,8 +19,9 @@ export default function SettingsPage() {
   const canManageRoleManagement = isSuperAdmin || hasAnyPermission(['settings:role_management:view', 'settings:role_management:manage']);
   const canManageAgreementTemplates = isSuperAdmin || hasAnyPermission(['settings:agreement_templates:manage']);
   const canManageImport = isSuperAdmin || hasAnyPermission(['import:manage']);
+  const canViewAuditLog = isSuperAdmin || hasAnyPermission(['audit:view']);
 
-  const canViewAnySettings = canManageUserRegistration || canManageUserManagement || canManageRoleManagement || canManageAgreementTemplates || canManageImport;
+  const canViewAnySettings = canManageUserRegistration || canManageUserManagement || canManageRoleManagement || canManageAgreementTemplates || canManageImport || canViewAuditLog;
 
   useEffect(() => {
     if (!canViewAnySettings) {
@@ -73,6 +74,15 @@ export default function SettingsPage() {
       details: "Use an Excel template to quickly upload multiple records into the system at once.",
       icon: UploadCloud,
       buttonText: "Go to Import Tool",
+    },
+    {
+      show: canViewAuditLog,
+      href: "/admin/audit-log",
+      title: "Audit Log",
+      description: "View a read-only log of all financial transactions.",
+      details: "Review a detailed history of all recorded payments, including amounts, dates, and references.",
+      icon: History,
+      buttonText: "View Audit Log",
     },
   ];
 
