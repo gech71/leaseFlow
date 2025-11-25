@@ -94,7 +94,7 @@ export function TenantDashboardClientPage({ initialData }: TenantDashboardClient
             setIsProofDialogOpen(false);
             setProofFile(null);
             setPaymentNotes('');
-            router.refresh();
+            window.location.reload();
         } else {
             toast({ title: "Submission Failed", description: result.error, variant: "destructive" });
         }
