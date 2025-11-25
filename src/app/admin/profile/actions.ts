@@ -24,14 +24,19 @@ export async function changePassword(values: z.infer<typeof changePasswordSchema
   const { currentPassword, newPassword } = validatedData.data;
 
   const user = await databaseService.getUserById(sessionUser.userId);
-  if (!user || !user.password) {
-    throw new Error("User not found or password not set.");
+  if (!user) {
+    throw new Error("User not found.");
   }
 
-  const passwordsMatch = await bcrypt.compare(currentPassword, user.password);
-  if (!passwordsMatch) {
-    throw new Error("The current password you entered is incorrect.");
+  // If user has a temp password, currentPassword validation is skipped.
+  // But if they have a main password, we must validate it.
+  if (user.password) {
+    const passwordsMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!passwordsMatch) {
+      throw new Error("The current password you entered is incorrect.");
+    }
   }
+
 
   const hashedNewPassword = await bcrypt.hash(newPassword, 10);
   await databaseService.updateUser(user.id, {

@@ -13,7 +13,7 @@ interface PermissionContextType {
   isSuperAdmin: boolean;
   isLoading: boolean;
   isAuthenticated: boolean;
-  logout: () => Promise<void>;
+  logout: (sessionExpired?: boolean) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -41,7 +41,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     setIsLoading(false);
   }, [initialUser]);
 
-  const logout = async () => {
+  const logout = useCallback(async (sessionExpired = false) => {
     try {
         const csrfToken = Cookies.get('nibrental_csrf_token');
         await fetch('/api/auth/logout', { 
@@ -56,9 +56,14 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode, initialUs
     } finally {
         setCurrentUser(null);
         setIsAuthenticated(false);
-        window.location.href = '/login';
+        const loginUrl = new URL('/login', window.location.origin);
+        if (sessionExpired) {
+          loginUrl.searchParams.set('error', 'session_expired');
+          loginUrl.searchParams.set('from', window.location.pathname);
+        }
+        window.location.href = loginUrl.toString();
     }
-  };
+  }, []);
   
   const refreshUser = useCallback(async () => {
     // This function is likely no longer needed as data is fetched on the server.

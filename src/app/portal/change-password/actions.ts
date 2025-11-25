@@ -12,8 +12,13 @@ const changePasswordSchema = z.object({
 
 export async function changePassword(values: z.infer<typeof changePasswordSchema>): Promise<{ success: boolean; error?: string }> {
   const sessionUser = await verifySession();
-  if (!sessionUser?.forceChangePass) {
-    throw new Error("Authentication required or not a forced password change session.");
+  if (!sessionUser) {
+    throw new Error("Authentication required.");
+  }
+
+  // This action should only work if the user is in a "force change" state.
+  if (!sessionUser.forceChangePass) {
+    throw new Error("This action is only for initial password setup.");
   }
 
   const validatedData = changePasswordSchema.safeParse(values);
