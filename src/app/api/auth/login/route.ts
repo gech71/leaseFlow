@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { databaseService } from '@/lib/services/databaseService';
 import bcrypt from 'bcryptjs';
@@ -11,14 +12,8 @@ async function checkRateLimit(identifier: string) {
 }
 
 export async function POST(request: NextRequest) {
-  // --- CSRF Protection ---
-  const csrfTokenFromHeader = request.headers.get('x-csrf-token');
-  const csrfTokenFromCookie = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
-
-  if (!csrfTokenFromHeader || !csrfTokenFromCookie || csrfTokenFromHeader !== csrfTokenFromCookie) {
-    return NextResponse.json({ message: "Invalid CSRF token." }, { status: 403 });
-  }
-  // --- End CSRF Protection ---
+  // CSRF protection is now implicitly handled by the browser's SameSite cookie policy.
+  // No need to check for a custom header.
 
   try {
     const body = await request.json();

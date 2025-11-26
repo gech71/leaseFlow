@@ -1,10 +1,8 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { CurrentUser } from '@/lib/types';
-import Cookies from 'js-cookie'; 
 import { getUserSessionAction } from '@/lib/actions/server-helpers';
 import { useToast } from '@/hooks/use-toast';
 
@@ -42,12 +40,10 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   
   const logout = useCallback(async (sessionExpired = false) => {
     try {
-        const csrfToken = Cookies.get('nibrental_csrf_token');
         await fetch('/api/auth/logout', { 
             method: 'POST',
              headers: {
                 'Content-Type': 'application/json',
-                'x-csrf-token': csrfToken || '',
             }
         });
     } catch (error) {

@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { usePermissions } from "@/contexts/PermissionContext";
-import Cookies from 'js-cookie';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -61,12 +60,12 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const csrfToken = Cookies.get('nibrental_csrf_token');
+      // CSRF token is now handled automatically by the browser via HttpOnly cookie.
+      // No need to send a custom header.
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-csrf-token': csrfToken || '',
         },
         body: JSON.stringify({ phone, password }),
       });

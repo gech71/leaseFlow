@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSessionCookieNames } from '@/lib/auth/jwt';
 
@@ -7,6 +8,7 @@ export async function POST(request: NextRequest) {
   // Clear all session-related cookies
   const cookieNames = getSessionCookieNames();
   cookieNames.forEach(name => {
+    // Setting a cookie with an expiration date in the past effectively deletes it.
     response.cookies.set(name, '', { expires: new Date(0), path: '/' });
   });
 
