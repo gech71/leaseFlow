@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import Link from 'next/link';
@@ -107,7 +106,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
     setIsLoggingOut(false);
   };
   
-  const userInitials = currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'AD';
+  const userInitials = (currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'AD';
 
   const availableNavItems = allNavItems.filter(item => {
     // A special check for the generic settings link
