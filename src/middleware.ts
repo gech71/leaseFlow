@@ -1,4 +1,3 @@
-
 import { NextResponse, type NextRequest } from "next/server";
 import {
   verifySession,
@@ -46,6 +45,7 @@ export async function middleware(request: NextRequest) {
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tiny.cloud;
     img-src 'self' data: https://cdn.tiny.cloud;
     font-src 'self' https://fonts.gstatic.com;
+    frame-ancestors 'none';
     connect-src 'self';
     frame-src 'self' https://cdn.tiny.cloud;
     object-src 'none';
@@ -100,7 +100,9 @@ export async function middleware(request: NextRequest) {
   // --- Priority #1: Handle forced password change ---
   if (session.forceChangePass) {
     if (!pathname.startsWith("/portal/change-password")) {
-      return NextResponse.redirect(new URL("/portal/change-password", request.url));
+      return NextResponse.redirect(
+        new URL("/portal/change-password", request.url),
+      );
     }
     return response; // Allow access to the change password page
   }
@@ -108,7 +110,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/portal/change-password")) {
     return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
-  
+
   // --- Role-based Routing Logic ---
   const userPermissions = new Set(session.permissions);
   const isTenantOnly =
@@ -146,7 +148,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Handle Portal Routes
-  if (pathname.startsWith("/portal/") && !isPublicRoute && !pathname.startsWith('/portal/change-password')) {
+  if (
+    pathname.startsWith("/portal/") &&
+    !isPublicRoute &&
+    !pathname.startsWith("/portal/change-password")
+  ) {
     if (!isTenantOnly) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
