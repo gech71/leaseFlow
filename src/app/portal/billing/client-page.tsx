@@ -198,8 +198,8 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                           </div>
                            <div className="text-xs text-muted-foreground pl-6 space-y-0.5 mt-1">
                               <div>Rent: {Number(bill.rentAmount).toFixed(2)}</div>
-                              {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 && (
-                                <div>Utilities: {bill.utilityBreakdown.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}</div>
+                              {(bill.utilityBreakdown || []).length > 0 && (
+                                <div>Utilities: {(bill.utilityBreakdown || []).reduce((sum, item) => sum + item.amount, 0).toFixed(2)}</div>
                               )}
                               {bill.penaltyAmount && Number(bill.penaltyAmount) > 0 && (
                                 <div className="text-destructive">Penalty: {Number(bill.penaltyAmount).toFixed(2)}</div>
