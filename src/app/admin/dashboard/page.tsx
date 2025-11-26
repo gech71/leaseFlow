@@ -186,6 +186,11 @@ export default function AdminDashboardPage() {
                 const spaceName = agreement?.space?.spaceIdName || "a space";
                 let actionText = "";
                 let billDueDateFormatted = format(parseISO(bill.billDate), 'PP');
+                
+                const safeTenantName = tenantName || '';
+                const nameParts = safeTenantName.split(' ');
+                const initials = (nameParts[0]?.[0] || '') + (nameParts.length > 1 ? nameParts[nameParts.length - 1]?.[0] || '' : '');
+
 
                 switch(bill.status) {
                     case "Paid": actionText = `paid bill for ${spaceName}.`; break;
@@ -199,7 +204,7 @@ export default function AdminDashboardPage() {
                     user: bill.status === "PendingVerification" ? tenantName : "System",
                     action: actionText,
                     time: format(parseISO(bill.billDate), 'PPp'),
-                    avatar: tenantName.substring(0,2).toUpperCase()
+                    avatar: initials.toUpperCase()
                 }
             });
     }, [allData]);
