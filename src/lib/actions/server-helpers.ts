@@ -107,7 +107,7 @@ export async function getUserSessionAction(): Promise<{
     const currentUserData: CurrentUser = {
       id: localUser.id,
       email: localUser.email,
-      name: localUser.name || `${localUser.firstName} ${localUser.lastName}`.trim(),
+      name: localUser.name || `${localUser.firstName || ''} ${localUser.lastName || ''}`.trim() || localUser.email,
       firstName: localUser.firstName,
       lastName: localUser.lastName,
       phoneNumber: localUser.phoneNumber,
