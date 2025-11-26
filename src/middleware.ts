@@ -34,6 +34,9 @@ export async function middleware(request: NextRequest) {
 
   let response = NextResponse.next();
 
+  // --- Always apply CSP first ---
+  response = applyCSP(response);
+
   // --- CSRF Token ---
   const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
   if (!csrfToken) {
@@ -45,7 +48,7 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // Skip static files
+  // Skip static files for auth/session logic but CSP already applied
   if (pathname.includes(".") && !pathname.startsWith("/api")) {
     return response;
   }
@@ -55,7 +58,7 @@ export async function middleware(request: NextRequest) {
   const isApiAuthRoute = pathname.startsWith("/api/auth");
 
   if (isPublicRoute || isApiAuthRoute) {
-    return applyCSP(request, response);
+    return response;
   }
 
   // --- Verify Session ---
@@ -74,7 +77,7 @@ export async function middleware(request: NextRequest) {
     }
 
     loginUrl.searchParams.set("error", "session_expired");
-    return applyCSP(request, NextResponse.redirect(loginUrl));
+    return NextResponse.redirect(loginUrl);
   }
 
   // --- Force Change Password ---
@@ -82,9 +85,8 @@ export async function middleware(request: NextRequest) {
     session.forceChangePass &&
     !pathname.startsWith("/portal/change-password")
   ) {
-    return applyCSP(
-      request,
-      NextResponse.redirect(new URL("/portal/change-password", request.url)),
+    return NextResponse.redirect(
+      new URL("/portal/change-password", request.url),
     );
   }
 
@@ -92,10 +94,7 @@ export async function middleware(request: NextRequest) {
     !session.forceChangePass &&
     pathname.startsWith("/portal/change-password")
   ) {
-    return applyCSP(
-      request,
-      NextResponse.redirect(new URL("/portal/dashboard", request.url)),
-    );
+    return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
 
   const userPermissions = new Set(session.permissions);
@@ -107,10 +106,7 @@ export async function middleware(request: NextRequest) {
   // --- Admin Routes ---
   if (pathname.startsWith("/admin")) {
     if (isTenantOnly) {
-      return applyCSP(
-        request,
-        NextResponse.redirect(new URL("/portal/dashboard", request.url)),
-      );
+      return NextResponse.redirect(new URL("/portal/dashboard", request.url));
     }
 
     if (!session.isSuperAdmin) {
@@ -132,7 +128,7 @@ export async function middleware(request: NextRequest) {
             : "You do not have any assigned permissions to access the admin panel.",
         );
 
-        return applyCSP(request, NextResponse.redirect(redirectUrl));
+        return NextResponse.redirect(redirectUrl);
       }
     }
   }
@@ -140,38 +136,34 @@ export async function middleware(request: NextRequest) {
   // --- Portal Routes ---
   if (pathname.startsWith("/portal/") && !isPublicRoute) {
     if (!isTenantOnly) {
-      return applyCSP(
-        request,
-        NextResponse.redirect(new URL("/admin/dashboard", request.url)),
-      );
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
   }
 
-  return applyCSP(request, response);
+  return response;
 }
 
 /**
- * Inject CSP + Script Nonce (no nonce for style)
+ * Inject CSP + Script Nonce
  */
-function applyCSP(request: NextRequest, response: NextResponse) {
+function applyCSP(response: NextResponse) {
   const nonce = nanoid(16);
-
   response.headers.set("x-nonce", nonce);
 
   const csp = `
-  default-src 'self';
-  script-src 'self' 'nonce-${nonce}' https://www.googletagmanager.com;
-  style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
-  img-src 'self' ;
-  font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' https://api.yourdomain.com;
-  frame-ancestors 'none';
-  object-src 'none';
-  base-uri 'self';
-  form-action 'self';
-  frame-src 'self' https://trustedpartner.com;
-  child-src 'self';
-`
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' https://cdn.tiny.cloud;
+    style-src 'self' https://fonts.googleapis.com https://cdn.tiny.cloud 'unsafe-inline';
+    img-src 'self' https://cdn.tiny.cloud;
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' https://api.yourdomain.com;
+    frame-ancestors 'none';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-src 'self' https://trustedpartner.com;
+    child-src 'self';
+  `
     .replace(/\s+/g, " ")
     .trim();
 
@@ -181,5 +173,5 @@ function applyCSP(request: NextRequest, response: NextResponse) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|images).*)"],
+  matcher: ["/((?!_next/image|favicon.ico|images).*)"], // CSP now applied even to static files
 };
