@@ -118,7 +118,7 @@ function PortalHeader() {
             <LayoutDashboard size={18} /> Dashboard
           </Link>
           <Link
-            href="/portal/profile"
+            href="/admin/profile"
             className="text-sm font-medium hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/80"
           >
             <User size={18} /> My Account
@@ -174,7 +174,7 @@ function PortalHeader() {
                 </SheetClose>
                 <SheetClose asChild>
                   <Link
-                    href="/portal/profile"
+                    href="/admin/profile"
                     className="text-base font-medium hover:underline flex items-center gap-2 p-2 rounded-md hover:bg-primary/80"
                   >
                     <User size={20} /> My Account
