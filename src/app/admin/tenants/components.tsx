@@ -37,7 +37,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createTenantAction, updateTenantAction, findUserByPhoneAction } from './actions';
+import { createTenantAction, updateTenantAction, findUserByPhoneAction, toggleTenantStatusAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
@@ -124,7 +124,7 @@ export function TenantsClientPage({
 
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [filterStatus, setFilterStatus] = useState<TenantStatus | 'All'>('Active');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
@@ -142,12 +142,8 @@ export function TenantsClientPage({
     },
   });
 
-  const filteredTenants = tenants.map(tenant => {
-    const isTenantActive = tenant.agreements.length === 0 || tenant.agreements.some(ag => ag.status !== 'Canceled');
-
-    return { ...tenant, isTenantActive };
-  }).filter(tenant => {
-    const statusMatch = filterStatus === 'Active' ? tenant.isTenantActive : !tenant.isTenantActive;
+  const filteredTenants = tenants.filter(tenant => {
+    const statusMatch = filterStatus === 'All' || tenant.status === filterStatus;
     if (!statusMatch) return false;
     
     const searchMatch = !searchTerm ||
@@ -298,6 +294,21 @@ export function TenantsClientPage({
     }
   };
   
+  const handleToggleStatus = async (tenantId: string, isActive: boolean) => {
+    if (!canChangeStatus) {
+      toast({ title: "Permission Denied", description: "You do not have permission to change tenant status.", variant: "destructive"});
+      return;
+    }
+
+    const result = await handleApiCall(() => toggleTenantStatusAction(tenantId, isActive));
+    if (result?.success) {
+      toast({ title: "Status Updated", description: `Tenant status has been updated to ${isActive ? 'Active' : 'Inactive'}.` });
+      router.refresh();
+    } else {
+      toast({ title: "Error", description: result?.error, variant: "destructive" });
+    }
+  };
+  
   const findActiveAgreementForTenant = (tenantId: string): ClientAgreement | undefined => {
     return agreements.find(ag => {
       if (ag.tenantId !== tenantId) return false;
@@ -345,7 +356,7 @@ export function TenantsClientPage({
       "Email": t.email,
       "Phone": t.phone,
       "National ID": t.nationalId,
-      "Status": t.isTenantActive ? 'Active' : 'Inactive',
+      "Status": t.status,
       "Rented Spaces": t.agreements
         .filter(ag => ag.status === 'Active' && isAfter(addMonths(parseISO(ag.startDate), ag.paymentTermMonths), new Date()))
         .map(ag => ag.space?.spaceIdName)
@@ -506,7 +517,8 @@ export function TenantsClientPage({
               
               const tenantActiveAgreement = findActiveAgreementForTenant(tenant.id);
               
-              const nameParts = tenant.name.split(' ');
+              const tenantName = tenant.name || '';
+              const nameParts = tenantName.split(' ');
               const initials = (nameParts[0]?.[0] || '') + (nameParts.length > 1 ? nameParts[nameParts.length - 1]?.[0] || '' : '');
 
               return (
@@ -522,7 +534,7 @@ export function TenantsClientPage({
                           <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
                         </div>
                       </div>
-                      <Badge variant={tenant.isTenantActive ? 'secondary' : 'destructive'} className="capitalize">{tenant.isTenantActive ? 'Active' : 'Inactive'}</Badge>
+                      <Badge variant={tenant.status === 'Active' ? 'secondary' : 'destructive'} className="capitalize">{tenant.status}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm flex-grow">
@@ -550,22 +562,20 @@ export function TenantsClientPage({
                   </CardContent>
                   <CardFooter className="border-t pt-4">
                     <div className="flex w-full flex-wrap items-center justify-between gap-2">
-                      <div>
-                        {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                                <Button variant="outline" size="sm" disabled={isSaving} className="h-8">
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Agreement
-                                </Button>
-                              </Link>
-                            </TooltipTrigger>
-                            <TooltipContent><p>View Active Agreement</p></TooltipContent>
-                          </Tooltip>
-                        ) : (<div/>) /* Spacer */
-                        }
-                      </div>
+                       {canChangeStatus && (
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id={`status-switch-${tenant.id}`}
+                                checked={tenant.status === 'Active'}
+                                onCheckedChange={(checked) => handleToggleStatus(tenant.id, checked)}
+                                aria-label="Toggle tenant status"
+                                disabled={isSaving}
+                            />
+                            <Label htmlFor={`status-switch-${tenant.id}`} className="text-xs text-muted-foreground">
+                                {tenant.status === 'Active' ? 'Active' : 'Inactive'}
+                            </Label>
+                        </div>
+                      )}
                       <div className="flex items-center gap-1">
                         {(canEditTenants || canViewTenants) && (
                            <Tooltip>
