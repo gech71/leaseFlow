@@ -21,7 +21,7 @@ export async function getAllRolesAction(): Promise<{ success: boolean, roles?: R
     
     let whereClause: Prisma.RoleWhereInput = {};
     
-    // Non-super-admins only see roles they have created, and not the system defaults.
+    // Non-super-admins only see roles they have created, and not the system defaults like SUPER_ADMIN.
     if (!isSuperAdmin) {
       whereClause = { 
         OR: [

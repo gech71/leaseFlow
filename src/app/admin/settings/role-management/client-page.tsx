@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -23,7 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
-import { ALL_RESOURCE_PERMISSIONS } from '@/lib/types'; 
+import { ALL_RESOURCE_PERMISSIONS, type ResourcePermissionGroup } from '@/lib/types'; 
 import { usePermissions } from '@/contexts/PermissionContext';
 import { cn } from '@/lib/utils';
 import { PaginationControls } from '@/components/custom/PaginationControls';
@@ -59,7 +60,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  const { hasPermission: contextHasPermission, isSuperAdmin } = usePermissions(); 
+  const { hasPermission: contextHasPermission, isSuperAdmin, currentUser } = usePermissions(); 
   const canManageRoles = isSuperAdmin || contextHasPermission('settings:role_management:manage');
   const canViewRoles = isSuperAdmin || contextHasPermission('settings:role_management:view') || canManageRoles;
 
@@ -68,13 +69,31 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
     setCurrentPage(1);
   };
 
-
   const form = useForm<RoleFormValues>({
     resolver: zodResolver(roleFormSchema),
     defaultValues: { name: "", description: "", permissions: [] },
   });
 
   const selectedPermissions = form.watch('permissions');
+  
+  const availablePermissions = useMemo(() => {
+    if (isSuperAdmin || !currentUser) {
+      return ALL_RESOURCE_PERMISSIONS;
+    }
+    
+    // Filter the permissions based on the current user's effective permissions
+    return ALL_RESOURCE_PERMISSIONS
+      .map(group => {
+        const filteredPermissions = group.permissions.filter(p => currentUser.effectivePermissions.includes(p.id));
+        return {
+          ...group,
+          permissions: filteredPermissions
+        };
+      })
+      .filter(group => group.permissions.length > 0); // Only include groups that have at least one visible permission
+
+  }, [isSuperAdmin, currentUser]);
+
 
   const totalPages = Math.ceil(roles.length / itemsPerPage);
   const paginatedRoles = roles.slice(
@@ -90,8 +109,6 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
   const fetchRoles = async () => {
     const result = await getAllRolesAction();
     if (result.success && result.roles) {
-        // Data from server actions has dates serialized to strings.
-        // We just need to cast it to the client-side type.
         setRoles(result.roles as ClientRole[]);
     } else {
         toast({ title: "Error", description: result.error || "Failed to refresh roles.", variant: "destructive" });
@@ -176,7 +193,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
     }
   };
 
-  const handleResourceGroupToggle = (group: typeof ALL_RESOURCE_PERMISSIONS[0], isChecked: boolean) => {
+  const handleResourceGroupToggle = (group: ResourcePermissionGroup, isChecked: boolean) => {
     const currentPermissions = form.getValues('permissions') || [];
     const groupPermissionIds = group.permissions.map(p => p.id);
     let newPermissions: string[];
@@ -263,8 +280,8 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                           ) : <span className="text-xs text-muted-foreground italic">None</span>}
                         </TableCell>
                         <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving || isSystemRole}>
-                              {canEditThisRole ? <Edit className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditForm(role)} className="mr-1 h-8 w-8" disabled={isSaving || (isSystemRole && !isSuperAdmin)}>
+                              {canEditThisRole || (isSuperAdmin && isSystemRole) ? <Edit className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-blue-600" />}
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => setRoleToDelete(role)} className="h-8 w-8" disabled={isSaving || !canDeleteThisRole}>
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -320,7 +337,7 @@ export function RoleManagementClientPage({ initialRoles }: RoleManagementClientP
                   <p className="text-sm text-muted-foreground">Select permissions for this role. Expand a section to see individual permissions.</p>
                 </div>
                 <Accordion type="multiple" className="w-full space-y-2">
-                  {ALL_RESOURCE_PERMISSIONS.map((group) => {
+                  {availablePermissions.map((group) => {
                     const groupPermissionIds = group.permissions.map(p => p.id);
                     const selectedCount = groupPermissionIds.filter(pId => selectedPermissions?.includes(pId)).length;
                     const isGroupChecked = selectedCount === groupPermissionIds.length;
