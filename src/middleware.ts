@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from "next/server";
 import {
   verifySession,
@@ -99,17 +100,20 @@ export async function middleware(request: NextRequest) {
 
   // --- Priority #1: Handle forced password change ---
   if (session.forceChangePass) {
+    // If user needs to change password, they can ONLY go to the change password page.
     if (!pathname.startsWith("/portal/change-password")) {
       return NextResponse.redirect(
         new URL("/portal/change-password", request.url),
       );
     }
-    return response; // Allow access to the change password page
+    // If they are already on the change password page, allow it.
+    return response; 
   }
-  // If user is NOT forced to change password but tries to access the page, redirect away
+  // If user is NOT forced to change password but tries to access the page, redirect away.
   if (pathname.startsWith("/portal/change-password")) {
     return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
+
 
   // --- Role-based Routing Logic ---
   const userPermissions = new Set(session.permissions);
@@ -151,7 +155,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/portal/") &&
     !isPublicRoute &&
-    !pathname.startsWith("/portal/change-password")
+    !pathname.startsWith("/portal/change-password") // Add this exception
   ) {
     if (!isTenantOnly) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
