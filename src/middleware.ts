@@ -1,7 +1,11 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { verifySession, ACCESS_TOKEN_COOKIE_NAME, CSRF_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
-import { PERMISSION_MAP } from '@/lib/auth-utils';
-import { nanoid } from 'nanoid';
+import { NextResponse, type NextRequest } from "next/server";
+import {
+  verifySession,
+  ACCESS_TOKEN_COOKIE_NAME,
+  CSRF_TOKEN_COOKIE_NAME,
+} from "@/lib/auth/jwt";
+import { PERMISSION_MAP } from "@/lib/auth-utils";
+import { nanoid } from "nanoid";
 
 const ORDERED_ADMIN_PAGES = [
   "/admin/dashboard",
@@ -16,110 +20,166 @@ const ORDERED_ADMIN_PAGES = [
   "/admin/import",
 ];
 
-const PUBLIC_ROUTES = ['/login', '/portal/connect', '/portal/cancel', '/portal/error', '/api/portal/payment-callback', '/api/portal/Arifcallback' ];
+const PUBLIC_ROUTES = [
+  "/login",
+  "/portal/connect",
+  "/portal/cancel",
+  "/portal/error",
+  "/api/portal/payment-callback",
+  "/api/portal/Arifcallback",
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
+
   let response = NextResponse.next();
 
-  // --- CSRF Token Generation ---
+  // --- CSRF Token ---
   const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
   if (!csrfToken) {
     response.cookies.set(CSRF_TOKEN_COOKIE_NAME, nanoid(32), {
-      httpOnly: false, // Must be readable by client script
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
     });
   }
-  // --- End CSRF Token Generation ---
-  
-  // Public files, such as images, should be ignored.
-  if (pathname.includes('.') && !pathname.startsWith('/api')) {
-    return response;
-  }
-  
-  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
-  const isApiAuthRoute = pathname.startsWith('/api/auth');
 
-  // Let public routes and API auth routes pass through without a session check.
-  if (isPublicRoute || isApiAuthRoute) {
+  // Skip static files
+  if (pathname.includes(".") && !pathname.startsWith("/api")) {
     return response;
   }
-  
-  // Verify session for all other routes
+
+  const isPublicRoute =
+    PUBLIC_ROUTES.some((path) => pathname.startsWith(path)) || pathname === "/";
+  const isApiAuthRoute = pathname.startsWith("/api/auth");
+
+  if (isPublicRoute || isApiAuthRoute) {
+    return applyCSP(request, response);
+  }
+
+  // --- Verify Session ---
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(accessToken);
-  
+
   if (!session) {
-    // For protected routes, redirect to login
     let from = pathname;
     if (request.nextUrl.search) {
       from += request.nextUrl.search;
     }
-    const loginUrl = new URL('/login', request.url);
-    if (pathname !== '/login' && pathname !== '/') {
-        loginUrl.searchParams.set('from', from);
-    }
-    loginUrl.searchParams.set('error', 'session_expired');
-    return NextResponse.redirect(loginUrl);
-  }
-  
-  // --- If session exists ---
 
-  // Handle forced password change
-  if (session.forceChangePass && !pathname.startsWith('/portal/change-password')) {
-    return NextResponse.redirect(new URL('/portal/change-password', request.url));
+    const loginUrl = new URL("/login", request.url);
+    if (pathname !== "/login" && pathname !== "/") {
+      loginUrl.searchParams.set("from", from);
+    }
+
+    loginUrl.searchParams.set("error", "session_expired");
+    return applyCSP(request, NextResponse.redirect(loginUrl));
   }
-  if (!session.forceChangePass && pathname.startsWith('/portal/change-password')) {
-     return NextResponse.redirect(new URL('/portal/dashboard', request.url));
+
+  // --- Force Change Password ---
+  if (
+    session.forceChangePass &&
+    !pathname.startsWith("/portal/change-password")
+  ) {
+    return applyCSP(
+      request,
+      NextResponse.redirect(new URL("/portal/change-password", request.url)),
+    );
+  }
+
+  if (
+    !session.forceChangePass &&
+    pathname.startsWith("/portal/change-password")
+  ) {
+    return applyCSP(
+      request,
+      NextResponse.redirect(new URL("/portal/dashboard", request.url)),
+    );
   }
 
   const userPermissions = new Set(session.permissions);
-  const isTenantOnly = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
+  const isTenantOnly =
+    userPermissions.has("portal:view") &&
+    userPermissions.size === 1 &&
+    !session.isSuperAdmin;
 
-  // Handle role-based authorization for admin routes
-  if (pathname.startsWith('/admin')) {
+  // --- Admin Routes ---
+  if (pathname.startsWith("/admin")) {
     if (isTenantOnly) {
-      return NextResponse.redirect(new URL('/portal/dashboard', request.url));
+      return applyCSP(
+        request,
+        NextResponse.redirect(new URL("/portal/dashboard", request.url)),
+      );
     }
 
-    if (session.isSuperAdmin) {
-      return response;
-    }
-    
-    const requiredPermission = Object.entries(PERMISSION_MAP).find(([pathPrefix]) => 
-      pathname.startsWith(pathPrefix)
-    )?.[1];
-    
-    if (requiredPermission && !userPermissions.has(requiredPermission)) {
-      const firstAllowedPage = ORDERED_ADMIN_PAGES.find(page => {
-        const permission = PERMISSION_MAP[page];
-        return permission && userPermissions.has(permission);
-      });
+    if (!session.isSuperAdmin) {
+      const requiredPermission = Object.entries(PERMISSION_MAP).find(
+        ([pathPrefix]) => pathname.startsWith(pathPrefix),
+      )?.[1];
 
-      const redirectUrl = new URL(firstAllowedPage || '/login', request.url);
-      const errorMessage = firstAllowedPage 
-        ? "You do not have permission to access the requested page."
-        : "You do not have any assigned permissions to access the admin panel.";
-      redirectUrl.searchParams.set("error", errorMessage);
-      return NextResponse.redirect(redirectUrl);
+      if (requiredPermission && !userPermissions.has(requiredPermission)) {
+        const firstAllowedPage = ORDERED_ADMIN_PAGES.find((page) => {
+          const permission = PERMISSION_MAP[page];
+          return permission && userPermissions.has(permission);
+        });
+
+        const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
+        redirectUrl.searchParams.set(
+          "error",
+          firstAllowedPage
+            ? "You do not have permission to access the requested page."
+            : "You do not have any assigned permissions to access the admin panel.",
+        );
+
+        return applyCSP(request, NextResponse.redirect(redirectUrl));
+      }
     }
   }
-  
-  // Handle role-based authorization for portal routes
-  if (pathname.startsWith('/portal/') && !isPublicRoute) {
+
+  // --- Portal Routes ---
+  if (pathname.startsWith("/portal/") && !isPublicRoute) {
     if (!isTenantOnly) {
-      // Any user who is NOT a tenant (e.g., an admin) trying to access the tenant portal is redirected.
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+      return applyCSP(
+        request,
+        NextResponse.redirect(new URL("/admin/dashboard", request.url)),
+      );
     }
   }
 
-  // If all checks pass, allow the request
+  return applyCSP(request, response);
+}
+
+/**
+ * Inject CSP + Script Nonce (no nonce for style)
+ */
+function applyCSP(request: NextRequest, response: NextResponse) {
+  const nonce = nanoid(16);
+
+  response.headers.set("x-nonce", nonce);
+
+  const csp = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' https://www.googletagmanager.com;
+  style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
+  img-src 'self' ;
+  font-src 'self' https://fonts.gstatic.com;
+  connect-src 'self' https://api.yourdomain.com;
+  frame-ancestors 'none';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+  frame-src 'self' https://trustedpartner.com;
+  child-src 'self';
+`
+    .replace(/\s+/g, " ")
+    .trim();
+
+  response.headers.set("Content-Security-Policy", csp);
+
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images).*)'],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|images).*)"],
 };

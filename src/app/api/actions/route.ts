@@ -1,7 +1,7 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { verifySession } from '@/lib/auth/jwt';
-import { PERMISSION_MAP } from '@/lib/auth-utils';
-import { nanoid } from 'nanoid';
+import { NextResponse, type NextRequest } from "next/server";
+import { verifySession } from "@/lib/auth/jwt";
+import { PERMISSION_MAP } from "@/lib/auth-utils";
+import { nanoid } from "nanoid";
 
 const ORDERED_ADMIN_PAGES = [
   "/admin/dashboard",
@@ -16,104 +16,122 @@ const ORDERED_ADMIN_PAGES = [
   "/admin/import",
 ];
 
-const PUBLIC_ROUTES = ['/login', '/portal/connect', '/portal/cancel', '/portal/error', '/api/portal/payment-callback', '/api/portal/Arifcallback' ];
-const CSRF_TOKEN_COOKIE_NAME = 'nibrental_csrf_token';
-
+const PUBLIC_ROUTES = [
+  "/login",
+  "/portal/connect",
+  "/portal/cancel",
+  "/portal/error",
+  "/api/portal/payment-callback",
+  "/api/portal/Arifcallback",
+];
+const CSRF_TOKEN_COOKIE_NAME = "nibrental_csrf_token";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
+
   let response = NextResponse.next();
 
   // --- CSRF Token Generation ---
   const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
   if (!csrfToken) {
     response.cookies.set(CSRF_TOKEN_COOKIE_NAME, nanoid(32), {
-      httpOnly: false, // Must be readable by client script
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      sameSite: 'lax',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
     });
   }
   // --- End CSRF Token Generation ---
-  
+
   // Public files, such as images, should be ignored.
-  if (pathname.includes('.') && !pathname.startsWith('/api')) {
+  if (pathname.includes(".") && !pathname.startsWith("/api")) {
     return response;
   }
-  
-  const isPublicRoute = PUBLIC_ROUTES.some(path => pathname.startsWith(path)) || pathname === '/';
-  const isApiAuthRoute = pathname.startsWith('/api/auth');
+
+  const isPublicRoute =
+    PUBLIC_ROUTES.some((path) => pathname.startsWith(path)) || pathname === "/";
+  const isApiAuthRoute = pathname.startsWith("/api/auth");
 
   // Let public routes and API auth routes pass through without a session check.
   if (isPublicRoute || isApiAuthRoute) {
     return response;
   }
-  
+
   // Verify session for all other routes
   const session = await verifySession();
-  
+
   if (!session) {
     // For protected routes, redirect to login
     let from = pathname;
     if (request.nextUrl.search) {
       from += request.nextUrl.search;
     }
-    const loginUrl = new URL('/login', request.url);
-    if (pathname !== '/login' && pathname !== '/') {
-        loginUrl.searchParams.set('from', from);
+    const loginUrl = new URL("/login", request.url);
+    if (pathname !== "/login" && pathname !== "/") {
+      loginUrl.searchParams.set("from", from);
     }
-    loginUrl.searchParams.set('error', 'session_expired');
+    loginUrl.searchParams.set("error", "session_expired");
     return NextResponse.redirect(loginUrl);
   }
-  
+
   // --- If session exists ---
 
   // Handle forced password change
-  if (session.forceChangePass && !pathname.startsWith('/portal/change-password')) {
-    return NextResponse.redirect(new URL('/portal/change-password', request.url));
+  if (
+    session.forceChangePass &&
+    !pathname.startsWith("/portal/change-password")
+  ) {
+    return NextResponse.redirect(
+      new URL("/portal/change-password", request.url),
+    );
   }
-  if (!session.forceChangePass && pathname.startsWith('/portal/change-password')) {
-     return NextResponse.redirect(new URL('/portal/dashboard', request.url));
+  if (
+    !session.forceChangePass &&
+    pathname.startsWith("/portal/change-password")
+  ) {
+    return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
 
   const userPermissions = new Set(session.permissions);
-  const isTenantOnly = userPermissions.has('portal:view') && userPermissions.size === 1 && !session.isSuperAdmin;
+  const isTenantOnly =
+    userPermissions.has("portal:view") &&
+    userPermissions.size === 1 &&
+    !session.isSuperAdmin;
 
   // Handle role-based authorization for admin routes
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith("/admin")) {
     if (isTenantOnly) {
-      return NextResponse.redirect(new URL('/portal/dashboard', request.url));
+      return NextResponse.redirect(new URL("/portal/dashboard", request.url));
     }
 
     if (session.isSuperAdmin) {
       return response;
     }
-    
-    const requiredPermission = Object.entries(PERMISSION_MAP).find(([pathPrefix]) => 
-      pathname.startsWith(pathPrefix)
+
+    const requiredPermission = Object.entries(PERMISSION_MAP).find(
+      ([pathPrefix]) => pathname.startsWith(pathPrefix),
     )?.[1];
-    
+
     if (requiredPermission && !userPermissions.has(requiredPermission)) {
-      const firstAllowedPage = ORDERED_ADMIN_PAGES.find(page => {
+      const firstAllowedPage = ORDERED_ADMIN_PAGES.find((page) => {
         const permission = PERMISSION_MAP[page];
         return permission && userPermissions.has(permission);
       });
 
-      const redirectUrl = new URL(firstAllowedPage || '/login', request.url);
-      const errorMessage = firstAllowedPage 
+      const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
+      const errorMessage = firstAllowedPage
         ? "You do not have permission to access the requested page."
         : "You do not have any assigned permissions to access the admin panel.";
       redirectUrl.searchParams.set("error", errorMessage);
       return NextResponse.redirect(redirectUrl);
     }
   }
-  
+
   // Handle role-based authorization for portal routes
-  if (pathname.startsWith('/portal/') && !isPublicRoute) {
+  if (pathname.startsWith("/portal/") && !isPublicRoute) {
     if (!isTenantOnly) {
       // Any user who is NOT a tenant (e.g., an admin) trying to access the tenant portal is redirected.
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
   }
 
@@ -122,5 +140,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images).*)'],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|images).*)"],
 };
