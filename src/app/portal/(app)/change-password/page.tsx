@@ -12,7 +12,7 @@ async function ChangePasswordPageDataFetcher() {
   const session = await verifySession();
   const isForcedChange = session?.forceChangePass || false;
 
-  // If a user who is NOT forced to change their password lands here, redirect them.
+  // This check is now secondary, as middleware handles the primary redirect.
   if (!isForcedChange) {
     redirect('/portal/dashboard');
   }
