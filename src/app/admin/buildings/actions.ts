@@ -14,10 +14,14 @@ export async function createBuildingAction(data: Omit<Prisma.BuildingCreateInput
         return { success: false, error: "User session not found." };
     }
 
+    // A user who creates a building should automatically be a manager of it.
     const buildingCreateInput: Prisma.BuildingCreateInput = {
       ...data,
       status: isSuperAdmin ? 'Active' : 'Pending', // Auto-approve for Super Admins
       createdBy: {
+        connect: { id: currentUser.id }
+      },
+      managers: { // Automatically assign the creator as a manager
         connect: { id: currentUser.id }
       },
       ...(isSuperAdmin && { approvedBy: { connect: { id: currentUser.id } } }),

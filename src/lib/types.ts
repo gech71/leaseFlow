@@ -1,5 +1,4 @@
 
-
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 

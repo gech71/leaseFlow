@@ -14,9 +14,18 @@ export interface BuildingWithRelations extends BuildingTypePrisma {
 
 // This is now a Server Component fetching its own data.
 export default async function BuildingsPage() {
-  const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+  const { isSuperAdmin, managedBuildingIds, currentUser } = await getUserAndManagedIds();
 
-  const whereClause: Prisma.BuildingWhereInput = !isSuperAdmin ? { id: { in: managedBuildingIds! } } : {};
+  // SuperAdmins see all buildings.
+  // Other users see buildings they manage OR buildings they have created that are pending.
+  const whereClause: Prisma.BuildingWhereInput = !isSuperAdmin 
+    ? {
+        OR: [
+          { id: { in: managedBuildingIds! } },
+          { createdById: currentUser.id }
+        ]
+      }
+    : {};
   
   const buildingsData = await databaseService.getAllBuildings({ 
     where: whereClause,
