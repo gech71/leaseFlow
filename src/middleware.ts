@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from "next/server";
 import {
   verifySession,
@@ -34,8 +35,26 @@ export async function middleware(request: NextRequest) {
 
   let response = NextResponse.next();
 
-  // --- Always apply CSP first ---
-  response = applyCSP(response);
+  // --- Apply CSP ---
+  const nonce = nanoid(16);
+  response.headers.set("x-nonce", nonce);
+  // NOTE: In a real production environment, this CSP would need to be more restrictive.
+  // For this project, we'll keep it broad to avoid breaking TinyMCE or other potential libraries.
+  const csp = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' https://cdn.tiny.cloud 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tiny.cloud;
+    img-src 'self' data: https://cdn.tiny.cloud;
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self';
+    frame-src 'self' https://cdn.tiny.cloud;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+  `
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  response.headers.set("Content-Security-Policy", csp);
 
   // --- CSRF Token ---
   const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
@@ -48,7 +67,7 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // Skip static files for auth/session logic but CSP already applied
+  // Skip auth checks for static files
   if (pathname.includes(".") && !pathname.startsWith("/api")) {
     return response;
   }
@@ -70,40 +89,34 @@ export async function middleware(request: NextRequest) {
     if (request.nextUrl.search) {
       from += request.nextUrl.search;
     }
-
     const loginUrl = new URL("/login", request.url);
     if (pathname !== "/login" && pathname !== "/") {
       loginUrl.searchParams.set("from", from);
     }
-
     loginUrl.searchParams.set("error", "session_expired");
     return NextResponse.redirect(loginUrl);
   }
 
-  // --- Force Change Password ---
-  if (
-    session.forceChangePass &&
-    !pathname.startsWith("/portal/change-password")
-  ) {
-    return NextResponse.redirect(
-      new URL("/portal/change-password", request.url),
-    );
+  // --- Priority #1: Handle forced password change ---
+  if (session.forceChangePass) {
+    if (!pathname.startsWith("/portal/change-password")) {
+      return NextResponse.redirect(new URL("/portal/change-password", request.url));
+    }
+    return response; // Allow access to the change password page
   }
-
-  if (
-    !session.forceChangePass &&
-    pathname.startsWith("/portal/change-password")
-  ) {
+  // If user is NOT forced to change password but tries to access the page, redirect away
+  if (pathname.startsWith("/portal/change-password")) {
     return NextResponse.redirect(new URL("/portal/dashboard", request.url));
   }
-
+  
+  // --- Role-based Routing Logic ---
   const userPermissions = new Set(session.permissions);
   const isTenantOnly =
     userPermissions.has("portal:view") &&
     userPermissions.size === 1 &&
     !session.isSuperAdmin;
 
-  // --- Admin Routes ---
+  // Handle Admin Routes
   if (pathname.startsWith("/admin")) {
     if (isTenantOnly) {
       return NextResponse.redirect(new URL("/portal/dashboard", request.url));
@@ -127,14 +140,13 @@ export async function middleware(request: NextRequest) {
             ? "You do not have permission to access the requested page."
             : "You do not have any assigned permissions to access the admin panel.",
         );
-
         return NextResponse.redirect(redirectUrl);
       }
     }
   }
 
-  // --- Portal Routes ---
-  if (pathname.startsWith("/portal/") && !isPublicRoute) {
+  // Handle Portal Routes
+  if (pathname.startsWith("/portal/") && !isPublicRoute && !pathname.startsWith('/portal/change-password')) {
     if (!isTenantOnly) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }
@@ -143,35 +155,6 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-/**
- * Inject CSP + Script Nonce
- */
-function applyCSP(response: NextResponse) {
-  const nonce = nanoid(16);
-  response.headers.set("x-nonce", nonce);
-
-  const csp = `
-    default-src 'self';
-    script-src 'self' 'nonce-${nonce}' https://cdn.tiny.cloud;
-    style-src 'self' https://fonts.googleapis.com https://cdn.tiny.cloud 'unsafe-inline';
-    img-src 'self' https://cdn.tiny.cloud;
-    font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' https://api.yourdomain.com;
-    frame-ancestors 'none';
-    object-src 'none';
-    base-uri 'self';
-    form-action 'self';
-    frame-src 'self' https://trustedpartner.com;
-    child-src 'self';
-  `
-    .replace(/\s+/g, " ")
-    .trim();
-
-  response.headers.set("Content-Security-Policy", csp);
-
-  return response;
-}
-
 export const config = {
-  matcher: ["/((?!_next/image|favicon.ico|images).*)"], // CSP now applied even to static files
+  matcher: ["/((?!_next/image|favicon.ico|images).*)"],
 };
