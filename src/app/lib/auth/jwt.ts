@@ -88,7 +88,7 @@ export async function verifySession(): Promise<SessionPayload | null> {
     });
     return payload as SessionPayload;
   } catch (error) {
-    console.log("Failed to verify session (access token). It may be expired.");
+  
     return null;
   }
 }
@@ -107,7 +107,7 @@ export async function verifyRefreshToken(): Promise<RefreshTokenPayload | null> 
         });
         return payload as RefreshTokenPayload;
     } catch (error) {
-        console.log("Failed to verify refresh token.");
+       
         return null;
     }
 }

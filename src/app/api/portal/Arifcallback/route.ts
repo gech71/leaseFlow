@@ -65,9 +65,7 @@ export async function POST(request: NextRequest) {
                 data: { isProcessed: true }
             });
 
-        } else {
-            console.log(`ArifCallback: Received a non-success status '${status}' for session ${sessionId}.`);
-        }
+        } 
 
         return NextResponse.json({ message: "Callback received successfully." }, { status: 200 });
 
