@@ -100,18 +100,14 @@ export async function middleware(request: NextRequest) {
 
   // --- Priority #1: Handle forced password change ---
   if (session.forceChangePass) {
-    // If user needs to change password, they can ONLY go to the change password page.
-    if (!pathname.startsWith("/portal/change-password")) {
-      return NextResponse.redirect(
-        new URL("/portal/change-password", request.url),
-      );
+    if (pathname !== "/change-password") {
+      return NextResponse.redirect(new URL("/change-password", request.url));
     }
-    // If they are already on the change password page, allow it.
-    return response; 
+    return response;
   }
   // If user is NOT forced to change password but tries to access the page, redirect away.
-  if (pathname.startsWith("/portal/change-password")) {
-    return NextResponse.redirect(new URL("/portal/dashboard", request.url));
+  if (pathname === "/change-password") {
+    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
   }
 
 
@@ -154,8 +150,7 @@ export async function middleware(request: NextRequest) {
   // Handle Portal Routes
   if (
     pathname.startsWith("/portal/") &&
-    !isPublicRoute &&
-    !pathname.startsWith("/portal/change-password") // Add this exception
+    !isPublicRoute
   ) {
     if (!isTenantOnly) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
