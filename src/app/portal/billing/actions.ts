@@ -1,3 +1,4 @@
+
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -39,16 +40,37 @@ export async function getBillingAmountForPhoneNumberAction(phone: string) {
       return { success: false, error: "No tenant profile found." };
     }
 
-    const bills = await databaseService.getAllBills({
+    const rawBills = await databaseService.getAllBills({
       where: {
         tenantId: tenant.id,
         status: { in: ["Pending", "Overdue"] },
       },
     });
 
-    if (bills.length === 0) {
+    if (rawBills.length === 0) {
       return { success: true, totalAmount: 0, message: "You have no outstanding bills. Thank you for your payments!" };
     }
+    
+    // Sanitize bills before sending to client
+    const bills = rawBills.map(bill => {
+        let parsedUtilityBreakdown = [];
+        const rawUtilityData = (bill as any).utilityBreakdown;
+        if (typeof rawUtilityData === 'string') {
+            try {
+                const jsonData = JSON.parse(rawUtilityData);
+                if (Array.isArray(jsonData)) {
+                    parsedUtilityBreakdown = jsonData;
+                }
+            } catch (e) {
+                // Keep it as an empty array on parse error
+            }
+        } else if (Array.isArray(rawUtilityData)) {
+            parsedUtilityBreakdown = rawUtilityData;
+        }
+
+        return { ...bill, utilityBreakdown: parsedUtilityBreakdown };
+    });
+
 
     const totalAmount = bills.reduce(
       (sum, bill) => sum + Number(bill.totalAmount),
