@@ -153,7 +153,7 @@ export function ImportClientPage({
       ],
       [
         "Robel Asaminew",
-        "robel.g@example.com",
+        "robel@example.com",
         "0912345677",
         "",
         "1234567890123456",
@@ -172,7 +172,7 @@ export function ImportClientPage({
         "additionalTerms (Optional)",
       ],
       [
-        "robel.g@example.com",
+        "robel@example.com",
         "Century Mall",
         "Office 101",
         "2023-01-15",
