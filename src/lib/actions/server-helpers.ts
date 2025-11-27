@@ -1,4 +1,5 @@
 
+
 'use server';
 import 'server-only';
 
@@ -103,11 +104,15 @@ export async function getUserSessionAction(): Promise<{
     }
 
     const effectivePermissions = session.permissions ?? [];
+    
+    const constructedName = [localUser.firstName, localUser.lastName].filter(Boolean).join(' ').trim();
+    const displayName = localUser.name || constructedName || localUser.email || 'User';
+
 
     const currentUserData: CurrentUser = {
       id: localUser.id,
       email: localUser.email,
-      name: localUser.name || `${localUser.firstName} ${localUser.lastName}`.trim(),
+      name: displayName,
       firstName: localUser.firstName,
       lastName: localUser.lastName,
       phoneNumber: localUser.phoneNumber,
