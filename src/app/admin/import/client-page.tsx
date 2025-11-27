@@ -139,7 +139,7 @@ export function ImportClientPage({
         "monthlyRentalPrice",
         "prorationShare",
       ],
-      ["Century Mall", "Office 101", "1st Floor", 150, 50000, 5],
+      ["Century Mall", "Office 101", "1", 100, 100000, 15],
     ];
     const tenantsData = [
       [
@@ -152,11 +152,11 @@ export function ImportClientPage({
         "representativePhone (Optional)",
       ],
       [
-        "Abebe Kebede",
-        "abebe.k@example.com",
-        "0912345678",
+        "Robel Asaminew",
+        "robel.g@example.com",
+        "0912345677",
         "",
-        "123456789012",
+        "1234567890123456",
         "",
         "",
       ],
@@ -172,13 +172,13 @@ export function ImportClientPage({
         "additionalTerms (Optional)",
       ],
       [
-        "abebe.k@example.com",
+        "robel.g@example.com",
         "Century Mall",
         "Office 101",
         "2023-01-15",
         12,
         1,
-        "Standard terms apply.",
+        "",
       ],
     ];
 
