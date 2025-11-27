@@ -1,5 +1,3 @@
-
-
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -15,13 +13,14 @@ import type {
 } from "@prisma/client";
 import { addMonths, isAfter, format } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from 'next/cache';
-import { verifySession } from '@/lib/auth/jwt'; // Correctly import verifySession
-
+import { revalidatePath } from "next/cache";
+import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
+import { cookies } from "next/headers";
 // --- User Authentication Helper ---
 // This function uses the project's custom JWT session verification.
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const session = await verifySession();
+  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(token);
   if (session?.userId) {
     const user = await databaseService.getUserById(session.userId, {
       roles: true,
@@ -30,7 +29,6 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
   }
   return null;
 }
-
 
 // Define a simple structure for parsed utility items
 interface ParsedUtilityItemForAction {
@@ -48,7 +46,18 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
     };
   };
   tenant: TenantPrisma;
-  bills: (Omit<BillPrisma, "utilityBreakdown" | "rentAmount" | "penaltyAmount" | "totalAmount" | "billDate" | "dueDate" | "createdAt" | "updatedAt" | "paymentDate"> & {
+  bills: (Omit<
+    BillPrisma,
+    | "utilityBreakdown"
+    | "rentAmount"
+    | "penaltyAmount"
+    | "totalAmount"
+    | "billDate"
+    | "dueDate"
+    | "createdAt"
+    | "updatedAt"
+    | "paymentDate"
+  > & {
     utilityBreakdown: ParsedUtilityItemForAction[];
     rentAmount: number;
     penaltyAmount: number | null;
@@ -65,7 +74,6 @@ export interface TenantPortalData {
   agreements: PortalAgreementWithRelations[]; // Changed to an array
   error?: string;
 }
-
 
 export async function getTenantPortalDashboardDataAction(): Promise<TenantPortalData> {
   try {
@@ -118,7 +126,9 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     });
 
     // Filter out disabled agreements before processing
-    const enabledAgreements = allAgreementsRaw.filter(ag => ag.status !== 'Canceled');
+    const enabledAgreements = allAgreementsRaw.filter(
+      (ag) => ag.status !== "Canceled",
+    );
 
     const processedAgreements = enabledAgreements.map((ag) => {
       const processedBills = ag.bills.map((rawBill) => {
@@ -163,71 +173,83 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
 
         const { utilityBreakdown: _originalScalarUtilityData, ...billData } =
           rawBill;
-        
+
         // Serialize Decimal and Date fields in the bill
-        return { 
-          ...billData, 
+        return {
+          ...billData,
           utilityBreakdown: parsedItems,
           rentAmount: Number(billData.rentAmount),
-          penaltyAmount: billData.penaltyAmount ? Number(billData.penaltyAmount) : null,
+          penaltyAmount: billData.penaltyAmount
+            ? Number(billData.penaltyAmount)
+            : null,
           totalAmount: Number(billData.totalAmount),
           billDate: billData.billDate.toISOString(),
           dueDate: billData.dueDate.toISOString(),
           createdAt: billData.createdAt.toISOString(),
           updatedAt: billData.updatedAt.toISOString(),
-          paymentDate: billData.paymentDate ? billData.paymentDate.toISOString() : null,
+          paymentDate: billData.paymentDate
+            ? billData.paymentDate.toISOString()
+            : null,
         };
       });
 
       // Serialize Decimal and Date fields in the agreement and its relations
-      return { 
-          ...ag, 
-          bills: processedBills,
-          startDate: ag.startDate.toISOString(),
-          createdAt: ag.createdAt.toISOString(),
-          updatedAt: ag.updatedAt.toISOString(),
-          nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
-          initialPaymentDate: ag.initialPaymentDate ? ag.initialPaymentDate.toISOString() : null,
-          endDate: ag.endDate ? ag.endDate.toISOString() : null,
-          monthlyRentalPrice: Number(ag.monthlyRentalPrice),
-          initialPaymentAmount: ag.initialPaymentAmount ? Number(ag.initialPaymentAmount) : null,
-          space: {
-              ...ag.space,
-              area: Number(ag.space.area),
-              monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
-              utilityProrationShare: Number(ag.space.utilityProrationShare),
-              createdAt: ag.space.createdAt.toISOString(),
-              updatedAt: ag.space.updatedAt.toISOString(),
-              building: {
-                ...ag.space.building,
-                createdAt: ag.space.building.createdAt.toISOString(),
-                updatedAt: ag.space.building.updatedAt.toISOString(),
-                penaltyPolicyTiers: ag.space.building.penaltyPolicyTiers.map(tier => ({
-                    ...tier,
-                    feeValue: Number(tier.feeValue)
-                }))
-              }
+      return {
+        ...ag,
+        bills: processedBills,
+        startDate: ag.startDate.toISOString(),
+        createdAt: ag.createdAt.toISOString(),
+        updatedAt: ag.updatedAt.toISOString(),
+        nextPaymentDueDate: ag.nextPaymentDueDate.toISOString(),
+        initialPaymentDate: ag.initialPaymentDate
+          ? ag.initialPaymentDate.toISOString()
+          : null,
+        endDate: ag.endDate ? ag.endDate.toISOString() : null,
+        monthlyRentalPrice: Number(ag.monthlyRentalPrice),
+        initialPaymentAmount: ag.initialPaymentAmount
+          ? Number(ag.initialPaymentAmount)
+          : null,
+        space: {
+          ...ag.space,
+          area: Number(ag.space.area),
+          monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
+          utilityProrationShare: Number(ag.space.utilityProrationShare),
+          createdAt: ag.space.createdAt.toISOString(),
+          updatedAt: ag.space.updatedAt.toISOString(),
+          building: {
+            ...ag.space.building,
+            createdAt: ag.space.building.createdAt.toISOString(),
+            updatedAt: ag.space.building.updatedAt.toISOString(),
+            penaltyPolicyTiers: ag.space.building.penaltyPolicyTiers.map(
+              (tier) => ({
+                ...tier,
+                feeValue: Number(tier.feeValue),
+              }),
+            ),
           },
-          tenant: {
-            ...ag.tenant,
-            createdAt: ag.tenant.createdAt.toISOString(),
-            updatedAt: ag.tenant.updatedAt.toISOString(),
-          }
+        },
+        tenant: {
+          ...ag.tenant,
+          createdAt: ag.tenant.createdAt.toISOString(),
+          updatedAt: ag.tenant.updatedAt.toISOString(),
+        },
       };
     });
 
-    const activeAgreements = processedAgreements.filter(ag => {
-        const agreementEndDate = addMonths(new Date(ag.startDate), ag.paymentTermMonths);
-        return isAfter(agreementEndDate, new Date());
+    const activeAgreements = processedAgreements.filter((ag) => {
+      const agreementEndDate = addMonths(
+        new Date(ag.startDate),
+        ag.paymentTermMonths,
+      );
+      return isAfter(agreementEndDate, new Date());
     });
 
     if (activeAgreements.length === 0) {
-        return {
-            agreements: [],
-            error: "You do not have any active agreements."
-        }
+      return {
+        agreements: [],
+        error: "You do not have any active agreements.",
+      };
     }
-
 
     return {
       agreements: activeAgreements as unknown as PortalAgreementWithRelations[],
