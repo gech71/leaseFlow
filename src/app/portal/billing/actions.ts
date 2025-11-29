@@ -1,3 +1,4 @@
+
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -39,19 +40,44 @@ export async function getBillingAmountForPhoneNumberAction(phone: string) {
       return { success: false, error: "No tenant profile found." };
     }
 
-    const bills = await databaseService.getAllBills({
+    const billsRaw = await databaseService.getAllBills({
       where: {
         tenantId: tenant.id,
         status: { in: ["Pending", "Overdue"] },
       },
     });
 
-    if (bills.length === 0) {
+    if (billsRaw.length === 0) {
       return { success: true, totalAmount: 0, message: "You have no outstanding bills. Thank you for your payments!" };
     }
+    
+    const bills = billsRaw.map(bill => {
+      let utilityBreakdown: any[] = [];
+      if (typeof bill.utilityBreakdown === 'string') {
+        try {
+          const parsed = JSON.parse(bill.utilityBreakdown);
+          if (Array.isArray(parsed)) {
+            utilityBreakdown = parsed;
+          }
+        } catch (e) {
+          console.error("Error parsing utility breakdown on server", e);
+        }
+      } else if (Array.isArray(bill.utilityBreakdown)) {
+        utilityBreakdown = bill.utilityBreakdown;
+      }
+      
+      return {
+        ...bill,
+        rentAmount: Number(bill.rentAmount),
+        totalAmount: Number(bill.totalAmount),
+        penaltyAmount: bill.penaltyAmount ? Number(bill.penaltyAmount) : 0,
+        utilityBreakdown: utilityBreakdown,
+      };
+    });
+
 
     const totalAmount = bills.reduce(
-      (sum, bill) => sum + Number(bill.totalAmount),
+      (sum, bill) => sum + bill.totalAmount,
       0,
     );
 

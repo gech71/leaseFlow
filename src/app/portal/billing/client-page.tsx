@@ -17,9 +17,13 @@ import { useToast } from '@/hooks/use-toast';
 import { getBillingAmountForPhoneNumberAction, initiatePaymentAction, getBillStatusAction } from './actions';
 import type { Bill } from '@prisma/client';
 import { format, parseISO } from 'date-fns';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface BillInfo extends Omit<Bill, 'utilityBreakdown'> {
-  utilityBreakdown: any[];
+interface BillInfo extends Omit<Bill, 'utilityBreakdown' | 'rentAmount' | 'totalAmount' | 'penaltyAmount'> {
+  utilityBreakdown: {name: string, amount: number}[];
+  rentAmount: number;
+  totalAmount: number;
+  penaltyAmount: number;
 }
 interface BillingInfo {
   bills: BillInfo[] | null;
@@ -126,6 +130,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   };
 
   return (
+    <TooltipProvider>
     <div className="flex justify-center items-start min-h-[80vh] bg-background pt-8 sm:pt-16">
       <Card
         className="w-full max-w-lg shadow-2xl animate-fadeIn border-t-4 border-primary"
@@ -190,23 +195,43 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                   <div className="space-y-3">
                     <p className="font-semibold text-foreground">Outstanding Bills:</p>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                      {billingInfo.bills.map(bill => (
-                        <div key={bill.id} className="p-3 bg-background/50 rounded-md border text-sm">
-                          <div className="flex justify-between items-start">
-                            <div className="font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary"/> Bill for {format(parseISO(bill.billDate as unknown as string), 'MMM yyyy')}</div>
-                            <div className="font-bold text-lg">{Number(bill.totalAmount).toFixed(2)}</div>
+                      {billingInfo.bills.map(bill => {
+                        const utilityTotal = (bill.utilityBreakdown || []).reduce((sum, item) => sum + item.amount, 0);
+                        return (
+                          <div key={bill.id} className="p-3 bg-background/50 rounded-md border text-sm">
+                            <div className="flex justify-between items-start">
+                              <div className="font-medium flex items-center gap-2"><Calendar className="h-4 w-4 text-primary"/> Bill for {format(parseISO(bill.billDate as unknown as string), 'MMM yyyy')}</div>
+                              <div className="font-bold text-lg">{Number(bill.totalAmount).toFixed(2)}</div>
+                            </div>
+                             <div className="text-xs text-muted-foreground pl-6 space-y-0.5 mt-1">
+                                <div>Rent: {Number(bill.rentAmount).toFixed(2)}</div>
+                                {(bill.utilityBreakdown || []).length > 0 && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="flex items-center cursor-help">
+                                        Utilities: {utilityTotal.toFixed(2)}
+                                        <Info className="h-3 w-3 ml-1.5"/>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="p-1">
+                                        <p className="font-semibold mb-1">Utility Details:</p>
+                                        <ul className="list-none space-y-1 text-xs">
+                                          {(bill.utilityBreakdown || []).map((item, index) => (
+                                            <li key={index} className="flex justify-between gap-2"><span>{item.name}:</span> <span>{item.amount.toFixed(2)}</span></li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {bill.penaltyAmount > 0 && (
+                                  <div className="text-destructive">Penalty: {Number(bill.penaltyAmount).toFixed(2)}</div>
+                                )}
+                             </div>
                           </div>
-                           <div className="text-xs text-muted-foreground pl-6 space-y-0.5 mt-1">
-                              <div>Rent: {Number(bill.rentAmount).toFixed(2)}</div>
-                              {bill.utilityBreakdown && bill.utilityBreakdown.length > 0 && (
-                                <div>Utilities: {bill.utilityBreakdown.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}</div>
-                              )}
-                              {bill.penaltyAmount && Number(bill.penaltyAmount) > 0 && (
-                                <div className="text-destructive">Penalty: {Number(bill.penaltyAmount).toFixed(2)}</div>
-                              )}
-                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                   <div className="border-t pt-4">
@@ -242,5 +267,6 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 }
