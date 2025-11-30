@@ -1,4 +1,3 @@
-
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -54,14 +53,16 @@ export async function getBillingInfoForPhoneNumberAction(phone: string) {
             status: { in: ["Pending", "Overdue"] },
           },
           orderBy: {
-            billDate: 'asc'
-          }
+            billDate: "asc",
+          },
         },
       },
     });
 
     // We only care about agreements that have outstanding bills
-    const agreementsWithBills = agreementsRaw.filter(ag => ag.bills.length > 0);
+    const agreementsWithBills = agreementsRaw.filter(
+      (ag) => ag.bills.length > 0,
+    );
 
     if (agreementsWithBills.length === 0) {
       return {
@@ -97,13 +98,17 @@ export async function getBillingInfoForPhoneNumberAction(phone: string) {
         ...agreement,
         bills,
         monthlyRentalPrice: Number(agreement.monthlyRentalPrice),
-        space: agreement.space ? {
-          ...agreement.space,
-          area: Number(agreement.space.area),
-          monthlyRentalPrice: Number(agreement.space.monthlyRentalPrice),
-          utilityProrationShare: Number(agreement.space.utilityProrationShare),
-          building: agreement.space.building
-        } : null
+        space: agreement.space
+          ? {
+              ...agreement.space,
+              area: Number(agreement.space.area),
+              monthlyRentalPrice: Number(agreement.space.monthlyRentalPrice),
+              utilityProrationShare: Number(
+                agreement.space.utilityProrationShare,
+              ),
+              building: agreement.space.building,
+            }
+          : null,
       };
     });
 
@@ -125,7 +130,7 @@ export async function initiatePaymentAction(
   billIds: string[],
   amount: number,
   agreementId: string,
-  nibToken: string
+  nibToken: string,
 ): Promise<PaymentInitiationResult> {
   const NIB_PAYMENT_URL = process.env.NIB_PAYMENT_URL;
   const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
@@ -133,53 +138,70 @@ export async function initiatePaymentAction(
   const CALLBACK_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/api/portal/payment-callback`;
 
   if (!NIB_PAYMENT_URL || !NIB_PAYMENT_KEY) {
-    console.error("Server Configuration Error: NIB payment environment variables are not set.");
-    return { success: false, error: "Payment service is not configured. Please contact support." };
+    console.error(
+      "Server Configuration Error: NIB payment environment variables are not set.",
+    );
+    return {
+      success: false,
+      error: "Payment service is not configured. Please contact support.",
+    };
   }
 
   if (!nibToken) {
-    return { success: false, error: "Portal session token not found. Please re-enter from the Mini App." };
+    return {
+      success: false,
+      error:
+        "Portal session token not found. Please re-enter from the Mini App.",
+    };
   }
 
   try {
-    const agreement = await databaseService.getAgreementById(agreementId, { space: { include: { building: true } } });
+    const agreement = await databaseService.getAgreementById(agreementId, {
+      space: { include: { building: true } },
+    });
     if (!agreement || !agreement.space?.building?.accountNumber) {
-      return { success: false, error: "Building account information is missing for this agreement." };
+      return {
+        success: false,
+        error: "Building account information is missing for this agreement.",
+      };
     }
     const ACCOUNT_NO = agreement.space.building.accountNumber;
 
     const transactionId = nanoid(16);
-    const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
-    
+    const transactionTime = format(new Date(), "yyyyMMddHHmmss");
+
     const signatureString = [
-        `accountNo=${ACCOUNT_NO}`,
-        `amount=${amount}`,
-        `callBackURL=${CALLBACK_URL}`,
-        `companyName=${COMPANY_NAME}`,
-        `Key=${NIB_PAYMENT_KEY}`,
-        `token=${nibToken}`,
-        `transactionId=${transactionId}`,
-        `transactionTime=${transactionTime}`
-    ].join('&');
-    
-    const signature = crypto.createHash('sha256').update(signatureString, 'utf8').digest('hex');
-    
+      `accountNo=${ACCOUNT_NO}`,
+      `amount=${amount}`,
+      `callBackURL=${CALLBACK_URL}`,
+      `companyName=${COMPANY_NAME}`,
+      `Key=${NIB_PAYMENT_KEY}`,
+      `token=${nibToken}`,
+      `transactionId=${transactionId}`,
+      `transactionTime=${transactionTime}`,
+    ].join("&");
+
+    const signature = crypto
+      .createHash("sha256")
+      .update(signatureString, "utf8")
+      .digest("hex");
+
     const payload = {
-        accountNo: ACCOUNT_NO,
-        amount: String(amount),
-        callBackURL: CALLBACK_URL,
-        companyName: COMPANY_NAME,
-        token: nibToken,
-        transactionId: transactionId,
-        transactionTime: transactionTime,
-        signature: signature
+      accountNo: ACCOUNT_NO,
+      amount: String(amount),
+      callBackURL: CALLBACK_URL,
+      companyName: COMPANY_NAME,
+      token: nibToken,
+      transactionId: transactionId,
+      transactionTime: transactionTime,
+      signature: signature,
     };
 
     const response = await fetch(NIB_PAYMENT_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${nibToken}`
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${nibToken}`,
       },
       body: JSON.stringify(payload),
     });
@@ -188,15 +210,20 @@ export async function initiatePaymentAction(
 
     if (!response.ok || !responseData.token) {
       console.error("NIB API Error:", responseData);
-      return { success: false, error: responseData.message || `Payment initiation failed with status ${response.status}.` };
+      return {
+        success: false,
+        error:
+          responseData.message ||
+          `Payment initiation failed with status ${response.status}.`,
+      };
     }
 
     // On successful initiation, update the bills with a reference to this transaction group
     await prisma.bill.updateMany({
-        where: { id: { in: billIds } },
-        data: {
-            tenantPaymentNotes: `Payment initiated with NIB Super App. Group Transaction Ref: ${transactionId}`
-        }
+      where: { id: { in: billIds } },
+      data: {
+        tenantPaymentNotes: `Payment initiated with NIB Super App. Group Transaction Ref: ${transactionId}`,
+      },
     });
 
     return {
@@ -214,17 +241,20 @@ export async function initiatePaymentAction(
 }
 
 export async function getBillStatusAction(billIds: string[]) {
-    try {
-        const currentUser = await getCurrentUser();
-        if (!currentUser) return { status: 'Error', error: 'Authentication failed.' };
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser)
+      return { status: "Error", error: "Authentication failed." };
 
-        const bills = await databaseService.getAllBills({ where: { id: { in: billIds } } });
-        if (!bills.length) return { status: 'Error', error: 'Bills not found.' };
+    const bills = await databaseService.getAllBills({
+      where: { id: { in: billIds } },
+    });
+    if (!bills.length) return { status: "Error", error: "Bills not found." };
 
-        if (bills.every(b => b.status === 'Paid')) return { status: 'Paid' };
+    if (bills.every((b) => b.status === "Paid")) return { status: "Paid" };
 
-        return { status: 'Pending' }; 
-    } catch (e: any) {
-        return { status: 'Error', error: e.message };
-    }
+    return { status: "Pending" };
+  } catch (e: any) {
+    return { status: "Error", error: e.message };
+  }
 }

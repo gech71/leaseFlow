@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -180,7 +179,6 @@ export function BillingClientPage({
       });
       if (window.myJsChannel?.postMessage) {
         window.myJsChannel.postMessage({ token: result.paymentToken });
-        startPolling(billIds);
       } else {
         console.error("NIB Super App channel (window.myJsChannel) not found.");
         setError(
@@ -425,4 +423,3 @@ export function BillingClientPage({
     </div>
   );
 }
-
