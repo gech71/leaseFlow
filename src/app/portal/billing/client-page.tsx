@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -24,6 +25,7 @@ import {
   Calendar,
   ChevronDown,
   Building,
+  List,
 } from "lucide-react";
 import {
   Accordion,
@@ -328,44 +330,43 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                             key={bill.id}
                             className="border-b"
                           >
-                            <AccordionTrigger className="font-medium hover:no-underline">
+                            <AccordionTrigger className="font-medium hover:no-underline text-base">
                               <div className="flex justify-between w-full items-center pr-4">
                                 <span>
-                                  Bill for {format(bill.billDate, "MMM yyyy")}
+                                  Bill for {format(parseISO(bill.billDate), "MMM yyyy")}
                                 </span>
-                                <Badge
-                                  variant={
-                                    bill.status === "Overdue"
-                                      ? "destructive"
-                                      : "default"
-                                  }
-                                >
-                                  {bill.status}
-                                </Badge>
+                                <span className="font-semibold text-foreground">
+                                    {bill.totalAmount.toFixed(2)} Birr
+                                </span>
                               </div>
                             </AccordionTrigger>
                             <AccordionContent className="px-4 pt-2 pb-4 bg-background/50 rounded-b-md">
-                              <div className="space-y-1 text-sm">
+                              <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                   <span>Rent:</span>{" "}
                                   <span>{bill.rentAmount.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span>Utilities:</span>{" "}
-                                  <span>
-                                    {(bill.utilityBreakdown || [])
-                                      .reduce((s, i) => s + i.amount, 0)
-                                      .toFixed(2)}
-                                  </span>
-                                </div>
+                                {(bill.utilityBreakdown || []).length > 0 && (
+                                  <div className="pl-4 border-l-2 border-primary/50 py-1 space-y-1">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Utilities:</span>
+                                    </div>
+                                    {(bill.utilityBreakdown || []).map((item, index) => (
+                                      <div key={index} className="flex justify-between text-muted-foreground pl-2 text-xs">
+                                        <span>- {item.name}</span>
+                                        <span>{item.amount.toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                                 {bill.penaltyAmount > 0 && (
                                   <div className="flex justify-between text-destructive">
                                     <span>Penalty:</span>{" "}
                                     <span>{bill.penaltyAmount.toFixed(2)}</span>
                                   </div>
                                 )}
-                                <div className="border-t my-1"></div>
-                                <div className="flex justify-between font-bold">
+                                <div className="border-t my-2"></div>
+                                <div className="flex justify-between font-bold text-base">
                                   <span>Total:</span>{" "}
                                   <span>{bill.totalAmount.toFixed(2)}</span>
                                 </div>
