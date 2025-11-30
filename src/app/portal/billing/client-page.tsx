@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -22,35 +23,48 @@ import {
   AlertOctagon,
   FileText,
   Calendar,
+  ChevronDown,
+  Building,
 } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  getBillingAmountForPhoneNumberAction,
+  getBillingInfoForPhoneNumberAction,
   initiatePaymentAction,
   getBillStatusAction,
 } from "./actions";
-import type { Bill } from "@prisma/client";
+import type { Bill, Agreement, Space } from "@prisma/client";
 import { format, parseISO } from "date-fns";
-import {
-  Tooltip,
-  TooltipProvider,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
-interface BillInfo
-  extends Omit<
-    Bill,
-    "utilityBreakdown" | "rentAmount" | "totalAmount" | "penaltyAmount"
-  > {
+// --- Type Definitions ---
+interface BillInfo extends Omit<Bill, 'utilityBreakdown' | 'rentAmount' | 'totalAmount' | 'penaltyAmount'> {
   utilityBreakdown: { name: string; amount: number }[];
   rentAmount: number;
   totalAmount: number;
   penaltyAmount: number;
 }
+
+interface AgreementInfo extends Omit<Agreement, 'bills' | 'space' | 'monthlyRentalPrice'> {
+  bills: BillInfo[];
+  monthlyRentalPrice: number;
+  space: (Space & { building: { name: string, accountNumber: string } }) | null;
+}
+
 interface BillingInfo {
-  bills: BillInfo[] | null;
-  totalAmount: number | null;
+  agreements: AgreementInfo[];
   message: string | null;
 }
 
@@ -64,19 +78,18 @@ declare global {
   }
 }
 
+// --- Main Component ---
 export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   const normalizePhone = (p: string) => {
     if (!p) return "";
-
-    if (p.startsWith("251") && p.length >= 12) {
-      return "0" + p.substring(3);
-    }
-    return p;
+    return p.startsWith("251") && p.length >= 12 ? "0" + p.substring(3) : p;
   };
+
   const [phone, setPhone] = useState(normalizePhone(initialPhone));
   const [isLoading, setIsLoading] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
+  const [selectedAgreementId, setSelectedAgreementId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -84,70 +97,66 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
 
   useEffect(() => {
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
   }, []);
 
-  const handleGetBillingAmount = async () => {
+  const handleGetBillingInfo = async () => {
     setIsLoading(true);
     setBillingInfo(null);
+    setSelectedAgreementId(null);
     setError(null);
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     setIsPolling(false);
 
-    const result = await getBillingAmountForPhoneNumberAction(phone);
+    const result = await getBillingInfoForPhoneNumberAction(phone);
 
     if (result.success) {
       setBillingInfo({
-        bills: result.bills ?? null,
-        totalAmount: result.totalAmount ?? null,
+        agreements: result.agreements ?? [],
         message: result.message ?? null,
       });
+      if (result.agreements && result.agreements.length === 1) {
+        setSelectedAgreementId(result.agreements[0].id);
+      }
     } else {
       setError(result.error || "An unknown error occurred.");
     }
 
     setIsLoading(false);
   };
+  
+  const selectedAgreement = useMemo(() => {
+    if (!selectedAgreementId || !billingInfo?.agreements) return null;
+    return billingInfo.agreements.find(ag => ag.id === selectedAgreementId);
+  }, [selectedAgreementId, billingInfo]);
+
+  const totalAmountForSelectedAgreement = useMemo(() => {
+    return selectedAgreement?.bills.reduce((sum, bill) => sum + bill.totalAmount, 0) ?? 0;
+  }, [selectedAgreement]);
+
 
   const handlePayNow = async () => {
-    const billIds = billingInfo?.bills?.map((b) => b.id);
-    if (!billIds || billIds.length === 0 || billingInfo.totalAmount === null) {
-      toast({
-        title: "Error",
-        description: "No bills selected for payment.",
-        variant: "destructive",
-      });
+    if (!selectedAgreement || !totalAmountForSelectedAgreement) {
+      toast({ title: "Error", description: "No agreement or amount to pay.", variant: "destructive" });
       return;
     }
+    
+    const billIds = selectedAgreement.bills.map(b => b.id);
     setIsLoading(true);
-    const result = await initiatePaymentAction(
-      billIds,
-      billingInfo.totalAmount,
-    );
+    const result = await initiatePaymentAction(billIds, totalAmountForSelectedAgreement, selectedAgreement.id);
 
-    if (result.success && result.data?.token) {
-      toast({
-        title: "Action Required",
-        description: "Please use your NIB SuperApp to complete the payment.",
-      });
-      if (typeof window !== "undefined" && window.myJsChannel?.postMessage) {
-        window.myJsChannel.postMessage({ token: result.data.token });
+    if (result.success && result.paymentToken) {
+      toast({ title: "Action Required", description: "Please complete the payment in your NIB SuperApp." });
+      if (window.myJsChannel?.postMessage) {
+        window.myJsChannel.postMessage({ token: result.paymentToken });
         startPolling(billIds);
       } else {
         console.error("NIB Super App channel (window.myJsChannel) not found.");
-        setError(
-          "Could not communicate with the payment app. Please try again.",
-        );
+        setError("Could not communicate with the payment app. Please try again.");
       }
     } else {
-      toast({
-        title: "Payment Failed",
-        description: result.error,
-        variant: "destructive",
-      });
+      toast({ title: "Payment Failed", description: result.error, variant: "destructive" });
     }
     setIsLoading(false);
   };
@@ -155,16 +164,14 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
   const startPolling = (billIds: string[]) => {
     setIsPolling(true);
     let pollCount = 0;
-    const maxPolls = 60; // Poll for 5 minutes (60 polls * 5 seconds)
+    const maxPolls = 60; // 5 minutes
 
     pollIntervalRef.current = setInterval(async () => {
       pollCount++;
       if (pollCount > maxPolls) {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         setIsPolling(false);
-        setError(
-          "Payment status check timed out. Please check your transaction history later.",
-        );
+        setError("Payment status check timed out. Please check your transaction history later.");
         return;
       }
 
@@ -172,24 +179,14 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
       if (statusResult.status === "Paid") {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         setIsPolling(false);
-        setBillingInfo({
-          bills: [],
-          totalAmount: 0,
-          message: "Payment was successful!",
-        });
-      } else if (
-        statusResult.status === "Pending" ||
-        statusResult.status === "Overdue"
-      ) {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-        setIsPolling(false);
-        setError("Payment failed or was rejected. Please try again.");
+        setBillingInfo({ agreements: [], message: "Payment was successful!" });
+        setSelectedAgreementId(null);
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
   };
+  
 
   return (
-    <TooltipProvider>
       <div className="flex justify-center items-start min-h-[80vh] bg-background pt-8 sm:pt-16">
         <Card className="w-full max-w-lg shadow-2xl animate-fadeIn border-t-4 border-primary">
           <CardHeader className="text-center">
@@ -198,187 +195,114 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
               <p className="text-sm font-medium">Connection Verified</p>
             </div>
             <CardTitle className="font-headline text-2xl mt-2">
-              Retrieve Your Billing Information
+              Pay Your Bills
             </CardTitle>
             <CardDescription className="px-4">
-              Confirm your phone number to fetch your outstanding bill.
+              Confirm your phone number to fetch your outstanding bills and agreements.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 p-6">
-            {!isPolling && !billingInfo?.message && (
-              <div className="space-y-2">
-                <Label
-                  htmlFor="phone"
-                  className="flex items-center text-muted-foreground"
-                >
-                  <Phone className="mr-2 h-4 w-4" />
-                  Enter your phone number
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Enter your phone number"
-                    className="text-lg h-12 flex-grow"
-                    disabled={isLoading}
-                  />
-                  <Button
-                    onClick={handleGetBillingAmount}
-                    disabled={isLoading || !phone}
-                    className="h-12 text-base px-6"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      "Get Bill"
-                    )}
-                  </Button>
-                </div>
+            
+            {/* Phone Number Input */}
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center text-muted-foreground">
+                <Phone className="mr-2 h-4 w-4" />
+                Enter your phone number
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="phone" type="tel" value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter your phone number"
+                  className="text-lg h-12 flex-grow" disabled={isLoading || isPolling}
+                />
+                <Button onClick={handleGetBillingInfo} disabled={isLoading || isPolling || !phone} className="h-12 text-base px-6">
+                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Get Info"}
+                </Button>
               </div>
-            )}
+            </div>
 
             {error && (
               <div className="mt-4 flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-                <AlertOctagon className="h-5 w-5 shrink-0" />
-                <p>{error}</p>
+                <AlertOctagon className="h-5 w-5 shrink-0" /> <p>{error}</p>
               </div>
             )}
 
             {isPolling && (
               <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg animate-pulse space-y-3 text-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                <p className="font-semibold text-primary">
-                  Awaiting Payment Confirmation...
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Please complete the transaction in the NIB app. This page will
-                  update automatically.
-                </p>
+                <p className="font-semibold text-primary">Awaiting Payment Confirmation...</p>
+                <p className="text-sm text-muted-foreground">Please complete the transaction in the NIB app. This page will update automatically.</p>
               </div>
             )}
-
+            
+            {/* Step 2 & 3: Display Agreements and Bills */}
             {!isPolling && billingInfo && (
-              <div className="mt-6 p-4 bg-secondary/40 border rounded-lg animate-fadeIn space-y-4">
-                {billingInfo.bills &&
-                billingInfo.bills.length > 0 &&
-                billingInfo.totalAmount &&
-                billingInfo.totalAmount > 0 ? (
-                  <>
-                    <div className="space-y-3">
-                      <p className="font-semibold text-foreground">
-                        Outstanding Bills:
-                      </p>
-                      <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                        {billingInfo.bills.map((bill) => {
-                          const utilityTotal = (
-                            bill.utilityBreakdown || []
-                          ).reduce((sum, item) => sum + item.amount, 0);
-                          return (
-                            <div
-                              key={bill.id}
-                              className="p-3 bg-background/50 rounded-md border text-sm"
-                            >
-                              <div className="flex justify-between items-start">
-                                <div className="font-medium flex items-center gap-2">
-                                  <Calendar className="h-4 w-4 text-primary" />{" "}
-                                  Bill for{" "}
-                                  {format(new Date(bill.billDate), "MMM yyyy")}
-                                </div>
-                                <div className="font-bold text-lg">
-                                  {Number(bill.totalAmount).toFixed(2)}
-                                </div>
-                              </div>
-                              <div className="text-xs text-muted-foreground pl-6 space-y-0.5 mt-1">
-                                <div>
-                                  Rent: {Number(bill.rentAmount).toFixed(2)}
-                                </div>
-                                {(bill.utilityBreakdown || []).length > 0 && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="flex items-center cursor-help">
-                                        Utilities: {utilityTotal.toFixed(2)}
-                                        <Info className="h-3 w-3 ml-1.5" />
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <div className="p-1">
-                                        <p className="font-semibold mb-1">
-                                          Utility Details:
-                                        </p>
-                                        <ul className="list-none space-y-1 text-xs">
-                                          {(bill.utilityBreakdown || []).map(
-                                            (item, index) => (
-                                              <li
-                                                key={index}
-                                                className="flex justify-between gap-2"
-                                              >
-                                                <span>{item.name}:</span>{" "}
-                                                <span>
-                                                  {item.amount.toFixed(2)}
-                                                </span>
-                                              </li>
-                                            ),
-                                          )}
-                                        </ul>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                                {bill.penaltyAmount > 0 && (
-                                  <div className="text-destructive">
-                                    Penalty:{" "}
-                                    {Number(bill.penaltyAmount).toFixed(2)}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="border-t pt-4">
-                      <p className="text-sm text-muted-foreground">
-                        Total Amount Due
-                      </p>
-                      <p className="text-4xl font-bold font-headline text-primary flex items-baseline gap-2">
-                        <Banknote className="h-8 w-8" />
-                        {billingInfo.totalAmount.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        <span className="text-2xl text-muted-foreground font-medium">
-                          Birr
-                        </span>
-                      </p>
-                    </div>
-                    <Button
-                      onClick={handlePayNow}
-                      className="w-full h-12 text-lg"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      ) : null}
-                      Pay Total Amount
-                    </Button>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-3 text-green-700 py-4">
+              <div className="mt-6 space-y-4 animate-fadeIn">
+                {billingInfo.message && (
+                  <div className="flex flex-col items-center gap-3 text-green-700 py-4 p-4 bg-green-500/10 border rounded-lg">
                     <CheckCircle className="h-10 w-10 shrink-0" />
-                    <p className="font-medium text-lg text-center">
-                      {billingInfo.message || "No outstanding amount found."}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleGetBillingAmount}
-                      disabled={isLoading}
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Check Again
-                    </Button>
+                    <p className="font-medium text-lg text-center">{billingInfo.message}</p>
+                  </div>
+                )}
+
+                {billingInfo.agreements.length > 0 && (
+                  <div className="space-y-4">
+                     <div className="space-y-2">
+                        <Label>Select an agreement to pay for</Label>
+                        <Select value={selectedAgreementId || ""} onValueChange={setSelectedAgreementId}>
+                            <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Choose an agreement..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {billingInfo.agreements.map(ag => (
+                                    <SelectItem key={ag.id} value={ag.id}>
+                                       {ag.space?.spaceIdName}, {ag.space?.building.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                     </div>
+                    
+                    {selectedAgreement && (
+                       <div className="p-4 bg-secondary/40 border rounded-lg space-y-4">
+                         <h3 className="font-semibold text-lg text-foreground">Bills for {selectedAgreement.space?.spaceIdName}</h3>
+                         <Accordion type="single" collapsible className="w-full">
+                           {selectedAgreement.bills.map(bill => (
+                             <AccordionItem value={bill.id} key={bill.id} className="border-b">
+                               <AccordionTrigger className="font-medium hover:no-underline">
+                                 <div className="flex justify-between w-full items-center pr-4">
+                                     <span>Bill for {format(parseISO(bill.billDate), 'MMM yyyy')}</span>
+                                     <Badge variant={bill.status === 'Overdue' ? 'destructive' : 'default'}>{bill.status}</Badge>
+                                 </div>
+                               </AccordionTrigger>
+                               <AccordionContent className="px-4 pt-2 pb-4 bg-background/50 rounded-b-md">
+                                 <div className="space-y-1 text-sm">
+                                   <div className="flex justify-between"><span>Rent:</span> <span>{bill.rentAmount.toFixed(2)}</span></div>
+                                   <div className="flex justify-between"><span>Utilities:</span> <span>{(bill.utilityBreakdown || []).reduce((s, i) => s + i.amount, 0).toFixed(2)}</span></div>
+                                   {bill.penaltyAmount > 0 && <div className="flex justify-between text-destructive"><span>Penalty:</span> <span>{bill.penaltyAmount.toFixed(2)}</span></div>}
+                                   <div className="border-t my-1"></div>
+                                   <div className="flex justify-between font-bold"><span>Total:</span> <span>{bill.totalAmount.toFixed(2)}</span></div>
+                                 </div>
+                               </AccordionContent>
+                             </AccordionItem>
+                           ))}
+                         </Accordion>
+
+                         <div className="border-t pt-4">
+                           <p className="text-sm text-muted-foreground">Total to Pay for this Agreement</p>
+                            <p className="text-4xl font-bold font-headline text-primary flex items-baseline gap-2">
+                                <Banknote className="h-8 w-8" />
+                                {totalAmountForSelectedAgreement.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <span className="text-2xl text-muted-foreground font-medium">Birr</span>
+                            </p>
+                         </div>
+                         <Button onClick={handlePayNow} className="w-full h-12 text-lg" disabled={isLoading}>
+                           {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                           Pay Total Amount
+                         </Button>
+                       </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -386,6 +310,5 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
           </CardContent>
         </Card>
       </div>
-    </TooltipProvider>
   );
 }
