@@ -227,10 +227,6 @@ export function BillingClientPage({
     <div className="flex justify-center items-start min-h-[80vh] bg-background pt-8 sm:pt-16">
       <Card className="w-full max-w-lg shadow-2xl animate-fadeIn border-t-4 border-primary">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 text-green-600">
-            <CheckCircle className="h-5 w-5" />
-            <p className="text-sm font-medium">Connection Verified</p>
-          </div>
           <CardTitle className="font-headline text-2xl mt-2">
             Pay Your Bills
           </CardTitle>
@@ -340,7 +336,7 @@ export function BillingClientPage({
                             <AccordionTrigger className="font-medium hover:no-underline text-base">
                               <div className="flex justify-between w-full items-center pr-4">
                                 <span>
-                                  Bill for {format(parseISO(bill.billDate), "MMM yyyy")}
+                                  Bill for {format(bill.billDate, "MMM yyyy")}
                                 </span>
                                 <span className="font-semibold text-foreground">
                                   {bill.totalAmount.toFixed(2)} Birr
