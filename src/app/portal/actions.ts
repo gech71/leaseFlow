@@ -1,3 +1,4 @@
+
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -36,6 +37,7 @@ export async function setPortalSessionAction(token: string) {
       isSuperAdmin: false,
       permissions: ['portal:view'],
       forceChangePass: false,
+      iat: Math.floor(Date.now() / 1000), // Use numeric timestamp for 'issued at'
     };
     
     const { accessToken, refreshToken } = await createSession(payload);
