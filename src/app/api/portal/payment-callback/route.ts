@@ -1,9 +1,6 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { databaseService } from '@/lib/services/databaseService';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
-import { Prisma } from '@prisma/client';
 
 const NIB_VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
 
@@ -64,14 +61,10 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-        paidAmount,
         paidByNumber,
         txnRef,
         transactionId,
-        transactionTime,
-        accountNo,
-        token,
-        signature: receivedSignature
+       
     } = requestBody;
 
     if (!transactionId) {
@@ -118,8 +111,7 @@ export async function POST(request: NextRequest) {
 
     } catch (dbError: any) {
         console.error("Callback DB Error: Failed to process bills after successful validation.", dbError);
-        // Important: Still return 200 OK to NIB to prevent them from retrying.
-        // We will need to handle this reconciliation separately (e.g., via logging/monitoring).
+      
         return NextResponse.json({ message: "Callback acknowledged, but an internal processing error occurred." }, { status: 200 });
     }
 }
