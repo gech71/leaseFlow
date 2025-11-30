@@ -65,7 +65,15 @@ declare global {
 }
 
 export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
-  const [phone, setPhone] = useState(initialPhone);
+  const normalizePhone = (p: string) => {
+    if (!p) return "";
+
+    if (p.startsWith("251") && p.length >= 12) {
+      return "0" + p.substring(3);
+    }
+    return p;
+  };
+  const [phone, setPhone] = useState(normalizePhone(initialPhone));
   const [isLoading, setIsLoading] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
