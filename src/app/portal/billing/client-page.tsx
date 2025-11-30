@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -333,10 +332,10 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                             <AccordionTrigger className="font-medium hover:no-underline text-base">
                               <div className="flex justify-between w-full items-center pr-4">
                                 <span>
-                                  Bill for {format(parseISO(bill.billDate), "MMM yyyy")}
+                                  Bill for {format(bill.billDate, "MMM yyyy")}
                                 </span>
                                 <span className="font-semibold text-foreground">
-                                    {bill.totalAmount.toFixed(2)} Birr
+                                  {bill.totalAmount.toFixed(2)} Birr
                                 </span>
                               </div>
                             </AccordionTrigger>
@@ -349,14 +348,21 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                                 {(bill.utilityBreakdown || []).length > 0 && (
                                   <div className="pl-4 border-l-2 border-primary/50 py-1 space-y-1">
                                     <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Utilities:</span>
+                                      <span className="text-muted-foreground">
+                                        Utilities:
+                                      </span>
                                     </div>
-                                    {(bill.utilityBreakdown || []).map((item, index) => (
-                                      <div key={index} className="flex justify-between text-muted-foreground pl-2 text-xs">
-                                        <span>- {item.name}</span>
-                                        <span>{item.amount.toFixed(2)}</span>
-                                      </div>
-                                    ))}
+                                    {(bill.utilityBreakdown || []).map(
+                                      (item, index) => (
+                                        <div
+                                          key={index}
+                                          className="flex justify-between text-muted-foreground pl-2 text-xs"
+                                        >
+                                          <span>- {item.name}</span>
+                                          <span>{item.amount.toFixed(2)}</span>
+                                        </div>
+                                      ),
+                                    )}
                                   </div>
                                 )}
                                 {bill.penaltyAmount > 0 && (
