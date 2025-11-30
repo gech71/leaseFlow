@@ -9,14 +9,15 @@ import { BillingClientPage } from './client-page';
 function BillingPageContent() {
   const searchParams = useSearchParams();
   const phone = searchParams.get('phone');
+  const nibToken = searchParams.get('token');
 
-  if (!phone) {
-    // Redirect or show an error if phone is missing
-    redirect('/portal/connect/error?message=phone_missing');
+  if (!phone || !nibToken) {
+    // Redirect or show an error if phone or token is missing
+    redirect('/portal/connect/error?message=missing_params');
     return null;
   }
 
-  return <BillingClientPage initialPhone={phone} />;
+  return <BillingClientPage initialPhone={phone} nibToken={nibToken} />;
 }
 
 export default function BillingPage() {

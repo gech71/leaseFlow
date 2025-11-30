@@ -8,6 +8,7 @@ import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import { format } from "date-fns";
+import { prisma } from "@/lib/prisma";
 
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
   const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
@@ -124,6 +125,7 @@ export async function initiatePaymentAction(
   billIds: string[],
   amount: number,
   agreementId: string,
+  nibToken: string
 ): Promise<PaymentInitiationResult> {
   const NIB_PAYMENT_URL = process.env.NIB_PAYMENT_URL;
   const NIB_PAYMENT_KEY = process.env.NIB_PAYMENT_KEY;
@@ -135,17 +137,11 @@ export async function initiatePaymentAction(
     return { success: false, error: "Payment service is not configured. Please contact support." };
   }
 
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return { success: false, error: "Authentication required. Please log in again." };
-    }
-    
-    const tokenFromCookie = cookies().get('nibrental_portal_token')?.value;
-     if (!tokenFromCookie) {
-      return { success: false, error: "Portal session token not found. Please re-enter from the Mini App." };
-    }
+  if (!nibToken) {
+    return { success: false, error: "Portal session token not found. Please re-enter from the Mini App." };
+  }
 
+  try {
     const agreement = await databaseService.getAgreementById(agreementId, { space: { include: { building: true } } });
     if (!agreement || !agreement.space?.building?.accountNumber) {
       return { success: false, error: "Building account information is missing for this agreement." };
@@ -154,15 +150,14 @@ export async function initiatePaymentAction(
 
     const transactionId = nanoid(16);
     const transactionTime = format(new Date(), 'yyyyMMddHHmmss');
-    const token = tokenFromCookie;
-
+    
     const signatureString = [
         `accountNo=${ACCOUNT_NO}`,
         `amount=${amount}`,
         `callBackURL=${CALLBACK_URL}`,
         `companyName=${COMPANY_NAME}`,
         `Key=${NIB_PAYMENT_KEY}`,
-        `token=${token}`,
+        `token=${nibToken}`,
         `transactionId=${transactionId}`,
         `transactionTime=${transactionTime}`
     ].join('&');
@@ -174,7 +169,7 @@ export async function initiatePaymentAction(
         amount: String(amount),
         callBackURL: CALLBACK_URL,
         companyName: COMPANY_NAME,
-        token: token,
+        token: nibToken,
         transactionId: transactionId,
         transactionTime: transactionTime,
         signature: signature
@@ -184,7 +179,7 @@ export async function initiatePaymentAction(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${nibToken}`
       },
       body: JSON.stringify(payload),
     });

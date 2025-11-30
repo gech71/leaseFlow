@@ -18,7 +18,9 @@ export function ConnectionSuccessPage({ token, phone }: Props) {
     async function establishSessionAndRedirect() {
       const result = await setPortalSessionAction(token);
       if (result.success) {
-        router.push(`/portal/billing?phone=${encodeURIComponent(phone)}`);
+        // Pass the original NIB token to the billing page
+        const billingUrl = `/portal/billing?phone=${encodeURIComponent(phone)}&token=${encodeURIComponent(token)}`;
+        router.push(billingUrl);
       } else {
         router.push(`/portal/connect/error?message=session_failed`);
       }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -84,7 +85,13 @@ declare global {
 }
 
 // --- Main Component ---
-export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
+export function BillingClientPage({
+  initialPhone,
+  nibToken,
+}: {
+  initialPhone: string;
+  nibToken: string;
+}) {
   const normalizePhone = (p: string) => {
     if (!p) return "";
     return p.startsWith("251") && p.length >= 12 ? "0" + p.substring(3) : p;
@@ -163,6 +170,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
       billIds,
       totalAmountForSelectedAgreement,
       selectedAgreement.id,
+      nibToken,
     );
 
     if (result.success && result.paymentToken) {
@@ -332,7 +340,7 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
                             <AccordionTrigger className="font-medium hover:no-underline text-base">
                               <div className="flex justify-between w-full items-center pr-4">
                                 <span>
-                                  Bill for {format(bill.billDate, "MMM yyyy")}
+                                  Bill for {format(parseISO(bill.billDate), "MMM yyyy")}
                                 </span>
                                 <span className="font-semibold text-foreground">
                                   {bill.totalAmount.toFixed(2)} Birr
@@ -421,3 +429,4 @@ export function BillingClientPage({ initialPhone }: { initialPhone: string }) {
     </div>
   );
 }
+
