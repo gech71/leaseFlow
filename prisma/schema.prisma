@@ -263,7 +263,7 @@ model ArifPayment {
 
 model AuditLog {
   id              String   @id @default(cuid())
-  actorId         String
+  actorId         String?       // <-- optional
   actorName       String
   action          String
   tenantId        String
@@ -280,8 +280,8 @@ model AuditLog {
   toAccountNumber String
   createdAt       DateTime @default(now())
   
-  building Building @relation(fields: [buildingId], references: [id], onDelete: Restrict)
-  actor    User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  building Building  @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  actor    User?     @relation(fields: [actorId], references: [id], onDelete: Restrict) // <-- optional
 }
 
 // --------------------------------------
