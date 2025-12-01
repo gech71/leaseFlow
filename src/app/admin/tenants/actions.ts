@@ -239,9 +239,10 @@ export async function toggleTenantStatusAction(
   isActive: boolean
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { isSuperAdmin, currentUser } = await getUserAndManagedIds();
-    if (!isSuperAdmin) {
-      return { success: false, error: "Permission denied." };
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    
+    if (!isSuperAdmin && !permissions.has('tenant:status')) {
+      return { success: false, error: "You do not have permission to change tenant status." };
     }
 
     await prisma.tenant.update({

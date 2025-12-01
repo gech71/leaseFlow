@@ -37,7 +37,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createTenantAction, updateTenantAction, findUserByPhoneAction } from './actions';
+import { createTenantAction, updateTenantAction, findUserByPhoneAction, toggleTenantStatusAction } from './actions';
 import { format, isAfter, addMonths, parseISO } from 'date-fns';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { PaginationControls } from '@/components/custom/PaginationControls';
@@ -68,6 +68,7 @@ export interface ClientAgreement extends Omit<AgreementTypePrisma, 'startDate' |
 export interface TenantWithRelations extends Omit<TenantTypePrisma, 'createdAt' | 'updatedAt' | 'rentedSpace' | 'agreements'> {
   createdAt: string;
   updatedAt: string;
+  status: TenantStatus;
   rentedSpace: ClientSpace | null;
   agreements: ClientAgreement[];
 }
@@ -124,7 +125,7 @@ export function TenantsClientPage({
 
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [filterStatus, setFilterStatus] = useState<TenantStatus | 'All'>('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
@@ -142,13 +143,10 @@ export function TenantsClientPage({
     },
   });
 
-  const filteredTenants = tenants.map(tenant => {
-    const isTenantActive = tenant.agreements.length === 0 || tenant.agreements.some(ag => ag.status !== 'Canceled');
-
-    return { ...tenant, isTenantActive };
-  }).filter(tenant => {
-    const statusMatch = filterStatus === 'Active' ? tenant.isTenantActive : !tenant.isTenantActive;
-    if (!statusMatch) return false;
+  const filteredTenants = tenants.filter(tenant => {
+    if (filterStatus !== 'All' && tenant.status !== filterStatus) {
+      return false;
+    }
     
     const searchMatch = !searchTerm ||
       tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -297,6 +295,18 @@ export function TenantsClientPage({
       toast({ title: `Error ${formMode === 'add' ? 'Adding' : 'Updating'} Tenant`, description: result.error, variant: "destructive" });
     }
   };
+
+  const handleToggleStatus = async (tenant: TenantWithRelations) => {
+    const newStatus = tenant.status === 'Active' ? 'Inactive' : 'Active';
+    const result = await handleApiCall(() => toggleTenantStatusAction(tenant.id, newStatus === 'Active'));
+
+    if (result?.success) {
+        toast({ title: "Status Updated", description: `${tenant.name} is now ${newStatus}.` });
+        router.refresh();
+    } else if (result?.error) {
+        toast({ title: "Update Failed", description: result.error, variant: "destructive" });
+    }
+  }
   
   const findActiveAgreementForTenant = (tenantId: string): ClientAgreement | undefined => {
     return agreements.find(ag => {
@@ -345,7 +355,7 @@ export function TenantsClientPage({
       "Email": t.email,
       "Phone": t.phone,
       "National ID": t.nationalId,
-      "Status": t.isTenantActive ? 'Active' : 'Inactive',
+      "Status": t.status,
       "Rented Spaces": t.agreements
         .filter(ag => ag.status === 'Active' && isAfter(addMonths(parseISO(ag.startDate), ag.paymentTermMonths), new Date()))
         .map(ag => ag.space?.spaceIdName)
@@ -522,7 +532,7 @@ export function TenantsClientPage({
                           <CardDescription className="text-sm flex items-center"><Mail className="mr-1.5 h-3.5 w-3.5 text-muted-foreground"/>{tenant.email}</CardDescription>
                         </div>
                       </div>
-                      <Badge variant={tenant.isTenantActive ? 'secondary' : 'destructive'} className="capitalize">{tenant.isTenantActive ? 'Active' : 'Inactive'}</Badge>
+                       <Badge variant={tenant.status === 'Active' ? 'secondary' : 'destructive'} className="capitalize">{tenant.status}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm flex-grow">
@@ -550,22 +560,28 @@ export function TenantsClientPage({
                   </CardContent>
                   <CardFooter className="border-t pt-4">
                     <div className="flex w-full flex-wrap items-center justify-between gap-2">
-                      <div>
-                        {canViewTenants && tenantActiveAgreement && tenantActiveAgreement.id ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Link href={`/admin/agreements/${tenantActiveAgreement.id}`} passHref>
-                                <Button variant="outline" size="sm" disabled={isSaving} className="h-8">
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Agreement
-                                </Button>
-                              </Link>
-                            </TooltipTrigger>
-                            <TooltipContent><p>View Active Agreement</p></TooltipContent>
-                          </Tooltip>
-                        ) : (<div/>) /* Spacer */
-                        }
-                      </div>
+                       <div className="flex items-center space-x-2">
+                            {canChangeStatus && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="flex items-center space-x-2">
+                                            <Switch
+                                                id={`status-switch-${tenant.id}`}
+                                                checked={tenant.status === 'Active'}
+                                                onCheckedChange={() => handleToggleStatus(tenant)}
+                                                aria-label="Toggle tenant status"
+                                            />
+                                            <Label htmlFor={`status-switch-${tenant.id}`} className="text-xs text-muted-foreground">
+                                                {tenant.status}
+                                            </Label>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Toggle Active/Inactive status</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+                        </div>
                       <div className="flex items-center gap-1">
                         {(canEditTenants || canViewTenants) && (
                            <Tooltip>
