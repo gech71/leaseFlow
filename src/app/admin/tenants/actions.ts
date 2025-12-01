@@ -252,30 +252,29 @@ export async function toggleTenantStatusAction(
           data: { status: TenantStatus.Inactive },
         });
 
-        // 2. Find all active agreements for this tenant and set them to Inactive
-        await tx.agreement.updateMany({
-          where: {
-            tenantId: tenantId,
-            status: AgreementStatus.Active,
-          },
-          data: { status: AgreementStatus.Inactive }
-        });
-        
-        // 3. Find IDs of now-inactive agreements to delete their bills
-        const agreementsToUpdate = await tx.agreement.findMany({
+        // 2. Find IDs of active agreements for this tenant
+        const activeAgreements = await tx.agreement.findMany({
             where: {
                 tenantId: tenantId,
-                status: AgreementStatus.Inactive,
+                status: AgreementStatus.Active,
             },
             select: { id: true },
         });
-        const agreementIds = agreementsToUpdate.map(ag => ag.id);
+        const agreementIdsToDeactivate = activeAgreements.map(ag => ag.id);
+        
+        if (agreementIdsToDeactivate.length > 0) {
+            // 3. Set the agreements to Inactive
+            await tx.agreement.updateMany({
+                where: {
+                    id: { in: agreementIdsToDeactivate },
+                },
+                data: { status: AgreementStatus.Inactive }
+            });
 
-        if (agreementIds.length > 0) {
-            // 4. Delete all non-paid bills for these agreements
+            // 4. Delete all non-paid bills for these now-inactive agreements
             await tx.bill.deleteMany({
                 where: {
-                    agreementId: { in: agreementIds },
+                    agreementId: { in: agreementIdsToDeactivate },
                     status: { not: 'Paid' },
                 },
             });
