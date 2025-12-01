@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -125,7 +124,7 @@ export function TenantsClientPage({
 
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<TenantStatus | 'All'>('All');
+  const [filterStatus, setFilterStatus] = useState<TenantStatus | 'All'>('Active');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
 
@@ -302,7 +301,7 @@ export function TenantsClientPage({
 
     if (result?.success) {
         toast({ title: "Status Updated", description: `${tenant.name} is now ${newStatus}.` });
-        router.refresh();
+        router.refresh(); // This forces a server-side data refetch.
     } else if (result?.error) {
         toast({ title: "Update Failed", description: result.error, variant: "destructive" });
     }
@@ -482,6 +481,7 @@ export function TenantsClientPage({
           <div className="flex items-center space-x-2">
             <Label htmlFor="status-filter">Status:</Label>
              <div className="flex items-center space-x-2">
+                <Button variant={filterStatus === 'All' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('All')}>All</Button>
                 <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
                 <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
             </div>
@@ -493,7 +493,7 @@ export function TenantsClientPage({
          <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <Users className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm || filterStatus === 'Inactive' ? 'No Tenants Found' : 'No Active Tenants'}</h3>
+            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm || filterStatus !== 'Active' ? 'No Tenants Found' : 'No Active Tenants'}</h3>
             <p className="text-muted-foreground mb-4">{searchTerm ? 'No tenants match your search.' : (filterStatus === 'Inactive' ? 'There are no inactive tenants.' : 'Add tenants by clicking the button above.')}</p>
             {!searchTerm && canCreateTenants && (
                 <Button onClick={handleOpenAddForm} disabled={isSaving}>
@@ -614,3 +614,5 @@ export function TenantsClientPage({
     </div>
   );
 }
+
+    

@@ -246,13 +246,11 @@ export async function toggleTenantStatusAction(
     
     if (!isActive) { // Deactivating tenant
       await prisma.$transaction(async (tx) => {
-        // 1. Update the tenant's status to Inactive
         await tx.tenant.update({
           where: { id: tenantId },
           data: { status: TenantStatus.Inactive },
         });
 
-        // 2. Set all of the tenant's ACTIVE agreements to INACTIVE
         await tx.agreement.updateMany({
             where: {
                 tenantId: tenantId,
@@ -261,7 +259,6 @@ export async function toggleTenantStatusAction(
             data: { status: AgreementStatus.Inactive }
         });
 
-        // 3. Delete all non-paid bills for this tenant
         await tx.bill.deleteMany({
             where: {
                 tenantId: tenantId,
@@ -271,13 +268,11 @@ export async function toggleTenantStatusAction(
       });
     } else { // Reactivating tenant
         await prisma.$transaction(async (tx) => {
-            // 1. Set tenant status to Active
             await tx.tenant.update({
                 where: { id: tenantId },
                 data: { status: TenantStatus.Active },
             });
 
-            // 2. Set previously inactive agreements for this tenant back to Active
             await tx.agreement.updateMany({
                 where: {
                     tenantId: tenantId,
@@ -291,7 +286,7 @@ export async function toggleTenantStatusAction(
     revalidatePath("/admin/tenants");
     revalidatePath("/admin/agreements");
     revalidatePath("/admin/billing");
-    revalidatePath("/admin/spaces");
+
     return { success: true };
   } catch (error: any) {
     console.error("Error toggling tenant status:", error);
@@ -301,3 +296,5 @@ export async function toggleTenantStatusAction(
     };
   }
 }
+
+    
