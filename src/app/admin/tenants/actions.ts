@@ -252,33 +252,23 @@ export async function toggleTenantStatusAction(
           data: { status: TenantStatus.Inactive },
         });
 
-        // 2. Find IDs of active agreements for this tenant
-        const activeAgreements = await tx.agreement.findMany({
+        // 2. Set all of the tenant's ACTIVE agreements to INACTIVE
+        await tx.agreement.updateMany({
             where: {
                 tenantId: tenantId,
                 status: AgreementStatus.Active,
             },
-            select: { id: true },
+            data: { status: AgreementStatus.Inactive }
         });
-        const agreementIdsToDeactivate = activeAgreements.map(ag => ag.id);
-        
-        if (agreementIdsToDeactivate.length > 0) {
-            // 3. Set the agreements to Inactive
-            await tx.agreement.updateMany({
-                where: {
-                    id: { in: agreementIdsToDeactivate },
-                },
-                data: { status: AgreementStatus.Inactive }
-            });
 
-            // 4. Delete all non-paid bills for these now-inactive agreements
-            await tx.bill.deleteMany({
-                where: {
-                    agreementId: { in: agreementIdsToDeactivate },
-                    status: { not: 'Paid' },
-                },
-            });
-        }
+        // 3. Delete all non-paid bills for this tenant
+        // This is safer as it targets the tenant directly, not just specific agreements
+        await tx.bill.deleteMany({
+            where: {
+                tenantId: tenantId,
+                status: { not: 'Paid' },
+            },
+        });
       });
     } else { // Reactivating tenant
         await prisma.$transaction(async (tx) => {
@@ -289,6 +279,7 @@ export async function toggleTenantStatusAction(
             });
 
             // 2. Set previously inactive agreements for this tenant back to Active
+            // This is safe because we didn't delete them.
             await tx.agreement.updateMany({
                 where: {
                     tenantId: tenantId,
