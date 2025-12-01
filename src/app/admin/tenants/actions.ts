@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -253,49 +252,52 @@ export async function toggleTenantStatusAction(
           data: { status: TenantStatus.Inactive },
         });
 
-        // 2. Find all active agreements for this tenant
-        const activeAgreements = await tx.agreement.findMany({
+        // 2. Find all active agreements for this tenant and set them to Inactive
+        await tx.agreement.updateMany({
           where: {
             tenantId: tenantId,
             status: AgreementStatus.Active,
           },
-          select: { id: true, spaceId: true },
+          data: { status: AgreementStatus.Inactive }
         });
-
-        if (activeAgreements.length > 0) {
-          const agreementIds = activeAgreements.map(ag => ag.id);
-          const spaceIds = activeAgreements.map(ag => ag.spaceId).filter((id): id is string => !!id);
-
-          // 3. Cancel all found active agreements
-          await tx.agreement.updateMany({
-            where: { id: { in: agreementIds } },
-            data: { status: AgreementStatus.Canceled },
-          });
-
-          // 4. Delete all unpaid bills for these agreements
-          await tx.bill.deleteMany({
+        
+        // 3. Find IDs of now-inactive agreements to delete their bills
+        const agreementsToUpdate = await tx.agreement.findMany({
             where: {
-              agreementId: { in: agreementIds },
-              status: { not: 'Paid' },
+                tenantId: tenantId,
+                status: AgreementStatus.Inactive,
             },
-          });
-          
-          // 5. Vacate spaces and disconnect tenant from spaces (redundant but safe)
-          await tx.space.updateMany({
-            where: { id: { in: spaceIds } },
-            data: { isOccupied: false },
-          });
-          await tx.tenant.update({
-            where: { id: tenantId },
-            data: { rentedSpaceId: null }
-          });
+            select: { id: true },
+        });
+        const agreementIds = agreementsToUpdate.map(ag => ag.id);
+
+        if (agreementIds.length > 0) {
+            // 4. Delete all non-paid bills for these agreements
+            await tx.bill.deleteMany({
+                where: {
+                    agreementId: { in: agreementIds },
+                    status: { not: 'Paid' },
+                },
+            });
         }
       });
     } else { // Reactivating tenant
-      await prisma.tenant.update({
-        where: { id: tenantId },
-        data: { status: TenantStatus.Active },
-      });
+        await prisma.$transaction(async (tx) => {
+            // 1. Set tenant status to Active
+            await tx.tenant.update({
+                where: { id: tenantId },
+                data: { status: TenantStatus.Active },
+            });
+
+            // 2. Set previously inactive agreements for this tenant back to Active
+            await tx.agreement.updateMany({
+                where: {
+                    tenantId: tenantId,
+                    status: AgreementStatus.Inactive,
+                },
+                data: { status: AgreementStatus.Active },
+            });
+        });
     }
 
     revalidatePath("/admin/tenants");
@@ -311,4 +313,3 @@ export async function toggleTenantStatusAction(
     };
   }
 }
-

@@ -24,6 +24,7 @@ import {
   Loader2,
   EyeOff,
   XCircle,
+  PauseCircle,
 } from "lucide-react";
 import type {
   Agreement as AgreementPrisma,
@@ -99,7 +100,7 @@ export function AgreementsListClientPage({
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
-  const [filterStatus, setFilterStatus] = useState<"Active" | "Expired" | "Canceled">("Active");
+  const [filterStatus, setFilterStatus] = useState<"Active" | "Expired" | "Canceled" | "Inactive">("Active");
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
@@ -127,9 +128,11 @@ export function AgreementsListClientPage({
       const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
       const isChronologicallyExpired = isBefore(agreementEndDate, today);
       
-      let status: 'Active' | 'Expired' | 'Canceled';
+      let status: 'Active' | 'Expired' | 'Canceled' | 'Inactive';
       if (agreement.status === 'Canceled') {
         status = 'Canceled';
+      } else if (agreement.status === 'Inactive') {
+        status = 'Inactive';
       } else if (isChronologicallyExpired) {
         status = 'Expired';
       } else {
@@ -295,6 +298,7 @@ export function AgreementsListClientPage({
             <Label htmlFor="status-filter">Status:</Label>
              <div className="flex items-center space-x-2">
                 <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
+                <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
                 <Button variant={filterStatus === 'Expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Expired')}>Expired</Button>
                 <Button variant={filterStatus === 'Canceled' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Canceled')}>Canceled</Button>
             </div>
@@ -349,11 +353,15 @@ export function AgreementsListClientPage({
               const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
               const isChronologicallyExpired = isBefore(agreementEndDate, today);
               
-              let status: 'Active' | 'Expired' | 'Canceled';
-              let statusBadgeVariant: 'secondary' | 'destructive' | 'outline' = 'secondary';
+              let status: 'Active' | 'Expired' | 'Canceled' | 'Inactive';
+              let statusBadgeVariant: 'secondary' | 'destructive' | 'outline' | 'default' = 'secondary';
+              
               if (agreement.status === 'Canceled') {
                 status = 'Canceled';
                 statusBadgeVariant = 'outline';
+              } else if (agreement.status === 'Inactive') {
+                status = 'Inactive';
+                statusBadgeVariant = 'default';
               } else if (isChronologicallyExpired) {
                 status = 'Expired';
                 statusBadgeVariant = 'destructive';
@@ -465,7 +473,7 @@ export function AgreementsListClientPage({
                           <p>Download Agreement</p>
                         </TooltipContent>
                       </Tooltip>
-                      {canEditAgreements && agreement.status === 'Active' && (
+                      {canEditAgreements && (agreement.status === 'Active' || agreement.status === 'Inactive') && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
