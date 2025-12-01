@@ -77,7 +77,19 @@ export async function POST(request: NextRequest) {
         const bills = await prisma.bill.findMany({
             where: {
                 tenantPaymentNotes: {
-                    contains: `Group Transaction Ref: ${txnRef}`
+                    contains: `Group Transaction Ref: ${transactionId}`
+                }
+            },
+            include: {
+                agreement: {
+                    include: {
+                        tenant: true,
+                        space: {
+                            include: {
+                                building: true
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -90,23 +102,54 @@ export async function POST(request: NextRequest) {
 
         
         // --- Step 4: Update Database ---
-        // Since this is a group payment, we mark all found bills as paid.
+        const paymentDate = new Date();
         await prisma.bill.updateMany({
-            where: {
-                id: { in: bills.map(b => b.id) }
-            },
+            where: { id: { in: bills.map(b => b.id) } },
             data: {
                 status: 'Paid',
-                paymentDate: new Date(), 
-                paymentReference: txnRef, // Use the final NIB transaction reference.
+                paymentDate: paymentDate, 
+                paymentReference: transactionId, 
+                paymentMethod: 'NIB_SuperApp',
                 adminVerifiedPayment: true, 
-                adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Group Ref: ${transactionId}.`,
-                tenantPaymentNotes: `Paid via NIB Super App. Group Transaction ID: ${transactionId}.`,
+                adminVerificationNotes: `Payment confirmed via NIB callback. Paid by: ${paidByNumber}. NIB Transaction ID: ${transactionId}.`,
             }
         });
 
+        // --- Step 5: Create Audit Log Entries ---
+        for (const bill of bills) {
+            if (bill.agreement?.space) {
+                let utilityAmount = 0;
+                if (typeof bill.utilityBreakdown === 'string') {
+                    try {
+                        const items = JSON.parse(bill.utilityBreakdown);
+                        if (Array.isArray(items)) {
+                            utilityAmount = items.reduce((sum, item) => sum + (item.amount || 0), 0);
+                        }
+                    } catch {}
+                }
+
+                await prisma.auditLog.create({
+                    data: {
+                        action: 'payment',
+                        actorName: 'NIB SuperApp Callback',
+                        tenantId: bill.tenantId,
+                        tenantName: bill.agreement.tenant?.name || 'N/A',
+                        buildingId: bill.agreement.space.buildingId,
+                        buildingName: bill.agreement.space.buildingName,
+                        spaceName: bill.agreement.space.spaceIdName,
+                        paymentDate: paymentDate,
+                        rentAmount: bill.rentAmount,
+                        utilityAmount: utilityAmount,
+                        penaltyAmount: bill.penaltyAmount || 0,
+                        totalAmount: bill.totalAmount,
+                        transactionId: transactionId,
+                        toAccountNumber: bill.agreement.space.building.accountNumber,
+                    }
+                });
+            }
+        }
         
-        // --- Step 5: Respond with 200 OK ---
+        // --- Step 6: Respond with 200 OK ---
         return NextResponse.json({ message: "Payment confirmed and all associated bills updated." }, { status: 200 });
 
     } catch (dbError: any) {
