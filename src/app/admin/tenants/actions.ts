@@ -262,7 +262,6 @@ export async function toggleTenantStatusAction(
         });
 
         // 3. Delete all non-paid bills for this tenant
-        // This is safer as it targets the tenant directly, not just specific agreements
         await tx.bill.deleteMany({
             where: {
                 tenantId: tenantId,
@@ -279,7 +278,6 @@ export async function toggleTenantStatusAction(
             });
 
             // 2. Set previously inactive agreements for this tenant back to Active
-            // This is safe because we didn't delete them.
             await tx.agreement.updateMany({
                 where: {
                     tenantId: tenantId,
