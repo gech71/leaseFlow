@@ -244,18 +244,71 @@ export async function toggleTenantStatusAction(
     if (!isSuperAdmin && !permissions.has('tenant:status')) {
       return { success: false, error: "You do not have permission to change tenant status." };
     }
+    
+    if (!isActive) { // Deactivating tenant
+      await prisma.$transaction(async (tx) => {
+        // 1. Update the tenant's status to Inactive
+        await tx.tenant.update({
+          where: { id: tenantId },
+          data: { status: TenantStatus.Inactive },
+        });
 
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: { status: isActive ? TenantStatus.Active : TenantStatus.Inactive },
-    });
+        // 2. Find all active agreements for this tenant
+        const activeAgreements = await tx.agreement.findMany({
+          where: {
+            tenantId: tenantId,
+            status: AgreementStatus.Active,
+          },
+          select: { id: true, spaceId: true },
+        });
+
+        if (activeAgreements.length > 0) {
+          const agreementIds = activeAgreements.map(ag => ag.id);
+          const spaceIds = activeAgreements.map(ag => ag.spaceId).filter((id): id is string => !!id);
+
+          // 3. Cancel all found active agreements
+          await tx.agreement.updateMany({
+            where: { id: { in: agreementIds } },
+            data: { status: AgreementStatus.Canceled },
+          });
+
+          // 4. Delete all unpaid bills for these agreements
+          await tx.bill.deleteMany({
+            where: {
+              agreementId: { in: agreementIds },
+              status: { not: 'Paid' },
+            },
+          });
+          
+          // 5. Vacate spaces and disconnect tenant from spaces (redundant but safe)
+          await tx.space.updateMany({
+            where: { id: { in: spaceIds } },
+            data: { isOccupied: false },
+          });
+          await tx.tenant.update({
+            where: { id: tenantId },
+            data: { rentedSpaceId: null }
+          });
+        }
+      });
+    } else { // Reactivating tenant
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { status: TenantStatus.Active },
+      });
+    }
 
     revalidatePath("/admin/tenants");
+    revalidatePath("/admin/agreements");
+    revalidatePath("/admin/billing");
+    revalidatePath("/admin/spaces");
     return { success: true };
   } catch (error: any) {
+    console.error("Error toggling tenant status:", error);
     return {
       success: false,
       error: error.message || "Failed to toggle tenant status.",
     };
   }
 }
+
