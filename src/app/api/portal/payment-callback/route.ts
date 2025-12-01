@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         const bills = await prisma.bill.findMany({
             where: {
                 tenantPaymentNotes: {
-                    contains: `Group Transaction Ref: ${transactionId}`
+                    contains: `Group Transaction Ref: ${txnRef}`
                 }
             }
         });

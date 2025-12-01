@@ -167,7 +167,7 @@ export async function initiatePaymentAction(
     }
     const ACCOUNT_NO = agreement.space.building.accountNumber;
 
-    const transactionId = nanoid(16);
+    const transactionId = crypto.randomUUID();
     const transactionTime = format(new Date(), "yyyyMMddHHmmss");
 
     const signatureString = [
@@ -180,6 +180,7 @@ export async function initiatePaymentAction(
       `transactionId=${transactionId}`,
       `transactionTime=${transactionTime}`,
     ].join("&");
+	
 
     const signature = crypto
       .createHash("sha256")
@@ -197,14 +198,16 @@ export async function initiatePaymentAction(
       signature: signature,
     };
 
+
     const response = await fetch(NIB_PAYMENT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${nibToken}`,
+        "Authorization": `Bearer ${nibToken}`,
       },
       body: JSON.stringify(payload),
     });
+
 
     const responseData = await response.json();
 
