@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState } from 'react';
@@ -17,14 +16,22 @@ import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 import { changePassword } from './actions';
 import { useRouter } from 'next/navigation';
 
+const passwordValidation = z.string()
+  .min(8, { message: "Password must be at least 8 characters long." })
+  .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter." })
+  .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter." })
+  .regex(/[0-9]/, { message: "Password must contain at least one number." })
+  .regex(/[^a-zA-Z0-9]/, { message: "Password must contain at least one symbol." });
+
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, { message: "Current password is required." }),
-  newPassword: z.string().min(6, { message: "New password must be at least 6 characters." }),
+  newPassword: passwordValidation,
   confirmPassword: z.string()
 }).refine(data => data.newPassword === data.confirmPassword, {
   message: "New passwords do not match.",
   path: ["confirmPassword"]
 });
+
 
 type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
