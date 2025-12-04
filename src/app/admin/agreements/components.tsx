@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -95,12 +94,15 @@ export function AgreementsListClientPage({
   const { toast } = useToast();
   const router = useRouter();
 
-  const [agreementToCancel, setAgreementToCancel] = useState<AgreementWithRelations | null>(null);
+  const [agreementToCancel, setAgreementToCancel] =
+    useState<AgreementWithRelations | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
-  const [filterStatus, setFilterStatus] = useState<"Active" | "Expired" | "Canceled" | "Inactive">("Active");
+  const [filterStatus, setFilterStatus] = useState<
+    "Active" | "Expired" | "Canceled" | "Inactive"
+  >("Active");
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
@@ -125,25 +127,28 @@ export function AgreementsListClientPage({
   const filteredAgreements = agreements
     .filter((agreement) => {
       // Status filter logic
-      const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
+      const agreementEndDate = addMonths(
+        parseISO(agreement.startDate),
+        agreement.paymentTermMonths,
+      );
       const isChronologicallyExpired = isBefore(agreementEndDate, today);
-      
-      let status: 'Active' | 'Expired' | 'Canceled' | 'Inactive';
-      if (agreement.status === 'Canceled') {
-        status = 'Canceled';
-      } else if (agreement.status === 'Inactive') {
-        status = 'Inactive';
+
+      let status: "Active" | "Expired" | "Canceled" | "Inactive";
+      if (agreement.status === "Canceled") {
+        status = "Canceled";
+      } else if (agreement.status === "Inactive") {
+        status = "Inactive";
       } else if (isChronologicallyExpired) {
-        status = 'Expired';
+        status = "Expired";
       } else {
-        status = 'Active';
+        status = "Active";
       }
 
       if (filterStatus !== status) return false;
 
       // Search term filter
       if (searchTerm) {
-         return (
+        return (
           agreement.tenant?.name
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
@@ -180,7 +185,8 @@ export function AgreementsListClientPage({
   }, [agreements.length, itemsPerPage, currentPage]);
 
   const isPaymentOverdue = (agreement: AgreementWithRelations): boolean => {
-    if (!agreement.nextPaymentDueDate || agreement.status !== 'Active') return false;
+    if (!agreement.nextPaymentDueDate || agreement.status !== "Active")
+      return false;
     const nextPaymentDate = startOfDay(parseISO(agreement.nextPaymentDueDate));
     const leaseEndDate = addMonths(
       parseISO(agreement.startDate),
@@ -234,11 +240,18 @@ export function AgreementsListClientPage({
     const result = await cancelAgreementAction(agreementToCancel.id);
     setIsSaving(false);
     if (result.success) {
-        toast({ title: 'Agreement Canceled', description: `The agreement for ${agreementToCancel.tenant?.name} has been successfully canceled.` });
-        setAgreementToCancel(null);
-        router.refresh();
+      toast({
+        title: "Agreement Canceled",
+        description: `The agreement for ${agreementToCancel.tenant?.name} has been successfully canceled.`,
+      });
+      setAgreementToCancel(null);
+      router.refresh();
     } else {
-        toast({ title: 'Error', description: result.error, variant: 'destructive' });
+      toast({
+        title: "Error",
+        description: result.error,
+        variant: "destructive",
+      });
     }
   };
 
@@ -260,7 +273,7 @@ export function AgreementsListClientPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>You do not have permission to view agreements.</p>
+          <p>Access Denied</p>
         </CardContent>
       </Card>
     );
@@ -296,28 +309,64 @@ export function AgreementsListClientPage({
           </div>
           <div className="flex items-center space-x-2">
             <Label htmlFor="status-filter">Status:</Label>
-             <div className="flex items-center space-x-2">
-                <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
-                <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
-                <Button variant={filterStatus === 'Expired' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Expired')}>Expired</Button>
-                <Button variant={filterStatus === 'Canceled' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Canceled')}>Canceled</Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant={filterStatus === "Active" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Active")}
+              >
+                Active
+              </Button>
+              <Button
+                variant={filterStatus === "Inactive" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Inactive")}
+              >
+                Inactive
+              </Button>
+              <Button
+                variant={filterStatus === "Expired" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Expired")}
+              >
+                Expired
+              </Button>
+              <Button
+                variant={filterStatus === "Canceled" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Canceled")}
+              >
+                Canceled
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
-      
-      <AlertDialog open={!!agreementToCancel} onOpenChange={(open) => !open && setAgreementToCancel(null)}>
+
+      <AlertDialog
+        open={!!agreementToCancel}
+        onOpenChange={(open) => !open && setAgreementToCancel(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to cancel this agreement?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Are you sure you want to cancel this agreement?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will set the agreement status to 'Canceled', make the space vacant, and delete all unpaid bills. This action cannot be undone.
+              This will set the agreement status to 'Canceled', make the space
+              vacant, and delete all unpaid bills. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSaving}>No, keep it</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmCancel} disabled={isSaving} className="bg-destructive hover:bg-destructive/80">
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+            <AlertDialogCancel disabled={isSaving}>
+              No, keep it
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancel}
+              disabled={isSaving}
+              className="bg-destructive hover:bg-destructive/80"
+            >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Yes, Cancel Agreement
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -336,13 +385,15 @@ export function AgreementsListClientPage({
                 ? `No ${filterStatus.toLowerCase()} agreements match your search.`
                 : `There are no ${filterStatus.toLowerCase()} agreements.`}
             </p>
-            {!searchTerm && canCreateAgreements && filterStatus === "Active" && (
-              <Link href="/admin/agreements/generate" passHref>
-                <Button>
-                  <PlusCircle className="mr-2 h-5 w-5" /> Create Agreement
-                </Button>
-              </Link>
-            )}
+            {!searchTerm &&
+              canCreateAgreements &&
+              filterStatus === "Active" && (
+                <Link href="/admin/agreements/generate" passHref>
+                  <Button>
+                    <PlusCircle className="mr-2 h-5 w-5" /> Create Agreement
+                  </Button>
+                </Link>
+              )}
           </CardContent>
         </Card>
       ) : (
@@ -350,23 +401,33 @@ export function AgreementsListClientPage({
           <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {paginatedAgreements.map((agreement) => {
               const overdue = isPaymentOverdue(agreement);
-              const agreementEndDate = addMonths(parseISO(agreement.startDate), agreement.paymentTermMonths);
-              const isChronologicallyExpired = isBefore(agreementEndDate, today);
-              
-              let status: 'Active' | 'Expired' | 'Canceled' | 'Inactive';
-              let statusBadgeVariant: 'secondary' | 'destructive' | 'outline' | 'default' = 'secondary';
-              
-              if (agreement.status === 'Canceled') {
-                status = 'Canceled';
-                statusBadgeVariant = 'outline';
-              } else if (agreement.status === 'Inactive') {
-                status = 'Inactive';
-                statusBadgeVariant = 'default';
+              const agreementEndDate = addMonths(
+                parseISO(agreement.startDate),
+                agreement.paymentTermMonths,
+              );
+              const isChronologicallyExpired = isBefore(
+                agreementEndDate,
+                today,
+              );
+
+              let status: "Active" | "Expired" | "Canceled" | "Inactive";
+              let statusBadgeVariant:
+                | "secondary"
+                | "destructive"
+                | "outline"
+                | "default" = "secondary";
+
+              if (agreement.status === "Canceled") {
+                status = "Canceled";
+                statusBadgeVariant = "outline";
+              } else if (agreement.status === "Inactive") {
+                status = "Inactive";
+                statusBadgeVariant = "default";
               } else if (isChronologicallyExpired) {
-                status = 'Expired';
-                statusBadgeVariant = 'destructive';
+                status = "Expired";
+                statusBadgeVariant = "destructive";
               } else {
-                status = 'Active';
+                status = "Active";
               }
 
               const spaceDesc = agreement.space
@@ -376,7 +437,9 @@ export function AgreementsListClientPage({
                 <Card
                   key={agreement.id}
                   className={`flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1 ${
-                    overdue && status === 'Active' ? "border-destructive border-2" : ""
+                    overdue && status === "Active"
+                      ? "border-destructive border-2"
+                      : ""
                   }`}
                 >
                   <CardHeader>
@@ -385,7 +448,7 @@ export function AgreementsListClientPage({
                         {agreement.tenant?.name || "N/A"}
                       </CardTitle>
                       <div className="flex flex-col items-end space-y-1">
-                        {overdue && status === 'Active' && (
+                        {overdue && status === "Active" && (
                           <Badge
                             variant="destructive"
                             className="flex items-center"
@@ -394,7 +457,12 @@ export function AgreementsListClientPage({
                             Overdue
                           </Badge>
                         )}
-                        <Badge variant={statusBadgeVariant} className="capitalize">{status}</Badge>
+                        <Badge
+                          variant={statusBadgeVariant}
+                          className="capitalize"
+                        >
+                          {status}
+                        </Badge>
                       </div>
                     </div>
                     <CardDescription>{spaceDesc}</CardDescription>
@@ -417,7 +485,7 @@ export function AgreementsListClientPage({
                       <strong>Term:</strong> {agreement.paymentTermMonths}{" "}
                       months
                     </p>
-                    {status === 'Active' && (
+                    {status === "Active" && (
                       <p
                         className={`${
                           overdue ? "text-destructive font-semibold" : ""
@@ -429,7 +497,7 @@ export function AgreementsListClientPage({
                           : "N/A"}
                       </p>
                     )}
-                     <p className="text-xs text-muted-foreground pt-1">
+                    <p className="text-xs text-muted-foreground pt-1">
                       Generated: {format(parseISO(agreement.createdAt), "PP")}
                     </p>
                   </CardContent>
@@ -473,25 +541,29 @@ export function AgreementsListClientPage({
                           <p>Download Agreement</p>
                         </TooltipContent>
                       </Tooltip>
-                      {canEditAgreements && (agreement.status === 'Active' || agreement.status === 'Inactive') && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => setAgreementToCancel(agreement)}
-                              disabled={isSaving}
-                            >
-                              <XCircle className="h-4 w-4" />
-                              <span className="sr-only">Cancel Agreement</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Cancel Agreement</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
+                      {canEditAgreements &&
+                        (agreement.status === "Active" ||
+                          agreement.status === "Inactive") && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => setAgreementToCancel(agreement)}
+                                disabled={isSaving}
+                              >
+                                <XCircle className="h-4 w-4" />
+                                <span className="sr-only">
+                                  Cancel Agreement
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Cancel Agreement</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                     </div>
                   </CardFooter>
                 </Card>

@@ -1,36 +1,47 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
+import { databaseService } from "@/lib/services/databaseService";
+import type { CurrentUser } from "@/lib/types";
 
-import { NextResponse, type NextRequest } from 'next/server';
-import { verifySession } from '@/lib/auth/jwt';
-import { databaseService } from '@/lib/services/databaseService';
-import type { CurrentUser } from '@/lib/types';
-
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const session = await verifySession();
+  const token = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(token);
 
   if (!session?.userId) {
-    return NextResponse.json({ isSuccess: false, errors: ["Authentication required."] }, { status: 401 });
+    return NextResponse.json(
+      { isSuccess: false, errors: ["Authentication required."] },
+      { status: 401 },
+    );
   }
 
   try {
-    const localUser = await databaseService.getUserById(session.userId, { roles: true });
+    const localUser = await databaseService.getUserById(session.userId, {
+      roles: true,
+    });
 
     if (!localUser) {
-      console.warn(`User with internal ID ${session.userId} not found in database during /api/user/me call.`);
-      return NextResponse.json({ isSuccess: false, errors: ["User not found in the system."] }, { status: 404 });
+      console.warn(
+        `User with internal ID ${session.userId} not found in database during /api/user/me call.`,
+      );
+      return NextResponse.json(
+        { isSuccess: false, errors: ["User not found in the system."] },
+        { status: 404 },
+      );
     }
 
     const effectivePermissions = session.permissions ?? [];
-    
+
     const currentUserData: CurrentUser = {
       id: localUser.id,
       email: localUser.email,
-      name: localUser.name || `${localUser.firstName} ${localUser.lastName}`.trim(),
+      name:
+        localUser.name || `${localUser.firstName} ${localUser.lastName}`.trim(),
       firstName: localUser.firstName,
       lastName: localUser.lastName,
       phoneNumber: localUser.phoneNumber,
-      roles: localUser.roles.map(role => ({
+      roles: localUser.roles.map((role) => ({
         id: role.id,
         name: role.name,
         permissions: role.permissions || [],
@@ -39,9 +50,11 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({ isSuccess: true, user: currentUserData });
-
   } catch (dbError: any) {
     console.error("Database error in /api/user/me:", dbError.message);
-    return NextResponse.json({ isSuccess: false, errors: ["Error fetching user details."] }, { status: 500 });
+    return NextResponse.json(
+      { isSuccess: false, errors: ["Error fetching user details."] },
+      { status: 500 },
+    );
   }
 }

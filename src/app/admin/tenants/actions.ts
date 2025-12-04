@@ -1,4 +1,3 @@
-
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -191,10 +190,7 @@ export async function updateTenantAction(
   }
 }
 
-
-export async function findUserByPhoneAction(
-  phone: string,
-): Promise<{
+export async function findUserByPhoneAction(phone: string): Promise<{
   success: boolean;
   user?: { name: string; email: string; nationalId?: string | null };
   error?: string;
@@ -235,16 +231,17 @@ export async function findUserByPhoneAction(
 
 export async function toggleTenantStatusAction(
   tenantId: string,
-  isActive: boolean
+  isActive: boolean,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
-    
-    if (!isSuperAdmin && !permissions.has('tenant:status')) {
-      return { success: false, error: "You do not have permission to change tenant status." };
+
+    if (!isSuperAdmin && !permissions.has("tenant:status")) {
+      return { success: false, error: "Access Denied" };
     }
-    
-    if (!isActive) { // Deactivating tenant
+
+    if (!isActive) {
+      // Deactivating tenant
       await prisma.$transaction(async (tx) => {
         await tx.tenant.update({
           where: { id: tenantId },
@@ -252,35 +249,36 @@ export async function toggleTenantStatusAction(
         });
 
         await tx.agreement.updateMany({
-            where: {
-                tenantId: tenantId,
-                status: AgreementStatus.Active,
-            },
-            data: { status: AgreementStatus.Inactive }
+          where: {
+            tenantId: tenantId,
+            status: AgreementStatus.Active,
+          },
+          data: { status: AgreementStatus.Inactive },
         });
 
         await tx.bill.deleteMany({
-            where: {
-                tenantId: tenantId,
-                status: { not: 'Paid' },
-            },
+          where: {
+            tenantId: tenantId,
+            status: { not: "Paid" },
+          },
         });
       });
-    } else { // Reactivating tenant
-        await prisma.$transaction(async (tx) => {
-            await tx.tenant.update({
-                where: { id: tenantId },
-                data: { status: TenantStatus.Active },
-            });
-
-            await tx.agreement.updateMany({
-                where: {
-                    tenantId: tenantId,
-                    status: AgreementStatus.Inactive,
-                },
-                data: { status: AgreementStatus.Active },
-            });
+    } else {
+      // Reactivating tenant
+      await prisma.$transaction(async (tx) => {
+        await tx.tenant.update({
+          where: { id: tenantId },
+          data: { status: TenantStatus.Active },
         });
+
+        await tx.agreement.updateMany({
+          where: {
+            tenantId: tenantId,
+            status: AgreementStatus.Inactive,
+          },
+          data: { status: AgreementStatus.Active },
+        });
+      });
     }
 
     revalidatePath("/admin/tenants");
@@ -296,5 +294,3 @@ export async function toggleTenantStatusAction(
     };
   }
 }
-
-    

@@ -1,25 +1,90 @@
-
-import 'server-only';
+import "server-only";
 export const runtime = "nodejs";
 
-import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
-import type { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
-import type { User, Role } from '@prisma/client';
+import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { nanoid } from "nanoid";
+import { databaseService } from "@/lib/services/databaseService";
+import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
+import type { User, Role } from "@prisma/client";
 
 const JWT_SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 // Define cookie names
-export const ACCESS_TOKEN_COOKIE_NAME = 'nibrental_access_token';
-export const REFRESH_TOKEN_COOKIE_NAME = 'nibrental_refresh_token';
-export const CSRF_TOKEN_COOKIE_NAME = 'nibrental_csrf_token';
+export const ACCESS_TOKEN_COOKIE_NAME = "nibrental_access_token";
+export const REFRESH_TOKEN_COOKIE_NAME = "nibrental_refresh_token";
+export const CSRF_TOKEN_COOKIE_NAME = "nibrental_csrf_token";
+export const CSRF_TOKEN_SIG_NAME = "nibrental_csrf_sig";
+export const LAST_ACTIVE_COOKIE_NAME = "nibrental_last_active";
 
+// Idle timeout in milliseconds. If no activity for this duration, session is considered idle.
+export const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+// Use Web Crypto (available in edge and modern Node) to compute HMAC-SHA256
+async function importHmacKey(): Promise<CryptoKey> {
+  const keyData = new TextEncoder().encode(JWT_SECRET_KEY || "");
+  return await (globalThis.crypto as any).subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
+}
+
+function bufferToHex(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function hexToUint8(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0) hex = "0" + hex;
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
+export async function signCsrfToken(value: string): Promise<string> {
+  const key = await importHmacKey();
+  const data = new TextEncoder().encode(value);
+  const sig = await (globalThis.crypto as any).subtle.sign("HMAC", key, data);
+  return bufferToHex(sig);
+}
+
+export async function verifyCsrfToken(
+  value: string | undefined,
+  sig: string | undefined,
+): Promise<boolean> {
+  if (!value || !sig) return false;
+  try {
+    const key = await importHmacKey();
+    const data = new TextEncoder().encode(value);
+    const sigBytes = hexToUint8(sig);
+    // WebCrypto verify expects ArrayBuffer for signature
+    const valid = await (globalThis.crypto as any).subtle.verify(
+      "HMAC",
+      key,
+      sigBytes.buffer,
+      data,
+    );
+    return Boolean(valid);
+  } catch (err) {
+    return false;
+  }
+}
 
 if (!JWT_SECRET_KEY || JWT_SECRET_KEY.length !== 64) {
-  const errorMessage = 'JWT_SECRET_KEY is not set or is not a 64-character hex string.';
-  if (process.env.NODE_ENV === 'production') {
+  const errorMessage =
+    "JWT_SECRET_KEY is not set or is not a 64-character hex string.";
+  if (process.env.NODE_ENV === "production") {
     throw new Error(`FATAL: ${errorMessage} This is required for production.`);
   } else {
-    console.warn(`WARN: ${errorMessage} The application will not be secure. Please generate a key for development.`);
+    console.warn(
+      `WARN: ${errorMessage} The application will not be secure. Please generate a key for development.`,
+    );
   }
 }
 
@@ -31,22 +96,24 @@ export interface SessionPayload extends JWTPayload {
   permissions: string[];
   isSuperAdmin: boolean;
   forceChangePass: boolean;
+  jti?: string;
 }
 
 export interface RefreshTokenPayload extends JWTPayload {
-    userId: string;
+  userId: string;
+  jti?: string;
 }
 
 interface GeneratedTokens {
   accessToken: {
     name: string;
     value: string;
-    options: Omit<ResponseCookie, 'name' | 'value'>;
+    options: Omit<ResponseCookie, "name" | "value">;
   };
   refreshToken: {
     name: string;
     value: string;
-    options: Omit<ResponseCookie, 'name' | 'value'>;
+    options: Omit<ResponseCookie, "name" | "value">;
   };
 }
 
@@ -55,11 +122,16 @@ interface GeneratedTokens {
  * @param payload - The user session data to encrypt.
  * @returns {Promise<GeneratedTokens>} An object containing access and refresh tokens and their respective cookie options.
  */
-export async function createSession(payload: Omit<SessionPayload, keyof JWTPayload>): Promise<GeneratedTokens> {
+export async function createSession(
+  payload: Omit<SessionPayload, keyof JWTPayload>,
+): Promise<GeneratedTokens> {
   // Create Access Token (short-lived)
+  const jti = nanoid();
+  // include jti in the payload so it's present in the token
+  const tokenPayload = { ...payload, jti } as typeof payload & { jti: string };
   const accessTokenExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-  const accessToken = await new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
+  const accessToken = await new SignJWT(tokenPayload)
+    .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(accessTokenExpires)
     .sign(key);
@@ -67,20 +139,29 @@ export async function createSession(payload: Omit<SessionPayload, keyof JWTPaylo
   // Create Refresh Token (long-lived)
   const refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   const refreshTokenPayload: RefreshTokenPayload = {
-      userId: payload.userId,
+    userId: payload.userId,
+    jti,
   };
   const refreshToken = await new SignJWT(refreshTokenPayload)
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(refreshTokenExpires)
     .sign(key);
 
   const commonCookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    sameSite: "lax" as const,
   };
+
+  // Persist session record so we can revoke tokens server-side
+  try {
+    await databaseService.createUserSession(jti, payload.userId);
+  } catch (err) {
+    // If DB write fails, we still return tokens but log a warning.
+    console.warn("Warning: failed to persist user session", err);
+  }
 
   return {
     accessToken: {
@@ -96,21 +177,38 @@ export async function createSession(payload: Omit<SessionPayload, keyof JWTPaylo
   };
 }
 
-
 /**
  * Verifies the access token from the cookie and returns its payload.
  * @returns {Promise<SessionPayload | null>} The session payload or null if invalid.
  */
-export async function verifySession(token: string | undefined): Promise<SessionPayload | null> {
+export async function verifySession(
+  token: string | undefined,
+): Promise<SessionPayload | null> {
   if (!token) return null;
 
   try {
     const { payload } = await jwtVerify(token, key, {
-      algorithms: ['HS256'],
+      algorithms: ["HS256"],
     });
-    return payload as SessionPayload;
+    const sessionPayload = payload as SessionPayload;
+    // If jti is present, ensure the session hasn't been revoked
+    try {
+      if (sessionPayload.jti) {
+        const record = await databaseService.getUserSessionByJti(
+          sessionPayload.jti,
+        );
+        if (!record || record.revoked) return null;
+        // Update lastActive timestamp in DB
+        await databaseService.updateUserSessionLastActive(sessionPayload.jti);
+      }
+    } catch (err) {
+      // If DB checks fail, be conservative and allow session (avoid accidental lockouts),
+      // but log the error in server logs.
+      console.warn("Warning: session verification DB check failed", err);
+    }
+
+    return sessionPayload;
   } catch (error) {
-   
     return null;
   }
 }
@@ -119,27 +217,33 @@ export async function verifySession(token: string | undefined): Promise<SessionP
  * Verifies the refresh token from the cookie and returns its payload.
  * @returns {Promise<RefreshTokenPayload | null>} The refresh token payload or null if invalid.
  */
-export async function verifyRefreshToken(token: string | undefined): Promise<RefreshTokenPayload | null> {
-    if (!token) return null;
-    
-    try {
-        const { payload } = await jwtVerify(token, key, {
-            algorithms: ['HS256'],
-        });
-        return payload as RefreshTokenPayload;
-    } catch (error) {
-        
-        return null;
-    }
-}
+export async function verifyRefreshToken(
+  token: string | undefined,
+): Promise<RefreshTokenPayload | null> {
+  if (!token) return null;
 
+  try {
+    const { payload } = await jwtVerify(token, key, {
+      algorithms: ["HS256"],
+    });
+    return payload as RefreshTokenPayload;
+  } catch (error) {
+    return null;
+  }
+}
 
 /**
  * Returns an array of cookie names that should be deleted for logout.
  * @returns {string[]}
  */
 export function getSessionCookieNames(): string[] {
-  return [ACCESS_TOKEN_COOKIE_NAME, REFRESH_TOKEN_COOKIE_NAME, CSRF_TOKEN_COOKIE_NAME];
+  return [
+    ACCESS_TOKEN_COOKIE_NAME,
+    REFRESH_TOKEN_COOKIE_NAME,
+    CSRF_TOKEN_COOKIE_NAME,
+    CSRF_TOKEN_SIG_NAME,
+    LAST_ACTIVE_COOKIE_NAME,
+  ];
 }
 
 /**
@@ -147,12 +251,16 @@ export function getSessionCookieNames(): string[] {
  * @param user - The user object from the database.
  * @returns The payload ready to be signed.
  */
-export function createUserPayload(user: User & { roles: Role[] }): Omit<SessionPayload, keyof JWTPayload> {
-  const isSuperAdmin = user.roles.some(role => role.name === 'SUPER_ADMIN');
-  
+export function createUserPayload(
+  user: User & { roles: Role[] },
+): Omit<SessionPayload, keyof JWTPayload> {
+  const isSuperAdmin = user.roles.some((role) => role.name === "SUPER_ADMIN");
+
   let permissions: string[] = [];
   if (!isSuperAdmin) {
-    permissions = Array.from(new Set(user.roles.flatMap(role => role.permissions)));
+    permissions = Array.from(
+      new Set(user.roles.flatMap((role) => role.permissions)),
+    );
   }
 
   return {

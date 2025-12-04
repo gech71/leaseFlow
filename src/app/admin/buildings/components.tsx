@@ -1,15 +1,44 @@
+"use client";
 
-"use client"; 
-
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/custom/PageHeader';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building as BuildingIcon, PlusCircle, Edit3, Trash2, MapPin, Clock, Banknote as BanknoteIcon, AlertTriangle, Layers, HomeIcon, Eye, EyeOff, Search, Hash, CheckCircle, XCircle, Download } from 'lucide-react';
-import type { Building as BuildingTypePrisma, PenaltyTier as PenaltyTierTypePrisma, BuildingStatus, User } from '@prisma/client';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/custom/PageHeader";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Building as BuildingIcon,
+  PlusCircle,
+  Edit3,
+  Trash2,
+  MapPin,
+  Clock,
+  Banknote as BanknoteIcon,
+  AlertTriangle,
+  Layers,
+  HomeIcon,
+  Eye,
+  EyeOff,
+  Search,
+  Hash,
+  CheckCircle,
+  XCircle,
+  Download,
+} from "lucide-react";
+import type {
+  Building as BuildingTypePrisma,
+  PenaltyTier as PenaltyTierTypePrisma,
+  BuildingStatus,
+  User,
+} from "@prisma/client";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,226 +49,371 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { format } from 'date-fns';
-import { toggleBuildingStatusAction } from './actions';
-import { usePermissions } from '@/contexts/PermissionContext'; 
-import { PaginationControls } from '@/components/custom/PaginationControls';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
+import { format } from "date-fns";
+import { toggleBuildingStatusAction } from "./actions";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { PaginationControls } from "@/components/custom/PaginationControls";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import * as XLSX from "xlsx-js-style";
-
 
 export interface BuildingWithRelations extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];
-  createdAt: string; 
+  createdAt: string;
   createdBy: User | null;
   approvedBy: User | null;
 }
 
 interface BuildingCardProps {
   building: BuildingWithRelations;
-  onStatusToggle: (buildingId: string, newStatus: BuildingStatus, rejectionReason?: string) => void;
+  onStatusToggle: (
+    buildingId: string,
+    newStatus: BuildingStatus,
+    rejectionReason?: string,
+  ) => void;
   canEdit: boolean;
   canApprove: boolean;
   canViewDetails: boolean;
 }
 
-function BuildingCard({ building, onStatusToggle, canEdit, canApprove, canViewDetails }: BuildingCardProps) {
+function BuildingCard({
+  building,
+  onStatusToggle,
+  canEdit,
+  canApprove,
+  canViewDetails,
+}: BuildingCardProps) {
   const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
-  
+
   const policiesByScopeGroup: Record<string, PenaltyTierTypePrisma[]> = {};
-  (building.penaltyPolicyTiers || []).forEach(tier => {
+  (building.penaltyPolicyTiers || []).forEach((tier) => {
     let key = tier.scope;
-    if (tier.scope === 'Floor' && tier.applicableFloor) key = `Floor: ${tier.applicableFloor}`;
-    if (tier.scope === 'SpecificSpaces' && tier.applicableSpaceIdNames?.length) key = `Spaces: ${tier.applicableSpaceIdNames.join(', ')}`;
-    
+    if (tier.scope === "Floor" && tier.applicableFloor)
+      key = `Floor: ${tier.applicableFloor}`;
+    if (tier.scope === "SpecificSpaces" && tier.applicableSpaceIdNames?.length)
+      key = `Spaces: ${tier.applicableSpaceIdNames.join(", ")}`;
+
     if (!policiesByScopeGroup[key]) policiesByScopeGroup[key] = [];
     policiesByScopeGroup[key].push(tier);
   });
 
   const getStatusBadgeVariant = (status: BuildingStatus) => {
     switch (status) {
-      case 'Active': return 'secondary';
-      case 'Pending': return 'default';
-      case 'Rejected': return 'destructive';
-      case 'Inactive': return 'outline';
-      default: return 'outline';
+      case "Active":
+        return "secondary";
+      case "Pending":
+        return "default";
+      case "Rejected":
+        return "destructive";
+      case "Inactive":
+        return "outline";
+      default:
+        return "outline";
     }
   };
 
   const handleReject = () => {
-    onStatusToggle(building.id, 'Rejected', rejectionReason);
+    onStatusToggle(building.id, "Rejected", rejectionReason);
     setShowRejectionDialog(false);
   };
-  
+
   return (
     <>
-    <Card key={building.id} className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
-      <CardHeader>
-        <div className="flex justify-between items-start gap-2">
-            <CardTitle className="font-headline text-xl mb-1">{building.name}</CardTitle>
-            <Badge variant={getStatusBadgeVariant(building.status)} className="capitalize">{building.status}</Badge>
-        </div>
-        <CardDescription className="text-sm flex flex-col gap-1">
-          {building.address && <span className="flex items-center"><MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />{building.address}</span>}
-          {building.accountNumber && <span className="flex items-center"><Hash className="mr-1.5 h-4 w-4 text-muted-foreground" />A/C: {building.accountNumber}</span>}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="text-sm space-y-2 flex-grow">
-           <p className="text-xs text-muted-foreground">Registered: {building.createdAt ? format(new Date(building.createdAt), 'PP') : 'N/A'}</p>
-           {building.status === 'Rejected' && building.rejectionReason && (
+      <Card
+        key={building.id}
+        className="flex flex-col justify-between shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1"
+      >
+        <CardHeader>
+          <div className="flex justify-between items-start gap-2">
+            <CardTitle className="font-headline text-xl mb-1">
+              {building.name}
+            </CardTitle>
+            <Badge
+              variant={getStatusBadgeVariant(building.status)}
+              className="capitalize"
+            >
+              {building.status}
+            </Badge>
+          </div>
+          <CardDescription className="text-sm flex flex-col gap-1">
+            {building.address && (
+              <span className="flex items-center">
+                <MapPin className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                {building.address}
+              </span>
+            )}
+            {building.accountNumber && (
+              <span className="flex items-center">
+                <Hash className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                A/C: {building.accountNumber}
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2 flex-grow">
+          <p className="text-xs text-muted-foreground">
+            Registered:{" "}
+            {building.createdAt
+              ? format(new Date(building.createdAt), "PP")
+              : "N/A"}
+          </p>
+          {building.status === "Rejected" && building.rejectionReason && (
             <div className="p-2 bg-destructive/10 border border-destructive/20 rounded-md text-xs text-destructive">
               <strong>Reason:</strong> {building.rejectionReason}
             </div>
-           )}
-           {Object.keys(policiesByScopeGroup).length > 0 ? (
-              <div className="mt-2 pt-2 border-t border-border/50 space-y-2.5">
-                  <h5 className="text-xs font-semibold text-foreground mb-1">Late Fee Policies:</h5>
-                  {Object.entries(policiesByScopeGroup).map(([scopeKey, tiersInGroup]) => (
-                    <div key={scopeKey} className="p-1.5 bg-secondary/30 rounded-sm">
-                        <p className="text-xs font-medium text-primary capitalize flex items-center">
-                            {tiersInGroup[0].scope === 'Building' && <BuildingIcon className="inline mr-1 h-3 w-3"/>}
-                            {tiersInGroup[0].scope === 'Floor' && <Layers className="inline mr-1 h-3 w-3"/>}
-                            {tiersInGroup[0].scope === 'SpecificSpaces' && <HomeIcon className="inline mr-1 h-3 w-3"/>}
-                            {scopeKey}
-                        </p>
-                        {tiersInGroup.sort((a,b)=>a.fromDay - b.fromDay).map((tier, index) => {
-                            let tierDurationDesc = `Days ${tier.fromDay}`;
-                            if (tier.toDay !== null && tier.toDay !== undefined && tier.toDay > 0) {
-                                tierDurationDesc += ` - ${tier.toDay}`;
-                            } else {
-                                tierDurationDesc += ` onwards`;
-                            }
-                            return (
-                                <div key={`${tier.id}-${index}`} className="text-xs pl-2 py-0.5">
-                                    <p><Clock className="inline mr-1 h-3 w-3"/>{tierDurationDesc}</p>
-                                    <p><BanknoteIcon className="inline mr-1 h-3 w-3"/>Fee: {tier.penaltyType === 'Fixed' ? `${Number(tier.feeValue).toFixed(2)} Birr` : `${tier.feeValue}%`}{tier.frequency === 'Daily' ? ' daily' : ''}</p>
-                                </div>
-                            )
-                        })}
-                    </div>
-                  ))}
-              </div>
-           ) : (
-              <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">No late fee policy set.</p>
-           )}
+          )}
+          {Object.keys(policiesByScopeGroup).length > 0 ? (
+            <div className="mt-2 pt-2 border-t border-border/50 space-y-2.5">
+              <h5 className="text-xs font-semibold text-foreground mb-1">
+                Late Fee Policies:
+              </h5>
+              {Object.entries(policiesByScopeGroup).map(
+                ([scopeKey, tiersInGroup]) => (
+                  <div
+                    key={scopeKey}
+                    className="p-1.5 bg-secondary/30 rounded-sm"
+                  >
+                    <p className="text-xs font-medium text-primary capitalize flex items-center">
+                      {tiersInGroup[0].scope === "Building" && (
+                        <BuildingIcon className="inline mr-1 h-3 w-3" />
+                      )}
+                      {tiersInGroup[0].scope === "Floor" && (
+                        <Layers className="inline mr-1 h-3 w-3" />
+                      )}
+                      {tiersInGroup[0].scope === "SpecificSpaces" && (
+                        <HomeIcon className="inline mr-1 h-3 w-3" />
+                      )}
+                      {scopeKey}
+                    </p>
+                    {tiersInGroup
+                      .sort((a, b) => a.fromDay - b.fromDay)
+                      .map((tier, index) => {
+                        let tierDurationDesc = `Days ${tier.fromDay}`;
+                        if (
+                          tier.toDay !== null &&
+                          tier.toDay !== undefined &&
+                          tier.toDay > 0
+                        ) {
+                          tierDurationDesc += ` - ${tier.toDay}`;
+                        } else {
+                          tierDurationDesc += ` onwards`;
+                        }
+                        return (
+                          <div
+                            key={`${tier.id}-${index}`}
+                            className="text-xs pl-2 py-0.5"
+                          >
+                            <p>
+                              <Clock className="inline mr-1 h-3 w-3" />
+                              {tierDurationDesc}
+                            </p>
+                            <p>
+                              <BanknoteIcon className="inline mr-1 h-3 w-3" />
+                              Fee:{" "}
+                              {tier.penaltyType === "Fixed"
+                                ? `${Number(tier.feeValue).toFixed(2)} Birr`
+                                : `${tier.feeValue}%`}
+                              {tier.frequency === "Daily" ? " daily" : ""}
+                            </p>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ),
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic mt-2 pt-2 border-t border-border/50">
+              No late fee policy set.
+            </p>
+          )}
         </CardContent>
-      <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center space-x-2">
-           {canEdit && (building.status === 'Active' || building.status === 'Inactive') && (
+        <CardFooter className="border-t pt-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            {canEdit &&
+              (building.status === "Active" ||
+                building.status === "Inactive") && (
                 <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div className="flex items-center space-x-2">
-                            <Switch
-                                id={`status-switch-${building.id}`}
-                                checked={building.status === 'Active'}
-                                onCheckedChange={(checked) => onStatusToggle(building.id, checked ? 'Active' : 'Inactive')}
-                                aria-label="Toggle building status"
-                            />
-                             <Label htmlFor={`status-switch-${building.id}`} className="text-xs text-muted-foreground">
-                                {building.status === 'Active' ? 'Active' : 'Inactive'}
-                            </Label>
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Toggle Active/Inactive status</p></TooltipContent>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`status-switch-${building.id}`}
+                        checked={building.status === "Active"}
+                        onCheckedChange={(checked) =>
+                          onStatusToggle(
+                            building.id,
+                            checked ? "Active" : "Inactive",
+                          )
+                        }
+                        aria-label="Toggle building status"
+                      />
+                      <Label
+                        htmlFor={`status-switch-${building.id}`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {building.status === "Active" ? "Active" : "Inactive"}
+                      </Label>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Toggle Active/Inactive status</p>
+                  </TooltipContent>
                 </Tooltip>
-           )}
-        </div>
-        <div className="flex items-center gap-1">
-            {building.status === 'Pending' && canApprove && (
+              )}
+          </div>
+          <div className="flex items-center gap-1">
+            {building.status === "Pending" && canApprove && (
               <>
-                <Button size="sm" variant="destructive" onClick={() => setShowRejectionDialog(true)}><XCircle className="mr-1.5 h-4 w-4"/> Reject</Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => onStatusToggle(building.id, 'Active')}><CheckCircle className="mr-1.5 h-4 w-4"/> Approve</Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setShowRejectionDialog(true)}
+                >
+                  <XCircle className="mr-1.5 h-4 w-4" /> Reject
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => onStatusToggle(building.id, "Active")}
+                >
+                  <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
+                </Button>
               </>
             )}
 
-            { (building.status === 'Active' || building.status === 'Inactive' || building.status === 'Rejected') && (
-              canEdit ? (
+            {(building.status === "Active" ||
+              building.status === "Inactive" ||
+              building.status === "Rejected") &&
+              (canEdit ? (
                 <Tooltip>
-                    <TooltipTrigger asChild>
-                    <Link href={`/admin/buildings/add-building?id=${building.id}`} passHref>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <TooltipTrigger asChild>
+                    <Link
+                      href={`/admin/buildings/add-building?id=${building.id}`}
+                      passHref
+                    >
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
                         <Edit3 className="h-4 w-4 text-blue-600" />
                         <span className="sr-only">Edit Building</span>
-                        </Button>
+                      </Button>
                     </Link>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Edit Building</p></TooltipContent>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Edit Building</p>
+                  </TooltipContent>
                 </Tooltip>
               ) : canViewDetails ? (
                 <Tooltip>
-                    <TooltipTrigger asChild>
-                    <Link href={`/admin/buildings/add-building?id=${building.id}&view=true`} passHref>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <TooltipTrigger asChild>
+                    <Link
+                      href={`/admin/buildings/add-building?id=${building.id}&view=true`}
+                      passHref
+                    >
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
                         <Eye className="h-4 w-4 text-blue-600" />
                         <span className="sr-only">View Building</span>
-                        </Button>
+                      </Button>
                     </Link>
-                    </TooltipTrigger>
-                    <TooltipContent><p>View Building</p></TooltipContent>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View Building</p>
+                  </TooltipContent>
                 </Tooltip>
-              ) : null)
-            }
-        </div>
-      </CardFooter>
-    </Card>
-    <AlertDialog open={showRejectionDialog} onOpenChange={setShowRejectionDialog}>
+              ) : null)}
+          </div>
+        </CardFooter>
+      </Card>
+      <AlertDialog
+        open={showRejectionDialog}
+        onOpenChange={setShowRejectionDialog}
+      >
         <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Reject Building</AlertDialogTitle>
-                <AlertDialogDescription>Please provide a reason for rejecting this building. This will be visible to the creator.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <Textarea 
-                placeholder="Reason for rejection..."
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-            />
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleReject} disabled={!rejectionReason}>Confirm Rejection</AlertDialogAction>
-            </AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Building</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please provide a reason for rejecting this building. This will be
+              visible to the creator.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Reason for rejection..."
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleReject}
+              disabled={!rejectionReason}
+            >
+              Confirm Rejection
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
-    </AlertDialog>
+      </AlertDialog>
     </>
   );
 }
 
-export function BuildingsClientPage({ initialBuildings }: { initialBuildings: BuildingWithRelations[] }) {
-  const [buildings, setBuildings] = useState<BuildingWithRelations[]>(initialBuildings);
+export function BuildingsClientPage({
+  initialBuildings,
+}: {
+  initialBuildings: BuildingWithRelations[];
+}) {
+  const [buildings, setBuildings] =
+    useState<BuildingWithRelations[]>(initialBuildings);
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin, handleApiCall } = usePermissions(); 
+  const { hasPermission, isSuperAdmin, handleApiCall } = usePermissions();
   const router = useRouter();
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
-  const [filterStatus, setFilterStatus] = useState<BuildingStatus | 'All'>('All');
+  const [filterStatus, setFilterStatus] = useState<BuildingStatus | "All">(
+    "All",
+  );
 
+  const canCreateBuildings = isSuperAdmin || hasPermission("building:create");
+  const canEditBuildings = isSuperAdmin || hasPermission("building:edit");
+  const canApproveBuildings = isSuperAdmin || hasPermission("building:approve");
+  const canDeleteBuildings = isSuperAdmin || hasPermission("building:delete");
+  const canViewBuildings =
+    isSuperAdmin ||
+    hasPermission("building:view") ||
+    canCreateBuildings ||
+    canEditBuildings ||
+    canDeleteBuildings ||
+    canApproveBuildings;
 
-  const canCreateBuildings = isSuperAdmin || hasPermission('building:create');
-  const canEditBuildings = isSuperAdmin || hasPermission('building:edit');
-  const canApproveBuildings = isSuperAdmin || hasPermission('building:approve');
-  const canDeleteBuildings = isSuperAdmin || hasPermission('building:delete');
-  const canViewBuildings = isSuperAdmin || hasPermission('building:view') || canCreateBuildings || canEditBuildings || canDeleteBuildings || canApproveBuildings;
-
-  const filteredBuildings = buildings.filter(building => {
-      const statusMatch = filterStatus === 'All' || building.status === filterStatus;
-      const searchMatch = building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (building.address && building.address.toLowerCase().includes(searchTerm.toLowerCase()));
-      return statusMatch && searchMatch;
+  const filteredBuildings = buildings.filter((building) => {
+    const statusMatch =
+      filterStatus === "All" || building.status === filterStatus;
+    const searchMatch =
+      building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (building.address &&
+        building.address.toLowerCase().includes(searchTerm.toLowerCase()));
+    return statusMatch && searchMatch;
   });
 
   const totalPages = Math.ceil(filteredBuildings.length / itemsPerPage);
-  
+
   useEffect(() => {
-    setBuildings(initialBuildings.map(b => ({...b, createdAt: b.createdAt || new Date().toISOString() })));
+    setBuildings(
+      initialBuildings.map((b) => ({
+        ...b,
+        createdAt: b.createdAt || new Date().toISOString(),
+      })),
+    );
   }, [initialBuildings]);
-  
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterStatus]);
@@ -250,35 +424,48 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
       setCurrentPage(newTotalPages);
     }
   }, [filteredBuildings.length, itemsPerPage, currentPage]);
-  
+
   const paginatedBuildings = filteredBuildings.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
-  
+
   const handleItemsPerPageChange = (newSize: number) => {
     setItemsPerPage(newSize);
     setCurrentPage(1);
   };
-  
-  const handleToggleStatus = async (buildingId: string, newStatus: BuildingStatus, rejectionReason?: string) => {
-      const result = await handleApiCall(() => toggleBuildingStatusAction(buildingId, newStatus, rejectionReason));
-      if (!result) return;
-      
-      if (result.success) {
-          toast({ title: "Status Updated", description: `Building status set to ${newStatus}.` });
-          router.refresh();
-      } else {
-          toast({ title: "Update Failed", description: result.error, variant: "destructive" });
-      }
+
+  const handleToggleStatus = async (
+    buildingId: string,
+    newStatus: BuildingStatus,
+    rejectionReason?: string,
+  ) => {
+    const result = await handleApiCall(() =>
+      toggleBuildingStatusAction(buildingId, newStatus, rejectionReason),
+    );
+    if (!result) return;
+
+    if (result.success) {
+      toast({
+        title: "Status Updated",
+        description: `Building status set to ${newStatus}.`,
+      });
+      router.refresh();
+    } else {
+      toast({
+        title: "Update Failed",
+        description: result.error,
+        variant: "destructive",
+      });
+    }
   };
 
   const exportToExcel = () => {
-    const dataToExport = filteredBuildings.map(b => ({
+    const dataToExport = filteredBuildings.map((b) => ({
       "Building Name": b.name,
-      "Address": b.address,
+      Address: b.address,
       "Account Number": b.accountNumber,
-      "Status": b.status,
+      Status: b.status,
       "Creation Date": format(new Date(b.createdAt), "yyyy-MM-dd HH:mm"),
       "Created By": b.createdBy?.name || "N/A",
       "Approved By": b.approvedBy?.name || "N/A",
@@ -288,14 +475,24 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Buildings");
     XLSX.writeFile(workbook, "Buildings_Export.xlsx");
-    toast({ title: "Exporting", description: "Excel file download has started." });
+    toast({
+      title: "Exporting",
+      description: "Excel file download has started.",
+    });
   };
-  
+
   if (!canViewBuildings) {
-     return (
+    return (
       <Card className="shadow-lg text-center py-12">
-        <CardHeader><CardTitle className="text-destructive flex items-center justify-center"><EyeOff className="mr-2"/>Access Denied</CardTitle></CardHeader>
-        <CardContent><p>You do not have permission to view buildings.</p></CardContent>
+        <CardHeader>
+          <CardTitle className="text-destructive flex items-center justify-center">
+            <EyeOff className="mr-2" />
+            Access Denied
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Access Denied</p>
+        </CardContent>
       </Card>
     );
   }
@@ -310,12 +507,18 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           <div className="flex flex-col sm:flex-row gap-2">
             {isSuperAdmin && (
               <>
-                <Button onClick={exportToExcel} variant="outline" size="sm"><Download className="mr-2 h-4 w-4"/>Export Excel</Button>
+                <Button onClick={exportToExcel} variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Excel
+                </Button>
               </>
             )}
             {canCreateBuildings && (
               <Link href="/admin/buildings/add-building" passHref>
-                <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
                   <PlusCircle className="mr-2 h-5 w-5" /> Add New Building
                 </Button>
               </Link>
@@ -323,7 +526,7 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           </div>
         }
       />
-      
+
       <Card className="mb-6 shadow-sm">
         <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
           <div className="relative flex-grow">
@@ -338,11 +541,41 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
           <div className="flex items-center space-x-2">
             <Label htmlFor="status-filter">Status:</Label>
             <div className="flex items-center space-x-2">
-                <Button variant={filterStatus === 'All' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('All')}>All</Button>
-                <Button variant={filterStatus === 'Active' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Active')}>Active</Button>
-                <Button variant={filterStatus === 'Pending' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Pending')}>Pending</Button>
-                <Button variant={filterStatus === 'Rejected' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Rejected')}>Rejected</Button>
-                <Button variant={filterStatus === 'Inactive' ? 'default' : 'outline'} size="sm" onClick={() => setFilterStatus('Inactive')}>Inactive</Button>
+              <Button
+                variant={filterStatus === "All" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("All")}
+              >
+                All
+              </Button>
+              <Button
+                variant={filterStatus === "Active" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Active")}
+              >
+                Active
+              </Button>
+              <Button
+                variant={filterStatus === "Pending" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Pending")}
+              >
+                Pending
+              </Button>
+              <Button
+                variant={filterStatus === "Rejected" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Rejected")}
+              >
+                Rejected
+              </Button>
+              <Button
+                variant={filterStatus === "Inactive" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Inactive")}
+              >
+                Inactive
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -352,13 +585,19 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
         <Card className="text-center py-12 shadow-sm">
           <CardContent>
             <BuildingIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2 font-headline">{searchTerm ? 'No Buildings Found' : 'No Buildings Yet'}</h3>
-            <p className="text-muted-foreground mb-4">{searchTerm ? 'No buildings match your search.' : 'Get started by adding your first building.'}</p>
+            <h3 className="text-xl font-semibold mb-2 font-headline">
+              {searchTerm ? "No Buildings Found" : "No Buildings Yet"}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {searchTerm
+                ? "No buildings match your search."
+                : "Get started by adding your first building."}
+            </p>
             {!searchTerm && canCreateBuildings && (
               <Link href="/admin/buildings/add-building" passHref>
-                  <Button>
+                <Button>
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Building
-                  </Button>
+                </Button>
               </Link>
             )}
           </CardContent>
@@ -367,20 +606,20 @@ export function BuildingsClientPage({ initialBuildings }: { initialBuildings: Bu
         <>
           <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {paginatedBuildings.map((building) => (
-              <BuildingCard 
-                key={building.id} 
-                building={building} 
-                onStatusToggle={handleToggleStatus} 
+              <BuildingCard
+                key={building.id}
+                building={building}
+                onStatusToggle={handleToggleStatus}
                 canEdit={canEditBuildings}
                 canApprove={canApproveBuildings}
                 canViewDetails={canViewBuildings}
               />
             ))}
           </div>
-          <PaginationControls 
-            currentPage={currentPage} 
-            totalPages={totalPages} 
-            onPageChange={setCurrentPage} 
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
             itemsPerPage={itemsPerPage}
             onItemsPerPageChange={handleItemsPerPageChange}
             className="mt-8"

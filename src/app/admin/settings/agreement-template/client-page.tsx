@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -21,9 +20,7 @@ import {
   AlertTriangle,
   EyeOff,
 } from "lucide-react";
-import {
-  deleteAgreementTemplateAction,
-} from "./actions";
+import { deleteAgreementTemplateAction } from "./actions";
 import type { AgreementTemplate } from "@prisma/client";
 import {
   Table,
@@ -45,7 +42,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
-import Link from 'next/link';
+import Link from "next/link";
 import { PaginationControls } from "@/components/custom/PaginationControls";
 
 interface AgreementTemplateClientPageProps {
@@ -60,11 +57,14 @@ export function AgreementTemplateClientPage({
   const { toast } = useToast();
   const router = useRouter();
   const { hasPermission } = usePermissions();
-  const canManageTemplates = hasPermission('settings:agreement_templates:manage');
+  const canManageTemplates = hasPermission(
+    "settings:agreement_templates:manage",
+  );
 
   const [templates, setTemplates] = useState(initialTemplates);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [templateToDelete, setTemplateToDelete] = useState<AgreementTemplate | null>(null);
+  const [templateToDelete, setTemplateToDelete] =
+    useState<AgreementTemplate | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -72,7 +72,7 @@ export function AgreementTemplateClientPage({
   const totalPages = Math.ceil(templates.length / itemsPerPage);
   const paginatedTemplates = templates.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   const handleItemsPerPageChange = (newSize: number) => {
@@ -104,14 +104,13 @@ export function AgreementTemplateClientPage({
   useEffect(() => {
     setTemplates(initialTemplates);
   }, [initialTemplates]);
-  
+
   useEffect(() => {
     const newTotalPages = Math.ceil(templates.length / itemsPerPage);
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(newTotalPages);
     }
   }, [templates.length, itemsPerPage, currentPage]);
-
 
   if (error) {
     return (
@@ -137,7 +136,7 @@ export function AgreementTemplateClientPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>You do not have permission to manage agreement templates.</p>
+          <p>Access Denied</p>
         </CardContent>
       </Card>
     );
@@ -187,10 +186,17 @@ export function AgreementTemplateClientPage({
                           {format(new Date(template.updatedAt), "PPp")}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/admin/settings/agreement-template/add-template?id=${template.id}`} passHref>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <Edit className="h-4 w-4 text-blue-600" />
-                              </Button>
+                          <Link
+                            href={`/admin/settings/agreement-template/add-template?id=${template.id}`}
+                            passHref
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <Edit className="h-4 w-4 text-blue-600" />
+                            </Button>
                           </Link>
                           <Button
                             variant="ghost"
@@ -219,7 +225,12 @@ export function AgreementTemplateClientPage({
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!templateToDelete} onOpenChange={(open) => { if (!open) setTemplateToDelete(null) }}>
+      <AlertDialog
+        open={!!templateToDelete}
+        onOpenChange={(open) => {
+          if (!open) setTemplateToDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">

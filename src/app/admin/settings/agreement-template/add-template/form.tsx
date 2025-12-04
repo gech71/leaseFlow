@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from "react";
@@ -9,18 +8,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter
+  CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/contexts/PermissionContext";
-import {
-  Loader2,
-  Save,
-  Info,
-  Clipboard,
-  EyeOff
-} from "lucide-react";
+import { Loader2, Save, Info, Clipboard, EyeOff } from "lucide-react";
 import { upsertAgreementTemplateAction } from "../actions";
 import type { AgreementTemplate } from "@prisma/client";
 import {
@@ -53,7 +46,9 @@ interface AddTemplateFormProps {
 export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
-  const canManageTemplates = hasPermission('settings:agreement_templates:manage');
+  const canManageTemplates = hasPermission(
+    "settings:agreement_templates:manage",
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<TemplateFormValues>({
@@ -137,19 +132,19 @@ export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
     // We just handle the toast messages.
     setIsSaving(false);
     if (result?.error) {
-       toast({
+      toast({
         title: "Error",
         description: result.error,
         variant: "destructive",
       });
     } else {
-        toast({
-            title: "Success",
-            description: `Template "${values.name}" has been saved.`,
-        });
+      toast({
+        title: "Success",
+        description: `Template "${values.name}" has been saved.`,
+      });
     }
   };
-  
+
   if (!canManageTemplates) {
     return (
       <Card className="shadow-lg">
@@ -159,7 +154,7 @@ export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>You do not have permission to manage agreement templates.</p>
+          <p>Access Denied</p>
         </CardContent>
       </Card>
     );
@@ -167,105 +162,105 @@ export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
 
   return (
     <div className="grid md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2 shadow-lg">
-            <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)}>
-                <CardContent className="p-6">
-                    <div className="space-y-6">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Template Name</FormLabel>
-                                <FormControl>
-                                <Input placeholder="Template Name" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
+      <Card className="md:col-span-2 shadow-lg">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleFormSubmit)}>
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Template Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Template Name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Template Content</FormLabel>
+                      <FormControl>
+                        <TinyMceEditor
+                          value={field.value || ""}
+                          onEditorChange={field.onChange}
                         />
-                        <FormField
-                            control={form.control}
-                            name="content"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Template Content</FormLabel>
-                                <FormControl>
-                                <TinyMceEditor
-                                    value={field.value || ""}
-                                    onEditorChange={field.onChange}
-                                />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                    </div>
-                </CardContent>
-                <CardFooter className="border-t px-6 py-4">
-                     <Button type="submit" disabled={isSaving}>
-                        {isSaving ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <Save className="mr-2 h-4 w-4" />
-                        )}
-                        Save Template
-                    </Button>
-                </CardFooter>
-            </form>
-            </Form>
-        </Card>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="border-t px-6 py-4">
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save Template
+              </Button>
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
 
-        <div className="hidden md:block">
-            <Card className="sticky top-20">
-                <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-md">
-                    <Info className="h-5 w-5 text-primary" />
-                    Available Placeholders
-                </CardTitle>
-                <CardDescription className="text-xs">
-                    Click to copy a placeholder to your clipboard.
-                </CardDescription>
-                </CardHeader>
-                <CardContent className="p-2">
-                <ScrollArea className="h-[50vh] w-full pr-2">
-                    <div className="space-y-2">
-                    {placeholders.map((p) => (
-                        <div
-                        key={p.value}
-                        className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2"
-                        >
-                        <div>
-                            <p className="font-semibold text-sm text-primary">
-                            {p.label}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                            {p.description}
-                            </p>
-                        </div>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() => {
-                            navigator.clipboard.writeText(p.value);
-                            toast({
-                                title: "Copied!",
-                                description: `Placeholder ${p.value} copied.`,
-                            });
-                            }}
-                        >
-                            <Clipboard className="h-4 w-4" />
-                        </Button>
-                        </div>
-                    ))}
+      <div className="hidden md:block">
+        <Card className="sticky top-20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-md">
+              <Info className="h-5 w-5 text-primary" />
+              Available Placeholders
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Click to copy a placeholder to your clipboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-2">
+            <ScrollArea className="h-[50vh] w-full pr-2">
+              <div className="space-y-2">
+                {placeholders.map((p) => (
+                  <div
+                    key={p.value}
+                    className="p-2 bg-secondary/30 rounded-md flex items-center justify-between gap-2"
+                  >
+                    <div>
+                      <p className="font-semibold text-sm text-primary">
+                        {p.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.description}
+                      </p>
                     </div>
-                </ScrollArea>
-                </CardContent>
-            </Card>
-        </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(p.value);
+                        toast({
+                          title: "Copied!",
+                          description: `Placeholder ${p.value} copied.`,
+                        });
+                      }}
+                    >
+                      <Clipboard className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

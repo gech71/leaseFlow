@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -38,19 +37,19 @@ export default function RootPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const urlError = searchParams.get('error');
+    const urlError = searchParams.get("error");
     if (urlError) {
-      if (urlError === 'session_expired' && searchParams.get('from')) {
-          setError("Your session has expired. Please log in again.");
-      } else if (urlError !== 'session_expired') {
-          setError(decodeURIComponent(urlError));
+      if (urlError === "session_expired" && searchParams.get("from")) {
+        setError("Your session has expired. Please log in again.");
+      } else if (urlError !== "session_expired") {
+        setError(decodeURIComponent(urlError));
       }
     }
   }, [searchParams]);
 
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated) {
-      router.replace('/admin/dashboard');
+      router.replace("/admin/dashboard");
     }
   }, [isAuthLoading, isAuthenticated, router]);
 
@@ -62,10 +61,10 @@ export default function RootPage() {
     try {
       // CSRF token is now handled automatically by the browser via HttpOnly cookie.
       // No need to send a custom header.
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ phone, password }),
       });
@@ -73,12 +72,14 @@ export default function RootPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'An unexpected error occurred.');
+        throw new Error(data.message || "An unexpected error occurred.");
       }
-      
-      toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
-      window.location.href = '/admin/dashboard';
 
+      toast({
+        title: "Login Successful",
+        description: "Redirecting to your dashboard...",
+      });
+      window.location.href = "/admin/dashboard";
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -86,7 +87,10 @@ export default function RootPage() {
     }
   };
 
-  if (isAuthLoading || isAuthenticated) {
+  // Only show the global loader when we're loading and already authenticated.
+  // If loading is in progress but the user is not authenticated, show the login/root form
+  // so the user can sign in without needing to refresh.
+  if (isAuthLoading && isAuthenticated) {
     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -167,7 +171,9 @@ export default function RootPage() {
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Log In
             </Button>
           </form>

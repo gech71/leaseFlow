@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -232,7 +231,7 @@ export function GenerateAgreementClientPage({
     if (!canCreateAgreements) {
       toast({
         title: "Permission Denied",
-        description: "You do not have permission to generate agreement text.",
+        description: "Access Denied",
         variant: "destructive",
       });
       return;
@@ -320,7 +319,7 @@ export function GenerateAgreementClientPage({
     if (!canCreateAgreements) {
       toast({
         title: "Permission Denied",
-        description: "You do not have permission to save agreements.",
+        description: "Access Denied",
         variant: "destructive",
       });
       return;
@@ -412,7 +411,7 @@ export function GenerateAgreementClientPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>You do not have permission to create agreements.</p>
+          <p>Access Denied</p>
         </CardContent>
       </Card>
     );

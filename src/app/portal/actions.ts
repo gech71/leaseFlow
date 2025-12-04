@@ -1,19 +1,18 @@
-
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
-import type {
-  User,
-  Role,
-} from "@prisma/client";
+import type { User, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/services/emailService";
-import { verifySession, createSession, ACCESS_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
-import { revalidatePath } from 'next/cache';
+import {
+  verifySession,
+  createSession,
+  ACCESS_TOKEN_COOKIE_NAME,
+} from "@/lib/auth/jwt";
+import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
-import { cookies } from 'next/headers';
-import type { PortalAgreementWithRelations } from './dashboard/actions';
-
+import { cookies } from "next/headers";
+import type { PortalAgreementWithRelations } from "./dashboard/actions";
 
 // --- User Authentication Helper ---
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
@@ -33,13 +32,13 @@ export async function setPortalSessionAction(token: string) {
     const payload = {
       portalToken: token,
       userId: `portal-user-${nanoid(8)}`, // Create a temporary unique ID
-      email: 'portal-user@example.com',
+      email: "portal-user@example.com",
       isSuperAdmin: false,
-      permissions: ['portal:view'],
+      permissions: ["portal:view"],
       forceChangePass: false,
       iat: Math.floor(Date.now() / 1000), // Use numeric timestamp for 'issued at'
     };
-    
+
     const { accessToken, refreshToken } = await createSession(payload);
 
     cookies().set(accessToken.name, accessToken.value, accessToken.options);
@@ -87,30 +86,35 @@ export async function sendContactEmailAction(formData: {
     ) {
       // If no manager assigned, find SUPER_ADMINs as a fallback
       const superAdmins = await prisma.user.findMany({
-        where: { roles: { some: { name: 'SUPER_ADMIN' } } }
+        where: { roles: { some: { name: "SUPER_ADMIN" } } },
       });
-      
+
       if (superAdmins.length === 0) {
         return {
           success: false,
-          error: "No manager or admin is assigned to your building. Cannot send email.",
+          error:
+            "No manager or admin is assigned to your building. Cannot send email.",
         };
       }
 
-      const adminEmails = superAdmins.map(a => a.email).filter((email): email is string => !!email);
-      
+      const adminEmails = superAdmins
+        .map((a) => a.email)
+        .filter((email): email is string => !!email);
+
       if (adminEmails.length === 0) {
-         return {
+        return {
           success: false,
           error: "No administrators have a configured email address.",
         };
       }
-      
+
       const emailHtml = `
         <h1>Contact Form Submission from Tenant Portal</h1>
         <p><strong>From Tenant:</strong> ${tenant.name} (${tenant.email})</p>
-        <p><strong>Building:</strong> ${agreement?.space?.building.name || 'N/A'}</p>
-        <p><strong>Space:</strong> ${agreement?.space?.spaceIdName || 'N/A'}</p>
+        <p><strong>Building:</strong> ${
+          agreement?.space?.building.name || "N/A"
+        }</p>
+        <p><strong>Space:</strong> ${agreement?.space?.spaceIdName || "N/A"}</p>
         <hr>
         <h2>Subject: ${formData.subject}</h2>
         <p>${formData.body.replace(/\n/g, "<br>")}</p>
@@ -121,20 +125,19 @@ export async function sendContactEmailAction(formData: {
         subject: `[Tenant Portal Contact] ${formData.subject}`,
         html: emailHtml,
       });
-
     } else {
-        const managerEmails = agreement.space.building.managers
-          .map((m) => m.email)
-          .filter((email): email is string => !!email);
+      const managerEmails = agreement.space.building.managers
+        .map((m) => m.email)
+        .filter((email): email is string => !!email);
 
-        if (managerEmails.length === 0) {
-          return {
-            success: false,
-            error: "Building manager(s) do not have an email address configured.",
-          };
-        }
-        
-        const emailHtml = `
+      if (managerEmails.length === 0) {
+        return {
+          success: false,
+          error: "Building manager(s) do not have an email address configured.",
+        };
+      }
+
+      const emailHtml = `
           <h1>Contact Form Submission from Tenant Portal</h1>
           <p><strong>From Tenant:</strong> ${tenant.name} (${tenant.email})</p>
           <p><strong>Building:</strong> ${agreement.space.building.name}</p>
@@ -144,11 +147,11 @@ export async function sendContactEmailAction(formData: {
           <p>${formData.body.replace(/\n/g, "<br>")}</p>
         `;
 
-        await sendEmail({
-          to: managerEmails.join(", "),
-          subject: `[Tenant Portal] ${formData.subject}`,
-          html: emailHtml,
-        });
+      await sendEmail({
+        to: managerEmails.join(", "),
+        subject: `[Tenant Portal] ${formData.subject}`,
+        html: emailHtml,
+      });
     }
 
     return { success: true };
@@ -171,37 +174,44 @@ export async function submitPaymentProofAction(data: {
     if (!currentUser) {
       return { success: false, error: "Authentication required." };
     }
-    
+
     const bill = await prisma.bill.findUnique({
       where: { id: data.billId },
-      include: { agreement: { include: { tenant: true } } }
+      include: { agreement: { include: { tenant: true } } },
     });
 
     if (!bill || bill.agreement?.tenant?.userId !== currentUser.id) {
-      return { success: false, error: "Bill not found or you do not have permission to modify it." };
+      return { success: false, error: "Bill not found or Access Denied." };
     }
-    
-    if (bill.status !== 'Pending' && bill.status !== 'Overdue') {
-      return { success: false, error: `Cannot submit proof for a bill with status "${bill.status}".` };
+
+    if (bill.status !== "Pending" && bill.status !== "Overdue") {
+      return {
+        success: false,
+        error: `Cannot submit proof for a bill with status "${bill.status}".`,
+      };
     }
-    
+
     // Check data URI size before saving
-    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) { // 2MB limit
-      return { success: false, error: "The uploaded PDF file is too large. Please upload a file smaller than 2MB." };
+    if (data.paymentProofDataUri.length > 2 * 1024 * 1024) {
+      // 2MB limit
+      return {
+        success: false,
+        error:
+          "The uploaded PDF file is too large. Please upload a file smaller than 2MB.",
+      };
     }
 
     await databaseService.updateBill(data.billId, {
-      status: 'PendingVerification',
+      status: "PendingVerification",
       paymentProofDataUri: data.paymentProofDataUri, // Save the data URI
       tenantPaymentNotes: data.notes,
       paymentDate: new Date(), // Set payment date to when proof is submitted
     });
-    
-    revalidatePath('/portal/dashboard');
-    revalidatePath('/admin/billing'); // Also revalidate admin page
+
+    revalidatePath("/portal/dashboard");
+    revalidatePath("/admin/billing"); // Also revalidate admin page
 
     return { success: true };
-
   } catch (error: any) {
     console.error("Error submitting payment proof:", error);
     return { success: false, error: "Failed to submit payment proof." };

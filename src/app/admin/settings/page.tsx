@@ -1,31 +1,66 @@
-
 "use client";
 
-import React, { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { UserPlus, Users, ShieldCheck, Mail, KeyRound, FileText, UploadCloud, History } from 'lucide-react';
-import Link from 'next/link';
-import { usePermissions } from '@/contexts/PermissionContext';
-import { useRouter } from 'next/navigation';
+import React, { useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  UserPlus,
+  Users,
+  ShieldCheck,
+  Mail,
+  KeyRound,
+  FileText,
+  UploadCloud,
+  History,
+} from "lucide-react";
+import Link from "next/link";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { useRouter } from "next/navigation";
 
 // This page will act as a hub for different settings.
 export default function SettingsPage() {
   const { hasAnyPermission, isSuperAdmin } = usePermissions();
   const router = useRouter();
 
-  const canManageUserRegistration = isSuperAdmin || hasAnyPermission(['settings:user_registration:manage']);
-  const canManageUserManagement = isSuperAdmin || hasAnyPermission(['settings:user_management:view', 'settings:user_management:assign']);
-  const canManageRoleManagement = isSuperAdmin || hasAnyPermission(['settings:role_management:view', 'settings:role_management:manage']);
-  const canManageAgreementTemplates = isSuperAdmin || hasAnyPermission(['settings:agreement_templates:manage']);
-  const canManageImport = isSuperAdmin || hasAnyPermission(['import:manage']);
-  const canViewAuditLog = isSuperAdmin || hasAnyPermission(['audit:view']);
+  const canManageUserRegistration =
+    isSuperAdmin || hasAnyPermission(["settings:user_registration:manage"]);
+  const canManageUserManagement =
+    isSuperAdmin ||
+    hasAnyPermission([
+      "settings:user_management:view",
+      "settings:user_management:assign",
+    ]);
+  const canManageRoleManagement =
+    isSuperAdmin ||
+    hasAnyPermission([
+      "settings:role_management:view",
+      "settings:role_management:manage",
+    ]);
+  const canManageAgreementTemplates =
+    isSuperAdmin || hasAnyPermission(["settings:agreement_templates:manage"]);
+  const canManageImport = isSuperAdmin || hasAnyPermission(["import:manage"]);
+  const canViewAuditLog = isSuperAdmin || hasAnyPermission(["audit:view"]);
 
-  const canViewAnySettings = canManageUserRegistration || canManageUserManagement || canManageRoleManagement || canManageAgreementTemplates || canManageImport || canViewAuditLog;
+  const canViewAnySettings =
+    canManageUserRegistration ||
+    canManageUserManagement ||
+    canManageRoleManagement ||
+    canManageAgreementTemplates ||
+    canManageImport ||
+    canViewAuditLog;
 
   useEffect(() => {
     if (!canViewAnySettings) {
-        router.replace('/admin/dashboard?error=' + encodeURIComponent('You do not have permission to view any settings.'));
+      router.replace(
+        "/admin/dashboard?error=" + encodeURIComponent("Access Denied"),
+      );
     }
   }, [canViewAnySettings, router]);
 
@@ -35,7 +70,8 @@ export default function SettingsPage() {
       href: "/admin/settings/user-registration",
       title: "User Registration",
       description: "Register new users for the application.",
-      details: "Create new accounts. New users are created without any roles by default.",
+      details:
+        "Create new accounts. New users are created without any roles by default.",
       icon: UserPlus,
       buttonText: "Go to User Registration",
     },
@@ -44,7 +80,8 @@ export default function SettingsPage() {
       href: "/admin/settings/user-management",
       title: "User Management",
       description: "Manage user roles and the buildings they are assigned to.",
-      details: "Assign roles and buildings to users to control access and responsibilities.",
+      details:
+        "Assign roles and buildings to users to control access and responsibilities.",
       icon: Users,
       buttonText: "Go to User Management",
     },
@@ -53,7 +90,8 @@ export default function SettingsPage() {
       href: "/admin/settings/role-management",
       title: "Role Management",
       description: "Define roles and their permissions within the application.",
-      details: "Create new roles, or edit existing ones to specify what actions users with that role can perform.",
+      details:
+        "Create new roles, or edit existing ones to specify what actions users with that role can perform.",
       icon: ShieldCheck,
       buttonText: "Go to Role Management",
     },
@@ -61,8 +99,10 @@ export default function SettingsPage() {
       show: canManageAgreementTemplates,
       href: "/admin/settings/agreement-template",
       title: "Agreement Templates",
-      description: "Manage reusable templates for generating new lease agreements.",
-      details: "Create and edit standard agreement text. Use placeholders to automatically insert details during generation.",
+      description:
+        "Manage reusable templates for generating new lease agreements.",
+      details:
+        "Create and edit standard agreement text. Use placeholders to automatically insert details during generation.",
       icon: FileText,
       buttonText: "Manage Templates",
     },
@@ -71,7 +111,8 @@ export default function SettingsPage() {
       href: "/admin/import",
       title: "Import Data",
       description: "Bulk import spaces, tenants, and agreements.",
-      details: "Use an Excel template to quickly upload multiple records into the system at once.",
+      details:
+        "Use an Excel template to quickly upload multiple records into the system at once.",
       icon: UploadCloud,
       buttonText: "Go to Import Tool",
     },
@@ -80,34 +121,35 @@ export default function SettingsPage() {
       href: "/admin/audit-log",
       title: "Audit Log",
       description: "View a read-only log of all financial transactions.",
-      details: "Review a detailed history of all recorded payments, including amounts, dates, and references.",
+      details:
+        "Review a detailed history of all recorded payments, including amounts, dates, and references.",
       icon: History,
       buttonText: "View Audit Log",
     },
   ];
 
-  const availableCards = settingCards.filter(card => card.show);
+  const availableCards = settingCards.filter((card) => card.show);
 
   return (
     <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {availableCards.map(card => (
-            <Card key={card.href} className="flex flex-col">
-              <CardHeader>
-                <CardTitle className="font-headline">{card.title}</CardTitle>
-                <CardDescription>{card.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <p className="text-sm text-muted-foreground mb-4">{card.details}</p>
-              </CardContent>
-              <CardFooter>
-                <Link href={card.href} passHref>
-                  <Button>
-                    <card.icon className="mr-2 h-4 w-4" /> {card.buttonText}
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
-        ))}
+      {availableCards.map((card) => (
+        <Card key={card.href} className="flex flex-col">
+          <CardHeader>
+            <CardTitle className="font-headline">{card.title}</CardTitle>
+            <CardDescription>{card.description}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-grow">
+            <p className="text-sm text-muted-foreground mb-4">{card.details}</p>
+          </CardContent>
+          <CardFooter>
+            <Link href={card.href} passHref>
+              <Button>
+                <card.icon className="mr-2 h-4 w-4" /> {card.buttonText}
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      ))}
     </div>
   );
 }

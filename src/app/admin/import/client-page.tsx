@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
@@ -58,7 +57,8 @@ interface ImportSummary {
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const XLSX_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MAX_ROWS_PER_SHEET = 2000;
 
 export function ImportClientPage({
@@ -102,7 +102,9 @@ export function ImportClientPage({
         } else {
           toast({
             title: "File Error",
-            description: firstError.message || "The selected file could not be uploaded. Please try again.",
+            description:
+              firstError.message ||
+              "The selected file could not be uploaded. Please try again.",
             variant: "destructive",
           });
         }
@@ -198,7 +200,7 @@ export function ImportClientPage({
     if (!canManageImport) {
       toast({
         title: "Permission Denied",
-        description: "You do not have permission to import data.",
+        description: "Access Denied",
         variant: "destructive",
       });
       return;
@@ -232,9 +234,15 @@ export function ImportClientPage({
 
         // **Strict Sheet Name Validation**
         const requiredSheets = ["Spaces", "Tenants", "Agreements"];
-        const missingSheets = requiredSheets.filter(sheetName => !workbook.SheetNames.includes(sheetName));
+        const missingSheets = requiredSheets.filter(
+          (sheetName) => !workbook.SheetNames.includes(sheetName),
+        );
         if (missingSheets.length > 0) {
-            throw new Error(`The Excel file is missing required sheets: ${missingSheets.join(', ')}. Please use the template.`);
+          throw new Error(
+            `The Excel file is missing required sheets: ${missingSheets.join(
+              ", ",
+            )}. Please use the template.`,
+          );
         }
 
         const spacesRaw = XLSX.utils.sheet_to_json(workbook.Sheets["Spaces"]);
@@ -243,16 +251,22 @@ export function ImportClientPage({
           workbook.Sheets["Agreements"],
           { raw: false, dateNF: "yyyy-mm-dd" },
         );
-        
+
         // Row count validation
         if (spacesRaw.length > MAX_ROWS_PER_SHEET) {
-            throw new Error(`The "Spaces" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`);
+          throw new Error(
+            `The "Spaces" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`,
+          );
         }
         if (tenantsRaw.length > MAX_ROWS_PER_SHEET) {
-            throw new Error(`The "Tenants" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`);
+          throw new Error(
+            `The "Tenants" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`,
+          );
         }
         if (agreementsRaw.length > MAX_ROWS_PER_SHEET) {
-            throw new Error(`The "Agreements" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`);
+          throw new Error(
+            `The "Agreements" sheet has too many rows. The maximum allowed is ${MAX_ROWS_PER_SHEET}.`,
+          );
         }
 
         const spaces = JSON.parse(JSON.stringify(spacesRaw));
@@ -283,7 +297,9 @@ export function ImportClientPage({
       } catch (error: any) {
         toast({
           title: "Import Failed",
-          description: error.message || "Failed to read or process the Excel file. Ensure it is not corrupted and matches the template format.",
+          description:
+            error.message ||
+            "Failed to read or process the Excel file. Ensure it is not corrupted and matches the template format.",
           variant: "destructive",
         });
         setImportSummary(null); // Clear summary on failure
@@ -312,7 +328,7 @@ export function ImportClientPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>You do not have permission to import data.</p>
+          <p>Access Denied</p>
         </CardContent>
       </Card>
     );
@@ -359,7 +375,8 @@ export function ImportClientPage({
           </Button>
           <p className="text-xs text-muted-foreground mt-4">
             The template has three sheets: Spaces, Tenants, and Agreements.
-            Please ensure buildings exist before importing spaces. Each sheet has a maximum limit of {MAX_ROWS_PER_SHEET} rows.
+            Please ensure buildings exist before importing spaces. Each sheet
+            has a maximum limit of {MAX_ROWS_PER_SHEET} rows.
           </p>
         </CardContent>
         <CardHeader>

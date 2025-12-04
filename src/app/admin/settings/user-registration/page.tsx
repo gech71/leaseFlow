@@ -1,29 +1,52 @@
-
-
 "use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Loader2, AlertTriangle, EyeOff, Eye, Lock } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { usePermissions } from '@/contexts/PermissionContext';
-import { createUserAndAccountAction } from './actions'; 
+import {
+  UserPlus,
+  Loader2,
+  AlertTriangle,
+  EyeOff,
+  Eye,
+  Lock,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { usePermissions } from "@/contexts/PermissionContext";
+import { createUserAndAccountAction } from "./actions";
 
 const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
   lastName: z.string().min(1, { message: "Last name is required." }),
-  phoneNumber: z.string().min(1, { message: "Phone number is required." })
-                 .regex(/^(09|07)\d{8}$/, { message: "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678)."}),
+  phoneNumber: z
+    .string()
+    .min(1, { message: "Phone number is required." })
+    .regex(/^(09|07)\d{8}$/, {
+      message:
+        "Phone number must start with 09 or 07 and be 10 digits long (e.g., 0912345678).",
+    }),
   email: z.string().email({ message: "Invalid email address." }),
 });
-
 
 type RegistrationFormValues = z.infer<typeof registrationFormSchema>;
 
@@ -34,7 +57,8 @@ export default function UserRegistrationPage() {
   const [apiError, setApiError] = useState<string | null>(null);
 
   const { hasPermission, isSuperAdmin } = usePermissions();
-  const canManageUsersRegistration = isSuperAdmin || hasPermission('settings:user_registration:manage');
+  const canManageUsersRegistration =
+    isSuperAdmin || hasPermission("settings:user_registration:manage");
 
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationFormSchema),
@@ -48,7 +72,11 @@ export default function UserRegistrationPage() {
 
   const handleRegisterUser = async (values: RegistrationFormValues) => {
     if (!canManageUsersRegistration) {
-      toast({ title: "Permission Denied", description: "You do not have permission to register users.", variant: "destructive" });
+      toast({
+        title: "Permission Denied",
+        description: "Access Denied",
+        variant: "destructive",
+      });
       return;
     }
     setIsLoading(true);
@@ -61,7 +89,7 @@ export default function UserRegistrationPage() {
         title: "User Registered Successfully",
         description: `User ${values.firstName} ${values.lastName} has been created. A temporary password has been generated for them. You can now assign them a role in User Management.`,
       });
-      form.reset(); 
+      form.reset();
     } else {
       setApiError(result.error || "An unknown error occurred.");
       toast({
@@ -72,7 +100,7 @@ export default function UserRegistrationPage() {
     }
     setIsLoading(false);
   };
-  
+
   if (!canManageUsersRegistration) {
     return (
       <Card className="w-full max-w-2xl mx-auto shadow-lg">
@@ -82,21 +110,22 @@ export default function UserRegistrationPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>You do not have permission to register new users.</p>
+          <p>Access Denied</p>
         </CardContent>
       </Card>
     );
   }
 
-
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline text-xl flex items-center">
-          <UserPlus className="mr-2 h-6 w-6 text-primary" /> Register New Staff User
+          <UserPlus className="mr-2 h-6 w-6 text-primary" /> Register New Staff
+          User
         </CardTitle>
         <CardDescription>
-          Create an account for a new staff member (e.g., manager, accountant). Tenants should be created from the Tenants page.
+          Create an account for a new staff member (e.g., manager, accountant).
+          Tenants should be created from the Tenants page.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -109,14 +138,97 @@ export default function UserRegistrationPage() {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem> <FormLabel>First Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="First Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-              <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem> <FormLabel>Last Name<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input placeholder="Last Name" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    {" "}
+                    <FormLabel>
+                      First Name<span className="text-destructive ml-1">*</span>
+                    </FormLabel>{" "}
+                    <FormControl>
+                      <Input
+                        placeholder="First Name"
+                        {...field}
+                        disabled={isLoading || !canManageUsersRegistration}
+                      />
+                    </FormControl>{" "}
+                    <FormMessage />{" "}
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    {" "}
+                    <FormLabel>
+                      Last Name<span className="text-destructive ml-1">*</span>
+                    </FormLabel>{" "}
+                    <FormControl>
+                      <Input
+                        placeholder="Last Name"
+                        {...field}
+                        disabled={isLoading || !canManageUsersRegistration}
+                      />
+                    </FormControl>{" "}
+                    <FormMessage />{" "}
+                  </FormItem>
+                )}
+              />
             </div>
-            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Email Address<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="email" placeholder="Email Address" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={form.control} name="phoneNumber" render={({ field }) => ( <FormItem> <FormLabel>Phone Number<span className="text-destructive ml-1">*</span></FormLabel> <FormControl><Input type="tel" placeholder="Phone Number" {...field} disabled={isLoading || !canManageUsersRegistration} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  {" "}
+                  <FormLabel>
+                    Email Address
+                    <span className="text-destructive ml-1">*</span>
+                  </FormLabel>{" "}
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="Email Address"
+                      {...field}
+                      disabled={isLoading || !canManageUsersRegistration}
+                    />
+                  </FormControl>{" "}
+                  <FormMessage />{" "}
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phoneNumber"
+              render={({ field }) => (
+                <FormItem>
+                  {" "}
+                  <FormLabel>
+                    Phone Number<span className="text-destructive ml-1">*</span>
+                  </FormLabel>{" "}
+                  <FormControl>
+                    <Input
+                      type="tel"
+                      placeholder="Phone Number"
+                      {...field}
+                      disabled={isLoading || !canManageUsersRegistration}
+                    />
+                  </FormControl>{" "}
+                  <FormMessage />{" "}
+                </FormItem>
+              )}
+            />
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isLoading || !canManageUsersRegistration}>
+            <Button
+              type="submit"
+              className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={isLoading || !canManageUsersRegistration}
+            >
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (

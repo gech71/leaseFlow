@@ -1,9 +1,14 @@
-
 import { NextResponse, type NextRequest } from "next/server";
 import {
   verifySession,
   ACCESS_TOKEN_COOKIE_NAME,
   CSRF_TOKEN_COOKIE_NAME,
+  CSRF_TOKEN_SIG_NAME,
+  signCsrfToken,
+  verifyCsrfToken,
+  getSessionCookieNames,
+  LAST_ACTIVE_COOKIE_NAME,
+  IDLE_TIMEOUT_MS,
 } from "@/lib/auth/jwt";
 import { PERMISSION_MAP } from "@/lib/auth-utils";
 import { nanoid } from "nanoid";
@@ -59,8 +64,17 @@ export async function middleware(request: NextRequest) {
 
   // --- CSRF Token ---
   const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
-  if (!csrfToken) {
-    response.cookies.set(CSRF_TOKEN_COOKIE_NAME, nanoid(32), {
+  const csrfSig = request.cookies.get(CSRF_TOKEN_SIG_NAME)?.value;
+  if (!csrfToken || !csrfSig || !(await verifyCsrfToken(csrfToken, csrfSig))) {
+    const tokenValue = nanoid(32);
+    const sigValue = await signCsrfToken(tokenValue);
+    response.cookies.set(CSRF_TOKEN_COOKIE_NAME, tokenValue, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+    });
+    response.cookies.set(CSRF_TOKEN_SIG_NAME, sigValue, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",
@@ -86,16 +100,51 @@ export async function middleware(request: NextRequest) {
   const session = await verifySession(accessToken);
 
   if (!session) {
-    let from = pathname;
-    if (request.nextUrl.search) {
-      from += request.nextUrl.search;
-    }
     const loginUrl = new URL("/login", request.url);
-    if (pathname !== "/login" && pathname !== "/") {
-      loginUrl.searchParams.set("from", from);
+    // For API requests, return 401 JSON so clients can handle logout.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { message: "Unauthorized. Please log in." },
+        { status: 401 },
+      );
     }
-    loginUrl.searchParams.set("error", "session_expired");
+    // Redirect to plain /login on session expiration for page navigations
     return NextResponse.redirect(loginUrl);
+  }
+
+  // --- Idle timeout enforcement ---
+  try {
+    const lastActive = request.cookies.get(LAST_ACTIVE_COOKIE_NAME)?.value;
+    const now = Date.now();
+    if (!lastActive || now - Number(lastActive) > IDLE_TIMEOUT_MS) {
+      // Treat this as session expired due to inactivity.
+      const cookieNames = getSessionCookieNames();
+      if (pathname.startsWith("/api/")) {
+        const resp = NextResponse.json(
+          { message: "Session expired due to inactivity." },
+          { status: 401 },
+        );
+        cookieNames.forEach((name) =>
+          resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
+        );
+        return resp;
+      }
+      const resp = NextResponse.redirect(new URL("/login", request.url));
+      cookieNames.forEach((name) =>
+        resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
+      );
+      return resp;
+    }
+
+    // Update last-active cookie to extend idle timeout
+    response.cookies.set(LAST_ACTIVE_COOKIE_NAME, String(now), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+    });
+  } catch (err) {
+    // If anything goes wrong reading/updating last-active, continue without blocking.
   }
 
   // --- Priority #1: Handle forced password change ---
@@ -109,7 +158,6 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/change-password") {
     return NextResponse.redirect(new URL("/admin/dashboard", request.url));
   }
-
 
   // --- Role-based Routing Logic ---
   const userPermissions = new Set(session.permissions);
@@ -138,9 +186,7 @@ export async function middleware(request: NextRequest) {
         const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
         redirectUrl.searchParams.set(
           "error",
-          firstAllowedPage
-            ? "You do not have permission to access the requested page."
-            : "You do not have any assigned permissions to access the admin panel.",
+          firstAllowedPage ? "Access Denied" : "Access Denied",
         );
         return NextResponse.redirect(redirectUrl);
       }
@@ -148,10 +194,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Handle Portal Routes
-  if (
-    pathname.startsWith("/portal/") &&
-    !isPublicRoute
-  ) {
+  if (pathname.startsWith("/portal/") && !isPublicRoute) {
     if (!isTenantOnly) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
     }

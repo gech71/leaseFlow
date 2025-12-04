@@ -1,10 +1,8 @@
-
-
 "use client";
 
-import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import React, { useState, useEffect } from 'react';
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { useState, useEffect } from "react";
 import {
   SidebarProvider,
   Sidebar,
@@ -16,9 +14,9 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   useSidebar,
-} from '@/components/ui/sidebar';
-import { AppLogo } from '@/components/custom/AppLogo';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/sidebar";
+import { AppLogo } from "@/components/custom/AppLogo";
+import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
   Building2,
@@ -37,8 +35,8 @@ import {
   Eye,
   LayoutGrid,
   UploadCloud,
-} from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,13 +49,13 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  TooltipProvider
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
-import type { PermissionId } from '@/lib/types';
-import Image from 'next/image';
-import { usePermissions } from '@/contexts/PermissionContext';
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import type { PermissionId } from "@/lib/types";
+import Image from "next/image";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 interface NavItem {
   href: string;
@@ -67,15 +65,60 @@ interface NavItem {
 }
 
 const allNavItems: NavItem[] = [
-  { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid, permission: 'dashboard:view' },
-  { href: '/admin/buildings', label: 'Buildings', icon: Building, permission: 'building:view' },
-  { href: '/admin/spaces', label: 'Spaces', icon: Building2, permission: 'space:view' },
-  { href: '/admin/tenants', label: 'Tenants', icon: Users, permission: 'tenant:view' },
-  { href: '/admin/agreements', label: 'Agreements', icon: FileText, permission: 'agreement:view' },
-  { href: '/admin/building-utilities', label: 'Building Utilities', icon: Wrench, permission: 'building_utility:view' },
-  { href: '/admin/billing', label: 'Billing', icon: Banknote, permission: 'billing:view' },
-  { href: '/admin/payments-overview', label: 'Payments Overview', icon: ClipboardList, permission: 'payment_overview:view' },
-  { href: '/admin/settings', label: 'Settings', icon: Settings, permission: 'settings:user_management:view' }, // Generic settings permission
+  {
+    href: "/admin/dashboard",
+    label: "Dashboard",
+    icon: LayoutGrid,
+    permission: "dashboard:view",
+  },
+  {
+    href: "/admin/buildings",
+    label: "Buildings",
+    icon: Building,
+    permission: "building:view",
+  },
+  {
+    href: "/admin/spaces",
+    label: "Spaces",
+    icon: Building2,
+    permission: "space:view",
+  },
+  {
+    href: "/admin/tenants",
+    label: "Tenants",
+    icon: Users,
+    permission: "tenant:view",
+  },
+  {
+    href: "/admin/agreements",
+    label: "Agreements",
+    icon: FileText,
+    permission: "agreement:view",
+  },
+  {
+    href: "/admin/building-utilities",
+    label: "Building Utilities",
+    icon: Wrench,
+    permission: "building_utility:view",
+  },
+  {
+    href: "/admin/billing",
+    label: "Billing",
+    icon: Banknote,
+    permission: "billing:view",
+  },
+  {
+    href: "/admin/payments-overview",
+    label: "Payments Overview",
+    icon: ClipboardList,
+    permission: "payment_overview:view",
+  },
+  {
+    href: "/admin/settings",
+    label: "Settings",
+    icon: Settings,
+    permission: "settings:user_management:view",
+  }, // Generic settings permission
 ];
 
 function ActualAdminLayout({ children }: { children: React.ReactNode }) {
@@ -88,7 +131,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    const error = searchParams.get('error');
+    const error = searchParams.get("error");
     if (error) {
       toast({
         title: "Access Denied",
@@ -96,7 +139,7 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         variant: "destructive",
       });
       // Remove the error from the URL without reloading the page
-      router.replace(pathname, {scroll: false});
+      router.replace(pathname, { scroll: false });
     }
   }, [searchParams, pathname, router, toast]);
 
@@ -106,13 +149,24 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
     // The logout function handles redirection.
     setIsLoggingOut(false);
   };
-  
-  const userInitials = currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'AD';
 
-  const availableNavItems = allNavItems.filter(item => {
+  const userInitials =
+    currentUser?.name
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase() || "AD";
+
+  const availableNavItems = allNavItems.filter((item) => {
     // A special check for the generic settings link
-    if (item.href === '/admin/settings') {
-      return isSuperAdmin || hasPermission('settings:user_management:view') || hasPermission('settings:role_management:view') || hasPermission('settings:agreement_templates:manage') || hasPermission('import:manage');
+    if (item.href === "/admin/settings") {
+      return (
+        isSuperAdmin ||
+        hasPermission("settings:user_management:view") ||
+        hasPermission("settings:role_management:view") ||
+        hasPermission("settings:agreement_templates:manage") ||
+        hasPermission("import:manage")
+      );
     }
     return isSuperAdmin || hasPermission(item.permission);
   });
@@ -129,15 +183,20 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         <SidebarContent className="p-2">
           <SidebarMenu>
             {availableNavItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && pathname.startsWith(item.href));
-              
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/admin/dashboard" &&
+                  pathname.startsWith(item.href));
+
               const sidebarButtonContent = (
                 <>
                   <item.icon className="h-5 w-5 shrink-0" />
                   <span
                     className={cn(
                       "flex-1 min-w-0 text-base",
-                      (!isMobile && sidebarState === "collapsed") ? "hidden" : "truncate"
+                      !isMobile && sidebarState === "collapsed"
+                        ? "hidden"
+                        : "truncate",
                     )}
                   >
                     {item.label}
@@ -148,13 +207,11 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               const commonLinkProps = {
                 href: item.href,
               };
-              
+
               const sidebarMenuButtonProps = {
                 isActive: isActive,
-                className: cn(
-                  "h-10",
-                ),
-                size: 'default' as const,
+                className: cn("h-10"),
+                size: "default" as const,
               };
 
               if (!isMobile && sidebarState === "collapsed") {
@@ -163,9 +220,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Link {...commonLinkProps}>
-                           <SidebarMenuButton {...sidebarMenuButtonProps}>
+                          <SidebarMenuButton {...sidebarMenuButtonProps}>
                             {sidebarButtonContent}
-                           </SidebarMenuButton>
+                          </SidebarMenuButton>
                         </Link>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="font-headline">
@@ -178,9 +235,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
               return (
                 <SidebarMenuItem key={item.href}>
                   <Link {...commonLinkProps}>
-                     <SidebarMenuButton {...sidebarMenuButtonProps}>
-                       {sidebarButtonContent}
-                     </SidebarMenuButton>
+                    <SidebarMenuButton {...sidebarMenuButtonProps}>
+                      {sidebarButtonContent}
+                    </SidebarMenuButton>
                   </Link>
                 </SidebarMenuItem>
               );
@@ -190,31 +247,43 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         <SidebarFooter className="p-4 border-t border-sidebar-border">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center group-data-[state=expanded]/sidebar-wrapper:justify-start group-data-[state=collapsed]/sidebar-wrapper:justify-center gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+              <Button
+                variant="ghost"
+                className="flex items-center group-data-[state=expanded]/sidebar-wrapper:justify-start group-data-[state=collapsed]/sidebar-wrapper:justify-center gap-2 w-full p-2 h-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback>{userInitials}</AvatarFallback>
                 </Avatar>
-                <div className={cn("text-left", "group-data-[state=collapsed]/sidebar-wrapper:hidden")}>
-                  <p className="text-sm font-medium">{currentUser?.name || 'Admin User'}</p>
-                  <p className="text-xs text-sidebar-foreground/70">{currentUser?.email || 'admin@example.com'}</p>
+                <div
+                  className={cn(
+                    "text-left",
+                    "group-data-[state=collapsed]/sidebar-wrapper:hidden",
+                  )}
+                >
+                  <p className="text-sm font-medium">
+                    {currentUser?.name || "Admin User"}
+                  </p>
+                  <p className="text-xs text-sidebar-foreground/70">
+                    {currentUser?.email || "admin@example.com"}
+                  </p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => router.push('/admin/profile')}>
+              <DropdownMenuItem onSelect={() => router.push("/admin/profile")}>
                 <UserCircle className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => router.push('/admin/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
+              <DropdownMenuItem onSelect={() => router.push("/admin/settings")}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={handleLogout} disabled={isLoggingOut}>
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>{isLoggingOut ? 'Logging out...' : 'Log out'}</span>
+                <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -233,14 +302,20 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AdminClientLayout({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated } = usePermissions();
+export default function AdminClientLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { isLoading, isAuthenticated, logout } = usePermissions();
   const router = useRouter();
 
   useEffect(() => {
-    // Only check for redirection when loading is finished
+    // Only redirect when loading is finished. Use `logout()` to force a full-page
+    // navigation so the `PermissionContext` remounts and the login form renders.
     if (!isLoading && !isAuthenticated) {
-      router.replace('/login?error=session_expired');
+      // logout will clear client state and perform a hard redirect to /login
+      logout();
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -255,10 +330,10 @@ export default function AdminClientLayout({ children }: { children: React.ReactN
 
   // If authenticated, render the main layout
   return (
-      <SidebarProvider defaultOpen>
-        <TooltipProvider>
-          <ActualAdminLayout>{children}</ActualAdminLayout>
-        </TooltipProvider>
-      </SidebarProvider>
+    <SidebarProvider defaultOpen>
+      <TooltipProvider>
+        <ActualAdminLayout>{children}</ActualAdminLayout>
+      </TooltipProvider>
+    </SidebarProvider>
   );
 }

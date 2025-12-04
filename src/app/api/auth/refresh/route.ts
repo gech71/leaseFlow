@@ -1,33 +1,93 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { verifyRefreshToken, createSession, createUserPayload, REFRESH_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
-import { databaseService } from '@/lib/services/databaseService';
+import { NextResponse, type NextRequest } from "next/server";
+import {
+  verifyRefreshToken,
+  createSession,
+  createUserPayload,
+  REFRESH_TOKEN_COOKIE_NAME,
+  LAST_ACTIVE_COOKIE_NAME,
+} from "@/lib/auth/jwt";
+import { databaseService } from "@/lib/services/databaseService";
 
 export async function POST(request: NextRequest) {
-    const refreshTokenFromCookie = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)?.value;
-    const refreshTokenPayload = await verifyRefreshToken(refreshTokenFromCookie);
+  const refreshTokenFromCookie = request.cookies.get(
+    REFRESH_TOKEN_COOKIE_NAME,
+  )?.value;
+  const refreshTokenPayload = await verifyRefreshToken(refreshTokenFromCookie);
 
-    if (!refreshTokenPayload) {
-        return NextResponse.json({ message: "Unauthorized. Invalid refresh token." }, { status: 401 });
+  if (!refreshTokenPayload) {
+    return NextResponse.json(
+      { message: "Unauthorized. Invalid refresh token." },
+      { status: 401 },
+    );
+  }
+
+  // Ensure the session referenced by the refresh token is still active (not revoked).
+  try {
+    if (refreshTokenPayload.jti) {
+      const sessionRecord = await databaseService.getUserSessionByJti(
+        refreshTokenPayload.jti,
+      );
+      if (!sessionRecord || sessionRecord.revoked) {
+        return NextResponse.json(
+          { message: "Unauthorized. Session revoked." },
+          { status: 401 },
+        );
+      }
     }
+  } catch (err) {
+    console.warn(
+      "Warning: failed to validate refresh token jti against DB",
+      err,
+    );
+  }
 
-    // Token is valid, get fresh user data to create a new session
-    const user = await databaseService.getUserById(refreshTokenPayload.userId, {
-        roles: true,
-    });
+  // Token is valid, get fresh user data to create a new session
+  const user = await databaseService.getUserById(refreshTokenPayload.userId, {
+    roles: true,
+  });
 
-    if (!user) {
-        return NextResponse.json({ message: "User not found." }, { status: 404 });
+  if (!user) {
+    return NextResponse.json({ message: "User not found." }, { status: 404 });
+  }
+
+  // Create a new session (which includes a new access token and a new refresh token)
+  const newSessionPayload = createUserPayload(user);
+  const { accessToken, refreshToken } = await createSession(newSessionPayload);
+
+  // Revoke the old session referenced by the incoming refresh token (rotation)
+  try {
+    if (refreshTokenPayload.jti) {
+      await databaseService.revokeUserSessionByJti(refreshTokenPayload.jti);
     }
+  } catch (err) {
+    console.warn("Warning: failed to revoke old session during refresh", err);
+  }
 
-    // Create a new session (which includes a new access token and a new refresh token)
-    const newSessionPayload = createUserPayload(user);
-    const { accessToken, refreshToken } = await createSession(newSessionPayload);
+  const response = NextResponse.json(
+    { message: "Session refreshed successfully." },
+    { status: 200 },
+  );
 
-    const response = NextResponse.json({ message: "Session refreshed successfully." }, { status: 200 });
-    
-    // Set the new cookies
-    response.cookies.set(accessToken.name, accessToken.value, accessToken.options);
-    response.cookies.set(refreshToken.name, refreshToken.value, refreshToken.options);
+  // Set the new cookies
+  response.cookies.set(
+    accessToken.name,
+    accessToken.value,
+    accessToken.options,
+  );
+  response.cookies.set(
+    refreshToken.name,
+    refreshToken.value,
+    refreshToken.options,
+  );
 
-    return response;
+  // Update last-active timestamp when refreshing session
+  response.cookies.set(LAST_ACTIVE_COOKIE_NAME, String(Date.now()), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    sameSite: "lax",
+    expires: accessToken.options.expires,
+  });
+
+  return response;
 }

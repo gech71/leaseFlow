@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -31,6 +30,8 @@ export default function LoginPage() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: isAuthLoading } = usePermissions();
 
+  const [csrfPresent, setCsrfPresent] = useState<boolean | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
@@ -38,19 +39,47 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const urlError = searchParams.get('error');
+    const urlError = searchParams.get("error");
     if (urlError) {
-      if (urlError === 'session_expired' && searchParams.get('from')) {
-          setError("Your session has expired. Please log in again.");
-      } else if (urlError !== 'session_expired') {
-          setError(decodeURIComponent(urlError));
+      if (urlError === "session_expired" && searchParams.get("from")) {
+        setError("Your session has expired. Please log in again.");
+      } else if (urlError !== "session_expired") {
+        setError(decodeURIComponent(urlError));
       }
     }
   }, [searchParams]);
 
   useEffect(() => {
+    // Check server-side whether CSRF cookie exists. If it's missing, inform the user
+    // and prevent login until they refresh the page (server middleware will recreate it).
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/csrf-check");
+        const data = await res.json();
+        if (!mounted) return;
+        setCsrfPresent(Boolean(data?.csrfPresent));
+        if (!data?.csrfPresent) {
+          setError(
+            "Your session has expired. Please refresh the page and try again.",
+          );
+        }
+      } catch (err) {
+        if (!mounted) return;
+        setCsrfPresent(false);
+        setError(
+          "Your session has expired. Please refresh the page and try again.",
+        );
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isAuthLoading && isAuthenticated) {
-      router.replace('/admin/dashboard');
+      router.replace("/admin/dashboard");
     }
   }, [isAuthLoading, isAuthenticated, router]);
 
@@ -59,13 +88,21 @@ export default function LoginPage() {
     setIsSubmitting(true);
     setError(null);
 
+    if (csrfPresent === false) {
+      setError(
+        "Your session has expired. Please refresh the page and try again.",
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       // CSRF token is now handled automatically by the browser via HttpOnly cookie.
       // No need to send a custom header.
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ phone, password }),
       });
@@ -73,12 +110,14 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'An unexpected error occurred.');
+        throw new Error(data.message || "An unexpected error occurred.");
       }
-      
-      toast({ title: "Login Successful", description: "Redirecting to your dashboard..." });
-      window.location.href = '/admin/dashboard';
 
+      toast({
+        title: "Login Successful",
+        description: "Redirecting to your dashboard...",
+      });
+      window.location.href = "/admin/dashboard";
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -86,7 +125,10 @@ export default function LoginPage() {
     }
   };
 
-  if (isAuthLoading || isAuthenticated) {
+  // Only show the global loader when we're loading and already authenticated.
+  // If loading is in progress but the user is not authenticated, show the login form
+  // so the user can sign in without needing to refresh.
+  if (isAuthLoading && isAuthenticated) {
     return (
       <div className="flex justify-center items-center h-screen w-screen bg-background">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -133,7 +175,7 @@ export default function LoginPage() {
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || csrfPresent === false}
               />
             </div>
             <div className="space-y-1">
@@ -149,7 +191,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || csrfPresent === false}
                 />
                 <Button
                   type="button"
@@ -166,8 +208,15 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {/* Disable submit if CSRF token is missing */}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || csrfPresent === false}
+            >
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Log In
             </Button>
           </form>

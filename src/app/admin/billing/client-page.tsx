@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, {
@@ -40,7 +39,7 @@ import {
   Eye,
   EyeOff,
   Search,
-  Clock
+  Clock,
 } from "lucide-react";
 import type {
   Agreement as AgreementPrisma,
@@ -159,7 +158,6 @@ const verificationFormSchema = z.object({
 });
 type VerificationFormValues = z.infer<typeof verificationFormSchema>;
 
-
 interface BillingClientPageProps {
   initialData: SerializedBillingPageData;
 }
@@ -214,8 +212,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
   });
 
   const verificationForm = useForm<VerificationFormValues>({
-      resolver: zodResolver(verificationFormSchema),
-      defaultValues: { adminVerificationNotes: "" },
+    resolver: zodResolver(verificationFormSchema),
+    defaultValues: { adminVerificationNotes: "" },
   });
 
   const isReadOnly = billForPayment?.status === "Paid";
@@ -301,7 +299,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         (t) => t.scope === "Floor" && t.applicableFloor === space.floor,
       );
       const buildingWideTiers = allTiers.filter((t) => t.scope === "Building");
-    
+
       let applicableTiers: typeof allTiers = [];
       if (spaceSpecificTiers.length > 0) {
         applicableTiers = spaceSpecificTiers;
@@ -310,32 +308,38 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
       } else {
         applicableTiers = buildingWideTiers;
       }
-    
+
       if (applicableTiers.length === 0) return 0;
-    
-      const sortedTiers = [...applicableTiers].sort((a, b) => a.fromDay - b.fromDay);
-      
+
+      const sortedTiers = [...applicableTiers].sort(
+        (a, b) => a.fromDay - b.fromDay,
+      );
+
       let totalPenalty = 0;
       let oneTimeFeesApplied = new Set<string>();
 
       for (let day = 1; day <= daysOverdue; day++) {
-        const tierForDay = sortedTiers.find(tier => 
-          day >= tier.fromDay && (tier.toDay === null || tier.toDay === undefined || day <= tier.toDay)
+        const tierForDay = sortedTiers.find(
+          (tier) =>
+            day >= tier.fromDay &&
+            (tier.toDay === null ||
+              tier.toDay === undefined ||
+              day <= tier.toDay),
         );
 
         if (tierForDay) {
           const feeValue = Number(tierForDay.feeValue);
           let dailyFee = 0;
-          
-          if (tierForDay.penaltyType === 'Fixed') {
+
+          if (tierForDay.penaltyType === "Fixed") {
             dailyFee = feeValue;
-          } else if (tierForDay.penaltyType === 'Percentage') {
+          } else if (tierForDay.penaltyType === "Percentage") {
             dailyFee = bill.rentAmount * (feeValue / 100);
           }
-          
-          if (tierForDay.frequency === 'Daily') {
+
+          if (tierForDay.frequency === "Daily") {
             totalPenalty += dailyFee;
-          } else if (tierForDay.frequency === 'OneTime') {
+          } else if (tierForDay.frequency === "OneTime") {
             if (!oneTimeFeesApplied.has(tierForDay.id!)) {
               totalPenalty += dailyFee;
               oneTimeFeesApplied.add(tierForDay.id!);
@@ -343,7 +347,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           }
         }
       }
-      
+
       return parseFloat(totalPenalty.toFixed(2));
     },
     [agreements, allBuildings, today],
@@ -361,8 +365,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         }
 
         const penalty =
-          currentStatus === "Overdue" &&
-          bill.status !== "Paid"
+          currentStatus === "Overdue" && bill.status !== "Paid"
             ? calculatePenalty(bill, currentStatus)
             : bill.penaltyAmount || 0;
 
@@ -437,16 +440,16 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const todayUtcDateString = new Date().toISOString().substring(0, 10);
     return agreements.filter((agreement) => {
       if (!agreement.tenant || !agreement.space) return false;
-      
+
       // Only include active agreements
-      if (agreement.status !== 'Active') return false;
+      if (agreement.status !== "Active") return false;
 
       const agreementStartDate = startOfDay(parseISO(agreement.startDate));
       const agreementEndDate = addMonths(
         agreementStartDate,
         agreement.paymentTermMonths,
       );
-      
+
       const isWithinDateRange =
         !isBefore(today, agreementStartDate) &&
         !isAfter(today, agreementEndDate);
@@ -517,7 +520,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     if (!canGenerateBills) {
       toast({
         title: "Permission Denied",
-        description: "You do not have permission to generate bills.",
+        description: "Access Denied",
         variant: "destructive",
       });
       return;
@@ -535,7 +538,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
 
     setIsLoading(true);
-    const result = await generateBillAndUpdateAgreementAction(agreementId, nextDueDateString);
+    const result = await generateBillAndUpdateAgreementAction(
+      agreementId,
+      nextDueDateString,
+    );
     setIsLoading(false);
 
     if (result.success && result.bill) {
@@ -560,7 +566,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     if (!canGenerateBills) {
       toast({
         title: "Permission Denied",
-        description: "You do not have permission to generate bills.",
+        description: "Access Denied",
         variant: "destructive",
       });
       return;
@@ -575,11 +581,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
     for (const agreement of agreements) {
       // Only process active agreements
-      if (agreement.status !== 'Active') {
+      if (agreement.status !== "Active") {
         totalSkipped++;
         continue;
       }
-      
+
       let currentNextDueDate = agreement.nextPaymentDueDate;
       let generatedForThisAgreement = false;
       let stopProcessing = false;
@@ -605,7 +611,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           continue;
         }
 
-        const result = await generateBillAndUpdateAgreementAction(agreement.id, nextDueDateString);
+        const result = await generateBillAndUpdateAgreementAction(
+          agreement.id,
+          nextDueDateString,
+        );
 
         if (result.success && result.bill) {
           totalGenerated++;
@@ -655,14 +664,20 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     setIsPaymentDialogOpen(true);
   };
 
-  const handlePaymentAction = async (actionType: 'confirmVerification' | 'rejectVerification') => {
+  const handlePaymentAction = async (
+    actionType: "confirmVerification" | "rejectVerification",
+  ) => {
     if (!billForPayment) return;
     if (!canManagePayments) {
-      toast({ title: "Permission Denied", description: "You do not have permission to manage payments.", variant: "destructive" });
+      toast({
+        title: "Permission Denied",
+        description: "Access Denied",
+        variant: "destructive",
+      });
       return;
     }
     setIsLoading(true);
-    
+
     const verificationValues = verificationForm.getValues();
     const result = await recordPaymentOrVerificationAction(
       billForPayment.id,
@@ -670,16 +685,23 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         paymentDate: billForPayment.paymentDate || new Date().toISOString(),
         adminVerificationNotes: verificationValues.adminVerificationNotes,
       },
-      actionType
+      actionType,
     );
     setIsLoading(false);
-    
+
     if (result.success) {
-      toast({ title: "Success", description: `Verification status updated for bill ${billForPayment.id}.` });
+      toast({
+        title: "Success",
+        description: `Verification status updated for bill ${billForPayment.id}.`,
+      });
       setIsPaymentDialogOpen(false);
       await refreshBillingData();
     } else {
-      toast({ title: "Error", description: result.error, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: result.error,
+        variant: "destructive",
+      });
     }
   };
 
@@ -688,7 +710,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
     if (!canManagePayments) {
       toast({
         title: "Permission Denied",
-        description: "You do not have permission to manage payments.",
+        description: "Access Denied",
         variant: "destructive",
       });
       return;
@@ -732,8 +754,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         return "default";
       case "Overdue":
         return "destructive";
-      case 'PendingVerification':
-        return 'outline';
+      case "PendingVerification":
+        return "outline";
       default:
         return "default";
     }
@@ -749,8 +771,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         return <InfoIcon className="mr-1 h-3 w-3 text-yellow-600" />;
       case "Overdue":
         return <AlertTriangle className="mr-1 h-3 w-3 text-red-600" />;
-      case 'PendingVerification':
-        return <Clock className="mr-1 h-3 w-3 text-blue-600"/>;
+      case "PendingVerification":
+        return <Clock className="mr-1 h-3 w-3 text-blue-600" />;
       default:
         return <InfoIcon className="mr-1 h-3 w-3" />;
     }
@@ -789,7 +811,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p>You do not have permission to view billing information.</p>
+          <p>Access Denied</p>
         </CardContent>
       </Card>
     );
@@ -963,57 +985,87 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-headline text-xl">
-              {billForPayment?.status === 'PendingVerification' ? 'Verify Payment' : (isReadOnly ? "View Payment Details" : "Record Payment")}
+              {billForPayment?.status === "PendingVerification"
+                ? "Verify Payment"
+                : isReadOnly
+                ? "View Payment Details"
+                : "Record Payment"}
             </DialogTitle>
-             <DialogDescription>
+            <DialogDescription>
               For bill ID: {billForPayment?.id}
             </DialogDescription>
           </DialogHeader>
-          {billForPayment?.status === 'PendingVerification' ? (
-             <div className="space-y-4 py-2">
-                <div className="text-sm">
-                    <p className="font-medium text-foreground">Tenant Notes:</p>
-                    <p className="text-muted-foreground p-2 bg-secondary/50 rounded-md">{billForPayment.tenantPaymentNotes || 'No notes provided.'}</p>
-                </div>
-                {billForPayment.paymentProofDataUri && (
-                    <Button asChild variant="outline" className="w-full">
-                        <a href={billForPayment.paymentProofDataUri} target="_blank" rel="noopener noreferrer">
-                            <Paperclip className="mr-2 h-4 w-4"/> View Proof of Payment
-                        </a>
-                    </Button>
-                )}
-                 <Form {...verificationForm}>
-                   <form className="space-y-4" onSubmit={e => e.preventDefault()}>
-                      <FormField
-                        control={verificationForm.control}
-                        name="adminVerificationNotes"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Verification Notes</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Verification Notes"
-                                {...field}
-                                disabled={isLoading}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                   </form>
-                 </Form>
-                 <DialogFooter className="pt-4">
-                    <Button variant="destructive" onClick={() => handlePaymentAction('rejectVerification')} disabled={isLoading}>
-                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldX className="mr-2 h-4 w-4"/>}
-                      Reject
-                    </Button>
-                    <Button variant="default" onClick={() => handlePaymentAction('confirmVerification')} disabled={isLoading} className="bg-green-600 hover:bg-green-700">
-                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}
-                      Confirm
-                    </Button>
-                 </DialogFooter>
-             </div>
+          {billForPayment?.status === "PendingVerification" ? (
+            <div className="space-y-4 py-2">
+              <div className="text-sm">
+                <p className="font-medium text-foreground">Tenant Notes:</p>
+                <p className="text-muted-foreground p-2 bg-secondary/50 rounded-md">
+                  {billForPayment.tenantPaymentNotes || "No notes provided."}
+                </p>
+              </div>
+              {billForPayment.paymentProofDataUri && (
+                <Button asChild variant="outline" className="w-full">
+                  <a
+                    href={billForPayment.paymentProofDataUri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Paperclip className="mr-2 h-4 w-4" /> View Proof of Payment
+                  </a>
+                </Button>
+              )}
+              <Form {...verificationForm}>
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => e.preventDefault()}
+                >
+                  <FormField
+                    control={verificationForm.control}
+                    name="adminVerificationNotes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Verification Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Verification Notes"
+                            {...field}
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </form>
+              </Form>
+              <DialogFooter className="pt-4">
+                <Button
+                  variant="destructive"
+                  onClick={() => handlePaymentAction("rejectVerification")}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldX className="mr-2 h-4 w-4" />
+                  )}
+                  Reject
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => handlePaymentAction("confirmVerification")}
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                  )}
+                  Confirm
+                </Button>
+              </DialogFooter>
+            </div>
           ) : (
             <Form {...paymentForm}>
               <form
@@ -1076,7 +1128,9 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                         <Input
                           placeholder="Transaction ID, Check No., etc."
                           {...field}
-                          disabled={isReadOnly || isLoading || !canManagePayments}
+                          disabled={
+                            isReadOnly || isLoading || !canManagePayments
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -1085,7 +1139,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                 />
                 <DialogFooter className="pt-4">
                   <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={isLoading}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isLoading}
+                    >
                       Cancel
                     </Button>
                   </DialogClose>
@@ -1107,7 +1165,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           )}
         </DialogContent>
       </Dialog>
-      
+
       <div className="space-y-4 mt-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="text-2xl font-headline font-semibold">
@@ -1133,7 +1191,9 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                   <SelectItem value="Paid">Paid</SelectItem>
                   <SelectItem value="Overdue">Overdue</SelectItem>
                   <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="PendingVerification">Pending Verification</SelectItem>
+                  <SelectItem value="PendingVerification">
+                    Pending Verification
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -1224,7 +1284,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                           Status
                         </TableHead>
                         <TableHead className="w-[10%] text-right">
-                            Actions
+                          Actions
                         </TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1288,29 +1348,36 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                             >
                               {getStatusIcon(bill.currentStatus || bill.status)}
                               <span className="ml-1">
-                                {(bill.currentStatus || bill.status).replace('PendingVerification', 'Verifying')}
+                                {(bill.currentStatus || bill.status).replace(
+                                  "PendingVerification",
+                                  "Verifying",
+                                )}
                               </span>
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                              {canManagePayments && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => handleOpenPaymentDialog(bill)}
-                                      >
-                                        <CreditCard className="h-4 w-4" />
-                                        <span className="sr-only">Record/Verify Payment</span>
-                                      </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Record/Verify Payment</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
+                            {canManagePayments && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() =>
+                                      handleOpenPaymentDialog(bill)
+                                    }
+                                  >
+                                    <CreditCard className="h-4 w-4" />
+                                    <span className="sr-only">
+                                      Record/Verify Payment
+                                    </span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Record/Verify Payment</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

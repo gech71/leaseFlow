@@ -1,5 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { verifySession } from "@/lib/auth/jwt";
+import {
+  verifySession,
+  CSRF_TOKEN_COOKIE_NAME,
+  CSRF_TOKEN_SIG_NAME,
+  signCsrfToken,
+  verifyCsrfToken,
+  LAST_ACTIVE_COOKIE_NAME,
+  IDLE_TIMEOUT_MS,
+  getSessionCookieNames,
+  ACCESS_TOKEN_COOKIE_NAME,
+} from "@/lib/auth/jwt";
 import { PERMISSION_MAP } from "@/lib/auth-utils";
 import { nanoid } from "nanoid";
 
@@ -24,8 +34,6 @@ const PUBLIC_ROUTES = [
   "/api/portal/payment-callback",
   "/api/portal/Arifcallback",
 ];
-const CSRF_TOKEN_COOKIE_NAME = "nibrental_csrf_token";
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -33,8 +41,17 @@ export async function middleware(request: NextRequest) {
 
   // --- CSRF Token Generation ---
   const csrfToken = request.cookies.get(CSRF_TOKEN_COOKIE_NAME)?.value;
-  if (!csrfToken) {
-    response.cookies.set(CSRF_TOKEN_COOKIE_NAME, nanoid(32), {
+  const csrfSig = request.cookies.get(CSRF_TOKEN_SIG_NAME)?.value;
+  if (!csrfToken || !csrfSig || !(await verifyCsrfToken(csrfToken, csrfSig))) {
+    const tokenValue = nanoid(32);
+    const sigValue = await signCsrfToken(tokenValue);
+    response.cookies.set(CSRF_TOKEN_COOKIE_NAME, tokenValue, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+    });
+    response.cookies.set(CSRF_TOKEN_SIG_NAME, sigValue, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",
@@ -58,20 +75,42 @@ export async function middleware(request: NextRequest) {
   }
 
   // Verify session for all other routes
-  const session = await verifySession();
+  const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(accessToken);
 
   if (!session) {
-    // For protected routes, redirect to login
-    let from = pathname;
-    if (request.nextUrl.search) {
-      from += request.nextUrl.search;
+    // For API protected routes, return 401 so clients can handle logout
+    return NextResponse.json(
+      { message: "Unauthorized. Please log in." },
+      { status: 401 },
+    );
+  }
+
+  // Idle timeout enforcement for API/actions middleware
+  try {
+    const lastActive = request.cookies.get(LAST_ACTIVE_COOKIE_NAME)?.value;
+    const now = Date.now();
+    if (!lastActive || now - Number(lastActive) > IDLE_TIMEOUT_MS) {
+      const resp = NextResponse.json(
+        { message: "Session expired due to inactivity." },
+        { status: 401 },
+      );
+      const cookieNames = getSessionCookieNames();
+      cookieNames.forEach((name) =>
+        resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
+      );
+      return resp;
     }
-    const loginUrl = new URL("/login", request.url);
-    if (pathname !== "/login" && pathname !== "/") {
-      loginUrl.searchParams.set("from", from);
-    }
-    loginUrl.searchParams.set("error", "session_expired");
-    return NextResponse.redirect(loginUrl);
+
+    // Update last-active cookie
+    response.cookies.set(LAST_ACTIVE_COOKIE_NAME, String(now), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      sameSite: "lax",
+    });
+  } catch (err) {
+    // ignore errors reading/updating the cookie
   }
 
   // --- If session exists ---
@@ -119,9 +158,7 @@ export async function middleware(request: NextRequest) {
       });
 
       const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
-      const errorMessage = firstAllowedPage
-        ? "You do not have permission to access the requested page."
-        : "You do not have any assigned permissions to access the admin panel.";
+      const errorMessage = firstAllowedPage ? "Access Denied" : "Access Denied";
       redirectUrl.searchParams.set("error", errorMessage);
       return NextResponse.redirect(redirectUrl);
     }
