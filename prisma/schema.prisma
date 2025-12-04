@@ -302,5 +302,6 @@ enum TenantStatus {
 
 enum AgreementStatus {
   Active
+  Inactive   
   Canceled
 }
