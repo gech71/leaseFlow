@@ -1,14 +1,12 @@
+"use server";
+import "server-only";
 
-
-'use server';
-import 'server-only';
-
-import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
-import { databaseService } from '@/lib/services/databaseService';
-import type { User, Role } from '@prisma/client';
-import { redirect } from 'next/navigation';
-import type { CurrentUser } from '@/lib/types';
-import { cookies } from 'next/headers';
+import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
+import { databaseService } from "@/lib/services/databaseService";
+import type { User, Role } from "@prisma/client";
+import { redirect } from "next/navigation";
+import type { CurrentUser } from "@/lib/types";
+import { cookies } from "next/headers";
 
 /**
  * A server-side helper to get the fully authenticated user object, their permissions,
@@ -16,26 +14,28 @@ import { cookies } from 'next/headers';
  * @returns {Promise<{currentUser: User & { roles: Role[] }, isSuperAdmin: boolean, permissions: Set<string>}>}
  */
 export async function getUserAndPermissions() {
-    const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
-    const session = await verifySession(token);
-    if (!session?.userId) {
-        // Instead of redirecting, which causes issues with server actions, we throw a specific error.
-        throw new Error("Authentication required. Please log in again.");
-    }
+  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(token);
+  if (!session?.userId) {
+    // Instead of redirecting, which causes issues with server actions, we throw a specific error.
+    throw new Error("Authentication required. Please log in again.");
+  }
 
-    const currentUser = await databaseService.getUserById(session.userId, {
-        roles: true,
-    });
-    
-    if (!currentUser) {
-        console.error(`CRITICAL: Authenticated user with id ${session.userId} not found in the database.`);
-        throw new Error("Authentication failed: User not found.");
-    }
+  const currentUser = await databaseService.getUserById(session.userId, {
+    roles: true,
+  });
 
-    const isSuperAdmin = session.isSuperAdmin;
-    const permissions = new Set<string>(session.permissions);
-    
-    return { currentUser, isSuperAdmin, permissions };
+  if (!currentUser) {
+    console.error(
+      `CRITICAL: Authenticated user with id ${session.userId} not found in the database.`,
+    );
+    throw new Error("Authentication failed.");
+  }
+
+  const isSuperAdmin = session.isSuperAdmin;
+  const permissions = new Set<string>(session.permissions);
+
+  return { currentUser, isSuperAdmin, permissions };
 }
 
 /**
@@ -45,31 +45,33 @@ export async function getUserAndPermissions() {
  * @returns {Promise<{currentUser: User, isSuperAdmin: boolean, managedBuildingIds: string[] | null}>}
  */
 export async function getUserAndManagedIds() {
-    const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
-    const session = await verifySession(token);
-     if (!session?.userId) {
-        throw new Error("Authentication required. Please log in again.");
-    }
+  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const session = await verifySession(token);
+  if (!session?.userId) {
+    throw new Error("Authentication required. Please log in again.");
+  }
 
-    const currentUser = await databaseService.getUserById(session.userId, {
-        roles: true,
-        managedBuildings: { select: { id: true } }
-    });
+  const currentUser = await databaseService.getUserById(session.userId, {
+    roles: true,
+    managedBuildings: { select: { id: true } },
+  });
 
-    if (!currentUser) {
-        console.error(`CRITICAL: Authenticated user with id ${session.userId} not found in the database.`);
-        throw new Error("Authentication failed: User not found.");
-    }
+  if (!currentUser) {
+    console.error(
+      `CRITICAL: Authenticated user with id ${session.userId} not found in the database.`,
+    );
+    throw new Error("Authentication failed.");
+  }
 
-    const isSuperAdmin = session.isSuperAdmin;
-    
-    const managedBuildingIds = isSuperAdmin 
-        ? null 
-        : currentUser.managedBuildings.map(building => building.id);
+  const isSuperAdmin = session.isSuperAdmin;
 
-    const permissions = new Set<string>(session.permissions);
-    
-    return { currentUser, isSuperAdmin, managedBuildingIds, permissions };
+  const managedBuildingIds = isSuperAdmin
+    ? null
+    : currentUser.managedBuildings.map((building) => building.id);
+
+  const permissions = new Set<string>(session.permissions);
+
+  return { currentUser, isSuperAdmin, managedBuildingIds, permissions };
 }
 
 /**
@@ -104,10 +106,13 @@ export async function getUserSessionAction(): Promise<{
     }
 
     const effectivePermissions = session.permissions ?? [];
-    
-    const constructedName = [localUser.firstName, localUser.lastName].filter(Boolean).join(' ').trim();
-    const displayName = localUser.name || constructedName || localUser.email || 'User';
 
+    const constructedName = [localUser.firstName, localUser.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    const displayName =
+      localUser.name || constructedName || localUser.email || "User";
 
     const currentUserData: CurrentUser = {
       id: localUser.id,

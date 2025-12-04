@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 import { addMonths, isAfter } from "date-fns";
 import { prisma } from "@/lib/prisma";
+import { GENERIC_NEUTRAL_ERROR } from "@/lib/security/messages";
 import { sendEmail } from "@/lib/services/emailService";
 import {
   getUserAndPermissions,
@@ -61,7 +62,7 @@ export async function createTenantAction(data: {
   try {
     const { currentUser: adminUser } = await getUserAndPermissions();
     if (!adminUser) {
-      return { success: false, error: "Admin session not found." };
+      return { success: false, error: GENERIC_NEUTRAL_ERROR };
     }
 
     const existingTenant = await databaseService.findTenantByEmailOrPhone(
@@ -72,7 +73,7 @@ export async function createTenantAction(data: {
     if (existingTenant) {
       return {
         success: false,
-        error: "A tenant with this email or phone number already exists.",
+        error: GENERIC_NEUTRAL_ERROR,
       };
     }
 
@@ -93,7 +94,7 @@ export async function createTenantAction(data: {
       if (!tenantRole)
         return {
           success: false,
-          error: "The default 'TENANT' role was not found.",
+          error: GENERIC_NEUTRAL_ERROR,
         };
 
       userForTenant = await databaseService.createUser({
@@ -140,20 +141,9 @@ export async function createTenantAction(data: {
     revalidatePath("/admin/tenants");
     return { success: true, tenant: newTenant, tempPassword: tempPassword };
   } catch (error: any) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      const target = (error.meta?.target as string[]) || [];
-      const fieldName = target.join(", ");
-      return {
-        success: false,
-        error: `Failed to create tenant. A tenant with the same ${fieldName} already exists.`,
-      };
-    }
     return {
       success: false,
-      error: error.message || "Failed to create tenant.",
+      error: GENERIC_NEUTRAL_ERROR,
     };
   }
 }
@@ -196,7 +186,7 @@ export async function findUserByPhoneAction(phone: string): Promise<{
   error?: string;
 }> {
   if (!phone) {
-    return { success: false, error: "Phone number is required." };
+    return { success: false, error: GENERIC_NEUTRAL_ERROR };
   }
   try {
     const user = await databaseService.findUserByPhoneNumber(phone, {
@@ -207,7 +197,7 @@ export async function findUserByPhoneAction(phone: string): Promise<{
       const hasOtherRoles = user.roles.some((role) => role.name !== "TENANT");
 
       if (hasOtherRoles) {
-        return { success: false, error: "Tenant not found." };
+        return { success: false, error: GENERIC_NEUTRAL_ERROR };
       }
 
       const tenant = await databaseService.findTenantByEmailOrPhone(
@@ -223,9 +213,9 @@ export async function findUserByPhoneAction(phone: string): Promise<{
         },
       };
     }
-    return { success: false, error: "Tenant not found." };
+    return { success: false, error: GENERIC_NEUTRAL_ERROR };
   } catch (error: any) {
-    return { success: false, error: "An internal error occurred." };
+    return { success: false, error: GENERIC_NEUTRAL_ERROR };
   }
 }
 

@@ -1,12 +1,11 @@
-
-
 "use server";
 
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
-import { sendEmail } from '@/lib/services/emailService';
-import { getUserAndPermissions } from '@/lib/actions/server-helpers';
-import bcrypt from 'bcryptjs';
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { GENERIC_NEUTRAL_ERROR } from "@/lib/security/messages";
+import { sendEmail } from "@/lib/services/emailService";
+import { getUserAndPermissions } from "@/lib/actions/server-helpers";
+import bcrypt from "bcryptjs";
 
 interface CreateUserAndAccountData {
   firstName: string;
@@ -16,38 +15,44 @@ interface CreateUserAndAccountData {
 }
 
 function generateTempPassword(length = 12): string {
-    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lower = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    const allChars = upper + lower + numbers + symbols;
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const numbers = "0123456789";
+  const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+  const allChars = upper + lower + numbers + symbols;
 
-    let password = '';
-    const randomValues = new Uint32Array(length);
-    crypto.getRandomValues(randomValues);
+  let password = "";
+  const randomValues = new Uint32Array(length);
+  crypto.getRandomValues(randomValues);
 
-    // Ensure at least one of each character type
-    password += upper[randomValues[0] % upper.length];
-    password += lower[randomValues[1] % lower.length];
-    password += numbers[randomValues[2] % numbers.length];
-    password += symbols[randomValues[3] % symbols.length];
+  // Ensure at least one of each character type
+  password += upper[randomValues[0] % upper.length];
+  password += lower[randomValues[1] % lower.length];
+  password += numbers[randomValues[2] % numbers.length];
+  password += symbols[randomValues[3] % symbols.length];
 
-    // Fill the rest of the password
-    for (let i = 4; i < length; i++) {
-        password += allChars[randomValues[i] % allChars.length];
-    }
-    
-    // Shuffle the password to avoid predictable patterns
-    return password.split('').sort(() => 0.5 - (crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296)).join('');
+  // Fill the rest of the password
+  for (let i = 4; i < length; i++) {
+    password += allChars[randomValues[i] % allChars.length];
+  }
+
+  // Shuffle the password to avoid predictable patterns
+  return password
+    .split("")
+    .sort(
+      () => 0.5 - crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296,
+    )
+    .join("");
 }
 
-
-export async function createUserAndAccountAction(data: CreateUserAndAccountData) {
+export async function createUserAndAccountAction(
+  data: CreateUserAndAccountData,
+) {
   try {
     const { currentUser: adminUser } = await getUserAndPermissions();
 
     if (!adminUser) {
-      return { success: false, error: "Admin session not found." };
+      return { success: false, error: GENERIC_NEUTRAL_ERROR };
     }
 
     const { firstName, lastName, phoneNumber, email } = data;
@@ -56,18 +61,18 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { email: { equals: email, mode: 'insensitive' } },
-          { phoneNumber: phoneNumber }
-        ]
-      }
+          { email: { equals: email, mode: "insensitive" } },
+          { phoneNumber: phoneNumber },
+        ],
+      },
     });
 
     if (existingUser) {
-      return { success: false, error: "A user with this email or phone number already exists." };
+      return { success: false, error: GENERIC_NEUTRAL_ERROR };
     }
 
     const tempPassword = generateTempPassword();
-    
+
     const userCreateInput: Prisma.UserCreateInput = {
       email: email,
       name: `${firstName} ${lastName}`.trim(),
@@ -98,14 +103,21 @@ export async function createUserAndAccountAction(data: CreateUserAndAccountData)
       subject: "Your New Staff Account for Nib Building Management",
       html: emailHtml,
     });
-    
-    return { success: true, message: "User registered successfully. Please assign them a role in User Management.", user: localUser };
 
+    return {
+      success: true,
+      message:
+        "User registered successfully. Please assign them a role in User Management.",
+      user: localUser,
+    };
   } catch (dbError: any) {
     console.error("Error creating user in local database:", dbError);
-    if (dbError instanceof Prisma.PrismaClientKnownRequestError && dbError.code === 'P2002') {
-      return { success: false, error: "A user with this email or phone number already exists." };
+    if (
+      dbError instanceof Prisma.PrismaClientKnownRequestError &&
+      dbError.code === "P2002"
+    ) {
+      return { success: false, error: GENERIC_NEUTRAL_ERROR };
     }
-    return { success: false, error: "Failed to create user due to a database error." };
+    return { success: false, error: GENERIC_NEUTRAL_ERROR };
   }
 }
