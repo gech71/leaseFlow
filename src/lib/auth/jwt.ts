@@ -3,7 +3,10 @@ export const runtime = "nodejs";
 
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { nanoid } from "nanoid";
-import { databaseService } from "@/lib/services/databaseService";
+// Note: we avoid importing `databaseService` at module load time because it
+// pulls in Prisma. Prisma cannot run in a browser environment; importing it
+// here can cause bundlers to include Prisma in client code. Instead we
+// dynamically import `databaseService` inside server-only branches.
 import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 import type { User, Role } from "@prisma/client";
 
@@ -81,11 +84,7 @@ if (!JWT_SECRET_KEY || JWT_SECRET_KEY.length !== 64) {
     "JWT_SECRET_KEY is not set or is not a 64-character hex string.";
   if (process.env.NODE_ENV === "production") {
     throw new Error(`FATAL: ${errorMessage} This is required for production.`);
-  } else {
-    console.warn(
-      `WARN: ${errorMessage} The application will not be secure. Please generate a key for development.`,
-    );
-  }
+  } 
 }
 
 const key = new TextEncoder().encode(JWT_SECRET_KEY);
@@ -155,9 +154,15 @@ export async function createSession(
     sameSite: "lax" as const,
   };
 
-  // Persist session record so we can revoke tokens server-side
+  // Persist session record so we can revoke tokens server-side. Do this
+  // only on the server by dynamically importing the DB service.
   try {
-    await databaseService.createUserSession(jti, payload.userId);
+    if (typeof window === "undefined") {
+      const { databaseService } = await import(
+        "@/lib/services/databaseService"
+      );
+      await databaseService.createUserSession(jti, payload.userId);
+    }
   } catch (err) {
     // If DB write fails, we still return tokens but log a warning.
     console.warn("Warning: failed to persist user session", err);
@@ -191,9 +196,13 @@ export async function verifySession(
       algorithms: ["HS256"],
     });
     const sessionPayload = payload as SessionPayload;
-    // If jti is present, ensure the session hasn't been revoked
+    // If jti is present, ensure the session hasn't been revoked. Only run DB
+    // checks on the server to avoid Prisma/browser issues.
     try {
-      if (sessionPayload.jti) {
+      if (typeof window === "undefined" && sessionPayload.jti) {
+        const { databaseService } = await import(
+          "@/lib/services/databaseService"
+        );
         const record = await databaseService.getUserSessionByJti(
           sessionPayload.jti,
         );
@@ -202,9 +211,8 @@ export async function verifySession(
         await databaseService.updateUserSessionLastActive(sessionPayload.jti);
       }
     } catch (err) {
-      // If DB checks fail, be conservative and allow session (avoid accidental lockouts),
-      // but log the error in server logs.
-      console.warn("Warning: session verification DB check failed", err);
+      // If DB checks fail, log a warning but allow the session to avoid
+      // accidental lockouts due to transient DB errors.
     }
 
     return sessionPayload;

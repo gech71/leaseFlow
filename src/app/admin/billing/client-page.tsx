@@ -110,6 +110,7 @@ import {
   parseISO,
   differenceInDays,
 } from "date-fns";
+import { formatDateOnlyUTC } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -1300,15 +1301,22 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                         >
                           <TableCell className="font-medium">
                             <div>{bill.tenantName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {bill.agreement?.space?.spaceIdName}
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs text-muted-foreground">
+                                {bill.agreement?.space?.spaceIdName}
+                              </div>
+                              {bill.isPrepaid ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs h-6 px-2"
+                                >
+                                  Prepaid
+                                </Badge>
+                              ) : null}
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-sm">
-                            <div>
-                              Bill:{" "}
-                              {format(parseISO(bill.billDate), "dd-MMM-yy")}
-                            </div>
+                            <div>Bill: {formatDateOnlyUTC(bill.billDate)}</div>
                             <div
                               className={`text-xs ${
                                 bill.currentStatus === "Overdue"
@@ -1316,7 +1324,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                                   : "text-muted-foreground"
                               }`}
                             >
-                              Due: {format(parseISO(bill.dueDate), "dd-MMM-yy")}
+                              Due: {formatDateOnlyUTC(bill.dueDate)}
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-xs">

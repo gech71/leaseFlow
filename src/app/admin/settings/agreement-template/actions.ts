@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { databaseService } from "@/lib/services/databaseService";
-import { getUserAndPermissions } from "@/lib/actions/server-helpers";
+import {
+  getUserAndManagedIds,
+  getUserAndPermissions,
+} from "@/lib/actions/server-helpers";
 import { AgreementTemplate, Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -13,10 +16,22 @@ export async function getAllAgreementTemplatesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const { currentUser, isSuperAdmin } = await getUserAndPermissions();
-    const where: Prisma.AgreementTemplateWhereInput = !isSuperAdmin
-      ? { createdById: currentUser.id }
-      : {};
+    const { currentUser, isSuperAdmin, managedBuildingIds } =
+      await getUserAndManagedIds();
+
+    // For non-superadmins, show templates that are either global (buildingId is null),
+    // owned by the current user, or scoped to one of the buildings they manage.
+    const where: Prisma.AgreementTemplateWhereInput = isSuperAdmin
+      ? {}
+      : {
+          OR: [
+            { buildingId: null },
+            { createdById: currentUser.id },
+            ...(managedBuildingIds && managedBuildingIds.length > 0
+              ? [{ buildingId: { in: managedBuildingIds } }]
+              : []),
+          ],
+        };
 
     const templates = await databaseService.getAllAgreementTemplates({
       where,
@@ -50,6 +65,7 @@ export async function upsertAgreementTemplateAction(data: {
   id?: string;
   name: string;
   content: string;
+  buildingId?: string | null;
 }): Promise<{
   success: boolean;
   template?: AgreementTemplate;
@@ -64,27 +80,30 @@ export async function upsertAgreementTemplateAction(data: {
     ) {
       return { success: false, error: "Access Denied" };
     }
-
-    const createOrUpdateData = {
+    const createData: Prisma.AgreementTemplateCreateInput = {
       name: data.name,
       content: data.content,
-      createdBy: data.id ? undefined : { connect: { id: currentUser.id } }, // Only connect on create
+      createdBy: { connect: { id: currentUser.id } },
+      building: data.buildingId
+        ? { connect: { id: data.buildingId } }
+        : undefined,
+    };
+
+    const updateData: Prisma.AgreementTemplateUpdateInput = {
+      name: data.name,
+      content: data.content,
+      building: data.buildingId
+        ? { connect: { id: data.buildingId } }
+        : undefined,
     };
 
     if (data.id) {
       // Update
-      await databaseService.updateAgreementTemplate(data.id, {
-        name: data.name,
-        content: data.content,
-      });
+      await databaseService.updateAgreementTemplate(data.id, updateData);
       revalidatePath("/admin/settings/agreement-template");
     } else {
       // Create
-      await databaseService.createAgreementTemplate({
-        name: data.name,
-        content: data.content,
-        createdBy: { connect: { id: currentUser.id } },
-      });
+      await databaseService.createAgreementTemplate(createData);
       revalidatePath("/admin/settings/agreement-template");
     }
   } catch (error: any) {

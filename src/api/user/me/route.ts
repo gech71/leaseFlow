@@ -22,9 +22,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!localUser) {
-      console.warn(
-        `User with internal ID ${session.userId} not found in database during /api/user/me call.`,
-      );
+   
       return NextResponse.json(
         { isSuccess: false, errors: ["User not found in the system."] },
         { status: 404 },

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { databaseService } from "@/lib/services/databaseService";
 import { Prisma, type Agreement, AgreementStatus } from "@prisma/client";
-import { addMonths, parseISO, isSameDay } from "date-fns";
+import { addMonths, parseISO } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getUserAndPermissions } from "@/lib/actions/server-helpers";
 
@@ -26,27 +26,71 @@ export async function createFullAgreementAction(
   input: CreateFullAgreementData,
 ) {
   try {
-    const startDateObj = parseISO(input.startDate);
-    // The next due date is for the first monthly utility bill.
-    const nextPaymentDueDateObj = addMonths(startDateObj, 1);
-    const initialPaymentAmount =
-      input.monthlyRentalPrice * input.initialPaymentMonths;
+    // If the incoming start date is a date-only string (YYYY-MM-DD),
+    // construct a UTC-midnight Date so storing it in the DB doesn't
+    // shift it backward by the local timezone offset (e.g. 00:00 local
+    // -> previous day 21:00 UTC). This ensures the first bill created
+    // at agreement import has the same calendar date in the DB.
+    let startDateObj: Date;
+    const rawStart = String(input.startDate || "").trim();
+    const dateOnlyMatch = /^\d{4}-\d{1,2}-\d{1,2}$/.test(rawStart);
+    if (dateOnlyMatch) {
+      const [y, m, d] = rawStart.split("-").map(Number);
+      startDateObj = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+    } else {
+      startDateObj = parseISO(rawStart);
+    }
+    // Compute agreement end date and next due date based on initial prepaid months
+    const endDateObj = addMonths(startDateObj, input.paymentTermMonths);
+    const initialMonths = input.initialPaymentMonths || 0;
+    // Always set next payment due date to the agreement start date so monthly
+    // bills will be generated for every month (including initial prepaid
+    // months, where rent may be zero). This prevents skipping months when the
+    // system previously advanced the next due date past prepaid months.
+    const nextPaymentDueDateObj = startDateObj;
+    const initialPaymentAmount = input.monthlyRentalPrice * initialMonths;
+
+    // Persist date-only strings (YYYY-MM-DD) to ensure the DB stores the
+    // same calendar date regardless of timezone or column type.
+    const toDateOnlyString = (d: Date) => {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    const startDateForDb = toDateOnlyString(startDateObj);
+    const nextPaymentDueForDb = toDateOnlyString(nextPaymentDueDateObj);
+    const initialPaymentDateForDb = toDateOnlyString(startDateObj);
+    const endDateForDb = toDateOnlyString(endDateObj);
+
+    // Prisma expects a Date object or full ISO-8601 date-time string for DateTime
+    // fields. Construct Date objects at UTC-midnight so the stored calendar
+    // date is consistent regardless of server TZ.
+    const toUtcMidnight = (d: Date) =>
+      new Date(
+        Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0),
+      );
+    const startDateForDbDate = toUtcMidnight(startDateObj);
+    const nextPaymentDueForDbDate = toUtcMidnight(nextPaymentDueDateObj);
+    const initialPaymentDateForDbDate = toUtcMidnight(startDateObj);
+    const endDateForDbDate = toUtcMidnight(endDateObj);
 
     const newAgreementId = await prisma.$transaction(async (tx) => {
       // 1. Create the Agreement
       const agreement = await tx.agreement.create({
         data: {
           agreementText: input.agreementText,
-          startDate: startDateObj,
+          startDate: startDateForDbDate,
           monthlyRentalPrice: input.monthlyRentalPrice,
           paymentTermMonths: input.paymentTermMonths,
           initialPaymentMonths: input.initialPaymentMonths,
-          nextPaymentDueDate: nextPaymentDueDateObj,
+          nextPaymentDueDate: nextPaymentDueForDbDate,
+          endDate: endDateForDbDate,
           additionalTerms: input.additionalTerms,
           status: "Active", // Set initial status to Active
 
           initialPaymentAmount: initialPaymentAmount,
-          initialPaymentDate: startDateObj,
+          initialPaymentDate: initialPaymentDateForDbDate,
 
           tenant: { connect: { id: input.tenantId } },
           space: { connect: { id: input.spaceId } },
@@ -54,23 +98,32 @@ export async function createFullAgreementAction(
         },
       });
 
-      // 2. Create a "Bill" for the initial payment, marked as Pending
-      if (initialPaymentAmount > 0) {
+      // 2. If there are initial prepaid months, create a single aggregated
+      // bill at agreement creation that covers `initialPaymentMonths`.
+      // Subsequent monthly bills will still be generated each month; for
+      // months covered by the prepaid amount the monthly rent portion will
+      // be zero so utilities/penalties can still apply.
+      const monthlyAmount = input.monthlyRentalPrice;
+      const initialMonthsForCreation = initialMonths;
+
+      if (initialMonthsForCreation > 0) {
+        const initialAmount = monthlyAmount * initialMonthsForCreation;
         await tx.bill.create({
           data: {
             agreementId: agreement.id,
             tenantId: input.tenantId,
-            billDate: startDateObj,
-            dueDate: startDateObj,
-            rentAmount: initialPaymentAmount,
+            billDate: startDateForDbDate,
+            dueDate: startDateForDbDate,
+            rentAmount: initialAmount,
             utilityBreakdown: Prisma.JsonNull,
             penaltyAmount: 0,
-            totalAmount: initialPaymentAmount,
-            status: "Pending", // Not verified on creation
+            totalAmount: initialAmount,
+            status: "Pending",
             paymentDate: null,
             paymentMethod: null,
             paymentReference: null,
             adminVerifiedPayment: false,
+            isPrepaid: true,
           },
         });
       }

@@ -91,6 +91,7 @@ const penaltyRuleSchema = z
 const buildingFormSchema = z.object({
   name: z.string().min(2, "Building name must be at least 2 characters."),
   address: z.string().min(5, "Address must be at least 5 characters."),
+  branchName: z.string().max(100).optional().nullable(),
   accountNumber: z
     .string()
     .regex(
@@ -151,6 +152,7 @@ export function BuildingUpsertFormInternal({
     defaultValues: {
       name: "",
       address: "",
+      branchName: "",
       accountNumber: "",
       penaltyRules: [],
     },
@@ -184,6 +186,7 @@ export function BuildingUpsertFormInternal({
       form.reset({
         name: initialBuildingData.name,
         address: initialBuildingData.address || "",
+        branchName: (initialBuildingData as any).branchName || "",
         accountNumber: initialBuildingData.accountNumber || "",
         penaltyRules: uiRules,
       });
@@ -195,6 +198,7 @@ export function BuildingUpsertFormInternal({
       form.reset({
         name: "",
         address: "",
+        branchName: "",
         accountNumber: "",
         penaltyRules: [],
       });
@@ -272,6 +276,7 @@ export function BuildingUpsertFormInternal({
       const buildingCreateInput: Prisma.BuildingCreateInput = {
         name: values.name.trim(),
         address: values.address.trim(),
+        branchName: values.branchName ? values.branchName.trim() : undefined,
         accountNumber: values.accountNumber.trim(),
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
@@ -284,6 +289,7 @@ export function BuildingUpsertFormInternal({
       const buildingUpdateInput: Prisma.BuildingUpdateInput = {
         name: values.name.trim(),
         address: values.address.trim(),
+        branchName: values.branchName ? values.branchName.trim() : undefined,
         accountNumber: values.accountNumber.trim(),
         penaltyPolicyTiers: {
           deleteMany: {},
@@ -422,6 +428,27 @@ export function BuildingUpsertFormInternal({
                     </FormItem>
                   )}
                 />
+                {isSuperAdmin && (
+                  <FormField
+                    control={form.control}
+                    name="branchName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center text-sm font-medium">
+                          Branch / District (optional)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Branch or district name"
+                            {...field}
+                            disabled={isSaving || !canManageThisForm}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             </div>
 

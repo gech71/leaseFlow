@@ -248,6 +248,7 @@ export async function toggleTenantStatusAction(
           data: { status: TenantStatus.Inactive },
         });
 
+        // Mark all active agreements for this tenant as Inactive
         await tx.agreement.updateMany({
           where: {
             tenantId: tenantId,
@@ -256,12 +257,28 @@ export async function toggleTenantStatusAction(
           data: { status: AgreementStatus.Inactive },
         });
 
+        // Delete unpaid bills
         await tx.bill.deleteMany({
           where: {
             tenantId: tenantId,
             status: { not: "Paid" },
           },
         });
+
+        // If tenant currently has a rentedSpace, mark that space as vacant
+        const tenantRecord = await tx.tenant.findUnique({
+          where: { id: tenantId },
+        });
+        if (tenantRecord && tenantRecord.rentedSpaceId) {
+          try {
+            await tx.space.update({
+              where: { id: tenantRecord.rentedSpaceId },
+              data: { isOccupied: false },
+            });
+          } catch (e) {
+            // ignore
+          }
+        }
       });
     } else {
       // Reactivating tenant
@@ -271,6 +288,7 @@ export async function toggleTenantStatusAction(
           data: { status: TenantStatus.Active },
         });
 
+        // Re-activate any inactive agreements for this tenant
         await tx.agreement.updateMany({
           where: {
             tenantId: tenantId,
@@ -278,6 +296,21 @@ export async function toggleTenantStatusAction(
           },
           data: { status: AgreementStatus.Active },
         });
+
+        // If tenant has a rentedSpaceId, mark that space as occupied again
+        const tenantRecord = await tx.tenant.findUnique({
+          where: { id: tenantId },
+        });
+        if (tenantRecord && tenantRecord.rentedSpaceId) {
+          try {
+            await tx.space.update({
+              where: { id: tenantRecord.rentedSpaceId },
+              data: { isOccupied: true },
+            });
+          } catch (e) {
+            // ignore
+          }
+        }
       });
     }
 

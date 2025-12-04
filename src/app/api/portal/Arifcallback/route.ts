@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
             });
 
             if (!arifPaymentRecord) {
-                console.warn(`ArifCallback: Received valid callback for session ${sessionId}, but no matching payment record found.`);
                 return NextResponse.json({ message: "Acknowledged, but no session found." }, { status: 200 });
             }
 

@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import { databaseService } from "@/lib/services/databaseService";
 import { createTenantAction } from "../tenants/actions";
 import { createFullAgreementAction } from "../agreements/actions";
-import { getUserAndPermissions } from "@/lib/actions/server-helpers";
+import {
+  getUserAndPermissions,
+  getUserAndManagedIds,
+} from "@/lib/actions/server-helpers";
 import type { Prisma } from "@prisma/client";
+import { addMonths } from "date-fns";
 
 const MAX_ROWS_PER_SHEET = 2000; // Server-side limit
 
@@ -19,9 +23,22 @@ export async function getAgreementTemplatesForImportAction(): Promise<
     return [];
   }
 
-  const where: Prisma.AgreementTemplateWhereInput = !isSuperAdmin
-    ? { createdById: currentUser.id }
-    : {};
+  // Templates are not scoped to a building in the schema, and import
+  // operators commonly need access to templates created by others in the
+  // organization. Return all templates for users with the import permission.
+  const { managedBuildingIds } = await getUserAndManagedIds();
+
+  const where: Prisma.AgreementTemplateWhereInput = isSuperAdmin
+    ? {}
+    : {
+        OR: [
+          { buildingId: null },
+          { createdById: currentUser.id },
+          ...(managedBuildingIds && managedBuildingIds.length > 0
+            ? [{ buildingId: { in: managedBuildingIds } }]
+            : []),
+        ],
+      };
 
   const templates = await databaseService.getAllAgreementTemplates({
     where,
@@ -104,6 +121,8 @@ export async function processImportAction(data: ImportData) {
     };
   }
 
+  const { managedBuildingIds } = await getUserAndManagedIds();
+
   // Server-side row limit validation
   if (
     data.spaces.length > MAX_ROWS_PER_SHEET ||
@@ -132,9 +151,18 @@ export async function processImportAction(data: ImportData) {
     return { success: false, createdCount, skippedCount, errors };
   }
 
-  if (!isSuperAdmin && agreementTemplate.createdById !== currentUser.id) {
-    errors.push("Access Denied");
-    return { success: false, createdCount, skippedCount, errors };
+  // Enforce that non-superadmin users may only use templates that are global,
+  // belong to one of their managed buildings, or are created by themselves.
+  if (!isSuperAdmin) {
+    const allowed =
+      agreementTemplate.buildingId === null ||
+      agreementTemplate.createdById === currentUser.id ||
+      (managedBuildingIds &&
+        managedBuildingIds.includes(agreementTemplate.buildingId as string));
+    if (!allowed) {
+      errors.push("Access Denied");
+      return { success: false, createdCount, skippedCount, errors };
+    }
   }
 
   // --- 1. Process Spaces ---
@@ -387,15 +415,77 @@ export async function processImportAction(data: ImportData) {
           });
 
           if (existingAgreement.length === 0) {
+            // Prepare agreement text by replacing common placeholders in the template
+            const templateContent = agreementTemplate.content || "";
+            const monthlyPrice = Number(spaceRecord[0].monthlyRentalPrice);
+            const floor = (spaceRecord[0] as any).floor || "";
+            const area = Number((spaceRecord[0] as any).area || 0);
+            const formattedStartDate = startDate.toISOString().substring(0, 10);
+            const paymentTermMonthsVal = Number(agreement.termMonths) || 0;
+            const initialMonthsVal =
+              Number(agreement.initialPaymentMonths) || 0;
+            const initialPaymentAmountVal = !isNaN(monthlyPrice)
+              ? monthlyPrice * initialMonthsVal
+              : 0;
+            const nextDueDateObj = addMonths(
+              startDate,
+              initialMonthsVal > 0 ? initialMonthsVal : 1,
+            );
+            const formattedNextDue = nextDueDateObj
+              .toISOString()
+              .substring(0, 10);
+
+            const substitutedAgreementText = templateContent
+              .replace(/{{\s*tenantName\s*}}/gi, tenantRecord.name || "")
+              .replace(/{{\s*tenantEmail\s*}}/gi, tenantRecord.email || "")
+              .replace(/{{\s*tenantPhone\s*}}/gi, tenantRecord.phone || "")
+              .replace(/{{\s*buildingName\s*}}/gi, buildingRecord[0].name || "")
+              .replace(
+                /{{\s*buildingAddress\s*}}/gi,
+                (buildingRecord[0] && (buildingRecord[0] as any).address) || "",
+              )
+              .replace(
+                /{{\s*spaceIdName\s*}}/gi,
+                spaceRecord[0].spaceIdName || "",
+              )
+              .replace(/{{\s*floor\s*}}/gi, floor)
+              .replace(/{{\s*area\s*}}/gi, isNaN(area) ? "" : area.toString())
+              .replace(/{{\s*startDate\s*}}/gi, formattedStartDate)
+              .replace(
+                /{{\s*paymentTermMonths\s*}}/gi,
+                paymentTermMonthsVal.toString(),
+              )
+              .replace(
+                /{{\s*monthlyRentalPrice\s*}}/gi,
+                isNaN(monthlyPrice) ? "" : monthlyPrice.toFixed(2),
+              )
+              .replace(
+                /{{\s*monthlyRent\s*}}/gi,
+                isNaN(monthlyPrice) ? "" : monthlyPrice.toFixed(2),
+              )
+              .replace(
+                /{{\s*initialPaymentMonths\s*}}/gi,
+                initialMonthsVal.toString(),
+              )
+              .replace(
+                /{{\s*initialPaymentAmount\s*}}/gi,
+                initialPaymentAmountVal
+                  ? initialPaymentAmountVal.toFixed(2)
+                  : "",
+              )
+              .replace(/{{\s*nextPaymentDueDate\s*}}/gi, formattedNextDue)
+              .replace(
+                /{{\s*additionalTerms\s*}}/gi,
+                agreement.additionalTerms || "",
+              );
+
             const agreementData = {
               tenantId: tenantRecord.id,
               spaceId: spaceRecord[0].id,
               agreementTemplateId: data.agreementTemplateId,
-              agreementText: "Agreement text generated via bulk import.",
+              agreementText: substitutedAgreementText,
               startDate: startDate.toISOString(),
-              monthlyRentalPrice: sanitizeNumber(
-                spaceRecord[0].monthlyRentalPrice,
-              ),
+              monthlyRentalPrice: monthlyPrice,
               paymentTermMonths: agreement.termMonths,
               initialPaymentMonths: agreement.initialPaymentMonths,
               additionalTerms: agreement.additionalTerms || undefined,

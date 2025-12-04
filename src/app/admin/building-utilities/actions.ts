@@ -53,9 +53,7 @@ export async function getBuildingUtilitiesAction(
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
-      console.warn(
-        `Permission denied: User tried to access utilities for unmanaged building ${buildingId}`,
-      );
+    
       return null; // Don't return data user can't access
     }
 

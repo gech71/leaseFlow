@@ -46,6 +46,7 @@ import {
   getMonth,
   differenceInDays,
 } from "date-fns";
+import { formatDateOnlyUTC } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -486,8 +487,8 @@ export function PaymentsOverviewClientPage({
     const worksheetData = data.map((bill) => ({
       "Tenant Name": bill.tenantName,
       "Space Description": bill.spaceDescription,
-      "Bill Date": format(parseISO(bill.billDate), "PP"),
-      "Due Date": format(parseISO(bill.dueDate), "PP"),
+      "Bill Date": formatDateOnlyUTC(bill.billDate),
+      "Due Date": formatDateOnlyUTC(bill.dueDate),
       "Rent Amount": bill.rentAmount,
       "Utilities Amount": (bill.utilityBreakdown || []).reduce(
         (sum, util) => sum + util.amount,
@@ -497,7 +498,7 @@ export function PaymentsOverviewClientPage({
       "Total Amount": bill.totalAmount,
       Status: bill.status,
       "Payment Date": bill.paymentDate
-        ? format(parseISO(bill.paymentDate), "PP")
+        ? formatDateOnlyUTC(bill.paymentDate)
         : "N/A",
       "Payment Method": bill.paymentMethod || "N/A",
       Reference: bill.paymentReference || "N/A",

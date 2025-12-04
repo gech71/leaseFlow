@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { addMonths, startOfDay } from "date-fns";
+import { revalidatePath } from "next/cache";
 import type {
   Prisma,
   Building,
@@ -165,7 +167,54 @@ export class DatabaseService {
 
   // --- Agreement ---
   async createAgreement(data: Prisma.AgreementCreateInput): Promise<Agreement> {
-    return prisma.agreement.create({ data });
+    // Normalize any date-only string values to UTC-midnight Date objects
+    // so stored values preserve the calendar date regardless of server TZ.
+    const normalizeDateInput = (v: any): string | undefined => {
+      if (!v && v !== 0) return undefined;
+      const toDateOnlyString = (d: Date) =>
+        `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(
+          2,
+          "0",
+        )}-${String(d.getUTCDate()).padStart(2, "0")}`;
+
+      if (typeof v === "string") {
+        const s = v.trim();
+        const dateOnlyMatch = /^\d{4}-\d{1,2}-\d{1,2}$/.test(s);
+        if (dateOnlyMatch) {
+          // Keep as normalized date-only string
+          const [y, m, d] = s.split("-").map(Number);
+          return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(
+            2,
+            "0",
+          )}`;
+        }
+        // Fallback: parse and convert to date-only string (use UTC components)
+        const parsed = new Date(s);
+        return toDateOnlyString(parsed);
+      }
+      if (v instanceof Date) return toDateOnlyString(v);
+      return undefined;
+    };
+
+    const normalized: any = { ...data };
+    if ((normalized as any).startDate)
+      (normalized as any).startDate = normalizeDateInput(
+        (normalized as any).startDate,
+      );
+    if ((normalized as any).nextPaymentDueDate)
+      (normalized as any).nextPaymentDueDate = normalizeDateInput(
+        (normalized as any).nextPaymentDueDate,
+      );
+    if ((normalized as any).initialPaymentDate)
+      (normalized as any).initialPaymentDate = normalizeDateInput(
+        (normalized as any).initialPaymentDate,
+      );
+    if ((normalized as any).endDate)
+      (normalized as any).endDate = normalizeDateInput(
+        (normalized as any).endDate,
+      );
+
+    return prisma.agreement.create({ data: normalized });
   }
 
   async getAgreementById(
@@ -201,7 +250,120 @@ export class DatabaseService {
 
   // --- Bill ---
   async createBill(data: Prisma.BillCreateInput): Promise<Bill> {
-    return prisma.bill.create({ data });
+    const created = await prisma.bill.create({ data });
+
+    // After creating a bill, check whether the agreement is fully covered
+    // with non-prepaid bills up to its end date. If so, expire the
+    // agreement and free the space/tenant link.
+    try {
+      const agreement = await prisma.agreement.findUnique({
+        where: { id: created.agreementId },
+        select: {
+          id: true,
+          startDate: true,
+          nextPaymentDueDate: true,
+          endDate: true,
+          status: true,
+          spaceId: true,
+          tenantId: true,
+        },
+      });
+
+      if (agreement && agreement.endDate) {
+        const nextDue = agreement.nextPaymentDueDate || agreement.startDate;
+
+        const nextDueMonthStart = new Date(
+          Date.UTC(nextDue.getUTCFullYear(), nextDue.getUTCMonth(), 1),
+        );
+        const agreementEndMonthStart = new Date(
+          Date.UTC(
+            agreement.endDate.getUTCFullYear(),
+            agreement.endDate.getUTCMonth(),
+            1,
+          ),
+        );
+        const agreementEndMonthExclusive = new Date(
+          Date.UTC(
+            agreementEndMonthStart.getUTCFullYear(),
+            agreementEndMonthStart.getUTCMonth() + 1,
+            1,
+          ),
+        );
+
+        let cursor = nextDueMonthStart;
+        let allCovered = true;
+        while (cursor < agreementEndMonthExclusive) {
+          const monthStart = cursor;
+          const monthEnd = new Date(
+            Date.UTC(
+              monthStart.getUTCFullYear(),
+              monthStart.getUTCMonth() + 1,
+              1,
+            ),
+          );
+          const count = await prisma.bill.count({
+            where: {
+              agreementId: agreement.id,
+              billDate: { gte: monthStart, lt: monthEnd },
+              AND: [{ isPrepaid: { not: true } }],
+            },
+          });
+          if (count === 0) {
+            allCovered = false;
+            break;
+          }
+          cursor = new Date(
+            Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1),
+          );
+        }
+
+        if (allCovered) {
+          // expire agreement and free space/tenant
+          if (
+            agreement.status === "Active" ||
+            agreement.status === "Inactive"
+          ) {
+            await prisma.agreement.update({
+              where: { id: agreement.id },
+              data: { status: "Expired" },
+            });
+          }
+          if (agreement.spaceId) {
+            try {
+              await prisma.space.update({
+                where: { id: agreement.spaceId },
+                data: { isOccupied: false },
+              });
+            } catch (e) {
+              /* ignore */
+            }
+          }
+          if (agreement.tenantId) {
+            try {
+              await prisma.tenant.update({
+                where: { id: agreement.tenantId },
+                data: { rentedSpaceId: null },
+              });
+            } catch (e) {
+              /* ignore */
+            }
+          }
+          // Revalidate admin pages so the UI reflects the expired status and freed space
+          try {
+            revalidatePath("/admin/agreements");
+            revalidatePath("/admin/spaces");
+            revalidatePath("/admin/billing");
+          } catch (e) {
+            /* ignore in non-Next server contexts */
+          }
+        }
+      }
+    } catch (e) {
+      // non-fatal; just log in development
+      if (process.env.NODE_ENV === "development") console.error(e);
+    }
+
+    return created;
   }
 
   async getBillById(
