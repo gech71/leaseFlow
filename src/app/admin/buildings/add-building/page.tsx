@@ -50,6 +50,9 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
         name: buildingToEdit.name,
         address: buildingToEdit.address || "",
         branchName: (buildingToEdit as any).branchName || "",
+        ownerName: (buildingToEdit as any).ownerName || "",
+        ownerPhone: (buildingToEdit as any).ownerPhone || "",
+        ownerEmail: (buildingToEdit as any).ownerEmail || "",
         accountNumber: buildingToEdit.accountNumber,
         createdAt: buildingToEdit.createdAt.toISOString(),
         penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map((tier) => ({

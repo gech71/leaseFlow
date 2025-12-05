@@ -424,6 +424,13 @@ export async function processImportAction(data: ImportData) {
             const paymentTermMonthsVal = Number(agreement.termMonths) || 0;
             const initialMonthsVal =
               Number(agreement.initialPaymentMonths) || 0;
+            if (initialMonthsVal > paymentTermMonthsVal) {
+              errors.push(
+                `Agreement Row ${row} (${agreement.tenantEmail}): Initial payment months (${initialMonthsVal}) cannot exceed total term months (${paymentTermMonthsVal}).`,
+              );
+              skippedCount.agreements++;
+              continue;
+            }
             const initialPaymentAmountVal = !isNaN(monthlyPrice)
               ? monthlyPrice * initialMonthsVal
               : 0;

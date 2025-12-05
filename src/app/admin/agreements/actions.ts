@@ -40,6 +40,19 @@ export async function createFullAgreementAction(
     } else {
       startDateObj = parseISO(rawStart);
     }
+    // Validate business rules: initial payment months must not exceed total term
+    if (
+      typeof input.initialPaymentMonths === "number" &&
+      typeof input.paymentTermMonths === "number" &&
+      input.initialPaymentMonths > input.paymentTermMonths
+    ) {
+      return {
+        success: false,
+        error:
+          "Initial payment months cannot exceed total payment term months.",
+      };
+    }
+
     // Compute agreement end date and next due date based on initial prepaid months
     const endDateObj = addMonths(startDateObj, input.paymentTermMonths);
     const initialMonths = input.initialPaymentMonths || 0;

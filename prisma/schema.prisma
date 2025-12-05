@@ -17,6 +17,9 @@ model Building {
   id                       String                     @id @default(cuid())
   name                     String                     @unique
   address                  String?
+  ownerName                String?
+  ownerPhone               String?
+  ownerEmail               String?
   branchName               String?
   accountNumber            String
   status                   BuildingStatus             @default(Pending)

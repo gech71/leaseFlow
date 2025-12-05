@@ -92,6 +92,11 @@ const buildingFormSchema = z.object({
   name: z.string().min(2, "Building name must be at least 2 characters."),
   address: z.string().min(5, "Address must be at least 5 characters."),
   branchName: z.string().max(100).optional().nullable(),
+  ownerName: z.string().max(200).optional().nullable(),
+  ownerPhone: z
+    .string()
+    .regex(/^09\d{8}$/, "Phone must start with '09' followed by 8 digits."),
+  ownerEmail: z.string().email("Invalid email address").optional().nullable(),
   accountNumber: z
     .string()
     .regex(
@@ -108,6 +113,10 @@ interface BuildingUpsertFormInternalProps {
     id: string;
     name: string;
     address: string | null;
+    branchName?: string | null;
+    ownerName?: string | null;
+    ownerPhone?: string | null;
+    ownerEmail?: string | null;
     accountNumber: string;
     penaltyPolicyTiers: PenaltyTierTypePrisma[];
     managers: { id: string }[];
@@ -153,6 +162,9 @@ export function BuildingUpsertFormInternal({
       name: "",
       address: "",
       branchName: "",
+      ownerName: "",
+      ownerPhone: "",
+      ownerEmail: "",
       accountNumber: "",
       penaltyRules: [],
     },
@@ -187,6 +199,9 @@ export function BuildingUpsertFormInternal({
         name: initialBuildingData.name,
         address: initialBuildingData.address || "",
         branchName: (initialBuildingData as any).branchName || "",
+        ownerName: (initialBuildingData as any).ownerName || "",
+        ownerPhone: (initialBuildingData as any).ownerPhone || "",
+        ownerEmail: (initialBuildingData as any).ownerEmail || "",
         accountNumber: initialBuildingData.accountNumber || "",
         penaltyRules: uiRules,
       });
@@ -199,6 +214,9 @@ export function BuildingUpsertFormInternal({
         name: "",
         address: "",
         branchName: "",
+        ownerName: "",
+        ownerPhone: "",
+        ownerEmail: "",
         accountNumber: "",
         penaltyRules: [],
       });
@@ -277,6 +295,9 @@ export function BuildingUpsertFormInternal({
         name: values.name.trim(),
         address: values.address.trim(),
         branchName: values.branchName ? values.branchName.trim() : undefined,
+        ownerName: values.ownerName ? values.ownerName.trim() : undefined,
+        ownerPhone: values.ownerPhone ? values.ownerPhone.trim() : undefined,
+        ownerEmail: values.ownerEmail ? values.ownerEmail.trim() : undefined,
         accountNumber: values.accountNumber.trim(),
         penaltyPolicyTiers: {
           create: finalPenaltyTiersCreateInput,
@@ -290,6 +311,9 @@ export function BuildingUpsertFormInternal({
         name: values.name.trim(),
         address: values.address.trim(),
         branchName: values.branchName ? values.branchName.trim() : undefined,
+        ownerName: values.ownerName ? values.ownerName.trim() : undefined,
+        ownerPhone: values.ownerPhone ? values.ownerPhone.trim() : undefined,
+        ownerEmail: values.ownerEmail ? values.ownerEmail.trim() : undefined,
         accountNumber: values.accountNumber.trim(),
         penaltyPolicyTiers: {
           deleteMany: {},
@@ -449,6 +473,72 @@ export function BuildingUpsertFormInternal({
                     )}
                   />
                 )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-4 border-b pb-6">
+                <FormField
+                  control={form.control}
+                  name="ownerName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">
+                        Building Owner Name
+                        <span className="text-destructive ml-1">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Owner full name"
+                          {...field}
+                          disabled={isSaving || !canManageThisForm}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ownerPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">
+                        Building Owner Phone
+                        <span className="text-destructive ml-1">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Building Owner Phone"
+                          {...field}
+                          disabled={isSaving || !canManageThisForm}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ownerEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">
+                        Building Owner Email (optional)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Building Owner Email"
+                          {...field}
+                          disabled={isSaving || !canManageThisForm}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 
