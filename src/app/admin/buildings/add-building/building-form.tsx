@@ -526,7 +526,8 @@ export function BuildingUpsertFormInternal({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex items-center text-sm font-medium">
-                        Building Owner Email (optional)
+                        Building Owner Email{" "}
+                        <span className="text-destructive ml-1">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
