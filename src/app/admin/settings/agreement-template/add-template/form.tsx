@@ -28,7 +28,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TinyMceEditor } from "@/components/custom/TinyMceEditor";
+import { Textarea } from "@/components/ui/textarea";
 
 const templateFormSchema = z.object({
   name: z.string().min(3, "Template name must be at least 3 characters."),
@@ -187,9 +187,12 @@ export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
                     <FormItem>
                       <FormLabel>Template Content</FormLabel>
                       <FormControl>
-                        <TinyMceEditor
-                          value={field.value || ""}
-                          onEditorChange={field.onChange}
+                        <Textarea
+                          placeholder={
+                            "Enter agreement template content here... Use placeholders from the right panel."
+                          }
+                          {...field}
+                          rows={15}
                         />
                       </FormControl>
                       <FormMessage />

@@ -43,17 +43,16 @@ export async function middleware(request: NextRequest) {
   // --- Apply CSP ---
   const nonce = nanoid(16);
   response.headers.set("x-nonce", nonce);
-  // NOTE: In a real production environment, this CSP would need to be more restrictive.
-  // For this project, we'll keep it broad to avoid breaking TinyMCE or other potential libraries.
+  
   const csp = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' https://cdn.tiny.cloud 'unsafe-inline';
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tiny.cloud;
-    img-src 'self' data: https://cdn.tiny.cloud;
+    script-src 'self' 'nonce-${nonce}' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' data:;
     font-src 'self' https://fonts.gstatic.com;
     frame-ancestors 'none';
     connect-src 'self';
-    frame-src 'self' https://cdn.tiny.cloud;
+    frame-src 'self';
     object-src 'none';
     base-uri 'self';
     form-action 'self';
