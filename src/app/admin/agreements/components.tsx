@@ -136,6 +136,10 @@ export function AgreementsListClientPage({
       let status: "Active" | "Expired" | "Canceled" | "Inactive";
       if (agreement.status === "Canceled") {
         status = "Canceled";
+      } else if (agreement.status === "Expired") {
+        // Honor the stored DB status first — if the agreement record is
+        // explicitly expired, reflect that immediately on the UI.
+        status = "Expired";
       } else if (agreement.status === "Inactive") {
         status = "Inactive";
       } else if (isChronologicallyExpired) {
@@ -420,6 +424,9 @@ export function AgreementsListClientPage({
               if (agreement.status === "Canceled") {
                 status = "Canceled";
                 statusBadgeVariant = "outline";
+              } else if (agreement.status === "Expired") {
+                status = "Expired";
+                statusBadgeVariant = "destructive";
               } else if (agreement.status === "Inactive") {
                 status = "Inactive";
                 statusBadgeVariant = "default";

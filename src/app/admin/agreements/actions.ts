@@ -43,11 +43,15 @@ export async function createFullAgreementAction(
     // Compute agreement end date and next due date based on initial prepaid months
     const endDateObj = addMonths(startDateObj, input.paymentTermMonths);
     const initialMonths = input.initialPaymentMonths || 0;
-    // Always set next payment due date to the agreement start date so monthly
-    // bills will be generated for every month (including initial prepaid
-    // months, where rent may be zero). This prevents skipping months when the
-    // system previously advanced the next due date past prepaid months.
-    const nextPaymentDueDateObj = startDateObj;
+    // For the billing UI we want to show the next monthly tick. When an
+    // aggregated prepaid bill is created that covers multiple months, the
+    // UI should still show the upcoming monthly due (one month after the
+    // bill date) so users can generate the next monthly invoice (which may
+    // be prepaid/zero rent if within the prepaid window). Set the initial
+    // next payment due to one month after the start date; we'll update it
+    // in the transaction after creating the aggregated bill to be exactly
+    // one month after that bill's date.
+    const nextPaymentDueDateObj = addMonths(startDateObj, 1);
     const initialPaymentAmount = input.monthlyRentalPrice * initialMonths;
 
     // Persist date-only strings (YYYY-MM-DD) to ensure the DB stores the
@@ -125,6 +129,17 @@ export async function createFullAgreementAction(
             adminVerifiedPayment: false,
             isPrepaid: true,
           },
+        });
+        // Update agreement nextPaymentDueDate to one month after the
+        // aggregated bill date so the billing page shows the upcoming
+        // monthly due (even though several months are covered by the
+        // prepaid invoice).
+        const nextDueAfterInitialBill = toUtcMidnight(
+          addMonths(startDateObj, 1),
+        );
+        await tx.agreement.update({
+          where: { id: agreement.id },
+          data: { nextPaymentDueDate: nextDueAfterInitialBill },
         });
       }
 

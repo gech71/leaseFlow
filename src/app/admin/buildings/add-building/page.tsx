@@ -1,4 +1,3 @@
-
 export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
@@ -50,11 +49,12 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
         id: buildingToEdit.id,
         name: buildingToEdit.name,
         address: buildingToEdit.address || "",
+        branchName: (buildingToEdit as any).branchName || "",
         accountNumber: buildingToEdit.accountNumber,
         createdAt: buildingToEdit.createdAt.toISOString(),
         penaltyPolicyTiers: buildingToEdit.penaltyPolicyTiers.map((tier) => ({
           ...tier,
-          feeValue: Number(tier.feeValue)
+          feeValue: Number(tier.feeValue),
         })),
         managers: buildingToEdit.managers.map((m) => ({ id: m.id })),
       };

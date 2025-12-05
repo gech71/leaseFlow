@@ -845,10 +845,15 @@ export async function generateBillAndUpdateAgreementAction(
     // effective bill date is on or after the agreement end date, mark the
     // agreement Inactive (if still Active) and stop generation.
     if (agreement.endDate) {
-      const agreementEndDate = startOfDay(agreement.endDate as Date);
-      const effectiveDay = startOfDay(effectiveBillDate);
-      // If effectiveDay is the same or after the end date, do not generate
-      if (!isBefore(effectiveDay, agreementEndDate)) {
+      // Use UTC date-only string comparisons to avoid TZ drift and ensure the
+      // agreement end date is treated inclusively regardless of server locale.
+      const agreementEndYMD = (agreement.endDate as Date)
+        .toISOString()
+        .slice(0, 10);
+      const effectiveYMD = effectiveBillDate.toISOString().slice(0, 10);
+      // Allow billing on the agreement end date (inclusive). Only block when
+      // the effective bill date is strictly after the agreement end date.
+      if (effectiveYMD > agreementEndYMD) {
         // Mark agreement expired and free the space. Disconnect tenant from the space.
         if (agreement.status === "Active" || agreement.status === "Inactive") {
           await databaseService.updateAgreement(agreement.id, {
@@ -1034,8 +1039,12 @@ export async function generateBillAndUpdateAgreementAction(
     // If the new next payment due date reaches or passes the agreement end
     // date, mark the agreement Expired and free the space/tenant link.
     if (agreement.endDate) {
-      const agreementEndDay = startOfDay(agreement.endDate as Date);
-      if (!isBefore(startOfDay(newNextDue), agreementEndDay)) {
+      // Compare using UTC date-only strings to ensure inclusive end-date handling.
+      const agreementEndYMD = (agreement.endDate as Date)
+        .toISOString()
+        .slice(0, 10);
+      const newNextDueYMD = startOfDay(newNextDue).toISOString().slice(0, 10);
+      if (newNextDueYMD >= agreementEndYMD) {
         if (agreement.status === "Active" || agreement.status === "Inactive") {
           await databaseService.updateAgreement(agreement.id, {
             status: "Expired",

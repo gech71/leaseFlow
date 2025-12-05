@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type { CurrentUser } from '@/lib/types';
 import { getUserSessionAction } from '@/lib/actions/server-helpers';
+import { GENERIC_AUTH_ERROR } from '@/lib/security/messages';
 import { useToast } from '@/hooks/use-toast';
 
 interface PermissionContextType {
@@ -122,7 +123,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       return await apiCall();
     } catch (error: any) {
-      if (error.message?.includes("Authentication required") || error.message?.includes("Session expired")) {
+      if (error.message?.includes("Authentication") || error.message?.includes("Session expired") || error.message === GENERIC_AUTH_ERROR) {
         await logout(true);
         return undefined;
       }

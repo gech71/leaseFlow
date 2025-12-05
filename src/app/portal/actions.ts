@@ -9,6 +9,7 @@ import {
   createSession,
   ACCESS_TOKEN_COOKIE_NAME,
 } from "@/lib/auth/jwt";
+import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { cookies } from "next/headers";
@@ -58,7 +59,7 @@ export async function sendContactEmailAction(formData: {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return { success: false, error: "Authentication required." };
+      return { success: false, error: GENERIC_AUTH_ERROR };
     }
 
     const tenant = await databaseService.findTenantByEmailOrPhone(
@@ -172,7 +173,7 @@ export async function submitPaymentProofAction(data: {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return { success: false, error: "Authentication required." };
+      return { success: false, error: GENERIC_AUTH_ERROR };
     }
 
     const bill = await prisma.bill.findUnique({

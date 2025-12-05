@@ -299,31 +299,46 @@ export function PaymentsOverviewClientPage({
 
       if (applicableTiersForScope.length === 0) return 0;
 
+      // Mirror server logic: iterate each overdue day and apply the tier
+      // that is active for that day. This handles tier transitions over
+      // time as well as multiple one-time fees that may apply on different
+      // days.
       const sortedTiers = [...applicableTiersForScope].sort(
         (a, b) => a.fromDay - b.fromDay,
       );
-      let calculatedPenalty = 0;
-      for (const tier of sortedTiers) {
-        if (
-          daysOverdue >= tier.fromDay &&
-          (tier.toDay === null ||
-            tier.toDay === undefined ||
-            daysOverdue <= tier.toDay)
-        ) {
-          if (tier.penaltyType === "Fixed") {
-            calculatedPenalty = tier.feeValue;
-          } else if (tier.penaltyType === "Percentage") {
-            calculatedPenalty = bill.rentAmount * (tier.feeValue / 100);
-          }
 
-          if (tier.frequency === "Daily") {
-            calculatedPenalty *= daysOverdue;
-          }
+      let totalPenalty = 0;
+      const oneTimeApplied = new Set<string>();
 
-          break;
+      for (let day = 1; day <= daysOverdue; day++) {
+        const tierForDay = sortedTiers.find(
+          (tier) =>
+            day >= tier.fromDay &&
+            (tier.toDay === null ||
+              tier.toDay === undefined ||
+              day <= tier.toDay),
+        );
+        if (!tierForDay) continue;
+
+        const feeValue = tierForDay.feeValue;
+        let feeAmount = 0;
+        if (tierForDay.penaltyType === "Fixed") {
+          feeAmount = feeValue;
+        } else if (tierForDay.penaltyType === "Percentage") {
+          feeAmount = bill.rentAmount * (feeValue / 100);
+        }
+
+        if (tierForDay.frequency === "Daily") {
+          totalPenalty += feeAmount;
+        } else if (tierForDay.frequency === "OneTime") {
+          if (!oneTimeApplied.has(tierForDay.id || "")) {
+            totalPenalty += feeAmount;
+            if (tierForDay.id) oneTimeApplied.add(tierForDay.id);
+          }
         }
       }
-      return parseFloat(calculatedPenalty.toFixed(2));
+
+      return parseFloat(totalPenalty.toFixed(2));
     },
     [today],
   );

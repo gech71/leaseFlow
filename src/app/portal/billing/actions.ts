@@ -4,6 +4,10 @@ import { databaseService } from "@/lib/services/databaseService";
 import type { Bill as BillPrisma, User, Role, Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
+import {
+  GENERIC_AUTH_ERROR,
+  GENERIC_NEUTRAL_ERROR,
+} from "@/lib/security/messages";
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import { format } from "date-fns";
@@ -30,12 +34,12 @@ export async function getBillingInfoForPhoneNumberAction(phone: string) {
     if (!user) {
       return {
         success: false,
-        error: "No user account found for this phone number.",
+        error: GENERIC_NEUTRAL_ERROR,
       };
     }
 
     const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
-    if (!tenant) return { success: false, error: "No tenant profile found." };
+    if (!tenant) return { success: false, error: GENERIC_NEUTRAL_ERROR };
 
     const agreementsRaw = await databaseService.getAllAgreements({
       where: {
@@ -180,7 +184,6 @@ export async function initiatePaymentAction(
       `transactionId=${transactionId}`,
       `transactionTime=${transactionTime}`,
     ].join("&");
-	
 
     const signature = crypto
       .createHash("sha256")
@@ -198,16 +201,14 @@ export async function initiatePaymentAction(
       signature: signature,
     };
 
-
     const response = await fetch(NIB_PAYMENT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${nibToken}`,
+        Authorization: `Bearer ${nibToken}`,
       },
       body: JSON.stringify(payload),
     });
-
 
     const responseData = await response.json();
 
@@ -246,8 +247,7 @@ export async function initiatePaymentAction(
 export async function getBillStatusAction(billIds: string[]) {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser)
-      return { status: "Error", error: "Authentication failed." };
+    if (!currentUser) return { status: "Error", error: GENERIC_AUTH_ERROR };
 
     const bills = await databaseService.getAllBills({
       where: { id: { in: billIds } },
