@@ -2,6 +2,7 @@
 import "server-only";
 
 import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
+import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
 import { databaseService } from "@/lib/services/databaseService";
 import type { User, Role } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -17,8 +18,8 @@ export async function getUserAndPermissions() {
   const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(token);
   if (!session?.userId) {
-    // Instead of redirecting, which causes issues with server actions, we throw a specific error.
-    throw new Error("Authentication required. Please log in again.");
+    // Instead of redirecting, which causes issues with server actions, we throw a generic auth error.
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   const currentUser = await databaseService.getUserById(session.userId, {
@@ -29,7 +30,7 @@ export async function getUserAndPermissions() {
     console.error(
       `CRITICAL: Authenticated user with id ${session.userId} not found in the database.`,
     );
-    throw new Error("Authentication failed.");
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   const isSuperAdmin = session.isSuperAdmin;
@@ -48,7 +49,7 @@ export async function getUserAndManagedIds() {
   const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(token);
   if (!session?.userId) {
-    throw new Error("Authentication required. Please log in again.");
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   const currentUser = await databaseService.getUserById(session.userId, {
@@ -60,7 +61,7 @@ export async function getUserAndManagedIds() {
     console.error(
       `CRITICAL: Authenticated user with id ${session.userId} not found in the database.`,
     );
-    throw new Error("Authentication failed.");
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   const isSuperAdmin = session.isSuperAdmin;

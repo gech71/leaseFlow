@@ -7,6 +7,7 @@ import {
   LAST_ACTIVE_COOKIE_NAME,
 } from "@/lib/auth/jwt";
 import { databaseService } from "@/lib/services/databaseService";
+import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
 
 export async function POST(request: NextRequest) {
   const refreshTokenFromCookie = request.cookies.get(
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (!user) {
-    return NextResponse.json({ message: "User not found." }, { status: 404 });
+    return NextResponse.json({ message: GENERIC_AUTH_ERROR }, { status: 404 });
   }
 
   // Create a new session (which includes a new access token and a new refresh token)

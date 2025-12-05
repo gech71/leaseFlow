@@ -1,21 +1,27 @@
-
 "use server";
 
 import { databaseService } from "@/lib/services/databaseService";
-import bcrypt from 'bcryptjs';
-import { z } from 'zod';
-import { verifySession, getSessionCookieNames, ACCESS_TOKEN_COOKIE_NAME } from '@/lib/auth/jwt';
+import bcrypt from "bcryptjs";
+import { z } from "zod";
+import {
+  verifySession,
+  getSessionCookieNames,
+  ACCESS_TOKEN_COOKIE_NAME,
+} from "@/lib/auth/jwt";
 import { cookies } from "next/headers";
+import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
 
 const changePasswordSchema = z.object({
   newPassword: z.string().min(6, "New password must be at least 6 characters."),
 });
 
-export async function changePasswordAction(values: z.infer<typeof changePasswordSchema>): Promise<{ success: boolean; error?: string }> {
+export async function changePasswordAction(
+  values: z.infer<typeof changePasswordSchema>,
+): Promise<{ success: boolean; error?: string }> {
   const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const sessionUser = await verifySession(token);
   if (!sessionUser) {
-    throw new Error("Authentication required.");
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   // This action should only work if the user is in a "force change" state.
@@ -31,7 +37,7 @@ export async function changePasswordAction(values: z.infer<typeof changePassword
 
   const user = await databaseService.getUserById(sessionUser.userId);
   if (!user || !user.tempPassword) {
-    throw new Error("User not found or no temporary password is set for this user.");
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   const hashedNewPassword = await bcrypt.hash(newPassword, 10);
@@ -42,8 +48,8 @@ export async function changePasswordAction(values: z.infer<typeof changePassword
 
   // Invalidate the user's session to force a re-login with the new password
   const cookieNames = getSessionCookieNames();
-  cookieNames.forEach(name => {
-    cookies().set(name, '', { expires: new Date(0), path: '/' });
+  cookieNames.forEach((name) => {
+    cookies().set(name, "", { expires: new Date(0), path: "/" });
   });
 
   return { success: true };

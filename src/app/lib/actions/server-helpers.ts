@@ -2,6 +2,7 @@
 import "server-only";
 import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
 import { databaseService } from "@/lib/services/databaseService";
+import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
 import type { User, Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import type { CurrentUser } from "@/lib/types";
@@ -30,7 +31,7 @@ export async function getUserAndPermissions() {
     console.error(
       `CRITICAL: Authenticated user with id ${session.userId} not found in the database.`,
     );
-    throw new Error("Authentication failed: User not found.");
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   const isSuperAdmin = session.isSuperAdmin;
@@ -61,7 +62,7 @@ export async function getUserAndManagedIds() {
     console.error(
       `CRITICAL: Authenticated user with id ${session.userId} not found in the database.`,
     );
-    throw new Error("Authentication failed: User not found.");
+    throw new Error(GENERIC_AUTH_ERROR);
   }
 
   const isSuperAdmin = session.isSuperAdmin;

@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifySession, ACCESS_TOKEN_COOKIE_NAME } from "@/lib/auth/jwt";
 import { databaseService } from "@/lib/services/databaseService";
+import {
+  GENERIC_AUTH_ERROR,
+  GENERIC_NEUTRAL_ERROR,
+} from "@/lib/security/messages";
 import type { CurrentUser } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   if (!session?.userId) {
     return NextResponse.json(
-      { isSuccess: false, errors: ["Authentication required."] },
+      { isSuccess: false, errors: [GENERIC_AUTH_ERROR] },
       { status: 401 },
     );
   }
@@ -22,9 +26,8 @@ export async function GET(request: NextRequest) {
     });
 
     if (!localUser) {
-   
       return NextResponse.json(
-        { isSuccess: false, errors: ["User not found in the system."] },
+        { isSuccess: false, errors: [GENERIC_AUTH_ERROR] },
         { status: 404 },
       );
     }
@@ -50,8 +53,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ isSuccess: true, user: currentUserData });
   } catch (dbError: any) {
     console.error("Database error in /api/user/me:", dbError.message);
+    console.error("Database error in /api/user/me:", dbError.message);
     return NextResponse.json(
-      { isSuccess: false, errors: ["Error fetching user details."] },
+      { isSuccess: false, errors: [GENERIC_NEUTRAL_ERROR] },
       { status: 500 },
     );
   }
