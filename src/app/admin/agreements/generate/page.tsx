@@ -29,7 +29,7 @@ async function GenerateAgreementDataFetcher() {
   // rented space belongs to one of the buildings the user manages, or
   // who have agreements for spaces in the buildings the user manages.
   const tenantWhereClause: Prisma.TenantWhereInput = !isSuperAdmin
-    ? {
+    ? ({
         OR: [
           { createdById: currentUser.id },
           ...(managedBuildingIds && managedBuildingIds.length > 0
@@ -44,10 +44,12 @@ async function GenerateAgreementDataFetcher() {
                     some: { space: { buildingId: { in: managedBuildingIds } } },
                   },
                 },
+                // Cast as any because Prisma types will be regenerated after migration
+                { buildingId: { in: managedBuildingIds } } as any,
               ]
             : []),
         ],
-      }
+      } as any)
     : {};
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {

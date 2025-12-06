@@ -77,6 +77,10 @@ model Tenant {
   rentedSpaceId String? @unique
   rentedSpace   Space?  @relation(fields: [rentedSpaceId], references: [id], onDelete: SetNull)
 
+  // Associate a tenant to a building for visibility and scoping purposes.
+  buildingId String?
+  building   Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+
   createdById String?
   createdBy   User?   @relation("CreatedTenants", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -110,6 +114,11 @@ model Agreement {
   tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   space             Space             @relation(fields: [spaceId], references: [id], onDelete: Restrict)
   agreementTemplate AgreementTemplate @relation(fields: [agreementTemplateId], references: [id], onDelete: Restrict)
+  // Attach agreement explicitly to a building to make building-scoped
+  // queries and permissions simpler. Nullable to support existing rows
+  // until a migration is applied that backfills values if desired.
+  buildingId String?
+  building   Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
   bills             Bill[]
   ArifPayment       ArifPayment[]
 }

@@ -93,27 +93,40 @@ export async function createFullAgreementAction(
     const endDateForDbDate = toUtcMidnight(endDateObj);
 
     const newAgreementId = await prisma.$transaction(async (tx) => {
-      // 1. Create the Agreement
-      const agreement = await tx.agreement.create({
-        data: {
-          agreementText: input.agreementText,
-          startDate: startDateForDbDate,
-          monthlyRentalPrice: input.monthlyRentalPrice,
-          paymentTermMonths: input.paymentTermMonths,
-          initialPaymentMonths: input.initialPaymentMonths,
-          nextPaymentDueDate: nextPaymentDueForDbDate,
-          endDate: endDateForDbDate,
-          additionalTerms: input.additionalTerms,
-          status: "Active", // Set initial status to Active
-
-          initialPaymentAmount: initialPaymentAmount,
-          initialPaymentDate: initialPaymentDateForDbDate,
-
-          tenant: { connect: { id: input.tenantId } },
-          space: { connect: { id: input.spaceId } },
-          agreementTemplate: { connect: { id: input.agreementTemplateId } },
-        },
+      // Determine the building for the selected space so we can attach
+      // the agreement directly to that building.
+      const spaceRecord = await tx.space.findUnique({
+        where: { id: input.spaceId },
+        select: { buildingId: true },
       });
+      const targetBuildingId = spaceRecord ? spaceRecord.buildingId : null;
+
+      // Build the agreement creation payload, conditionally adding
+      // the building relation when we have a building id.
+      const agreementData: any = {
+        agreementText: input.agreementText,
+        startDate: startDateForDbDate,
+        monthlyRentalPrice: input.monthlyRentalPrice,
+        paymentTermMonths: input.paymentTermMonths,
+        initialPaymentMonths: input.initialPaymentMonths,
+        nextPaymentDueDate: nextPaymentDueForDbDate,
+        endDate: endDateForDbDate,
+        additionalTerms: input.additionalTerms,
+        status: "Active",
+
+        initialPaymentAmount: initialPaymentAmount,
+        initialPaymentDate: initialPaymentDateForDbDate,
+
+        tenant: { connect: { id: input.tenantId } },
+        space: { connect: { id: input.spaceId } },
+        agreementTemplate: { connect: { id: input.agreementTemplateId } },
+      };
+
+      if (targetBuildingId) {
+        agreementData.building = { connect: { id: targetBuildingId } };
+      }
+
+      const agreement = await tx.agreement.create({ data: agreementData });
 
       // 2. If there are initial prepaid months, create a single aggregated
       // bill at agreement creation that covers `initialPaymentMonths`.
@@ -178,10 +191,8 @@ export async function createFullAgreementAction(
     // Re-fetch the agreement with all relations to ensure the returned object is complete
     const completeNewAgreement = await databaseService.getAgreementById(
       newAgreementId,
-      {
-        tenant: true,
-        space: true,
-      },
+      // Include building so callers can see the explicit building attachment
+      { tenant: true, space: true, building: true } as any,
     );
 
     if (!completeNewAgreement) {
@@ -200,6 +211,8 @@ export async function createFullAgreementAction(
       initialPaymentAmount: completeNewAgreement.initialPaymentAmount
         ? Number(completeNewAgreement.initialPaymentAmount)
         : null,
+      buildingId: (completeNewAgreement as any).buildingId ?? null,
+      building: (completeNewAgreement as any).building ?? null,
     };
 
     return { success: true, agreement: serializableAgreement };
