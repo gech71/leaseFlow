@@ -73,7 +73,11 @@ async function GenerateAgreementDataFetcher() {
   const tenants = await databaseService.getAllTenants({
     where: tenantWhereClause,
     orderBy: { name: "asc" },
-    include: { rentedSpace: true, agreements: { include: { space: true } } },
+    include: {
+      rentedSpace: true,
+      agreements: { include: { space: true } },
+      buildingStatuses: true,
+    },
   });
   const availableSpaces = await databaseService.getAllSpaces({
     where: spaceWhereClause,
@@ -145,6 +149,12 @@ async function GenerateAgreementDataFetcher() {
       tenants={serializableTenants}
       availableSpaces={serializableSpaces}
       agreementTemplates={agreementTemplates}
+      managedBuildingIds={managedBuildingIds}
+      currentBuildingId={
+        managedBuildingIds && managedBuildingIds.length > 0
+          ? managedBuildingIds[0]
+          : undefined
+      }
     />
   );
 }

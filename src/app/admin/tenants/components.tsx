@@ -140,6 +140,7 @@ export interface TenantWithRelations
   status: TenantStatus;
   rentedSpace: ClientSpace | null;
   agreements: ClientAgreement[];
+  buildingStatuses?: { buildingId: string; status: TenantStatus }[];
 }
 export interface SpaceWithTenant
   extends Omit<SpaceTypePrisma, "createdAt" | "updatedAt" | "tenant"> {
@@ -191,10 +192,14 @@ export function TenantsClientPage({
   initialTenants,
   initialSpaces,
   initialAgreements,
+  currentBuildingId,
+  managedBuildingIds,
 }: {
   initialTenants: TenantWithRelations[];
   initialSpaces: SpaceWithTenant[];
   initialAgreements: ClientAgreement[];
+  currentBuildingId?: string | undefined;
+  managedBuildingIds?: string[] | undefined;
 }) {
   const [tenants, setTenantsState] =
     useState<TenantWithRelations[]>(initialTenants);
@@ -254,7 +259,25 @@ export function TenantsClientPage({
   });
 
   const filteredTenants = tenants.filter((tenant) => {
-    if (filterStatus !== "All" && tenant.status !== filterStatus) {
+    const matchForCurrent = tenant.buildingStatuses?.find(
+      (bs) =>
+        bs.buildingId === (currentBuildingId ?? tenant.rentedSpace?.buildingId),
+    )?.status;
+
+    const anyManagedInactive =
+      managedBuildingIds && tenant.buildingStatuses
+        ? tenant.buildingStatuses.some(
+            (bs) =>
+              managedBuildingIds.includes(bs.buildingId) &&
+              bs.status === "Inactive",
+          )
+        : false;
+
+    const effectiveStatus =
+      matchForCurrent ??
+      (anyManagedInactive ? ("Inactive" as TenantStatus) : tenant.status);
+
+    if (filterStatus !== "All" && effectiveStatus !== filterStatus) {
       return false;
     }
 
@@ -461,10 +484,10 @@ export function TenantsClientPage({
       let toastDescription = `${result.tenant?.name} has been ${
         formMode === "add" ? "added" : "updated"
       }.`;
-      if (formMode === "add" && result.tempPassword) {
+      if (formMode === "add" && (result as any).tempPassword) {
         toastDescription = `A user account has been created for ${result.tenant?.name}. The temporary password is shown in the user list.`;
-      } else if (formMode === "add" && result.message) {
-        toastDescription = result.message;
+      } else if (formMode === "add" && (result as any).message) {
+        toastDescription = (result as any).message;
       }
 
       toast({
@@ -485,17 +508,107 @@ export function TenantsClientPage({
   };
 
   const handleToggleStatus = async (tenant: TenantWithRelations) => {
-    const newStatus = tenant.status === "Active" ? "Inactive" : "Active";
+    const matchForCurrent = tenant.buildingStatuses?.find(
+      (bs) =>
+        bs.buildingId === (currentBuildingId ?? tenant.rentedSpace?.buildingId),
+    )?.status;
+
+    const anyManagedInactive =
+      managedBuildingIds && tenant.buildingStatuses
+        ? tenant.buildingStatuses.some(
+            (bs) =>
+              managedBuildingIds.includes(bs.buildingId) &&
+              bs.status === "Inactive",
+          )
+        : false;
+
+    const effectiveStatus =
+      matchForCurrent ??
+      (anyManagedInactive ? ("Inactive" as TenantStatus) : tenant.status);
+
+    const newStatus = effectiveStatus === "Active" ? "Inactive" : "Active";
+
     const result = await handleApiCall(() =>
-      toggleTenantStatusAction(tenant.id, newStatus === "Active"),
+      toggleTenantStatusAction(
+        tenant.id,
+        newStatus === "Active",
+        currentBuildingId ?? (tenant.rentedSpace?.buildingId || undefined),
+      ),
     );
 
     if (result?.success) {
+      // If server returned authoritative tenant data, merge it into local state
+      if ((result as any).tenant) {
+        const updated = (result as any).tenant as any;
+        setTenantsState((prev) =>
+          prev.map((t) => {
+            if (t.id !== tenant.id) return t;
+
+            const bs = (updated.buildingStatuses || []).map((s: any) => ({
+              buildingId: s.buildingId,
+              status: s.status as TenantStatus,
+            }));
+
+            return {
+              ...t,
+              status: updated.status || t.status,
+              buildingStatuses: bs,
+              rentedSpace: updated.rentedSpace
+                ? {
+                    ...t.rentedSpace,
+                    buildingId: updated.rentedSpace.buildingId,
+                    buildingName: updated.rentedSpace.buildingName,
+                  }
+                : t.rentedSpace,
+            } as TenantWithRelations;
+          }),
+        );
+      } else {
+        // Fallback: optimistic update if no tenant payload provided
+        setTenantsState((prev) =>
+          prev.map((t) => {
+            if (t.id !== tenant.id) return t;
+            const bs = t.buildingStatuses ? [...t.buildingStatuses] : [];
+            const targetBuildingId = tenant.rentedSpace?.buildingId;
+            if (targetBuildingId) {
+              const idx = bs.findIndex(
+                (x) => x.buildingId === targetBuildingId,
+              );
+              if (idx >= 0)
+                bs[idx] = {
+                  buildingId: targetBuildingId,
+                  status: newStatus as TenantStatus,
+                };
+              else
+                bs.push({
+                  buildingId: targetBuildingId,
+                  status: newStatus as TenantStatus,
+                });
+              return { ...t, buildingStatuses: bs } as TenantWithRelations;
+            }
+
+            // Global toggle (no building) — update global status and all building statuses
+            return {
+              ...t,
+              status: newStatus as TenantStatus,
+              buildingStatuses: bs.map((x) => ({
+                ...x,
+                status: newStatus as TenantStatus,
+              })),
+            } as TenantWithRelations;
+          }),
+        );
+      }
+
       toast({
         title: "Status Updated",
-        description: `${tenant.name} is now ${newStatus}.`,
+        description: tenant.rentedSpace?.buildingName
+          ? `${tenant.name} is now ${newStatus} for ${tenant.rentedSpace.buildingName}.`
+          : `${tenant.name} is now ${newStatus}.`,
       });
-      router.refresh(); // This forces a server-side data refetch.
+
+      // Refresh server data in background to ensure consistency
+      router.refresh();
     } else if (result?.error) {
       toast({
         title: "Update Failed",
@@ -565,6 +678,12 @@ export function TenantsClientPage({
             (foundTenant.status as TenantStatus) || ("Active" as TenantStatus),
           rentedSpace: null,
           agreements: [],
+          buildingStatuses: (foundTenant as any).buildingStatuses || [],
+          // fill optional relationship fields with sensible defaults
+          buildingId: (foundTenant as any).buildingId || null,
+          userId: (foundTenant as any).userId || null,
+          rentedSpaceId: (foundTenant as any).rentedSpaceId || null,
+          createdById: (foundTenant as any).createdById || null,
         };
 
         setFoundExistingTenant(prepared);
@@ -1044,6 +1163,26 @@ export function TenantsClientPage({
         <>
           <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {paginatedTenants.map((tenant) => {
+              const matchForCurrent = tenant.buildingStatuses?.find(
+                (bs) =>
+                  bs.buildingId ===
+                  (currentBuildingId ?? tenant.rentedSpace?.buildingId),
+              )?.status;
+
+              const anyManagedInactive =
+                managedBuildingIds && tenant.buildingStatuses
+                  ? tenant.buildingStatuses.some(
+                      (bs) =>
+                        managedBuildingIds.includes(bs.buildingId) &&
+                        bs.status === "Inactive",
+                    )
+                  : false;
+
+              const effectiveStatus =
+                matchForCurrent ??
+                (anyManagedInactive
+                  ? ("Inactive" as TenantStatus)
+                  : tenant.status);
               const activeAgreements = tenant.agreements.filter((ag) => {
                 if (!ag.startDate || !ag.paymentTermMonths) return false;
                 const agreementEndDate = addMonths(
@@ -1098,13 +1237,13 @@ export function TenantsClientPage({
                       </div>
                       <Badge
                         variant={
-                          tenant.status === "Active"
+                          effectiveStatus === "Active"
                             ? "secondary"
                             : "destructive"
                         }
                         className="capitalize"
                       >
-                        {tenant.status}
+                        {effectiveStatus}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -1150,7 +1289,7 @@ export function TenantsClientPage({
                               <div className="flex items-center space-x-2">
                                 <Switch
                                   id={`status-switch-${tenant.id}`}
-                                  checked={tenant.status === "Active"}
+                                  checked={effectiveStatus === "Active"}
                                   onCheckedChange={() =>
                                     handleToggleStatus(tenant)
                                   }
@@ -1160,7 +1299,7 @@ export function TenantsClientPage({
                                   htmlFor={`status-switch-${tenant.id}`}
                                   className="text-xs text-muted-foreground"
                                 >
-                                  {tenant.status}
+                                  {effectiveStatus}
                                 </Label>
                               </div>
                             </TooltipTrigger>

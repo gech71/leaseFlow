@@ -36,6 +36,9 @@ model Building {
   approvedById             String?
   approvedBy               User?                      @relation("ApprovedBuildings", fields: [approvedById], references: [id], onDelete: SetNull)
   AgreementTemplate        AgreementTemplate[]
+  Tenant                   Tenant[]
+  Agreement                Agreement[]
+  tenantStatuses          TenantBuildingStatus[]
 }
 
 model Space {
@@ -87,6 +90,22 @@ model Tenant {
   // One-to-many
   agreements Agreement[]
   bills      Bill[]
+  buildingStatuses TenantBuildingStatus[]
+}
+
+// Track tenant status per building to allow scoped activation/deactivation
+model TenantBuildingStatus {
+  id         String       @id @default(cuid())
+  tenantId   String
+  buildingId String
+  status     TenantStatus @default(Active)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime?    @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, buildingId])
 }
 
 model Agreement {
@@ -103,7 +122,7 @@ model Agreement {
 
   paymentTermMonths    Int
   initialPaymentMonths Int
-  nextPaymentDueDate   DateTime @db.Date
+  nextPaymentDueDate   DateTime        @db.Date
   status               AgreementStatus @default(Active)
 
   initialPaymentAmount Decimal?
@@ -117,15 +136,15 @@ model Agreement {
   // Attach agreement explicitly to a building to make building-scoped
   // queries and permissions simpler. Nullable to support existing rows
   // until a migration is applied that backfills values if desired.
-  buildingId String?
-  building   Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  buildingId        String?
+  building          Building?         @relation(fields: [buildingId], references: [id], onDelete: SetNull)
   bills             Bill[]
   ArifPayment       ArifPayment[]
 }
 
 model AgreementTemplate {
   id      String @id @default(cuid())
-  name    String @unique
+  name    String 
   content String @db.Text
 
   createdAt   DateTime    @default(now())

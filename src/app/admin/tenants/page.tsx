@@ -58,6 +58,7 @@ export default async function TenantsPage() {
     include: {
       rentedSpace: true,
       agreements: agreementsInclude,
+      buildingStatuses: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -130,6 +131,10 @@ export default async function TenantsPage() {
             }
           : null,
       })),
+      buildingStatuses: (tenant.buildingStatuses || []).map((bs) => ({
+        buildingId: bs.buildingId,
+        status: bs.status,
+      })),
     }),
   );
 
@@ -193,6 +198,12 @@ export default async function TenantsPage() {
       initialTenants={serializableTenants}
       initialSpaces={serializableSpaces}
       initialAgreements={serializableAgreements}
+      currentBuildingId={
+        managedBuildingIds && managedBuildingIds.length > 0
+          ? managedBuildingIds[0]
+          : undefined
+      }
+      managedBuildingIds={managedBuildingIds}
     />
   );
 }

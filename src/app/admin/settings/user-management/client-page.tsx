@@ -627,53 +627,57 @@ export function UserManagementClientPage({
                     )}
                   </section>
 
-                  <section>
-                    <h3 className="text-md font-semibold mb-2 flex items-center">
-                      <Building className="mr-2 h-5 w-5 text-primary" />
-                      Assign Managed Buildings
-                    </h3>
-                    <div className="relative mb-2">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="text"
-                        placeholder="Search buildings..."
-                        value={buildingSearchTerm}
-                        onChange={(e) => setBuildingSearchTerm(e.target.value)}
-                        className="pl-8 h-9"
-                        disabled={isSaving || !canManageBuildings}
-                      />
-                    </div>
-                    <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-60">
-                      {filteredBuildings.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-2">
-                          {buildingSearchTerm
-                            ? "No buildings match your search."
-                            : "No buildings available."}
-                        </p>
-                      )}
-                      {filteredBuildings.map((building) => (
-                        <div
-                          key={building.id}
-                          className="flex items-center space-x-2 py-1"
-                        >
-                          <Checkbox
-                            id={`building-${currentUserToEdit.id}-${building.id}`}
-                            checked={selectedBuildingIds.has(building.id)}
-                            onCheckedChange={() =>
-                              handleBuildingToggle(building.id)
-                            }
-                            disabled={isSaving || !canManageBuildings}
-                          />
-                          <Label
-                            htmlFor={`building-${currentUserToEdit.id}-${building.id}`}
-                            className="text-sm font-normal cursor-pointer"
+                  {isSuperAdmin && (
+                    <section>
+                      <h3 className="text-md font-semibold mb-2 flex items-center">
+                        <Building className="mr-2 h-5 w-5 text-primary" />
+                        Assign Managed Buildings
+                      </h3>
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="text"
+                          placeholder="Search buildings..."
+                          value={buildingSearchTerm}
+                          onChange={(e) =>
+                            setBuildingSearchTerm(e.target.value)
+                          }
+                          className="pl-8 h-9"
+                          disabled={isSaving || !canManageBuildings}
+                        />
+                      </div>
+                      <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-60">
+                        {filteredBuildings.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-2">
+                            {buildingSearchTerm
+                              ? "No buildings match your search."
+                              : "No buildings available."}
+                          </p>
+                        )}
+                        {filteredBuildings.map((building) => (
+                          <div
+                            key={building.id}
+                            className="flex items-center space-x-2 py-1"
                           >
-                            {building.name}
-                          </Label>
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  </section>
+                            <Checkbox
+                              id={`building-${currentUserToEdit.id}-${building.id}`}
+                              checked={selectedBuildingIds.has(building.id)}
+                              onCheckedChange={() =>
+                                handleBuildingToggle(building.id)
+                              }
+                              disabled={isSaving || !canManageBuildings}
+                            />
+                            <Label
+                              htmlFor={`building-${currentUserToEdit.id}-${building.id}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {building.name}
+                            </Label>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </section>
+                  )}
                 </div>
 
                 <DialogFooter className="pt-4 border-t mt-auto">

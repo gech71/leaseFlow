@@ -194,7 +194,11 @@ export async function findUserByPhoneAction(phone: string): Promise<{
     });
 
     if (user) {
-      const hasOtherRoles = user.roles.some((role) => role.name !== "TENANT");
+      // `user.roles` may be omitted in the Prisma type here; guard access safely
+      const rolesArr = (user as any).roles || [];
+      const hasOtherRoles =
+        Array.isArray(rolesArr) &&
+        rolesArr.some((role: any) => role?.name !== "TENANT");
 
       if (hasOtherRoles) {
         return { success: false, error: GENERIC_NEUTRAL_ERROR };
@@ -236,7 +240,7 @@ export async function findUserByPhoneAction(phone: string): Promise<{
         user: {
           name: user.name || `${user.firstName} ${user.lastName}`,
           email: user.email,
-          nationalId: tenant?.nationalId,
+          nationalId: (tenant as any)?.nationalId,
         },
       };
     }
@@ -249,93 +253,273 @@ export async function findUserByPhoneAction(phone: string): Promise<{
 export async function toggleTenantStatusAction(
   tenantId: string,
   isActive: boolean,
-): Promise<{ success: boolean; error?: string }> {
+  buildingId?: string,
+): Promise<{ success: boolean; tenant?: any; error?: string }> {
   try {
-    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    const { isSuperAdmin, permissions, managedBuildingIds } =
+      await getUserAndManagedIds();
 
     if (!isSuperAdmin && !permissions.has("tenant:status")) {
       return { success: false, error: "Access Denied" };
     }
 
+    // If a buildingId is provided or the user manages buildings, perform a
+    // building-scoped deactivation/reactivation. Otherwise, fall back to the
+    // previous global behavior (super-admin global toggle).
+    const scopeBuildingId =
+      buildingId || (managedBuildingIds && managedBuildingIds[0]);
+
     if (!isActive) {
-      // Deactivating tenant
-      await prisma.$transaction(async (tx) => {
-        await tx.tenant.update({
-          where: { id: tenantId },
-          data: { status: TenantStatus.Inactive },
-        });
+      // Deactivating
+      if (scopeBuildingId) {
+        // Scoped: do not change tenant.status globally — only affect
+        // agreements, bills, and occupied space in the target building.
+        await prisma.$transaction(async (tx) => {
+          // Mark active agreements in this building as Inactive
+          await tx.agreement.updateMany({
+            where: {
+              tenantId: tenantId,
+              space: { buildingId: scopeBuildingId },
+              status: AgreementStatus.Active,
+            },
+            data: { status: AgreementStatus.Inactive },
+          });
 
-        // Mark all active agreements for this tenant as Inactive
-        await tx.agreement.updateMany({
-          where: {
-            tenantId: tenantId,
-            status: AgreementStatus.Active,
-          },
-          data: { status: AgreementStatus.Inactive },
-        });
+          // Delete unpaid bills for agreements in this building
+          await tx.bill.deleteMany({
+            where: {
+              tenantId: tenantId,
+              status: { not: "Paid" },
+              agreement: { space: { buildingId: scopeBuildingId } },
+            },
+          });
 
-        // Delete unpaid bills
-        await tx.bill.deleteMany({
-          where: {
-            tenantId: tenantId,
-            status: { not: "Paid" },
-          },
-        });
-
-        // If tenant currently has a rentedSpace, mark that space as vacant
-        const tenantRecord = await tx.tenant.findUnique({
-          where: { id: tenantId },
-        });
-        if (tenantRecord && tenantRecord.rentedSpaceId) {
-          try {
-            await tx.space.update({
+          // If tenant's rentedSpace is in this building, free it and clear rentedSpaceId
+          const tenantRecord = await tx.tenant.findUnique({
+            where: { id: tenantId },
+          });
+          if (tenantRecord && tenantRecord.rentedSpaceId) {
+            const spaceRec = await tx.space.findUnique({
               where: { id: tenantRecord.rentedSpaceId },
-              data: { isOccupied: false },
+              select: { buildingId: true },
             });
-          } catch (e) {
-            // ignore
+            if (spaceRec && spaceRec.buildingId === scopeBuildingId) {
+              try {
+                await tx.space.update({
+                  where: { id: tenantRecord.rentedSpaceId },
+                  data: { isOccupied: false },
+                });
+                await tx.tenant.update({
+                  where: { id: tenantId },
+                  data: { rentedSpaceId: null } as any,
+                });
+              } catch (e) {
+                // ignore individual errors
+              }
+            }
           }
-        }
-      });
+          // Upsert per-building tenant status to Inactive
+          const existingStatus = await tx.tenantBuildingStatus.findFirst({
+            where: { tenantId: tenantId, buildingId: scopeBuildingId },
+          });
+          if (existingStatus) {
+            await tx.tenantBuildingStatus.update({
+              where: { id: existingStatus.id },
+              data: { status: TenantStatus.Inactive },
+            });
+          } else {
+            await tx.tenantBuildingStatus.create({
+              data: {
+                tenantId: tenantId,
+                buildingId: scopeBuildingId,
+                status: TenantStatus.Inactive,
+              },
+            });
+          }
+        });
+      } else {
+        // Global fallback (existing behavior)
+        await prisma.$transaction(async (tx) => {
+          await tx.tenant.update({
+            where: { id: tenantId },
+            data: { status: TenantStatus.Inactive },
+          });
+
+          await tx.agreement.updateMany({
+            where: { tenantId: tenantId, status: AgreementStatus.Active },
+            data: { status: AgreementStatus.Inactive },
+          });
+
+          await tx.bill.deleteMany({
+            where: { tenantId: tenantId, status: { not: "Paid" } },
+          });
+
+          // Mark all per-building tenant statuses as Inactive as well
+          await tx.tenantBuildingStatus.updateMany({
+            where: { tenantId: tenantId },
+            data: { status: TenantStatus.Inactive },
+          });
+
+          const tenantRecord = await tx.tenant.findUnique({
+            where: { id: tenantId },
+          });
+          if (tenantRecord && tenantRecord.rentedSpaceId) {
+            try {
+              await tx.space.update({
+                where: { id: tenantRecord.rentedSpaceId },
+                data: { isOccupied: false },
+              });
+            } catch (e) {
+              /* ignore */
+            }
+          }
+        });
+      }
     } else {
-      // Reactivating tenant
-      await prisma.$transaction(async (tx) => {
-        await tx.tenant.update({
-          where: { id: tenantId },
-          data: { status: TenantStatus.Active },
-        });
+      // Reactivating
+      if (scopeBuildingId) {
+        await prisma.$transaction(async (tx) => {
+          // Re-activate agreements in this building that were set to Inactive
+          await tx.agreement.updateMany({
+            where: {
+              tenantId: tenantId,
+              space: { buildingId: scopeBuildingId },
+              status: AgreementStatus.Inactive,
+            },
+            data: { status: AgreementStatus.Active },
+          });
 
-        // Re-activate any inactive agreements for this tenant
-        await tx.agreement.updateMany({
-          where: {
-            tenantId: tenantId,
-            status: AgreementStatus.Inactive,
-          },
-          data: { status: AgreementStatus.Active },
-        });
-
-        // If tenant has a rentedSpaceId, mark that space as occupied again
-        const tenantRecord = await tx.tenant.findUnique({
-          where: { id: tenantId },
-        });
-        if (tenantRecord && tenantRecord.rentedSpaceId) {
-          try {
-            await tx.space.update({
+          // If tenant's rentedSpace is in this building, mark it occupied
+          const tenantRecord = await tx.tenant.findUnique({
+            where: { id: tenantId },
+          });
+          if (tenantRecord && tenantRecord.rentedSpaceId) {
+            const spaceRec = await tx.space.findUnique({
               where: { id: tenantRecord.rentedSpaceId },
-              data: { isOccupied: true },
+              select: { buildingId: true },
             });
-          } catch (e) {
-            // ignore
+            if (spaceRec && spaceRec.buildingId === scopeBuildingId) {
+              try {
+                await tx.space.update({
+                  where: { id: tenantRecord.rentedSpaceId },
+                  data: { isOccupied: true },
+                });
+              } catch (e) {
+                // ignore
+              }
+            }
           }
-        }
-      });
+          // Ensure spaces for newly re-activated agreements are marked occupied
+          const activeAgreements = await tx.agreement.findMany({
+            where: {
+              tenantId: tenantId,
+              space: { buildingId: scopeBuildingId },
+              status: AgreementStatus.Active,
+            },
+            select: { id: true, spaceId: true },
+          });
+
+          for (const ag of activeAgreements) {
+            if (ag.spaceId) {
+              try {
+                await tx.space.update({
+                  where: { id: ag.spaceId },
+                  data: { isOccupied: true },
+                });
+              } catch (e) {
+                /* ignore individual errors */
+              }
+            }
+          }
+
+          // If tenant.rentedSpaceId is not set, set it to first active agreement's spaceId (if any)
+          if (activeAgreements.length > 0) {
+            const tenantRec = await tx.tenant.findUnique({
+              where: { id: tenantId },
+              select: { rentedSpaceId: true },
+            });
+            if (tenantRec && !tenantRec.rentedSpaceId) {
+              const firstSpace = activeAgreements.find(
+                (a) => a.spaceId,
+              )?.spaceId;
+              if (firstSpace) {
+                try {
+                  await tx.tenant.update({
+                    where: { id: tenantId },
+                    data: { rentedSpaceId: firstSpace } as any,
+                  });
+                } catch (e) {
+                  /* ignore */
+                }
+              }
+            }
+          }
+          // Upsert per-building tenant status to Active
+          const existingStatus = await tx.tenantBuildingStatus.findFirst({
+            where: { tenantId: tenantId, buildingId: scopeBuildingId },
+          });
+          if (existingStatus) {
+            await tx.tenantBuildingStatus.update({
+              where: { id: existingStatus.id },
+              data: { status: TenantStatus.Active },
+            });
+          } else {
+            await tx.tenantBuildingStatus.create({
+              data: {
+                tenantId: tenantId,
+                buildingId: scopeBuildingId,
+                status: TenantStatus.Active,
+              },
+            });
+          }
+        });
+      } else {
+        // Global fallback (existing behavior)
+        await prisma.$transaction(async (tx) => {
+          await tx.tenant.update({
+            where: { id: tenantId },
+            data: { status: TenantStatus.Active },
+          });
+
+          await tx.agreement.updateMany({
+            where: { tenantId: tenantId, status: AgreementStatus.Inactive },
+            data: { status: AgreementStatus.Active },
+          });
+
+          // Mark all per-building tenant statuses as Active as well
+          await tx.tenantBuildingStatus.updateMany({
+            where: { tenantId: tenantId },
+            data: { status: TenantStatus.Active },
+          });
+
+          const tenantRecord = await tx.tenant.findUnique({
+            where: { id: tenantId },
+          });
+          if (tenantRecord && tenantRecord.rentedSpaceId) {
+            try {
+              await tx.space.update({
+                where: { id: tenantRecord.rentedSpaceId },
+                data: { isOccupied: true },
+              });
+            } catch (e) {
+              /* ignore */
+            }
+          }
+        });
+      }
     }
 
     revalidatePath("/admin/tenants");
     revalidatePath("/admin/agreements");
     revalidatePath("/admin/billing");
 
-    return { success: true };
+    // Fetch the updated tenant with buildingStatuses and rentedSpace to return to the client
+    const updatedTenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: { buildingStatuses: true, rentedSpace: true },
+    });
+
+    return { success: true, tenant: updatedTenant };
   } catch (error: any) {
     console.error("Error toggling tenant status:", error);
     return {

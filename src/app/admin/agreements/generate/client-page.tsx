@@ -81,6 +81,7 @@ interface ClientTenant
   extends Omit<TenantPrismaType, "createdAt" | "updatedAt"> {
   createdAt: string;
   updatedAt: string;
+  buildingStatuses?: { buildingId: string; status: string }[];
 }
 interface ClientSpace extends Omit<SpacePrismaType, "createdAt" | "updatedAt"> {
   createdAt: string;
@@ -126,12 +127,16 @@ interface GenerateAgreementClientPageProps {
   tenants: ClientTenant[];
   availableSpaces: ClientSpace[];
   agreementTemplates: AgreementTemplate[];
+  managedBuildingIds?: string[];
+  currentBuildingId?: string;
 }
 
 export function GenerateAgreementClientPage({
   tenants,
   availableSpaces,
   agreementTemplates,
+  managedBuildingIds,
+  currentBuildingId,
 }: GenerateAgreementClientPageProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -497,12 +502,42 @@ export function GenerateAgreementClientPage({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {tenants.length > 0 ? (
-                          tenants.map((tenant) => (
-                            <SelectItem key={tenant.id} value={tenant.id}>
-                              {tenant.name} ({tenant.email})
-                            </SelectItem>
-                          ))
+                        {tenants && tenants.length > 0 ? (
+                          // Filter out tenants that are inactive for the current building
+                          tenants
+                            .filter((tenant) => {
+                              // Check per-building status first for current building
+                              const matchForCurrent =
+                                tenant.buildingStatuses?.find(
+                                  (bs) =>
+                                    bs.buildingId ===
+                                    (currentBuildingId || tenant.buildingId),
+                                )?.status;
+
+                              // If any managed building has an Inactive flag for this tenant,
+                              // consider them inactive for selection.
+                              const anyManagedInactive =
+                                managedBuildingIds && tenant.buildingStatuses
+                                  ? tenant.buildingStatuses.some(
+                                      (bs) =>
+                                        managedBuildingIds.includes(
+                                          bs.buildingId,
+                                        ) && bs.status === "Inactive",
+                                    )
+                                  : false;
+
+                              const effectiveStatus =
+                                matchForCurrent ??
+                                (anyManagedInactive
+                                  ? "Inactive"
+                                  : tenant.status);
+                              return effectiveStatus === "Active";
+                            })
+                            .map((tenant) => (
+                              <SelectItem key={tenant.id} value={tenant.id}>
+                                {tenant.name} ({tenant.email})
+                              </SelectItem>
+                            ))
                         ) : (
                           <SelectItem value="no-tenants" disabled>
                             No tenants found
