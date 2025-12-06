@@ -24,9 +24,25 @@ async function GenerateAgreementDataFetcher() {
   const { isSuperAdmin, managedBuildingIds, currentUser } =
     await getUserAndManagedIds();
 
-  // For generating agreements, a manager should be able to see ANY tenant,
-  // so they can add an existing tenant to one of their buildings.
-  const tenantWhereClause: Prisma.TenantWhereInput = {};
+  // For generating agreements, limit visible tenants for non-superadmins
+  // to tenants that either were created by the current user or whose
+  // rented space belongs to one of the buildings the user manages.
+  const tenantWhereClause: Prisma.TenantWhereInput = !isSuperAdmin
+    ? {
+        OR: [
+          { createdById: currentUser.id },
+          ...(managedBuildingIds && managedBuildingIds.length > 0
+            ? [
+                {
+                  rentedSpace: {
+                    is: { buildingId: { in: managedBuildingIds } },
+                  },
+                },
+              ]
+            : []),
+        ],
+      }
+    : {};
 
   const spaceWhereClause: Prisma.SpaceWhereInput = {
     isOccupied: false,
