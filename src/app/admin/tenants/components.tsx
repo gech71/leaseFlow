@@ -215,6 +215,10 @@ export function TenantsClientPage({
   );
   const [searchPhone, setSearchPhone] = useState("");
   const [isUserFound, setIsUserFound] = useState(false);
+  // When a tenant record already exists in the DB for the searched phone,
+  // we store it here and display its details in the form in read-only mode.
+  const [foundExistingTenant, setFoundExistingTenant] =
+    useState<TenantWithRelations | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<TenantStatus | "All">(
@@ -311,6 +315,7 @@ export function TenantsClientPage({
     setGeneratedPassword(null);
     setSearchPhone("");
     setIsUserFound(false);
+    setFoundExistingTenant(null);
     form.reset({
       name: "",
       email: "",
@@ -336,6 +341,7 @@ export function TenantsClientPage({
     setGeneratedPassword(null);
     setCurrentTenantForForm(tenant);
     setIsUserFound(false);
+    setFoundExistingTenant(null);
     form.reset({
       name: tenant.name,
       email: tenant.email,
@@ -349,6 +355,23 @@ export function TenantsClientPage({
   };
 
   const handleFormSubmit = async (values: TenantFormValues) => {
+    // If an existing tenant was found and we're viewing it, attach it to the
+    // in-memory list and close the modal without saving a duplicate to the DB.
+    if (foundExistingTenant) {
+      // Prepend to UI list if not already present
+      setTenantsState((prev) => {
+        if (prev.some((t) => t.id === foundExistingTenant.id)) return prev;
+        return [foundExistingTenant, ...prev];
+      });
+      toast({
+        title: "Tenant Selected",
+        description: `${foundExistingTenant.name} has been attached.`,
+      });
+      setFoundExistingTenant(null);
+      setIsFormOpen(false);
+      form.reset({ name: "", email: "", phone: "" });
+      return;
+    }
     if (
       (formMode === "add" && !canCreateTenants) ||
       (formMode === "edit" && !canEditTenants)
@@ -491,15 +514,15 @@ export function TenantsClientPage({
         title: "User Found",
         description: "Tenant details have been auto-filled.",
       });
-      // If the server returned an existing tenant record, switch to edit mode
-      // and populate the form with the tenant data so the user can save updates.
-      // Otherwise, keep add-mode and prefill with user info for creating a new tenant.
+      // If the server returned an existing tenant record, populate the form
+      // with tenant details but keep fields read-only and allow the user to
+      // simply "select" (attach) that tenant to the UI on Save rather than
+      // creating/updating it in the database. Otherwise prefill create form.
       // @ts-ignore - tenant may be appended by the server action when found
       const foundTenant = result.tenant;
 
       if (foundTenant && foundTenant.id) {
-        setFormMode("edit");
-        setCurrentTenantForForm({
+        const prepared: TenantWithRelations = {
           id: foundTenant.id,
           name: foundTenant.name,
           email: foundTenant.email,
@@ -512,20 +535,24 @@ export function TenantsClientPage({
           updatedAt: new Date(
             foundTenant.updatedAt || foundTenant.createdAt,
           ).toISOString(),
-          status: foundTenant.status || ("Active" as any),
+          status:
+            (foundTenant.status as TenantStatus) || ("Active" as TenantStatus),
           rentedSpace: null,
           agreements: [],
-        } as any);
+        };
 
+        setFoundExistingTenant(prepared);
+        // Fill the form inputs (they will be disabled when foundExistingTenant is set)
         form.reset({
-          name: foundTenant.name,
-          email: foundTenant.email,
-          phone: foundTenant.phone || searchPhone,
-          alternativePhone: foundTenant.alternativePhone || "",
-          nationalId: foundTenant.nationalId || "",
-          representativeName: foundTenant.representativeName || "",
-          representativePhone: foundTenant.representativePhone || "",
+          name: prepared.name,
+          email: prepared.email,
+          phone: prepared.phone || searchPhone,
+          alternativePhone: prepared.alternativePhone || "",
+          nationalId: prepared.nationalId || "",
+          representativeName: prepared.representativeName || "",
+          representativePhone: prepared.representativePhone || "",
         });
+        setFormMode("add");
         setIsUserFound(false);
       } else {
         form.reset({
@@ -540,6 +567,7 @@ export function TenantsClientPage({
         setIsUserFound(true);
         setFormMode("add");
         setCurrentTenantForForm(null);
+        setFoundExistingTenant(null);
       }
     } else {
       toast({
@@ -647,6 +675,7 @@ export function TenantsClientPage({
             setCurrentTenantForForm(null);
             setGeneratedPassword(null);
             setIsUserFound(false);
+            setFoundExistingTenant(null);
           }
         }}
       >
@@ -718,6 +747,7 @@ export function TenantsClientPage({
                         disabled={
                           isSaving ||
                           isUserFound ||
+                          !!foundExistingTenant ||
                           (!canEditTenants && formMode === "edit")
                         }
                       />
@@ -744,6 +774,7 @@ export function TenantsClientPage({
                         disabled={
                           isSaving ||
                           isUserFound ||
+                          !!foundExistingTenant ||
                           (!canEditTenants && formMode === "edit")
                         }
                       />
@@ -772,6 +803,7 @@ export function TenantsClientPage({
                         disabled={
                           isSaving ||
                           isUserFound ||
+                          !!foundExistingTenant ||
                           (!canEditTenants && formMode === "edit")
                         }
                       />
@@ -798,7 +830,9 @@ export function TenantsClientPage({
                         {...field}
                         value={field.value ?? ""}
                         disabled={
-                          isSaving || (!canEditTenants && formMode === "edit")
+                          isSaving ||
+                          !!foundExistingTenant ||
+                          (!canEditTenants && formMode === "edit")
                         }
                       />
                     </FormControl>{" "}
@@ -825,6 +859,7 @@ export function TenantsClientPage({
                         disabled={
                           isSaving ||
                           isUserFound ||
+                          !!foundExistingTenant ||
                           (!canEditTenants && formMode === "edit")
                         }
                       />
@@ -849,7 +884,9 @@ export function TenantsClientPage({
                         {...field}
                         value={field.value ?? ""}
                         disabled={
-                          isSaving || (!canEditTenants && formMode === "edit")
+                          isSaving ||
+                          !!foundExistingTenant ||
+                          (!canEditTenants && formMode === "edit")
                         }
                       />
                     </FormControl>{" "}
@@ -874,7 +911,9 @@ export function TenantsClientPage({
                         {...field}
                         value={field.value ?? ""}
                         disabled={
-                          isSaving || (!canEditTenants && formMode === "edit")
+                          isSaving ||
+                          !!foundExistingTenant ||
+                          (!canEditTenants && formMode === "edit")
                         }
                       />
                     </FormControl>{" "}
@@ -899,7 +938,11 @@ export function TenantsClientPage({
                     {isSaving ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
-                    {formMode === "add" ? "Add Tenant" : "Save Changes"}
+                    {foundExistingTenant
+                      ? "Select Tenant"
+                      : formMode === "add"
+                      ? "Add Tenant"
+                      : "Save Changes"}
                   </Button>
                 )}
               </DialogFooter>

@@ -19,11 +19,18 @@ export async function getAllAgreementTemplatesAction(): Promise<{
     const { currentUser, isSuperAdmin, managedBuildingIds } =
       await getUserAndManagedIds();
 
-    // Strict scoping: non-superadmins only see templates tied to the
-    // buildings they manage. If they manage no buildings, the result is empty.
+    // For non-superadmins allow templates that were created by the current
+    // user or are tied to buildings they manage. This ensures creators can
+    // see templates they created even if they didn't attach them to a
+    // managed building at creation time.
     const where: Prisma.AgreementTemplateWhereInput = isSuperAdmin
       ? {}
-      : { buildingId: { in: managedBuildingIds ?? [] } };
+      : {
+          OR: [
+            { createdById: currentUser.id },
+            { buildingId: { in: managedBuildingIds ?? [] } },
+          ],
+        };
 
     const templates = await databaseService.getAllAgreementTemplates({
       where,

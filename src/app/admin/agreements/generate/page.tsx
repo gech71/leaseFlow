@@ -59,7 +59,14 @@ async function GenerateAgreementDataFetcher() {
   // explicitly tied to one of the buildings the user manages. If the user
   // does not manage any buildings, they will receive an empty list.
   const agreementTemplateWhere: Prisma.AgreementTemplateWhereInput =
-    !isSuperAdmin ? { buildingId: { in: managedBuildingIds ?? [] } } : {};
+    !isSuperAdmin
+      ? {
+          OR: [
+            { createdById: currentUser.id },
+            { buildingId: { in: managedBuildingIds ?? [] } },
+          ],
+        }
+      : {};
 
   const tenants = await databaseService.getAllTenants({
     where: tenantWhereClause,
