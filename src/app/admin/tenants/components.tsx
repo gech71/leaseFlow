@@ -86,6 +86,7 @@ import {
   updateTenantAction,
   findUserByPhoneAction,
   toggleTenantStatusAction,
+  attachTenantToCurrentUserAction,
 } from "./actions";
 import { format, isAfter, addMonths, parseISO } from "date-fns";
 import { usePermissions } from "@/contexts/PermissionContext";
@@ -355,22 +356,47 @@ export function TenantsClientPage({
   };
 
   const handleFormSubmit = async (values: TenantFormValues) => {
-    // If an existing tenant was found and we're viewing it, attach it to the
-    // in-memory list and close the modal without saving a duplicate to the DB.
+    // If an existing tenant was found, attach it server-side to the current
+    // user (set createdBy) so it persists and remains visible after refresh.
     if (foundExistingTenant) {
-      // Prepend to UI list if not already present
-      setTenantsState((prev) => {
-        if (prev.some((t) => t.id === foundExistingTenant.id)) return prev;
-        return [foundExistingTenant, ...prev];
-      });
-      toast({
-        title: "Tenant Selected",
-        description: `${foundExistingTenant.name} has been attached.`,
-      });
-      setFoundExistingTenant(null);
-      setIsFormOpen(false);
-      form.reset({ name: "", email: "", phone: "" });
-      return;
+      const result = await handleApiCall(() =>
+        attachTenantToCurrentUserAction(foundExistingTenant.id),
+      );
+      if (result && result.success) {
+        // Update UI optimistically and refresh server state
+        setTenantsState((prev) => {
+          if (prev.some((t) => t.id === result.tenant.id)) return prev;
+          const prepared = {
+            ...result.tenant,
+            createdAt: result.tenant.createdAt
+              ? new Date(result.tenant.createdAt).toISOString()
+              : new Date().toISOString(),
+            updatedAt: result.tenant.updatedAt
+              ? new Date(result.tenant.updatedAt).toISOString()
+              : new Date().toISOString(),
+            rentedSpace: null,
+            agreements: [],
+          } as TenantWithRelations;
+          return [prepared, ...prev];
+        });
+        toast({
+          title: "Tenant Attached",
+          description: `${foundExistingTenant.name} is now attached to your account.`,
+        });
+        setFoundExistingTenant(null);
+        setIsFormOpen(false);
+        form.reset({ name: "", email: "", phone: "" });
+        router.refresh();
+        return;
+      } else {
+        toast({
+          title: "Error",
+          description: result?.error || "Failed to attach tenant.",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
     }
     if (
       (formMode === "add" && !canCreateTenants) ||

@@ -344,3 +344,36 @@ export async function toggleTenantStatusAction(
     };
   }
 }
+
+export async function attachTenantToCurrentUserAction(
+  tenantId: string,
+): Promise<{ success: boolean; tenant?: any; error?: string }> {
+  try {
+    const { currentUser, permissions, isSuperAdmin } =
+      await getUserAndPermissions();
+
+    // Require at least tenant:create or tenant:edit permission, or superadmin
+    if (
+      !isSuperAdmin &&
+      !permissions.has("tenant:create") &&
+      !permissions.has("tenant:edit")
+    ) {
+      return { success: false, error: "Access Denied" };
+    }
+
+    // Attach current user as the creator of the tenant so it becomes visible
+    // in the Manage Tenants view for this user.
+    const updated = await databaseService.updateTenant(tenantId, {
+      createdBy: { connect: { id: currentUser.id } },
+    } as any);
+
+    revalidatePath("/admin/tenants");
+    return { success: true, tenant: updated };
+  } catch (error: any) {
+    console.error("Error attaching tenant to user:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to attach tenant.",
+    };
+  }
+}
