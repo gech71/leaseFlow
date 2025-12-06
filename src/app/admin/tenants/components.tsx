@@ -491,16 +491,56 @@ export function TenantsClientPage({
         title: "User Found",
         description: "Tenant details have been auto-filled.",
       });
-      form.reset({
-        name: result.user.name,
-        email: result.user.email,
-        phone: searchPhone,
-        alternativePhone: "",
-        nationalId: result.user.nationalId || "",
-        representativeName: "",
-        representativePhone: "",
-      });
-      setIsUserFound(true);
+      // If the server returned an existing tenant record, switch to edit mode
+      // and populate the form with the tenant data so the user can save updates.
+      // Otherwise, keep add-mode and prefill with user info for creating a new tenant.
+      // @ts-ignore - tenant may be appended by the server action when found
+      const foundTenant = result.tenant;
+
+      if (foundTenant && foundTenant.id) {
+        setFormMode("edit");
+        setCurrentTenantForForm({
+          id: foundTenant.id,
+          name: foundTenant.name,
+          email: foundTenant.email,
+          phone: foundTenant.phone,
+          alternativePhone: foundTenant.alternativePhone || null,
+          nationalId: foundTenant.nationalId || null,
+          representativeName: foundTenant.representativeName || null,
+          representativePhone: foundTenant.representativePhone || null,
+          createdAt: new Date(foundTenant.createdAt).toISOString(),
+          updatedAt: new Date(
+            foundTenant.updatedAt || foundTenant.createdAt,
+          ).toISOString(),
+          status: foundTenant.status || ("Active" as any),
+          rentedSpace: null,
+          agreements: [],
+        } as any);
+
+        form.reset({
+          name: foundTenant.name,
+          email: foundTenant.email,
+          phone: foundTenant.phone || searchPhone,
+          alternativePhone: foundTenant.alternativePhone || "",
+          nationalId: foundTenant.nationalId || "",
+          representativeName: foundTenant.representativeName || "",
+          representativePhone: foundTenant.representativePhone || "",
+        });
+        setIsUserFound(false);
+      } else {
+        form.reset({
+          name: result.user.name,
+          email: result.user.email,
+          phone: searchPhone,
+          alternativePhone: "",
+          nationalId: result.user.nationalId || "",
+          representativeName: "",
+          representativePhone: "",
+        });
+        setIsUserFound(true);
+        setFormMode("add");
+        setCurrentTenantForForm(null);
+      }
     } else {
       toast({
         title: "Not Found",

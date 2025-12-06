@@ -28,17 +28,11 @@ export async function getAgreementTemplatesForImportAction(): Promise<
   // organization. Return all templates for users with the import permission.
   const { managedBuildingIds } = await getUserAndManagedIds();
 
+  // Strict scoping for import: non-superadmins only may choose templates
+  // that belong to buildings they manage. If none, no templates are returned.
   const where: Prisma.AgreementTemplateWhereInput = isSuperAdmin
     ? {}
-    : {
-        OR: [
-          { buildingId: null },
-          { createdById: currentUser.id },
-          ...(managedBuildingIds && managedBuildingIds.length > 0
-            ? [{ buildingId: { in: managedBuildingIds } }]
-            : []),
-        ],
-      };
+    : { buildingId: { in: managedBuildingIds ?? [] } };
 
   const templates = await databaseService.getAllAgreementTemplates({
     where,

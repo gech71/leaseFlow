@@ -85,6 +85,10 @@ interface ClientTenant
 interface ClientSpace extends Omit<SpacePrismaType, "createdAt" | "updatedAt"> {
   createdAt: string;
   updatedAt: string;
+  // Convert Prisma Decimal fields to numbers for client usage
+  area: number;
+  utilityProrationShare: number;
+  monthlyRentalPrice: number;
 }
 
 const agreementFormSchema = z

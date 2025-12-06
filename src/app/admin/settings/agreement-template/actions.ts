@@ -19,19 +19,11 @@ export async function getAllAgreementTemplatesAction(): Promise<{
     const { currentUser, isSuperAdmin, managedBuildingIds } =
       await getUserAndManagedIds();
 
-    // For non-superadmins, show templates that are either global (buildingId is null),
-    // owned by the current user, or scoped to one of the buildings they manage.
+    // Strict scoping: non-superadmins only see templates tied to the
+    // buildings they manage. If they manage no buildings, the result is empty.
     const where: Prisma.AgreementTemplateWhereInput = isSuperAdmin
       ? {}
-      : {
-          OR: [
-            { buildingId: null },
-            { createdById: currentUser.id },
-            ...(managedBuildingIds && managedBuildingIds.length > 0
-              ? [{ buildingId: { in: managedBuildingIds } }]
-              : []),
-          ],
-        };
+      : { buildingId: { in: managedBuildingIds ?? [] } };
 
     const templates = await databaseService.getAllAgreementTemplates({
       where,

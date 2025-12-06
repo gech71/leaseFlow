@@ -204,6 +204,33 @@ export async function findUserByPhoneAction(phone: string): Promise<{
         null,
         phone,
       );
+
+      // Return tenant details when available so the client can switch to edit mode
+      if (tenant) {
+        return {
+          success: true,
+          user: {
+            name: user.name || `${user.firstName} ${user.lastName}`,
+            email: user.email,
+            nationalId: tenant.nationalId,
+          },
+          // @ts-ignore - dynamic return shape for convenience in client
+          tenant: {
+            id: tenant.id,
+            name: tenant.name,
+            email: tenant.email,
+            phone: tenant.phone,
+            alternativePhone: tenant.alternativePhone,
+            nationalId: tenant.nationalId,
+            representativeName: tenant.representativeName,
+            representativePhone: tenant.representativePhone,
+            createdAt: tenant.createdAt,
+            updatedAt: tenant.updatedAt,
+            status: tenant.status,
+          },
+        };
+      }
+
       return {
         success: true,
         user: {

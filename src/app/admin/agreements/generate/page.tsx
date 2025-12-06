@@ -25,8 +25,9 @@ async function GenerateAgreementDataFetcher() {
     await getUserAndManagedIds();
 
   // For generating agreements, limit visible tenants for non-superadmins
-  // to tenants that either were created by the current user or whose
-  // rented space belongs to one of the buildings the user manages.
+  // to tenants that either were created by the current user, whose
+  // rented space belongs to one of the buildings the user manages, or
+  // who have agreements for spaces in the buildings the user manages.
   const tenantWhereClause: Prisma.TenantWhereInput = !isSuperAdmin
     ? {
         OR: [
@@ -36,6 +37,11 @@ async function GenerateAgreementDataFetcher() {
                 {
                   rentedSpace: {
                     is: { buildingId: { in: managedBuildingIds } },
+                  },
+                },
+                {
+                  agreements: {
+                    some: { space: { buildingId: { in: managedBuildingIds } } },
                   },
                 },
               ]
@@ -49,27 +55,16 @@ async function GenerateAgreementDataFetcher() {
     ...(!isSuperAdmin ? { buildingId: { in: managedBuildingIds! } } : {}),
   };
 
-  // Agreement templates are not scoped to a building. Allow managers to use
-  // templates created by others in the organization rather than limiting to
-  // templates created by the current user.
-  // For non-superadmins, show templates that are global, created by the
-  // current user, or scoped to one of the buildings they manage.
+  // Strict scoping: for non-superadmins only allow templates that are
+  // explicitly tied to one of the buildings the user manages. If the user
+  // does not manage any buildings, they will receive an empty list.
   const agreementTemplateWhere: Prisma.AgreementTemplateWhereInput =
-    !isSuperAdmin
-      ? {
-          OR: [
-            { buildingId: null },
-            { createdById: currentUser.id },
-            ...(managedBuildingIds && managedBuildingIds.length > 0
-              ? [{ buildingId: { in: managedBuildingIds } }]
-              : []),
-          ],
-        }
-      : {};
+    !isSuperAdmin ? { buildingId: { in: managedBuildingIds ?? [] } } : {};
 
   const tenants = await databaseService.getAllTenants({
     where: tenantWhereClause,
     orderBy: { name: "asc" },
+    include: { rentedSpace: true, agreements: { include: { space: true } } },
   });
   const availableSpaces = await databaseService.getAllSpaces({
     where: spaceWhereClause,
@@ -80,11 +75,52 @@ async function GenerateAgreementDataFetcher() {
     orderBy: { name: "asc" },
   });
 
-  // Serialize dates before passing to client component
-  const serializableTenants = tenants.map((t) => ({
+  // Serialize dates and Decimal fields before passing to client component
+  const serializableTenants = (tenants as any).map((t: any) => ({
     ...t,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt?.toISOString() || t.createdAt.toISOString(), // Fallback for updatedAt
+    rentedSpace: t.rentedSpace
+      ? {
+          ...t.rentedSpace,
+          area: Number(t.rentedSpace.area),
+          utilityProrationShare: Number(t.rentedSpace.utilityProrationShare),
+          monthlyRentalPrice: Number(t.rentedSpace.monthlyRentalPrice),
+          createdAt: t.rentedSpace.createdAt.toISOString(),
+          updatedAt:
+            t.rentedSpace.updatedAt?.toISOString() ||
+            t.rentedSpace.createdAt.toISOString(),
+        }
+      : null,
+    agreements: t.agreements
+      ? (t.agreements as any[]).map((ag: any) => ({
+          ...ag,
+          monthlyRentalPrice: Number(ag.monthlyRentalPrice),
+          initialPaymentAmount: ag.initialPaymentAmount
+            ? Number(ag.initialPaymentAmount)
+            : null,
+          startDate: ag.startDate?.toISOString() || null,
+          endDate: ag.endDate?.toISOString() || null,
+          nextPaymentDueDate: ag.nextPaymentDueDate?.toISOString() || null,
+          createdAt: ag.createdAt?.toISOString() || null,
+          updatedAt:
+            ag.updatedAt?.toISOString() || ag.createdAt?.toISOString() || null,
+          initialPaymentDate: ag.initialPaymentDate?.toISOString() || null,
+          space: ag.space
+            ? {
+                ...ag.space,
+                area: Number(ag.space.area),
+                utilityProrationShare: Number(ag.space.utilityProrationShare),
+                monthlyRentalPrice: Number(ag.space.monthlyRentalPrice),
+                createdAt: ag.space.createdAt?.toISOString() || null,
+                updatedAt:
+                  ag.space.updatedAt?.toISOString() ||
+                  ag.space.createdAt?.toISOString() ||
+                  null,
+              }
+            : null,
+        }))
+      : [],
   }));
   const serializableSpaces = availableSpaces.map((s) => ({
     ...s,
