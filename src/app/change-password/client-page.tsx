@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { isCommonPassword } from "@/lib/security/common-passwords";
 import {
   Card,
   CardContent,
@@ -39,10 +38,7 @@ const passwordValidation = z
   .regex(/[^a-zA-Z0-9]/, {
     message: "Password must contain at least one symbol.",
   })
-  .refine((val) => !isCommonPassword(val, { fuzzy: true, maxDistance: 1 }), {
-    message:
-      "The selected password is commonly used and does not meet our security standards. Please choose a more secure option.",
-  });
+  ;
 
 const changePasswordSchema = z
   .object({

@@ -10,7 +10,7 @@ import {
 } from "@/lib/auth/jwt";
 import { cookies } from "next/headers";
 import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
-import { isCommonPassword } from "@/lib/security/common-passwords";
+import { isPwnedPassword } from "@/lib/security/pwned";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string(),
@@ -46,13 +46,18 @@ export async function changePassword(
     }
   }
 
-  // Reject very common passwords (case-insensitive + small fuzzy check)
-  if (isCommonPassword(newPassword, { fuzzy: true, maxDistance: 1 })) {
-    return {
-      success: false,
-      error:
-        "The selected password is commonly used and does not meet our security standards. Please choose a more secure option.",
-    };
+  // Check against HaveIBeenPwned (k-anonymity). If pwned, reject.
+  try {
+    const { pwned } = await isPwnedPassword(newPassword);
+    if (pwned) {
+      return {
+        success: false,
+        error:
+          "The selected password is commonly used and does not meet our security standards. Please choose a more secure option.",
+      };
+    }
+  } catch (e) {
+    // Fail open on API/network error
   }
 
   const hashedNewPassword = await bcrypt.hash(newPassword, 10);

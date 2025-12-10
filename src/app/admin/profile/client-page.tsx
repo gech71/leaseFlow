@@ -26,7 +26,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff } from "lucide-react";
-import { isCommonPassword } from "@/lib/security/common-passwords";
 import { changePassword } from "./actions";
 import { useRouter } from "next/navigation";
 
@@ -44,21 +43,12 @@ const passwordValidation = z
     message: "Password must contain at least one symbol.",
   });
 
-// Add common-password check (case-insensitive + fuzzy distance <= 1)
-const passwordValidationWithCommonCheck = passwordValidation.refine(
-  (val) => !isCommonPassword(val, { fuzzy: true, maxDistance: 1 }),
-  {
-    message:
-      "The selected password is commonly used and does not meet our security standards. Please choose a more secure option.",
-  },
-);
-
 const changePasswordSchema = z
   .object({
     currentPassword: z
       .string()
       .min(1, { message: "Current password is required." }),
-    newPassword: passwordValidationWithCommonCheck,
+    newPassword: passwordValidation,
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {

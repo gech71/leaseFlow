@@ -16,7 +16,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { isCommonPassword } from "@/lib/security/common-passwords";
 import {
   Form,
   FormControl,
@@ -46,13 +45,7 @@ const changePasswordSchema = z
     newPassword: z
       .string()
       .min(6, { message: "New password must be at least 6 characters." })
-      .refine(
-        (val) => !isCommonPassword(val, { fuzzy: true, maxDistance: 1 }),
-        {
-          message:
-            "The selected password is commonly used and does not meet our security standards. Please choose a more secure option.",
-        },
-      ),
+      ,
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
