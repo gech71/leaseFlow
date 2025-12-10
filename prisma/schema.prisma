@@ -264,6 +264,9 @@ model User {
   roles             Role[]              @relation("UserRoles")
   AuditLog          AuditLog[]
   UserSession       UserSession[]
+
+  currentAccessJti  String?
+  currentRefreshJti String?
 }
 
 model Role {

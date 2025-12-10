@@ -40,10 +40,14 @@ export async function setPortalSessionAction(token: string) {
       iat: Math.floor(Date.now() / 1000), // Use numeric timestamp for 'issued at'
     };
 
-    const { accessToken, refreshToken } = await createSession(payload);
+    const { accessToken, refreshToken, sessionId } = await createSession(
+      payload,
+    );
 
     cookies().set(accessToken.name, accessToken.value, accessToken.options);
     cookies().set(refreshToken.name, refreshToken.value, refreshToken.options);
+    // Set session id cookie to bind this browser session to the issued JTI
+    cookies().set(sessionId.name, sessionId.value, sessionId.options);
 
     return { success: true };
   } catch (error) {

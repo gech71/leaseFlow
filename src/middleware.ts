@@ -8,6 +8,7 @@ import {
   verifyCsrfToken,
   getSessionCookieNames,
   LAST_ACTIVE_COOKIE_NAME,
+  SESSION_ID_COOKIE_NAME,
   IDLE_TIMEOUT_MS,
 } from "@/lib/auth/jwt";
 import { PERMISSION_MAP } from "@/lib/auth-utils";
@@ -43,7 +44,7 @@ export async function middleware(request: NextRequest) {
   // --- Apply CSP ---
   const nonce = nanoid(16);
   response.headers.set("x-nonce", nonce);
-  
+
   const csp = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'unsafe-inline';
@@ -98,7 +99,116 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(accessToken);
 
+  // If a valid session was returned, ensure the browser's session-id cookie
+  // matches the token's JTI. If it doesn't, this indicates token misuse
+  // (copied/modified token) and we should revoke and force logout.
+  if (session) {
+    try {
+      const sessionCookie = request.cookies.get(SESSION_ID_COOKIE_NAME)?.value;
+      // Compute expected signed session cookie from the token's jti
+      const { signSessionCookie } = await import("@/lib/auth/jwt");
+      const expected = session.jti
+        ? await signSessionCookie(session.jti)
+        : null;
+      if (
+        session.jti &&
+        sessionCookie &&
+        expected &&
+        sessionCookie !== expected
+      ) {
+        try {
+          const { databaseService } = await import(
+            "@/lib/services/databaseService"
+          );
+          // Revoke the session represented by this token JTI
+          await databaseService.revokeUserSessionByJti(session.jti);
+          const user = await databaseService.getUserById(session.userId);
+          if (user) {
+            await databaseService.updateUser(user.id, {
+              currentAccessJti: null,
+              currentRefreshJti: null,
+            } as any);
+          }
+        } catch (err) {
+          // ignore DB errors
+        }
+
+        const cookieNames = getSessionCookieNames();
+        if (pathname.startsWith("/api/")) {
+          const resp = NextResponse.json(
+            { message: "Unauthorized. Token mismatch detected." },
+            { status: 401 },
+          );
+          cookieNames.forEach((name) =>
+            resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
+          );
+          return resp;
+        }
+
+        const resp = NextResponse.redirect(new URL("/login", request.url));
+        cookieNames.forEach((name) =>
+          resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
+        );
+        return resp;
+      }
+    } catch (err) {
+      // ignore
+    }
+  }
+
   if (!session) {
+    // If verifySession returned null, try to decode the token to see if it's
+    // a valid JWT whose JTI no longer matches the user's stored JTI. This
+    // indicates possible token reuse/tampering. In that case, revoke the
+    // session server-side and clear cookies so the affected user is force-logged-out.
+    try {
+      const payload = await (
+        await import("@/lib/auth/jwt")
+      ).decodeJwt(accessToken);
+      if (payload && (payload as any).jti && (payload as any).userId) {
+        try {
+          const { databaseService } = await import(
+            "@/lib/services/databaseService"
+          );
+          const user = await databaseService.getUserById(
+            (payload as any).userId,
+          );
+          if (
+            user &&
+            user.currentAccessJti &&
+            user.currentAccessJti !== (payload as any).jti
+          ) {
+            // Tampering / reuse detected. Revoke session and clear stored JTIs.
+            await databaseService.revokeUserSessionByJti((payload as any).jti);
+            await databaseService.updateUser(user.id, {
+              currentAccessJti: null,
+              currentRefreshJti: null,
+            } as any);
+
+            const cookieNames = getSessionCookieNames();
+            if (pathname.startsWith("/api/")) {
+              const resp = NextResponse.json(
+                { message: "Unauthorized. Token mismatch detected." },
+                { status: 401 },
+              );
+              cookieNames.forEach((name) =>
+                resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
+              );
+              return resp;
+            }
+            const resp = NextResponse.redirect(new URL("/login", request.url));
+            cookieNames.forEach((name) =>
+              resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
+            );
+            return resp;
+          }
+        } catch (err) {
+          // DB checks failed; fall through to normal redirect below.
+        }
+      }
+    } catch (err) {
+      // ignore decode errors and continue with standard redirect
+    }
     const loginUrl = new URL("/login", request.url);
     // For API requests, return 401 JSON so clients can handle logout.
     if (pathname.startsWith("/api/")) {

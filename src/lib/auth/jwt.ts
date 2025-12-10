@@ -18,6 +18,7 @@ export const REFRESH_TOKEN_COOKIE_NAME = "nibrental_refresh_token";
 export const CSRF_TOKEN_COOKIE_NAME = "nibrental_csrf_token";
 export const CSRF_TOKEN_SIG_NAME = "nibrental_csrf_sig";
 export const LAST_ACTIVE_COOKIE_NAME = "nibrental_last_active";
+export const SESSION_ID_COOKIE_NAME = "nibrental_session_id";
 
 // Idle timeout in milliseconds. If no activity for this duration, session is considered idle.
 export const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
@@ -32,6 +33,18 @@ async function importHmacKey(): Promise<CryptoKey> {
     false,
     ["sign", "verify"],
   );
+}
+
+/**
+ * Compute an HMAC signature of the session jti for use as the session-id cookie value.
+ * This prevents storing the raw JTI in the cookie while still allowing the server
+ * to verify the cookie matches the token's jti.
+ */
+export async function signSessionCookie(jti: string): Promise<string> {
+  const key = await importHmacKey();
+  const data = new TextEncoder().encode(jti);
+  const sig = await (globalThis.crypto as any).subtle.sign("HMAC", key, data);
+  return bufferToHex(sig);
 }
 
 function bufferToHex(buf: ArrayBuffer): string {
@@ -84,7 +97,7 @@ if (!JWT_SECRET_KEY || JWT_SECRET_KEY.length !== 64) {
     "JWT_SECRET_KEY is not set or is not a 64-character hex string.";
   if (process.env.NODE_ENV === "production") {
     throw new Error(`FATAL: ${errorMessage} This is required for production.`);
-  } 
+  }
 }
 
 const key = new TextEncoder().encode(JWT_SECRET_KEY);
@@ -110,6 +123,11 @@ interface GeneratedTokens {
     options: Omit<ResponseCookie, "name" | "value">;
   };
   refreshToken: {
+    name: string;
+    value: string;
+    options: Omit<ResponseCookie, "name" | "value">;
+  };
+  sessionId: {
     name: string;
     value: string;
     options: Omit<ResponseCookie, "name" | "value">;
@@ -162,6 +180,21 @@ export async function createSession(
         "@/lib/services/databaseService"
       );
       await databaseService.createUserSession(jti, payload.userId);
+      // Attach the created session JTI to the user record so tokens are
+      // explicitly bound to the user account. If the user doesn't exist
+      // (e.g. portal ephemeral users), skip this step.
+      try {
+        const user = await databaseService.getUserById(payload.userId);
+        if (user) {
+          await databaseService.updateUser(payload.userId, {
+            currentAccessJti: jti,
+            currentRefreshJti: jti,
+          } as any);
+        }
+      } catch (err) {
+        // Non-fatal: continue even if we can't attach to user record.
+        console.warn("Warning: failed to attach jti to user record", err);
+      }
     }
   } catch (err) {
     // If DB write fails, we still return tokens but log a warning.
@@ -177,6 +210,11 @@ export async function createSession(
     refreshToken: {
       name: REFRESH_TOKEN_COOKIE_NAME,
       value: refreshToken,
+      options: { ...commonCookieOptions, expires: refreshTokenExpires },
+    },
+    sessionId: {
+      name: SESSION_ID_COOKIE_NAME,
+      value: await signSessionCookie(jti),
       options: { ...commonCookieOptions, expires: refreshTokenExpires },
     },
   };
@@ -207,6 +245,30 @@ export async function verifySession(
           sessionPayload.jti,
         );
         if (!record || record.revoked) return null;
+
+        // If a user record exists, ensure the user's attached JTI matches
+        // the presented token; if it doesn't, revoke and clear to force
+        // a logout for that user's sessions.
+        try {
+          const user = await databaseService.getUserById(sessionPayload.userId);
+          if (user) {
+            if (
+              user.currentAccessJti &&
+              user.currentAccessJti !== sessionPayload.jti
+            ) {
+              // Token reuse or mismatch detected: revoke the session and clear the user's stored JTIs.
+              await databaseService.revokeUserSessionByJti(sessionPayload.jti);
+              await databaseService.updateUser(user.id, {
+                currentAccessJti: null,
+                currentRefreshJti: null,
+              } as any);
+              return null;
+            }
+          }
+        } catch (err) {
+          // ignore user-specific errors and continue.
+        }
+
         // Update lastActive timestamp in DB
         await databaseService.updateUserSessionLastActive(sessionPayload.jti);
       }
@@ -234,8 +296,53 @@ export async function verifyRefreshToken(
     const { payload } = await jwtVerify(token, key, {
       algorithms: ["HS256"],
     });
-    return payload as RefreshTokenPayload;
+    const refreshPayload = payload as RefreshTokenPayload;
+    // If running on the server, ensure the presented refresh token matches
+    // the user's attached refresh JTI (if present). If it doesn't, reject.
+    try {
+      if (typeof window === "undefined" && refreshPayload.jti) {
+        const { databaseService } = await import(
+          "@/lib/services/databaseService"
+        );
+        const user = await databaseService.getUserById(refreshPayload.userId);
+        if (
+          user &&
+          user.currentRefreshJti &&
+          user.currentRefreshJti !== refreshPayload.jti
+        ) {
+          // Mismatch: revoke the incoming JTI and clear stored JTIs
+          await databaseService.revokeUserSessionByJti(refreshPayload.jti);
+          await databaseService.updateUser(user.id, {
+            currentAccessJti: null,
+            currentRefreshJti: null,
+          } as any);
+          return null;
+        }
+      }
+    } catch (err) {
+      // ignore DB-specific errors and continue; callers may perform additional checks
+    }
+
+    return refreshPayload;
   } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Decode a JWT and return its payload without performing DB/session checks.
+ * Useful in middleware to inspect token contents (jti/userId) when verifySession
+ * returned null so we can differentiate between expired/invalid tokens and
+ * token tampering (e.g., mismatched jti).
+ */
+export async function decodeJwt(
+  token: string | undefined,
+): Promise<JWTPayload | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, key, { algorithms: ["HS256"] });
+    return payload;
+  } catch (err) {
     return null;
   }
 }
@@ -248,6 +355,7 @@ export function getSessionCookieNames(): string[] {
   return [
     ACCESS_TOKEN_COOKIE_NAME,
     REFRESH_TOKEN_COOKIE_NAME,
+    SESSION_ID_COOKIE_NAME,
     CSRF_TOKEN_COOKIE_NAME,
     CSRF_TOKEN_SIG_NAME,
     LAST_ACTIVE_COOKIE_NAME,
