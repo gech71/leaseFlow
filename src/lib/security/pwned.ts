@@ -12,7 +12,11 @@ export async function isPwnedPassword(
   if (!raw) return { pwned: false, count: 0 };
 
   // Compute SHA1 hash (uppercase hex)
-  const sha1 = crypto.createHash("sha1").update(raw, "utf8").digest("hex").toUpperCase();
+  const sha1 = crypto
+    .createHash("sha1")
+    .update(raw, "utf8")
+    .digest("hex")
+    .toUpperCase();
   const prefix = sha1.slice(0, 5);
   const suffix = sha1.slice(5);
 
@@ -43,7 +47,8 @@ export async function isPwnedPassword(
       if (!hashSuffix) continue;
       if (hashSuffix.toUpperCase() === suffix) {
         const count = Number(countStr || "0");
-        const max = typeof opts?.maxBreaches === "number" ? opts!.maxBreaches : 0;
+        const max =
+          typeof opts?.maxBreaches === "number" ? opts!.maxBreaches : 0;
         const pwned = max > 0 ? count >= max : count > 0;
         return { pwned, count };
       }

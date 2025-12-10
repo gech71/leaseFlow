@@ -37,9 +37,7 @@ const passwordValidation = z
   .regex(/[0-9]/, { message: "Password must contain at least one number." })
   .regex(/[^a-zA-Z0-9]/, {
     message: "Password must contain at least one symbol.",
-  })
-  ;
-
+  });
 const changePasswordSchema = z
   .object({
     newPassword: passwordValidation,

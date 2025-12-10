@@ -44,8 +44,7 @@ const changePasswordSchema = z
       .min(1, { message: "Current password is required." }),
     newPassword: z
       .string()
-      .min(6, { message: "New password must be at least 6 characters." })
-      ,
+      .min(6, { message: "New password must be at least 6 characters." }),
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
