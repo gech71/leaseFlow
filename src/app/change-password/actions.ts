@@ -15,6 +15,8 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(6, "New password must be at least 6 characters."),
 });
 
+import { isCommonPassword } from "@/lib/security/common-passwords";
+
 export async function changePasswordAction(
   values: z.infer<typeof changePasswordSchema>,
 ): Promise<{ success: boolean; error?: string }> {
@@ -34,6 +36,15 @@ export async function changePasswordAction(
     throw new Error("Invalid data provided.");
   }
   const { newPassword } = validatedData.data;
+
+  // Reject very common passwords (case-insensitive + small fuzzy check)
+  if (isCommonPassword(newPassword, { fuzzy: true, maxDistance: 1 })) {
+    return {
+      success: false,
+      error:
+        "The selected password is commonly used and does not meet our security standards. Please choose a more secure option.",
+    };
+  }
 
   const user = await databaseService.getUserById(sessionUser.userId);
   if (!user || !user.tempPassword) {

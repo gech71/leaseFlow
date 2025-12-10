@@ -121,7 +121,9 @@ export async function updateUserAssignments(
   selectedManagedBuildingIds: string[],
 ) {
   try {
-    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    // Get the current user and managed building ids to enforce scoping.
+    const { isSuperAdmin, permissions, managedBuildingIds } =
+      await getUserAndManagedIds();
     if (!isSuperAdmin && !permissions.has("settings:user_management:assign")) {
       return { success: false, error: "Permission denied." };
     }
@@ -130,10 +132,27 @@ export async function updateUserAssignments(
       roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] },
     };
 
+    // If the caller is a super-admin they can explicitly set managed buildings.
+    // For non-super-admins, when they assign a role to a user we automatically
+    // assign the caller's managed buildings by default (or use the explicit
+    // `selectedManagedBuildingIds` if provided).
     if (isSuperAdmin) {
       updateData.managedBuildings = {
         set: selectedManagedBuildingIds.map((id) => ({ id: id })),
       };
+    } else {
+      // If a role is being assigned, attach the caller's managed buildings
+      // unless an explicit list is provided.
+      if (selectedRoleId) {
+        const targetIds =
+          selectedManagedBuildingIds && selectedManagedBuildingIds.length > 0
+            ? selectedManagedBuildingIds
+            : managedBuildingIds ?? [];
+        updateData.managedBuildings = { set: targetIds.map((id) => ({ id })) };
+      } else {
+        // No role selected -> clear managed buildings for the target user
+        updateData.managedBuildings = { set: [] };
+      }
     }
 
     await prisma.user.update({

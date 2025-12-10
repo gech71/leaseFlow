@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/jwt";
 import { cookies } from "next/headers";
 import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
+import { isCommonPassword } from "@/lib/security/common-passwords";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string(),
@@ -43,6 +44,15 @@ export async function changePassword(
     if (!passwordsMatch) {
       throw new Error(GENERIC_AUTH_ERROR);
     }
+  }
+
+  // Reject very common passwords (case-insensitive + small fuzzy check)
+  if (isCommonPassword(newPassword, { fuzzy: true, maxDistance: 1 })) {
+    return {
+      success: false,
+      error:
+        "The selected password is commonly used and does not meet our security standards. Please choose a more secure option.",
+    };
   }
 
   const hashedNewPassword = await bcrypt.hash(newPassword, 10);
