@@ -1,4 +1,3 @@
-
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ConnectionSuccessPage } from "./client-page";
@@ -69,7 +68,8 @@ function ConnectionErrorDisplay({ message }: { message: string }) {
 }
 
 export default async function PortalConnectPage() {
-  const authorizationHeader = headers().get("Authorization");
+  const h = await headers();
+  const authorizationHeader = h.get("Authorization");
 
   const { success, phone, error } = await validateTokenAndGetPhone(
     authorizationHeader,
@@ -91,10 +91,5 @@ export default async function PortalConnectPage() {
   // On success, render the client component that will handle session creation and redirection.
   // We pass the validated token and phone number to it.
   const token = authorizationHeader!.replace("Bearer ", "");
-  return (
-    <ConnectionSuccessPage
-      token={token}
-      phone={phone!}
-    />
-  );
+  return <ConnectionSuccessPage token={token} phone={phone!} />;
 }

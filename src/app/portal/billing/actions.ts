@@ -14,7 +14,8 @@ import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   if (!token) return null;
 
   const session = await verifySession(token);

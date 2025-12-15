@@ -19,7 +19,8 @@ import { cookies } from "next/headers";
 // --- User Authentication Helper ---
 // This function uses the project's custom JWT session verification.
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(token);
   if (session?.userId) {
     const user = await databaseService.getUserById(session.userId, {

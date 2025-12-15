@@ -9,22 +9,29 @@ import { redirect } from "next/navigation";
 import type { CurrentUser } from "@/lib/types";
 import { cookies } from "next/headers";
 
+type UserWithRoles = User & { roles: Role[] };
+type UserWithRolesAndManagedBuildings = User & {
+  roles: Role[];
+  managedBuildings: Array<{ id: string }>;
+};
+
 /**
  * A server-side helper to get the fully authenticated user object, their permissions,
  * and super admin status. Throws an error if the user is not authenticated.
  * @returns {Promise<{currentUser: User & { roles: Role[] }, isSuperAdmin: boolean, permissions: Set<string>}>}
  */
 export async function getUserAndPermissions() {
-  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(token);
   if (!session?.userId) {
     // Instead of redirecting, which causes issues with server actions, we throw a generic auth error.
     throw new Error(GENERIC_AUTH_ERROR);
   }
 
-  const currentUser = await databaseService.getUserById(session.userId, {
+  const currentUser = (await databaseService.getUserById(session.userId, {
     roles: true,
-  });
+  })) as UserWithRoles | null;
 
   if (!currentUser) {
     console.error(
@@ -46,16 +53,17 @@ export async function getUserAndPermissions() {
  * @returns {Promise<{currentUser: User, isSuperAdmin: boolean, managedBuildingIds: string[] | null}>}
  */
 export async function getUserAndManagedIds() {
-  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(token);
   if (!session?.userId) {
     throw new Error(GENERIC_AUTH_ERROR);
   }
 
-  const currentUser = await databaseService.getUserById(session.userId, {
+  const currentUser = (await databaseService.getUserById(session.userId, {
     roles: true,
     managedBuildings: { select: { id: true } },
-  });
+  })) as UserWithRolesAndManagedBuildings | null;
 
   if (!currentUser) {
     console.error(
@@ -91,16 +99,17 @@ export async function getUserSessionAction(): Promise<{
   user: CurrentUser | null;
 }> {
   try {
-    const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+    const cookieStore = await cookies();
+    const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
     const session = await verifySession(token);
 
     if (!session?.userId) {
       return { isSuccess: false, user: null };
     }
 
-    const localUser = await databaseService.getUserById(session.userId, {
+    const localUser = (await databaseService.getUserById(session.userId, {
       roles: true,
-    });
+    })) as UserWithRoles | null;
 
     if (!localUser) {
       return { isSuccess: false, user: null };

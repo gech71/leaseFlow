@@ -102,13 +102,9 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(accessToken);
 
-  // NOTE: session_id cookie binding has been removed.
-
   if (!session) {
-    // If verifySession returned null, try to decode the token to see if it's
-    // a valid JWT whose JTI no longer matches the user's stored JTI. This
-    // indicates possible token reuse/tampering. In that case, revoke the
-    // session server-side and clear cookies so the affected user is force-logged-out.
+    // If verifySession returned null, try to decode the token so we can revoke the
+    // presented session JTI server-side in case of reuse/tampering.
     try {
       const payload = await (
         await import("@/lib/auth/jwt")
@@ -121,17 +117,9 @@ export async function middleware(request: NextRequest) {
           const user = await databaseService.getUserById(
             (payload as any).userId,
           );
-          if (
-            user &&
-            user.currentAccessJti &&
-            user.currentAccessJti !== (payload as any).jti
-          ) {
-            // Tampering / reuse detected. Revoke session and clear stored JTIs.
+          if (user) {
+            // Revoke the presented JTI. Do not update per-user JTI fields.
             await databaseService.revokeUserSessionByJti((payload as any).jti);
-            await databaseService.updateUser(user.id, {
-              currentAccessJti: null,
-              currentRefreshJti: null,
-            } as any);
 
             const cookieNames = getSessionCookieNames();
             if (pathname.startsWith("/api/")) {
@@ -157,15 +145,14 @@ export async function middleware(request: NextRequest) {
     } catch (err) {
       // ignore decode errors and continue with standard redirect
     }
+
     const loginUrl = new URL("/login", request.url);
-    // For API requests, return 401 JSON so clients can handle logout.
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { message: "Unauthorized. Please log in." },
         { status: 401 },
       );
     }
-    // Redirect to plain /login on session expiration for page navigations
     return NextResponse.redirect(loginUrl);
   }
 
@@ -174,7 +161,6 @@ export async function middleware(request: NextRequest) {
     const lastActive = request.cookies.get(LAST_ACTIVE_COOKIE_NAME)?.value;
     const now = Date.now();
     if (!lastActive || now - Number(lastActive) > IDLE_TIMEOUT_MS) {
-      // Treat this as session expired due to inactivity.
       const cookieNames = getSessionCookieNames();
       if (pathname.startsWith("/api/")) {
         const resp = NextResponse.json(
@@ -193,7 +179,6 @@ export async function middleware(request: NextRequest) {
       return resp;
     }
 
-    // Update last-active cookie to extend idle timeout
     response.cookies.set(LAST_ACTIVE_COOKIE_NAME, String(now), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -211,7 +196,6 @@ export async function middleware(request: NextRequest) {
     }
     return response;
   }
-  // If user is NOT forced to change password but tries to access the page, redirect away.
   if (pathname === "/change-password") {
     return NextResponse.redirect(new URL("/admin/dashboard", request.url));
   }
@@ -223,7 +207,6 @@ export async function middleware(request: NextRequest) {
     userPermissions.size === 1 &&
     !session.isSuperAdmin;
 
-  // Handle Admin Routes
   if (pathname.startsWith("/admin")) {
     if (isTenantOnly) {
       return NextResponse.redirect(new URL("/portal/dashboard", request.url));
@@ -241,9 +224,6 @@ export async function middleware(request: NextRequest) {
         });
 
         const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
-        // If the user's first allowed page is within Settings, don't show the
-        // generic "Access Denied" banner — redirect silently to their settings
-        // page instead. For all other cases, preserve the existing behavior.
         const showError =
           !firstAllowedPage || !firstAllowedPage.startsWith("/admin/settings");
         if (showError) {
@@ -254,7 +234,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Handle Portal Routes
   if (pathname.startsWith("/portal/") && !isPublicRoute) {
     if (!isTenantOnly) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url));
@@ -263,6 +242,9 @@ export async function middleware(request: NextRequest) {
 
   return response;
 }
+
+// Provide a named `proxy` export for runtimes that expect it.
+export const proxy = middleware;
 
 export const config = {
   matcher: ["/((?!_next/image|favicon.ico|images).*)"],

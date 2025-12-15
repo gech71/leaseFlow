@@ -100,6 +100,11 @@ export interface SessionPayload extends JWTPayload {
   jti?: string;
 }
 
+export type SessionUserData = Pick<
+  SessionPayload,
+  "userId" | "email" | "permissions" | "isSuperAdmin" | "forceChangePass"
+>;
+
 export interface RefreshTokenPayload extends JWTPayload {
   userId: string;
   jti?: string;
@@ -124,7 +129,7 @@ interface GeneratedTokens {
  * @returns {Promise<GeneratedTokens>} An object containing access and refresh tokens and their respective cookie options.
  */
 export async function createSession(
-  payload: Omit<SessionPayload, keyof JWTPayload>,
+  payload: SessionUserData,
 ): Promise<GeneratedTokens> {
   // Create Access Token (short-lived)
   const jti = nanoid();
@@ -167,18 +172,9 @@ export async function createSession(
       // Attach the created session JTI to the user record so tokens are
       // explicitly bound to the user account. If the user doesn't exist
       // (e.g. portal ephemeral users), skip this step.
-      try {
-        const user = await databaseService.getUserById(payload.userId);
-        if (user) {
-          await databaseService.updateUser(payload.userId, {
-            currentAccessJti: jti,
-            currentRefreshJti: jti,
-          } as any);
-        }
-      } catch (err) {
-        // Non-fatal: continue even if we can't attach to user record.
-        console.warn("Warning: failed to attach jti to user record", err);
-      }
+      // Persisted session record created in `UserSession`. Do not attach
+      // JTI values to the `User` record; rely on `UserSession` entries for
+      // revocation/checking instead.
     }
   } catch (err) {
     // If DB write fails, we still return tokens but log a warning.
@@ -228,25 +224,9 @@ export async function verifySession(
         // If a user record exists, ensure the user's attached JTI matches
         // the presented token; if it doesn't, revoke and clear to force
         // a logout for that user's sessions.
-        try {
-          const user = await databaseService.getUserById(sessionPayload.userId);
-          if (user) {
-            if (
-              user.currentAccessJti &&
-              user.currentAccessJti !== sessionPayload.jti
-            ) {
-              // Token reuse or mismatch detected: revoke the session and clear the user's stored JTIs.
-              await databaseService.revokeUserSessionByJti(sessionPayload.jti);
-              await databaseService.updateUser(user.id, {
-                currentAccessJti: null,
-                currentRefreshJti: null,
-              } as any);
-              return null;
-            }
-          }
-        } catch (err) {
-          // ignore user-specific errors and continue.
-        }
+        // Do not rely on per-user JTI fields on `User`. Revocation and
+        // session validation occur via `UserSession` records. If additional
+        // checks are needed, they should operate on `UserSession`.
 
         // Update lastActive timestamp in DB
         await databaseService.updateUserSessionLastActive(sessionPayload.jti);
@@ -284,19 +264,8 @@ export async function verifyRefreshToken(
           "@/lib/services/databaseService"
         );
         const user = await databaseService.getUserById(refreshPayload.userId);
-        if (
-          user &&
-          user.currentRefreshJti &&
-          user.currentRefreshJti !== refreshPayload.jti
-        ) {
-          // Mismatch: revoke the incoming JTI and clear stored JTIs
-          await databaseService.revokeUserSessionByJti(refreshPayload.jti);
-          await databaseService.updateUser(user.id, {
-            currentAccessJti: null,
-            currentRefreshJti: null,
-          } as any);
-          return null;
-        }
+        // Do not rely on per-user JTI fields on `User`. Session revocation and
+        // validation should be performed via `UserSession` records instead.
       }
     } catch (err) {
       // ignore DB-specific errors and continue; callers may perform additional checks
@@ -347,7 +316,7 @@ export function getSessionCookieNames(): string[] {
  */
 export function createUserPayload(
   user: User & { roles: Role[] },
-): Omit<SessionPayload, keyof JWTPayload> {
+): SessionUserData {
   const isSuperAdmin = user.roles.some((role) => role.name === "SUPER_ADMIN");
 
   let permissions: string[] = [];

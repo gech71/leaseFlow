@@ -20,7 +20,8 @@ const changePasswordSchema = z.object({
 export async function changePassword(
   values: z.infer<typeof changePasswordSchema>,
 ): Promise<{ success: boolean; error?: string }> {
-  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const sessionUser = await verifySession(token);
   if (!sessionUser) {
     throw new Error(GENERIC_AUTH_ERROR);
@@ -69,7 +70,7 @@ export async function changePassword(
   // Invalidate the user's session by deleting the cookie
   const cookieNames = getSessionCookieNames();
   cookieNames.forEach((name) => {
-    cookies().set(name, "", { expires: new Date(0), path: "/" });
+    cookieStore.set(name, "", { expires: new Date(0), path: "/" });
   });
 
   return { success: true };

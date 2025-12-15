@@ -2,11 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  productionBrowserSourceMaps: false,
   typescript: {
     ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
   async headers() {
     return [
@@ -20,7 +18,7 @@ const nextConfig: NextConfig = {
             value: "max-age=31536000; includeSubDomains; preload",
           },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-		   {
+          {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(self)",
           },

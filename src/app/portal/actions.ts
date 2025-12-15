@@ -17,7 +17,8 @@ import type { PortalAgreementWithRelations } from "./dashboard/actions";
 
 // --- User Authentication Helper ---
 async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
-  const token = cookies().get(ACCESS_TOKEN_COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(token);
   if (session?.userId) {
     const user = await databaseService.getUserById(session.userId, {
@@ -42,8 +43,13 @@ export async function setPortalSessionAction(token: string) {
 
     const { accessToken, refreshToken } = await createSession(payload);
 
-    cookies().set(accessToken.name, accessToken.value, accessToken.options);
-    cookies().set(refreshToken.name, refreshToken.value, refreshToken.options);
+    const cookieStore = await cookies();
+    cookieStore.set(accessToken.name, accessToken.value, accessToken.options);
+    cookieStore.set(
+      refreshToken.name,
+      refreshToken.value,
+      refreshToken.options,
+    );
 
     return { success: true };
   } catch (error) {

@@ -265,8 +265,6 @@ model User {
   AuditLog          AuditLog[]
   UserSession       UserSession[]
 
-  currentAccessJti  String?
-  currentRefreshJti String?
 }
 
 model Role {

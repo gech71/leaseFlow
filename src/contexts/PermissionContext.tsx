@@ -1,11 +1,17 @@
-
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import type { CurrentUser } from '@/lib/types';
-import { getUserSessionAction } from '@/lib/actions/server-helpers';
-import { GENERIC_AUTH_ERROR } from '@/lib/security/messages';
-import { useToast } from '@/hooks/use-toast';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import type { CurrentUser } from "@/lib/types";
+import { getUserSessionAction } from "@/lib/actions/server-helpers";
+import { GENERIC_AUTH_ERROR } from "@/lib/security/messages";
+import { useToast } from "@/hooks/use-toast";
 
 interface PermissionContextType {
   currentUser: CurrentUser | null;
@@ -33,29 +39,31 @@ const PermissionContext = createContext<PermissionContextType>({
 
 export const usePermissions = () => useContext(PermissionContext);
 
-export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
-  
+
   const logout = useCallback(async (sessionExpired = false) => {
     try {
-        await fetch('/api/auth/logout', { 
-            method: 'POST',
-             headers: {
-                'Content-Type': 'application/json',
-            }
-        });
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
     } catch (error) {
-        console.error("Logout request failed:", error);
+      console.error("Logout request failed:", error);
     } finally {
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-        setIsLoading(false); // Stop loading on logout
-        const loginUrl = new URL('/login', window.location.origin);
-        // Always redirect to plain /login (no query params) on logout/session expiry
-        window.location.href = loginUrl.toString();
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setIsLoading(false); // Stop loading on logout
+      const loginUrl = new URL("/login", window.location.origin);
+      // Always redirect to plain /login (no query params) on logout/session expiry
+      window.location.href = loginUrl.toString();
     }
   }, []);
 
@@ -67,7 +75,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const checkCsrfAndLogoutIfMissing = async () => {
       try {
-        const res = await fetch('/api/auth/csrf-check');
+        const res = await fetch("/api/auth/csrf-check");
         const data = await res.json();
         if (!mounted) return;
         if (data && data.csrfPresent === false) {
@@ -79,59 +87,65 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     if (isAuthenticated) {
-        const onFocus = () => {
-          checkCsrfAndLogoutIfMissing();
-        };
+      const onFocus = () => {
+        checkCsrfAndLogoutIfMissing();
+      };
 
-        // Run an immediate check and also check on window focus.
-        window.addEventListener("focus", onFocus);
+      // Run an immediate check and also check on window focus.
+      window.addEventListener("focus", onFocus);
 
-        // Add short polling (5s) in addition to focus checks so tampering
-        // is detected even if the user doesn't refocus the window.
-        let pollId: number | undefined;
-        pollId = window.setInterval(() => {
-          checkCsrfAndLogoutIfMissing();
-        }, 5000);
-      
-        return () => {
-          window.removeEventListener("focus", onFocus);
-          if (pollId) {
-            clearInterval(pollId);
-          }
-        };
+      // Add short polling (5s) in addition to focus checks so tampering
+      // is detected even if the user doesn't refocus the window.
+      let pollId: number | undefined;
+      pollId = window.setInterval(() => {
+        checkCsrfAndLogoutIfMissing();
+      }, 5000);
+
+      return () => {
+        window.removeEventListener("focus", onFocus);
+        if (pollId) {
+          clearInterval(pollId);
+        }
+      };
     }
 
     return () => {
       mounted = false;
-      window.removeEventListener('focus', checkCsrfAndLogoutIfMissing);
+      window.removeEventListener("focus", checkCsrfAndLogoutIfMissing);
     };
   }, [isAuthenticated, logout]);
 
-  const handleApiCall = useCallback(async <T>(apiCall: () => Promise<T>): Promise<T | undefined> => {
-    // Before making the API call, ensure the CSRF token is present and valid.
-    try {
-      const res = await fetch('/api/auth/csrf-check');
-      const data = await res.json();
-      if (data && data.csrfPresent === false) {
-        await logout(true);
-        return undefined;
+  const handleApiCall = useCallback(
+    async <T,>(apiCall: () => Promise<T>): Promise<T | undefined> => {
+      // Before making the API call, ensure the CSRF token is present and valid.
+      try {
+        const res = await fetch("/api/auth/csrf-check");
+        const data = await res.json();
+        if (data && data.csrfPresent === false) {
+          await logout(true);
+          return undefined;
+        }
+      } catch (err) {
+        // network errors: proceed to call the API (the API itself will reject if unauthenticated)
       }
-    } catch (err) {
-      // network errors: proceed to call the API (the API itself will reject if unauthenticated)
-    }
 
-    try {
-      return await apiCall();
-    } catch (error: any) {
-      if (error.message?.includes("Authentication") || error.message?.includes("Session expired") || error.message === GENERIC_AUTH_ERROR) {
-        await logout(true);
-        return undefined;
+      try {
+        return await apiCall();
+      } catch (error: any) {
+        if (
+          error.message?.includes("Authentication") ||
+          error.message?.includes("Session expired") ||
+          error.message === GENERIC_AUTH_ERROR
+        ) {
+          await logout(true);
+          return undefined;
+        }
+        // Re-throw other errors to be handled by the component
+        throw error;
       }
-      // Re-throw other errors to be handled by the component
-      throw error;
-    }
-  }, [logout]);
-
+    },
+    [logout],
+  );
 
   const refreshUser = useCallback(async () => {
     // No need to set loading to true here, as it's for background refreshes or initial load.
@@ -153,7 +167,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsLoading(false);
     }
   }, []);
-  
+
   useEffect(() => {
     refreshUser();
 
@@ -188,20 +202,26 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const isSuperAdmin = useMemo(() => {
     if (!currentUser) return false;
-    return currentUser.roles.some(role => role.name === 'SUPER_ADMIN');
+    return currentUser.roles.some((role) => role.name === "SUPER_ADMIN");
   }, [currentUser]);
 
-  const hasPermission = useCallback((permission: string): boolean => {
-    if (!currentUser) return false;
-    if (isSuperAdmin) return true;
-    return effectivePermissions.has(permission);
-  }, [currentUser, isSuperAdmin, effectivePermissions]);
+  const hasPermission = useCallback(
+    (permission: string): boolean => {
+      if (!currentUser) return false;
+      if (isSuperAdmin) return true;
+      return effectivePermissions.has(permission);
+    },
+    [currentUser, isSuperAdmin, effectivePermissions],
+  );
 
-  const hasAnyPermission = useCallback((permissions: string[]): boolean => {
-    if (!currentUser) return false;
-    if (isSuperAdmin) return true;
-    return permissions.some(p => effectivePermissions.has(p));
-  }, [currentUser, isSuperAdmin, effectivePermissions]);
+  const hasAnyPermission = useCallback(
+    (permissions: string[]): boolean => {
+      if (!currentUser) return false;
+      if (isSuperAdmin) return true;
+      return permissions.some((p) => effectivePermissions.has(p));
+    },
+    [currentUser, isSuperAdmin, effectivePermissions],
+  );
 
   const value = {
     currentUser,
