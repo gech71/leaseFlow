@@ -8,7 +8,6 @@ import {
   verifyCsrfToken,
   getSessionCookieNames,
   LAST_ACTIVE_COOKIE_NAME,
-  SESSION_ID_COOKIE_NAME,
   IDLE_TIMEOUT_MS,
 } from "@/lib/auth/jwt";
 import { PERMISSION_MAP } from "@/lib/auth-utils";
@@ -23,7 +22,11 @@ const ORDERED_ADMIN_PAGES = [
   "/admin/billing",
   "/admin/payments-overview",
   "/admin/building-utilities",
+  // Settings sub-pages (so users with only Settings permissions can land somewhere valid)
+  "/admin/settings/agreement-template",
+  "/admin/settings/role-management",
   "/admin/settings/user-management",
+  "/admin/settings/user-registration",
   "/admin/import",
 ];
 
@@ -99,62 +102,7 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(accessToken);
 
-  // If a valid session was returned, ensure the browser's session-id cookie
-  // matches the token's JTI. If it doesn't, this indicates token misuse
-  // (copied/modified token) and we should revoke and force logout.
-  if (session) {
-    try {
-      const sessionCookie = request.cookies.get(SESSION_ID_COOKIE_NAME)?.value;
-      // Compute expected signed session cookie from the token's jti
-      const { signSessionCookie } = await import("@/lib/auth/jwt");
-      const expected = session.jti
-        ? await signSessionCookie(session.jti)
-        : null;
-      if (
-        session.jti &&
-        sessionCookie &&
-        expected &&
-        sessionCookie !== expected
-      ) {
-        try {
-          const { databaseService } = await import(
-            "@/lib/services/databaseService"
-          );
-          // Revoke the session represented by this token JTI
-          await databaseService.revokeUserSessionByJti(session.jti);
-          const user = await databaseService.getUserById(session.userId);
-          if (user) {
-            await databaseService.updateUser(user.id, {
-              currentAccessJti: null,
-              currentRefreshJti: null,
-            } as any);
-          }
-        } catch (err) {
-          // ignore DB errors
-        }
-
-        const cookieNames = getSessionCookieNames();
-        if (pathname.startsWith("/api/")) {
-          const resp = NextResponse.json(
-            { message: "Unauthorized. Token mismatch detected." },
-            { status: 401 },
-          );
-          cookieNames.forEach((name) =>
-            resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
-          );
-          return resp;
-        }
-
-        const resp = NextResponse.redirect(new URL("/login", request.url));
-        cookieNames.forEach((name) =>
-          resp.cookies.set(name, "", { expires: new Date(0), path: "/" }),
-        );
-        return resp;
-      }
-    } catch (err) {
-      // ignore
-    }
-  }
+  // NOTE: session_id cookie binding has been removed.
 
   if (!session) {
     // If verifySession returned null, try to decode the token to see if it's
@@ -293,10 +241,14 @@ export async function middleware(request: NextRequest) {
         });
 
         const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
-        redirectUrl.searchParams.set(
-          "error",
-          firstAllowedPage ? "Access Denied" : "Access Denied",
-        );
+        // If the user's first allowed page is within Settings, don't show the
+        // generic "Access Denied" banner — redirect silently to their settings
+        // page instead. For all other cases, preserve the existing behavior.
+        const showError =
+          !firstAllowedPage || !firstAllowedPage.startsWith("/admin/settings");
+        if (showError) {
+          redirectUrl.searchParams.set("error", "Access Denied");
+        }
         return NextResponse.redirect(redirectUrl);
       }
     }

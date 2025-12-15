@@ -53,9 +53,7 @@ export async function POST(request: NextRequest) {
 
   // Create a new session (which includes a new access token and a new refresh token)
   const newSessionPayload = createUserPayload(user);
-  const { accessToken, refreshToken, sessionId } = await createSession(
-    newSessionPayload,
-  );
+  const { accessToken, refreshToken } = await createSession(newSessionPayload);
 
   // Revoke the old session referenced by the incoming refresh token (rotation)
   try {
@@ -82,8 +80,6 @@ export async function POST(request: NextRequest) {
     refreshToken.value,
     refreshToken.options,
   );
-  // Set session identifier cookie
-  response.cookies.set(sessionId.name, sessionId.value, sessionId.options);
 
   // Update last-active timestamp when refreshing session
   response.cookies.set(LAST_ACTIVE_COOKIE_NAME, String(Date.now()), {

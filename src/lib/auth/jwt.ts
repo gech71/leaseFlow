@@ -18,7 +18,8 @@ export const REFRESH_TOKEN_COOKIE_NAME = "nibrental_refresh_token";
 export const CSRF_TOKEN_COOKIE_NAME = "nibrental_csrf_token";
 export const CSRF_TOKEN_SIG_NAME = "nibrental_csrf_sig";
 export const LAST_ACTIVE_COOKIE_NAME = "nibrental_last_active";
-export const SESSION_ID_COOKIE_NAME = "nibrental_session_id";
+// NOTE: We previously used a separate `session_id` cookie to bind tokens to a
+// browser session. This has been removed per requirements.
 
 // Idle timeout in milliseconds. If no activity for this duration, session is considered idle.
 export const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
@@ -33,18 +34,6 @@ async function importHmacKey(): Promise<CryptoKey> {
     false,
     ["sign", "verify"],
   );
-}
-
-/**
- * Compute an HMAC signature of the session jti for use as the session-id cookie value.
- * This prevents storing the raw JTI in the cookie while still allowing the server
- * to verify the cookie matches the token's jti.
- */
-export async function signSessionCookie(jti: string): Promise<string> {
-  const key = await importHmacKey();
-  const data = new TextEncoder().encode(jti);
-  const sig = await (globalThis.crypto as any).subtle.sign("HMAC", key, data);
-  return bufferToHex(sig);
 }
 
 function bufferToHex(buf: ArrayBuffer): string {
@@ -127,11 +116,6 @@ interface GeneratedTokens {
     value: string;
     options: Omit<ResponseCookie, "name" | "value">;
   };
-  sessionId: {
-    name: string;
-    value: string;
-    options: Omit<ResponseCookie, "name" | "value">;
-  };
 }
 
 /**
@@ -210,11 +194,6 @@ export async function createSession(
     refreshToken: {
       name: REFRESH_TOKEN_COOKIE_NAME,
       value: refreshToken,
-      options: { ...commonCookieOptions, expires: refreshTokenExpires },
-    },
-    sessionId: {
-      name: SESSION_ID_COOKIE_NAME,
-      value: await signSessionCookie(jti),
       options: { ...commonCookieOptions, expires: refreshTokenExpires },
     },
   };
@@ -355,7 +334,6 @@ export function getSessionCookieNames(): string[] {
   return [
     ACCESS_TOKEN_COOKIE_NAME,
     REFRESH_TOKEN_COOKIE_NAME,
-    SESSION_ID_COOKIE_NAME,
     CSRF_TOKEN_COOKIE_NAME,
     CSRF_TOKEN_SIG_NAME,
     LAST_ACTIVE_COOKIE_NAME,

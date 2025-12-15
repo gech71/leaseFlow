@@ -71,20 +71,33 @@ export async function upsertAgreementTemplateAction(data: {
   error?: string;
 }> {
   try {
-    const { currentUser, isSuperAdmin, permissions } =
-      await getUserAndPermissions();
+    // Use managed IDs helper so we know the caller's managed buildings
+    const { currentUser, isSuperAdmin, permissions, managedBuildingIds } =
+      await getUserAndManagedIds();
     if (
       !isSuperAdmin &&
       !permissions.has("settings:agreement_templates:manage")
     ) {
       return { success: false, error: "Access Denied" };
     }
+
+    // Default to the caller's first managed building when not a superadmin
+    // and the caller didn't explicitly select a building.
+    const defaultBuildingId =
+      !isSuperAdmin && (!data.buildingId || data.buildingId === null)
+        ? managedBuildingIds && managedBuildingIds.length > 0
+          ? managedBuildingIds[0]
+          : undefined
+        : undefined;
+
     const createData: Prisma.AgreementTemplateCreateInput = {
       name: data.name,
       content: data.content,
       createdBy: { connect: { id: currentUser.id } },
       building: data.buildingId
         ? { connect: { id: data.buildingId } }
+        : defaultBuildingId
+        ? { connect: { id: defaultBuildingId } }
         : undefined,
     };
 

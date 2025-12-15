@@ -22,7 +22,11 @@ const ORDERED_ADMIN_PAGES = [
   "/admin/billing",
   "/admin/payments-overview",
   "/admin/building-utilities",
+  // Settings sub-pages (so users with only Settings permissions can land somewhere valid)
+  "/admin/settings/agreement-template",
+  "/admin/settings/role-management",
   "/admin/settings/user-management",
+  "/admin/settings/user-registration",
   "/admin/import",
 ];
 
@@ -158,8 +162,17 @@ export async function middleware(request: NextRequest) {
       });
 
       const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
-      const errorMessage = firstAllowedPage ? "Access Denied" : "Access Denied";
-      redirectUrl.searchParams.set("error", errorMessage);
+      // If the user's first allowed page is within Settings, avoid showing the
+      // generic "Access Denied" banner and redirect silently to their settings
+      // page. Otherwise, include the error message as before.
+      const showError =
+        !firstAllowedPage || !firstAllowedPage.startsWith("/admin/settings");
+      if (showError) {
+        const errorMessage = firstAllowedPage
+          ? "Access Denied"
+          : "Access Denied";
+        redirectUrl.searchParams.set("error", errorMessage);
+      }
       return NextResponse.redirect(redirectUrl);
     }
   }

@@ -135,9 +135,7 @@ export async function POST(request: NextRequest) {
 
     const payload = createUserPayload(user as User & { roles: Role[] });
     payload.forceChangePass = forceChangePass; // Ensure flag is set correctly
-    const { accessToken, refreshToken, sessionId } = await createSession(
-      payload,
-    );
+    const { accessToken, refreshToken } = await createSession(payload);
 
     const response = NextResponse.json(
       { message: "Login successful" },
@@ -155,8 +153,6 @@ export async function POST(request: NextRequest) {
       refreshToken.value,
       refreshToken.options,
     );
-    // Set session identifier cookie (used to bind the token to this browser session)
-    response.cookies.set(sessionId.name, sessionId.value, sessionId.options);
 
     // Initialize last-active timestamp so idle timeout starts now.
     response.cookies.set(LAST_ACTIVE_COOKIE_NAME, String(Date.now()), {
