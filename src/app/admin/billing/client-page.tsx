@@ -174,6 +174,11 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [billForPayment, setBillForPayment] = useState<ClientBill | null>(null);
+  const [confirmGenerateAllOpen, setConfirmGenerateAllOpen] = useState(false);
+  const [confirmSingleGenerateOpen, setConfirmSingleGenerateOpen] =
+    useState(false);
+  const [selectedAgreementToGenerate, setSelectedAgreementToGenerate] =
+    useState<string | null>(null);
 
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
@@ -840,7 +845,7 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           </CardHeader>
           <CardContent>
             <Button
-              onClick={handleGenerateAllDueBills}
+              onClick={() => setConfirmGenerateAllOpen(true)}
               className="w-full md:w-auto bg-accent text-accent-foreground hover:bg-accent/90"
               disabled={isLoading || agreements.length === 0}
             >
@@ -942,9 +947,10 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
                         <CardFooter className="pb-4">
                           <Button
                             className="w-full"
-                            onClick={() =>
-                              handleGenerateSingleBill(agreement.id)
-                            }
+                            onClick={() => {
+                              setSelectedAgreementToGenerate(agreement.id);
+                              setConfirmSingleGenerateOpen(true);
+                            }}
                             disabled={isLoading}
                           >
                             Generate Bill
@@ -1166,6 +1172,62 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={confirmGenerateAllOpen}
+        onOpenChange={(open) => setConfirmGenerateAllOpen(open)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate All Due Bills?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will generate bills for all agreements that are due. Do you
+              want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmGenerateAllOpen(false);
+                await handleGenerateAllDueBills();
+              }}
+              className="bg-primary"
+            >
+              Yes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmSingleGenerateOpen}
+        onOpenChange={(open) => setConfirmSingleGenerateOpen(open)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate Bill?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Generate the next bill for this agreement? Choose Yes to proceed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmSingleGenerateOpen(false);
+                if (selectedAgreementToGenerate) {
+                  await handleGenerateSingleBill(selectedAgreementToGenerate);
+                  setSelectedAgreementToGenerate(null);
+                }
+              }}
+              className="bg-primary"
+            >
+              Yes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="space-y-4 mt-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

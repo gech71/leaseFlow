@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import * as XLSX from "xlsx-js-style";
+import XLSX from "xlsx-js-style";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { PaginationControls } from "@/components/custom/PaginationControls";
 

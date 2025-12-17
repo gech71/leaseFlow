@@ -1,4 +1,3 @@
-
 export const dynamic = "force-dynamic";
 
 import { databaseService } from "@/lib/services/databaseService";
@@ -18,14 +17,14 @@ import { prisma } from "@/lib/prisma";
 // This is the main Server Component for the page
 export default async function SpacesPage() {
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
-  
+
   // --- Automatic Space Vacating Logic ---
   // This logic now runs first to prevent race conditions.
   const today = startOfDay(new Date());
   // Find agreements that are now expired but their spaces are still marked as occupied.
   const expiredAgreementsOnOccupiedSpaces = await prisma.agreement.findMany({
     where: {
-      status: { not: 'Canceled' }, // Exclude canceled agreements from this check
+      status: { notIn: ["Canceled", "Rejected"] }, // Exclude canceled/rejected agreements from this check
       space: {
         isOccupied: true,
         // Limit the check to buildings managed by the current user if not super admin
@@ -59,25 +58,32 @@ export default async function SpacesPage() {
 
   // If we found any spaces to vacate, update them in a batch transaction.
   if (relationsToUpdate.length > 0) {
-    const spaceIdsToVacate = [...new Set(relationsToUpdate.map(r => r.spaceId))];
-    const tenantIdsToUpdate = [...new Set(relationsToUpdate.map(r => r.tenantId))];
+    const spaceIdsToVacate = [
+      ...new Set(relationsToUpdate.map((r) => r.spaceId)),
+    ];
+    const tenantIdsToUpdate = [
+      ...new Set(relationsToUpdate.map((r) => r.tenantId)),
+    ];
 
     try {
-        await prisma.$transaction([
-          // Set the space as not occupied
-          prisma.space.updateMany({
-            where: { id: { in: spaceIdsToVacate } },
-            data: { isOccupied: false },
-          }),
-          // Disconnect the tenant from their rented space
-          prisma.tenant.updateMany({
-            where: { id: { in: tenantIdsToUpdate }, rentedSpaceId: { in: spaceIdsToVacate } },
-            data: { rentedSpaceId: null },
-          }),
-        ]);
-    } catch(e) {
-        console.error("Error during automatic space vacating transaction:", e);
-        // Log the error but don't block page render.
+      await prisma.$transaction([
+        // Set the space as not occupied
+        prisma.space.updateMany({
+          where: { id: { in: spaceIdsToVacate } },
+          data: { isOccupied: false },
+        }),
+        // Disconnect the tenant from their rented space
+        prisma.tenant.updateMany({
+          where: {
+            id: { in: tenantIdsToUpdate },
+            rentedSpaceId: { in: spaceIdsToVacate },
+          },
+          data: { rentedSpaceId: null },
+        }),
+      ]);
+    } catch (e) {
+      console.error("Error during automatic space vacating transaction:", e);
+      // Log the error but don't block page render.
     }
   }
   // --- End Automatic Logic ---
@@ -94,6 +100,7 @@ export default async function SpacesPage() {
     include: {
       building: true,
       agreements: true,
+      createdBy: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -108,8 +115,13 @@ export default async function SpacesPage() {
       let availabilityDate: string | null = null;
       if (space.isOccupied && space.agreements.length > 0) {
         const activeAgreements = space.agreements
-          .filter((ag) =>
-            isAfter(addMonths(ag.startDate, ag.paymentTermMonths), new Date()),
+          .filter(
+            (ag) =>
+              ag.status === "Active" &&
+              isAfter(
+                addMonths(ag.startDate, ag.paymentTermMonths),
+                new Date(),
+              ),
           )
           .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
 
@@ -130,6 +142,9 @@ export default async function SpacesPage() {
         createdAt: space.createdAt.toISOString(),
         updatedAt: space.updatedAt?.toISOString() || new Date().toISOString(),
         buildingName: space.building.name,
+        createdBy: space.createdBy
+          ? { id: space.createdBy.id, name: space.createdBy.name }
+          : null,
         availabilityDate,
         agreements: space.agreements.map((ag) => ({
           ...ag,

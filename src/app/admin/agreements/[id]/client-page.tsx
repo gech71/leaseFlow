@@ -47,9 +47,21 @@ const sanitizeFilename = (name: string) => {
   return name.replace(/[^a-z0-9_.-]/gi, "_").replace(/_{2,}/g, "_");
 };
 
-export interface AgreementWithRelations extends AgreementPrisma {
+export interface AgreementWithRelations
+  extends Omit<
+    AgreementPrisma,
+    | "monthlyRentalPrice"
+    | "initialPaymentAmount"
+    | "startDate"
+    | "nextPaymentDueDate"
+    | "createdAt"
+    | "updatedAt"
+    | "initialPaymentDate"
+  > {
   tenant: Tenant | null;
   space: Space | null;
+  monthlyRentalPrice: number;
+  initialPaymentAmount: number | null;
   // Dates are expected as strings from server props
   startDate: string;
   nextPaymentDueDate: string;

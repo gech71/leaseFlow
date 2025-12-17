@@ -63,7 +63,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import * as XLSX from "xlsx-js-style";
+import XLSX from "xlsx-js-style";
 
 export interface BuildingWithRelations extends BuildingTypePrisma {
   penaltyPolicyTiers: PenaltyTierTypePrisma[];

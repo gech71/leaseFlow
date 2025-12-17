@@ -93,6 +93,7 @@ const buildingFormSchema = z.object({
   address: z.string().min(5, "Address must be at least 5 characters."),
   branchName: z.string().max(100).optional().nullable(),
   ownerName: z.string().max(200).optional().nullable(),
+  ownerAddress: z.string().max(300).optional().nullable(),
   ownerPhone: z
     .string()
     .regex(/^09\d{8}$/, "Phone must start with '09' followed by 8 digits."),
@@ -163,6 +164,7 @@ export function BuildingUpsertFormInternal({
       address: "",
       branchName: "",
       ownerName: "",
+      ownerAddress: "",
       ownerPhone: "",
       ownerEmail: "",
       accountNumber: "",
@@ -200,6 +202,7 @@ export function BuildingUpsertFormInternal({
         address: initialBuildingData.address || "",
         branchName: (initialBuildingData as any).branchName || "",
         ownerName: (initialBuildingData as any).ownerName || "",
+        ownerAddress: (initialBuildingData as any).ownerAddress || "",
         ownerPhone: (initialBuildingData as any).ownerPhone || "",
         ownerEmail: (initialBuildingData as any).ownerEmail || "",
         accountNumber: initialBuildingData.accountNumber || "",
@@ -215,6 +218,7 @@ export function BuildingUpsertFormInternal({
         address: "",
         branchName: "",
         ownerName: "",
+        ownerAddress: "",
         ownerPhone: "",
         ownerEmail: "",
         accountNumber: "",
@@ -296,6 +300,9 @@ export function BuildingUpsertFormInternal({
         address: values.address.trim(),
         branchName: values.branchName ? values.branchName.trim() : undefined,
         ownerName: values.ownerName ? values.ownerName.trim() : undefined,
+        ownerAddress: values.ownerAddress
+          ? values.ownerAddress.trim()
+          : undefined,
         ownerPhone: values.ownerPhone ? values.ownerPhone.trim() : undefined,
         ownerEmail: values.ownerEmail ? values.ownerEmail.trim() : undefined,
         accountNumber: values.accountNumber.trim(),
@@ -312,6 +319,9 @@ export function BuildingUpsertFormInternal({
         address: values.address.trim(),
         branchName: values.branchName ? values.branchName.trim() : undefined,
         ownerName: values.ownerName ? values.ownerName.trim() : undefined,
+        ownerAddress: values.ownerAddress
+          ? values.ownerAddress.trim()
+          : undefined,
         ownerPhone: values.ownerPhone ? values.ownerPhone.trim() : undefined,
         ownerEmail: values.ownerEmail ? values.ownerEmail.trim() : undefined,
         accountNumber: values.accountNumber.trim(),
@@ -532,6 +542,26 @@ export function BuildingUpsertFormInternal({
                       <FormControl>
                         <Input
                           placeholder="Building Owner Email"
+                          {...field}
+                          disabled={isSaving || !canManageThisForm}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ownerAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">
+                        Building Owner Address (optional)
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Owner address"
+                          rows={2}
                           {...field}
                           disabled={isSaving || !canManageThisForm}
                         />

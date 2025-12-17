@@ -1,4 +1,3 @@
-
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
@@ -6,20 +5,20 @@ export interface PenaltyTier {
   id?: string;
   fromDay: number;
   toDay?: number | null;
-  penaltyType: 'Fixed' | 'Percentage';
+  penaltyType: "Fixed" | "Percentage";
   feeValue: number;
-  scope: 'Building' | 'Floor' | 'SpecificSpaces';
+  scope: "Building" | "Floor" | "SpecificSpaces";
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
   buildingId?: string;
-  frequency: 'OneTime' | 'Daily';
+  frequency: "OneTime" | "Daily";
 }
 
 export interface Building {
   id: string;
   name: string;
   address?: string | null;
-  status: 'Pending' | 'Active' | 'Rejected' | 'Inactive';
+  status: "Pending" | "Active" | "Rejected" | "Inactive";
   rejectionReason?: string | null;
   penaltyPolicyTiers: PenaltyTier[];
   createdAt: string; // ISO Date String
@@ -32,6 +31,8 @@ export interface Space {
   id: string;
   buildingId: string;
   buildingName: string;
+  status?: "Pending" | "Active" | "Rejected" | "Inactive";
+  rejectionReason?: string | null;
   spaceIdName: string;
   area: number;
   floor: string;
@@ -44,6 +45,7 @@ export interface Space {
   tenant?: Tenant | null;
   building?: Building;
   agreements?: Agreement[];
+  createdBy?: { id?: string; name?: string } | null;
 }
 
 export interface Tenant {
@@ -64,7 +66,7 @@ export interface Tenant {
 }
 
 export interface Agreement {
-  id:string;
+  id: string;
   tenantId: string;
   spaceId: string;
   agreementTemplateId: string;
@@ -77,7 +79,14 @@ export interface Agreement {
   paymentTermMonths: number;
   initialPaymentMonths: number;
   nextPaymentDueDate: string; // ISO Date String
-  status: 'Active' | 'Canceled' | 'Inactive';
+  status:
+    | "Pending"
+    | "Active"
+    | "Inactive"
+    | "Expired"
+    | "Canceled"
+    | "Rejected";
+  rejectionReason?: string | null;
 
   initialPaymentAmount?: number | null;
   initialPaymentMethod?: string | null;
@@ -87,7 +96,7 @@ export interface Agreement {
   endDate?: string | null; // ISO Date String (calculated if needed)
 
   tenant?: Tenant; // Optional on base type, usually included where needed
-  space?: Space;   // Optional on base type, usually included where needed
+  space?: Space; // Optional on base type, usually included where needed
   bills?: Bill[];
 }
 
@@ -102,7 +111,7 @@ export interface BuildingUtilityItem {
   id?: string;
   name: string;
   totalCost: number;
-  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
+  appliesToScope: "Building" | "Floor" | "SpecificSpaces";
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
   monthlyUtilitiesId?: string | null;
@@ -112,6 +121,8 @@ export interface BuildingMonthlyUtilities {
   id: string;
   buildingId: string;
   buildingName: string;
+  status?: "Pending" | "Active" | "Rejected" | "Inactive";
+  rejectionReason?: string | null;
   year: number;
   month: number;
   utilities: BuildingUtilityItem[];
@@ -130,7 +141,7 @@ export interface Bill {
   utilityBreakdown: UtilityBreakdownItem[];
   penaltyAmount?: number | null;
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue' | 'PendingVerification';
+  status: "Pending" | "Paid" | "Overdue" | "PendingVerification";
   paymentDate?: string | null; // ISO Date String
   paymentMethod?: string | null;
   paymentReference?: string | null;
@@ -180,126 +191,127 @@ export interface ResourcePermissionGroup {
 // New structured permissions list
 export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
   {
-    resourceId: 'dashboard',
-    resourceLabel: 'Dashboard',
-    permissions: [{ id: 'dashboard:view', label: 'View' }],
+    resourceId: "dashboard",
+    resourceLabel: "Dashboard",
+    permissions: [{ id: "dashboard:view", label: "View" }],
   },
   {
-    resourceId: 'building',
-    resourceLabel: 'Buildings',
+    resourceId: "building",
+    resourceLabel: "Buildings",
     permissions: [
-      { id: 'building:view', label: 'View' },
-      { id: 'building:create', label: 'Create (Maker)' },
-      { id: 'building:approve', label: 'Approve (Checker)' },
-      { id: 'building:edit', label: 'Edit' },
-      { id: 'building:delete', label: 'Delete' },
+      { id: "building:view", label: "View" },
+      { id: "building:export", label: "Export" },
+      { id: "building:create", label: "Create (Maker)" },
+      { id: "building:approve", label: "Approve (Checker)" },
+      { id: "building:edit", label: "Edit" },
+      { id: "building:delete", label: "Delete" },
     ],
   },
   {
-    resourceId: 'space',
-    resourceLabel: 'Spaces',
+    resourceId: "space",
+    resourceLabel: "Spaces",
     permissions: [
-      { id: 'space:view', label: 'View' },
-      { id: 'space:create', label: 'Create' },
-      { id: 'space:edit', label: 'Edit' },
-      { id: 'space:delete', label: 'Delete' },
+      { id: "space:view", label: "View" },
+      { id: "space:create", label: "Create (Maker)" },
+      { id: "space:approve", label: "Approve (Checker)" },
+      { id: "space:export", label: "Export" },
+      { id: "space:edit", label: "Edit" },
+      { id: "space:delete", label: "Delete" },
     ],
   },
   {
-    resourceId: 'tenant',
-    resourceLabel: 'Tenants',
+    resourceId: "tenant",
+    resourceLabel: "Tenants",
     permissions: [
-      { id: 'tenant:view', label: 'View' },
-      { id: 'tenant:create', label: 'Create' },
-      { id: 'tenant:edit', label: 'Edit' },
-      { id: 'tenant:status', label: 'Change Status' },
+      { id: "tenant:view", label: "View" },
+      { id: "tenant:export", label: "Export" },
+      { id: "tenant:create", label: "Create" },
+      { id: "tenant:edit", label: "Edit" },
+      { id: "tenant:status", label: "Change Status" },
     ],
   },
   {
-    resourceId: 'agreement',
-    resourceLabel: 'Agreements',
+    resourceId: "agreement",
+    resourceLabel: "Agreements",
     permissions: [
-      { id: 'agreement:view', label: 'View' },
-      { id: 'agreement:create', label: 'Create' },
-      { id: 'agreement:edit', label: 'Edit' },
+      { id: "agreement:view", label: "View" },
+      { id: "agreement:create", label: "Create (Maker)" },
+      { id: "agreement:approve", label: "Approve (Checker)" },
+      { id: "agreement:edit", label: "Edit" },
     ],
   },
   {
-    resourceId: 'building_utility',
-    resourceLabel: 'Building Utilities',
+    resourceId: "building_utility",
+    resourceLabel: "Building Utilities",
     permissions: [
-      { id: 'building_utility:view', label: 'View' },
-      { id: 'building_utility:save', label: 'Save' },
+      { id: "building_utility:view", label: "View" },
+      { id: "building_utility:save", label: "Save (Maker)" },
+      { id: "building_utility:approve", label: "Approve (Checker)" },
     ],
   },
   {
-    resourceId: 'billing',
-    resourceLabel: 'Billing',
+    resourceId: "billing",
+    resourceLabel: "Billing",
     permissions: [
-      { id: 'billing:view', label: 'View' },
-      { id: 'billing:generate', label: 'Generate' },
-      { id: 'billing:manage_payments', label: 'Manage Payments' },
+      { id: "billing:view", label: "View" },
+      { id: "billing:generate", label: "Generate" },
+      { id: "billing:manage_payments", label: "Manage Payments" },
     ],
   },
   {
-    resourceId: 'payment_overview',
-    resourceLabel: 'Payments Overview',
+    resourceId: "payment_overview",
+    resourceLabel: "Payments Overview",
+    permissions: [{ id: "payment_overview:view", label: "View" }],
+  },
+  {
+    resourceId: "audit",
+    resourceLabel: "Audit Log",
+    permissions: [{ id: "audit:view", label: "View" }],
+  },
+  {
+    resourceId: "settings:user_registration",
+    resourceLabel: "Settings: User Registration",
+    permissions: [{ id: "settings:user_registration:manage", label: "Manage" }],
+  },
+  {
+    resourceId: "settings:user_management",
+    resourceLabel: "Settings: User Management",
     permissions: [
-      { id: 'payment_overview:view', label: 'View' },
+      { id: "settings:user_management:view", label: "View" },
+      {
+        id: "settings:user_management:assign",
+        label: "Assign Roles/Buildings",
+      },
     ],
   },
   {
-    resourceId: 'audit',
-    resourceLabel: 'Audit Log',
+    resourceId: "settings:role_management",
+    resourceLabel: "Settings: Role Management",
     permissions: [
-      { id: 'audit:view', label: 'View' },
+      { id: "settings:role_management:view", label: "View" },
+      { id: "settings:role_management:manage", label: "Manage" },
     ],
   },
   {
-    resourceId: 'settings:user_registration',
-    resourceLabel: 'Settings: User Registration',
+    resourceId: "settings:agreement_templates",
+    resourceLabel: "Settings: Agreement Templates",
     permissions: [
-      { id: 'settings:user_registration:manage', label: 'Manage' },
+      { id: "settings:agreement_templates:manage", label: "Manage" },
     ],
   },
   {
-    resourceId: 'settings:user_management',
-    resourceLabel: 'Settings: User Management',
-    permissions: [
-      { id: 'settings:user_management:view', label: 'View' },
-      { id: 'settings:user_management:assign', label: 'Assign Roles/Buildings' },
-    ],
+    resourceId: "import",
+    resourceLabel: "Data Import",
+    permissions: [{ id: "import:manage", label: "Manage" }],
   },
   {
-    resourceId: 'settings:role_management',
-    resourceLabel: 'Settings: Role Management',
-    permissions: [
-      { id: 'settings:role_management:view', label: 'View' },
-      { id: 'settings:role_management:manage', label: 'Manage' },
-    ],
-  },
-  {
-    resourceId: 'settings:agreement_templates',
-    resourceLabel: 'Settings: Agreement Templates',
-    permissions: [
-      { id: 'settings:agreement_templates:manage', label: 'Manage' },
-    ],
-  },
-  {
-    resourceId: 'import',
-    resourceLabel: 'Data Import',
-    permissions: [
-      { id: 'import:manage', label: 'Manage' },
-    ],
-  },
-   {
-    resourceId: 'portal',
-    resourceLabel: 'Tenant Portal',
-    permissions: [{ id: 'portal:view', label: 'View Tenant Portal' }],
+    resourceId: "portal",
+    resourceLabel: "Tenant Portal",
+    permissions: [{ id: "portal:view", label: "View Tenant Portal" }],
   },
 ];
 
-
 // Flattened list for convenience
-export const AVAILABLE_PERMISSIONS: PermissionItem[] = ALL_RESOURCE_PERMISSIONS.flatMap(group => group.permissions);
-export type PermissionId = typeof AVAILABLE_PERMISSIONS[number]['id'];
+export const AVAILABLE_PERMISSIONS: PermissionItem[] =
+  ALL_RESOURCE_PERMISSIONS.flatMap((group) => group.permissions);
+export type PermissionId = (typeof AVAILABLE_PERMISSIONS)[number]["id"];

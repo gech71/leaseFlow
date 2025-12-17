@@ -23,7 +23,7 @@ import { format } from "date-fns";
 import { PaginationControls } from "@/components/custom/PaginationControls";
 import type { SerializedAuditLog } from "./actions";
 import { usePermissions } from "@/contexts/PermissionContext";
-import * as XLSX from "xlsx-js-style";
+import XLSX from "xlsx-js-style";
 
 interface AuditLogClientPageProps {
   initialData: SerializedAuditLog[];

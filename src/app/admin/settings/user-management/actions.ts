@@ -36,7 +36,7 @@ export async function getUserManagementPageData() {
             agreements: {
               some: {
                 space: {
-                  buildingId: { in: managedBuildingIds },
+                  buildingId: { in: managedBuildingIds ?? [] },
                 },
               },
             },
@@ -56,16 +56,7 @@ export async function getUserManagementPageData() {
 
     const users = await databaseService.getAllUsers({
       where: userWhereClause,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        phoneNumber: true,
-        tempPassword: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
         roles: true,
         managedBuildings: true,
       },
@@ -132,25 +123,74 @@ export async function updateUserAssignments(
       roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] },
     };
 
+    // If we are assigning a role, we may want to auto-assign buildings for makers.
+    let rolePermissions: string[] = [];
+    let targetUser: { email: string; phoneNumber: string } | null = null;
+    if (selectedRoleId) {
+      const [role, user] = await Promise.all([
+        prisma.role.findUnique({
+          where: { id: selectedRoleId },
+          select: { permissions: true },
+        }),
+        prisma.user.findUnique({
+          where: { id: targetUserId },
+          select: { email: true, phoneNumber: true },
+        }),
+      ]);
+      rolePermissions = role?.permissions ?? [];
+      targetUser = user;
+    }
+
+    const isBuildingMaker = rolePermissions.includes("building:create");
+    const isBuildingChecker = rolePermissions.includes("building:approve");
+    const isMakerAndChecker = isBuildingMaker && isBuildingChecker;
+
+    // If no buildings were explicitly selected and the assigned role has both maker & checker
+    // permissions, default to ALL buildings.
+    // Otherwise, for building makers, auto-assign buildings where the target user matches
+    // the building owner.
+    let resolvedManagedBuildingIds = selectedManagedBuildingIds;
+    if (selectedRoleId && selectedManagedBuildingIds.length === 0) {
+      if (isMakerAndChecker) {
+        const all = await prisma.building.findMany({ select: { id: true } });
+        resolvedManagedBuildingIds = all.map((b) => b.id);
+      } else if (isBuildingMaker && targetUser) {
+        const matched = await prisma.building.findMany({
+          where: {
+            OR: [
+              { ownerEmail: targetUser.email },
+              { ownerPhone: targetUser.phoneNumber },
+            ],
+          },
+          select: { id: true },
+        });
+        resolvedManagedBuildingIds = matched.map((b) => b.id);
+      }
+    }
+
     // If the caller is a super-admin they can explicitly set managed buildings.
     // For non-super-admins, when they assign a role to a user we automatically
     // assign the caller's managed buildings by default (or use the explicit
     // `selectedManagedBuildingIds` if provided).
+    let finalManagedBuildingIds: string[] = [];
     if (isSuperAdmin) {
+      finalManagedBuildingIds = resolvedManagedBuildingIds;
       updateData.managedBuildings = {
-        set: selectedManagedBuildingIds.map((id) => ({ id: id })),
+        set: resolvedManagedBuildingIds.map((id) => ({ id: id })),
       };
     } else {
       // If a role is being assigned, attach the caller's managed buildings
       // unless an explicit list is provided.
       if (selectedRoleId) {
         const targetIds =
-          selectedManagedBuildingIds && selectedManagedBuildingIds.length > 0
-            ? selectedManagedBuildingIds
+          resolvedManagedBuildingIds && resolvedManagedBuildingIds.length > 0
+            ? resolvedManagedBuildingIds
             : managedBuildingIds ?? [];
+        finalManagedBuildingIds = targetIds;
         updateData.managedBuildings = { set: targetIds.map((id) => ({ id })) };
       } else {
         // No role selected -> clear managed buildings for the target user
+        finalManagedBuildingIds = [];
         updateData.managedBuildings = { set: [] };
       }
     }
@@ -162,7 +202,11 @@ export async function updateUserAssignments(
 
     revalidatePath("/admin/settings/user-management");
     revalidatePath("/admin/buildings");
-    return { success: true, message: "User assignments updated successfully." };
+    return {
+      success: true,
+      message: "User assignments updated successfully.",
+      assignedManagedBuildingIds: finalManagedBuildingIds,
+    };
   } catch (error: any) {
     console.error("Error updating user assignments:", error);
     return { success: false, error: GENERIC_NEUTRAL_ERROR };
@@ -242,6 +286,50 @@ export async function changeUserPhoneNumberAction(
     return { success: true };
   } catch (error: any) {
     console.error("Error in changeUserPhoneNumberAction:", error);
+    return { success: false, error: GENERIC_NEUTRAL_ERROR };
+  }
+}
+
+export async function changeUserEmailAction(
+  userId: string,
+  newEmail: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { isSuperAdmin, permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has("settings:user_management:assign")) {
+      return { success: false, error: "Permission denied." };
+    }
+
+    // Check for existing user with the new email
+    const existing = await databaseService.findUserByEmailOrPhone(
+      newEmail,
+      null,
+    );
+    if (existing && existing.id !== userId) {
+      return {
+        success: false,
+        error: "Email is already in use by another user.",
+      };
+    }
+
+    const userToUpdate = await databaseService.getUserById(userId);
+    if (!userToUpdate) return { success: false, error: "User not found." };
+
+    await databaseService.updateUser(userId, { email: newEmail });
+
+    // If there's a tenant profile linked by the old email/phone, update it
+    const tenantProfile = await databaseService.findTenantByEmailOrPhone(
+      userToUpdate.email,
+      userToUpdate.phoneNumber,
+    );
+    if (tenantProfile) {
+      await databaseService.updateTenant(tenantProfile.id, { email: newEmail });
+    }
+
+    revalidatePath("/admin/settings/user-management");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in changeUserEmailAction:", error);
     return { success: false, error: GENERIC_NEUTRAL_ERROR };
   }
 }

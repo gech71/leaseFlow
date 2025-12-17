@@ -9,6 +9,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Building,
   Building2,
@@ -49,7 +50,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import type { DashboardData } from "./actions";
-import { getDashboardDataAction } from "./actions";
+import { getDashboardDataAction, markTenantMessageReadAction } from "./actions";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -114,9 +115,11 @@ export default function AdminDashboardPage() {
   const [allData, setAllData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [readingMessageId, setReadingMessageId] = useState<string | null>(null);
 
   const [selectedYear, setSelectedYear] = useState(getYear(today));
   const [selectedMonth, setSelectedMonth] = useState(getMonth(today));
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string>("all");
 
   useEffect(() => {
     if (!isUserLoading && currentUser) {
@@ -217,7 +220,7 @@ export default function AdminDashboardPage() {
       activeAgreements: activeAgreements.length,
     };
 
-    const financials: BuildingFinancialSummary[] = allData.buildings.map(
+    let financials: BuildingFinancialSummary[] = allData.buildings.map(
       (building) => {
         const buildingUtil = allData.allUtilities.find(
           (u) =>
@@ -264,15 +267,38 @@ export default function AdminDashboardPage() {
       },
     );
 
+    if (selectedBuildingId !== "all") {
+      financials = financials.filter(
+        (f) => f.buildingId === selectedBuildingId,
+      );
+    }
+
     return { stats, financials };
-  }, [allData, selectedYear, selectedMonth, today]);
+  }, [allData, selectedYear, selectedMonth, selectedBuildingId, today]);
 
   const chartData = useMemo(() => {
     if (!allData) return [];
     const data = [];
-    const allPaidBills = allData.allBills.filter(
-      (bill) => bill.status === "Paid",
-    );
+
+    const buildingSpaceIds =
+      selectedBuildingId === "all"
+        ? null
+        : allData.spaces
+            .filter((s) => s.buildingId === selectedBuildingId)
+            .map((s) => s.id);
+
+    const agreementIdsInBuilding =
+      buildingSpaceIds === null
+        ? null
+        : allData.agreements
+            .filter((ag) => ag.spaceId && buildingSpaceIds.includes(ag.spaceId))
+            .map((ag) => ag.id);
+
+    const allPaidBills = allData.allBills.filter((bill) => {
+      if (bill.status !== "Paid") return false;
+      if (!agreementIdsInBuilding) return true;
+      return agreementIdsInBuilding.includes(bill.agreementId);
+    });
 
     for (let i = 5; i >= 0; i--) {
       const date = subMonths(new Date(selectedYear, selectedMonth), i);
@@ -291,7 +317,11 @@ export default function AdminDashboardPage() {
         .reduce((sum, bill) => sum + bill.totalAmount, 0);
 
       const monthlyExpenses = allData.allUtilities
-        .filter((util) => util.year === year && util.month === month)
+        .filter((util) => {
+          if (util.year !== year || util.month !== month) return false;
+          if (selectedBuildingId === "all") return true;
+          return util.buildingId === selectedBuildingId;
+        })
         .reduce((sum, util) => sum + util.totalCost, 0);
 
       data.push({
@@ -301,11 +331,31 @@ export default function AdminDashboardPage() {
       });
     }
     return data;
-  }, [allData, selectedYear, selectedMonth]);
+  }, [allData, selectedYear, selectedMonth, selectedBuildingId]);
 
   const recentActivities = useMemo(() => {
     if (!allData) return [];
+
+    const buildingSpaceIds =
+      selectedBuildingId === "all"
+        ? null
+        : allData.spaces
+            .filter((s) => s.buildingId === selectedBuildingId)
+            .map((s) => s.id);
+
+    const agreementIdsInBuilding =
+      buildingSpaceIds === null
+        ? null
+        : allData.agreements
+            .filter((ag) => ag.spaceId && buildingSpaceIds.includes(ag.spaceId))
+            .map((ag) => ag.id);
+
     return [...allData.allBills] // Create a mutable copy
+      .filter((b) =>
+        agreementIdsInBuilding
+          ? agreementIdsInBuilding.includes(b.agreementId)
+          : true,
+      )
       .sort(
         (a, b) =>
           parseISO(b.billDate).getTime() - parseISO(a.billDate).getTime(),
@@ -344,7 +394,7 @@ export default function AdminDashboardPage() {
           avatar: tenantName.substring(0, 2).toUpperCase(),
         };
       });
-  }, [allData]);
+  }, [allData, selectedBuildingId]);
 
   const availableYears = useMemo(() => {
     if (!allData) return [getYear(new Date())];
@@ -438,6 +488,86 @@ export default function AdminDashboardPage() {
       <Card className="mb-10 shadow-sm">
         <CardHeader>
           <CardTitle className="font-headline text-xl">
+            Tenant Messages
+          </CardTitle>
+          <CardDescription>
+            Recent messages sent from the tenant portal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {allData.tenantMessages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No new messages.</p>
+          ) : (
+            <div className="space-y-4">
+              {allData.tenantMessages.map((m) => (
+                <div
+                  key={m.id}
+                  className="border-b pb-4 last:border-b-0 last:pb-0"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-foreground truncate">
+                          {m.tenantName}
+                        </p>
+                        {!m.readAt ? (
+                          <Badge variant="secondary">Unread</Badge>
+                        ) : null}
+                      </div>
+                      {m.subject ? (
+                        <p className="text-sm text-muted-foreground truncate">
+                          {m.subject}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">
+                        {format(parseISO(m.createdAt), "PP p")}
+                      </p>
+                      {!m.readAt ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={readingMessageId === m.id}
+                          onClick={async () => {
+                            setReadingMessageId(m.id);
+                            const result = await markTenantMessageReadAction(
+                              m.id,
+                            );
+                            setReadingMessageId(null);
+                            if (!result.success || !result.readAt) return;
+
+                            setAllData((prev) => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                tenantMessages: prev.tenantMessages.map((x) =>
+                                  x.id === m.id
+                                    ? { ...x, readAt: result.readAt! }
+                                    : x,
+                                ),
+                              };
+                            });
+                          }}
+                        >
+                          Mark as read
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <p className="mt-2 text-sm text-foreground whitespace-pre-wrap">
+                    {m.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-10 shadow-sm">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">
             Financial Snapshot
           </CardTitle>
           <CardDescription>
@@ -446,6 +576,28 @@ export default function AdminDashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <Label htmlFor="building-select">Building</Label>
+            <Select
+              value={selectedBuildingId}
+              onValueChange={(val) => setSelectedBuildingId(val)}
+            >
+              <SelectTrigger
+                id="building-select"
+                className="w-full sm:w-[220px]"
+              >
+                <SelectValue placeholder="Select Building" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Buildings</SelectItem>
+                {allData.buildings.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex-1">
             <Label htmlFor="month-select">Month</Label>
             <Select

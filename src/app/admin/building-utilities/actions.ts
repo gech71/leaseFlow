@@ -9,9 +9,13 @@ import {
   type User,
   type Role,
   type BuildingUtilityItem,
+  type BuildingStatus,
 } from "@prisma/client";
 import { cookies } from "next/headers";
-import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
+import {
+  getUserAndManagedIds,
+  getUserAndPermissions,
+} from "@/lib/actions/server-helpers";
 import { prisma } from "@/lib/prisma";
 
 export async function getRegisteredBuildingsAction(): Promise<Building[]> {
@@ -53,7 +57,6 @@ export async function getBuildingUtilitiesAction(
   try {
     const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
-    
       return null; // Don't return data user can't access
     }
 
@@ -112,9 +115,14 @@ export async function saveBuildingUtilitiesAction(
   utilityItems: BuildingUtilityItemInput[],
 ) {
   try {
-    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+    const { isSuperAdmin, managedBuildingIds, currentUser, permissions } =
+      await getUserAndManagedIds();
     if (!isSuperAdmin && !managedBuildingIds?.includes(buildingId)) {
       return { success: false, error: "Permission denied." };
+    }
+
+    if (!isSuperAdmin && !permissions.has("building_utility:save")) {
+      return { success: false, error: "Access Denied" };
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -131,8 +139,30 @@ export async function saveBuildingUtilitiesAction(
             buildingName,
             year,
             month,
+            status: isSuperAdmin ? "Active" : "Pending",
+            rejectionReason: null,
+            createdBy: { connect: { id: currentUser.id } },
+            ...(isSuperAdmin
+              ? { approvedBy: { connect: { id: currentUser.id } } }
+              : {}),
           },
           include: { utilities: true },
+        });
+      } else {
+        // Any edit should return the record to Pending unless a Super Admin is saving.
+        await tx.buildingMonthlyUtilities.update({
+          where: { id: monthlyUtil.id },
+          data: isSuperAdmin
+            ? {
+                status: "Active",
+                rejectionReason: null,
+                approvedBy: { connect: { id: currentUser.id } },
+              }
+            : {
+                status: "Pending",
+                rejectionReason: null,
+                approvedBy: { disconnect: true },
+              },
         });
       }
 
@@ -220,6 +250,57 @@ export async function saveBuildingUtilitiesAction(
     return {
       success: false,
       error: error.message || "Failed to save utilities.",
+    };
+  }
+}
+
+export async function setBuildingUtilitiesStatusAction(
+  monthlyUtilitiesId: string,
+  newStatus: BuildingStatus,
+  rejectionReason?: string,
+) {
+  try {
+    const { isSuperAdmin, permissions, currentUser } =
+      await getUserAndPermissions();
+
+    if (newStatus === "Active" || newStatus === "Rejected") {
+      if (!isSuperAdmin && !permissions.has("building_utility:approve")) {
+        return { success: false, error: "Access Denied" };
+      }
+    }
+
+    const existing = await databaseService.getBuildingMonthlyUtilitiesById(
+      monthlyUtilitiesId,
+    );
+    if (!existing) {
+      return { success: false, error: "Utility record not found." };
+    }
+
+    const updateData: Prisma.BuildingMonthlyUtilitiesUpdateInput = {
+      status: newStatus,
+    };
+    if (newStatus === "Active") {
+      updateData.rejectionReason = null;
+      updateData.approvedBy = { connect: { id: currentUser.id } };
+    }
+    if (newStatus === "Rejected") {
+      updateData.rejectionReason = rejectionReason || null;
+      updateData.approvedBy = { connect: { id: currentUser.id } };
+    }
+
+    await prisma.buildingMonthlyUtilities.update({
+      where: { id: monthlyUtilitiesId },
+      data: updateData,
+    });
+
+    revalidatePath("/admin/building-utilities");
+    revalidatePath("/admin/billing");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error changing building utilities status:", error);
+    return {
+      success: false,
+      error: error.message || `Failed to set status to ${newStatus}.`,
     };
   }
 }

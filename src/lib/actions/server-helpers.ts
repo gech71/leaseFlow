@@ -100,8 +100,8 @@ export async function getUserSessionAction(): Promise<{
 }> {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
-    const session = await verifySession(token);
+    const accessCookie = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME);
+    const session = await verifySession(accessCookie?.value ?? "");
 
     if (!session?.userId) {
       return { isSuccess: false, user: null };

@@ -16,14 +16,12 @@ import { cookies } from "next/headers";
 import type { PortalAgreementWithRelations } from "./dashboard/actions";
 
 // --- User Authentication Helper ---
-async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
+async function getCurrentUser(): Promise<User | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(ACCESS_TOKEN_COOKIE_NAME)?.value;
   const session = await verifySession(token);
   if (session?.userId) {
-    const user = await databaseService.getUserById(session.userId, {
-      roles: true,
-    });
+    const user = await databaseService.getUserById(session.userId);
     if (user) return user;
   }
   return null;
@@ -85,6 +83,25 @@ export async function sendContactEmailAction(formData: {
         space: { include: { building: { include: { managers: true } } } },
       },
       orderBy: { startDate: "desc" },
+    });
+
+    const buildingId =
+      agreement?.space?.building?.id ?? tenant.buildingId ?? null;
+    if (!buildingId) {
+      return {
+        success: false,
+        error:
+          "Could not determine your building. Please contact support to assign your tenant profile to a building.",
+      };
+    }
+
+    await (prisma as any).tenantMessage.create({
+      data: {
+        tenantId: tenant.id,
+        buildingId,
+        subject: formData.subject,
+        body: formData.body,
+      },
     });
 
     if (
@@ -160,6 +177,8 @@ export async function sendContactEmailAction(formData: {
         html: emailHtml,
       });
     }
+
+    revalidatePath("/admin/dashboard");
 
     return { success: true };
   } catch (error: any) {

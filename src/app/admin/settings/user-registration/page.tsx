@@ -37,7 +37,7 @@ import { createUserAndAccountAction } from "./actions";
 
 const registrationFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
-  lastName: z.string().min(1, { message: "Last name is required." }),
+  lastName: z.string().min(1, { message: "Middle name is required." }),
   phoneNumber: z
     .string()
     .min(1, { message: "Phone number is required." })
@@ -165,11 +165,12 @@ export default function UserRegistrationPage() {
                   <FormItem>
                     {" "}
                     <FormLabel>
-                      Last Name<span className="text-destructive ml-1">*</span>
+                      Middle Name
+                      <span className="text-destructive ml-1">*</span>
                     </FormLabel>{" "}
                     <FormControl>
                       <Input
-                        placeholder="Last Name"
+                        placeholder="Middle Name"
                         {...field}
                         disabled={isLoading || !canManageUsersRegistration}
                       />

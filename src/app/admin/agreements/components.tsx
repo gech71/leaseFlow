@@ -51,8 +51,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
+import XLSX from "xlsx-js-style";
 import { Label } from "@/components/ui/label";
-import { cancelAgreementAction } from "./actions";
+import { cancelAgreementAction, setAgreementStatusAction } from "./actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,12 +102,15 @@ export function AgreementsListClientPage({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(3);
   const [filterStatus, setFilterStatus] = useState<
-    "Active" | "Expired" | "Canceled" | "Inactive"
+    "Pending" | "Active" | "Expired" | "Canceled" | "Inactive" | "Rejected"
   >("Active");
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
+  const canExportAgreements = isSuperAdmin || hasPermission("agreement:export");
   const canEditAgreements = isSuperAdmin || hasPermission("agreement:edit");
+  const canApproveAgreements =
+    isSuperAdmin || hasPermission("agreement:approve");
   const canViewAgreements =
     isSuperAdmin ||
     hasPermission("agreement:view") ||
@@ -134,6 +138,15 @@ export function AgreementsListClientPage({
       const isChronologicallyExpired = isBefore(agreementEndDate, today);
 
       let status: "Active" | "Expired" | "Canceled" | "Inactive";
+      // Explicit Pending/Rejected should be reflected as-is.
+      if (agreement.status === "Pending") {
+        if (filterStatus !== "Pending") return false;
+      }
+      if (agreement.status === "Rejected") {
+        if (filterStatus !== "Rejected") return false;
+      }
+
+      // Existing legacy filters
       if (agreement.status === "Canceled") {
         status = "Canceled";
       } else if (agreement.status === "Expired") {
@@ -148,7 +161,9 @@ export function AgreementsListClientPage({
         status = "Active";
       }
 
-      if (filterStatus !== status) return false;
+      if (agreement.status !== "Pending" && agreement.status !== "Rejected") {
+        if (filterStatus !== status) return false;
+      }
 
       // Search term filter
       if (searchTerm) {
@@ -238,6 +253,84 @@ export function AgreementsListClientPage({
     });
   };
 
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+      [
+        "Space ID",
+        "Floor",
+        "Area",
+        "Agreement Start Date",
+        "Agreement Duration (months)",
+        "Rent Price",
+        "Initial Payment",
+        "Tenant ID",
+        "Tenant Full Name",
+        "Tenant Phone",
+        "Tenant National ID",
+        "Tenant Email",
+        "Representative Full Name",
+        "Representative Phone",
+        "Agreement Status",
+        "Amendment Date",
+        "Amended By",
+      ],
+    ];
+
+    const rows = filteredAgreements.map((ag) => ({
+      spaceId: ag.space?.spaceIdName || "",
+      floor: ag.space?.floor || "",
+      area: ag.space?.area || "",
+      startDate: ag.startDate
+        ? new Date(ag.startDate).toLocaleDateString()
+        : "",
+      duration: ag.paymentTermMonths,
+      rentPrice: ag.monthlyRentalPrice,
+      initialPayment: ag.initialPaymentAmount ?? "",
+      tenantId: ag.tenant?.id || "",
+      tenantFullName: ag.tenant?.name || "",
+      tenantPhone: ag.tenant?.phone || "",
+      tenantNationalId: (ag.tenant as any)?.nationalId || "",
+      tenantEmail: ag.tenant?.email || "",
+      repFullName: (ag.tenant as any)?.representativeName || "",
+      repPhone: (ag.tenant as any)?.representativePhone || "",
+      status: ag.status,
+      amendmentDate: ag.updatedAt || "",
+      amendedBy:
+        (ag as any).approvedBy?.name || (ag as any).createdBy?.name || "",
+    }));
+
+    rows.forEach((r) => {
+      wsData.push([
+        r.spaceId,
+        r.floor,
+        r.area,
+        r.startDate,
+        r.duration,
+        r.rentPrice,
+        r.initialPayment,
+        r.tenantId,
+        r.tenantFullName,
+        r.tenantPhone,
+        r.tenantNationalId,
+        r.tenantEmail,
+        r.repFullName,
+        r.repPhone,
+        r.status,
+        r.amendmentDate,
+        r.amendedBy,
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, "Agreements");
+    XLSX.writeFile(wb, `agreements_export_${new Date().toISOString()}.xlsx`);
+    toast({
+      title: "Export Started",
+      description: "Agreements export is downloading.",
+    });
+  };
+
   const handleConfirmCancel = async () => {
     if (!agreementToCancel || !canEditAgreements) return;
     setIsSaving(true);
@@ -254,6 +347,48 @@ export function AgreementsListClientPage({
       toast({
         title: "Error",
         description: result.error,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSetAgreementStatus = async (
+    agreementId: string,
+    status: AgreementStatus,
+  ) => {
+    if (!canApproveAgreements) {
+      toast({
+        title: "Permission Denied",
+        description: "Access Denied",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const rejectionReason =
+      status === "Rejected"
+        ? window.prompt("Rejection reason (optional):") || undefined
+        : undefined;
+
+    setIsSaving(true);
+    const result = await setAgreementStatusAction(
+      agreementId,
+      status,
+      rejectionReason,
+    );
+    setIsSaving(false);
+
+    if (result.success) {
+      toast({
+        title: "Status Updated",
+        description:
+          status === "Active" ? "Agreement approved." : "Agreement rejected.",
+      });
+      router.refresh();
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to update agreement status.",
         variant: "destructive",
       });
     }
@@ -290,13 +425,20 @@ export function AgreementsListClientPage({
         icon={FileText}
         description="Browse and manage all rental agreements."
         actions={
-          canCreateAgreements && (
-            <Link href="/admin/agreements/generate" passHref>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                <PlusCircle className="mr-2 h-5 w-5" /> Create New Agreement
+          <div className="flex items-center gap-2">
+            {canCreateAgreements && (
+              <Link href="/admin/agreements/generate" passHref>
+                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                  <PlusCircle className="mr-2 h-5 w-5" /> Create New Agreement
+                </Button>
+              </Link>
+            )}
+            {canExportAgreements && (
+              <Button variant="outline" onClick={exportToExcel} size="sm">
+                <Download className="mr-2 h-4 w-4" /> Export
               </Button>
-            </Link>
-          )
+            )}
+          </div>
         }
       />
 
@@ -314,6 +456,13 @@ export function AgreementsListClientPage({
           <div className="flex items-center space-x-2">
             <Label htmlFor="status-filter">Status:</Label>
             <div className="flex items-center space-x-2">
+              <Button
+                variant={filterStatus === "Pending" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Pending")}
+              >
+                Pending
+              </Button>
               <Button
                 variant={filterStatus === "Active" ? "default" : "outline"}
                 size="sm"
@@ -341,6 +490,13 @@ export function AgreementsListClientPage({
                 onClick={() => setFilterStatus("Canceled")}
               >
                 Canceled
+              </Button>
+              <Button
+                variant={filterStatus === "Rejected" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterStatus("Rejected")}
+              >
+                Rejected
               </Button>
             </div>
           </div>
@@ -414,14 +570,26 @@ export function AgreementsListClientPage({
                 today,
               );
 
-              let status: "Active" | "Expired" | "Canceled" | "Inactive";
+              let status:
+                | "Pending"
+                | "Active"
+                | "Expired"
+                | "Canceled"
+                | "Inactive"
+                | "Rejected";
               let statusBadgeVariant:
                 | "secondary"
                 | "destructive"
                 | "outline"
                 | "default" = "secondary";
 
-              if (agreement.status === "Canceled") {
+              if (agreement.status === "Pending") {
+                status = "Pending";
+                statusBadgeVariant = "outline";
+              } else if (agreement.status === "Rejected") {
+                status = "Rejected";
+                statusBadgeVariant = "destructive";
+              } else if (agreement.status === "Canceled") {
                 status = "Canceled";
                 statusBadgeVariant = "outline";
               } else if (agreement.status === "Expired") {
@@ -510,6 +678,34 @@ export function AgreementsListClientPage({
                   </CardContent>
                   <CardFooter className="border-t pt-4">
                     <div className="flex w-full flex-wrap items-center justify-end gap-2">
+                      {canApproveAgreements &&
+                        agreement.status === "Pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleSetAgreementStatus(agreement.id, "Active")
+                              }
+                              disabled={isSaving}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() =>
+                                handleSetAgreementStatus(
+                                  agreement.id,
+                                  "Rejected",
+                                )
+                              }
+                              disabled={isSaving}
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        )}
                       {canViewAgreements && (
                         <Tooltip>
                           <TooltipTrigger asChild>

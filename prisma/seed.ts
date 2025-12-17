@@ -1,4 +1,3 @@
-
 import { PrismaClient, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -37,7 +36,6 @@ async function main() {
     await prisma.agreementTemplate.deleteMany({});
     console.log("Deleted AgreementTemplates");
 
-
     console.log("Finished clearing data.");
   } catch (e: any) {
     console.error("Error during data clearing:", e);
@@ -53,20 +51,26 @@ async function main() {
       permissions: [
         "dashboard:view",
         "building:view",
+        "building:export",
         "building:create",
         "building:approve",
         "building:edit",
         "building:delete",
         "space:view",
+        "space:export",
         "space:create",
+        "space:approve",
         "space:edit",
         "space:delete",
         "tenant:view",
+        "tenant:export",
         "tenant:create",
         "tenant:edit",
         "tenant:status",
         "agreement:view",
         "agreement:create",
+        "agreement:export",
+        "agreement:approve",
         "agreement:edit",
         "billing:view",
         "billing:generate",
@@ -74,6 +78,7 @@ async function main() {
         "payment_overview:view",
         "building_utility:view",
         "building_utility:save",
+        "building_utility:approve",
         "audit:view",
         "settings:user_registration:manage",
         "settings:user_management:view",
@@ -87,6 +92,38 @@ async function main() {
     },
   });
   console.log(`Created Role: ${superAdminRole.name}`);
+
+  console.log("Creating SYSTEM_ADMIN Role...");
+  const systemAdminRole = await prisma.role.create({
+    data: {
+      name: "SYSTEM_ADMIN",
+      description:
+        "Operational maker role. Can create/update records but cannot approve them.",
+      permissions: [
+        "dashboard:view",
+        "building:view",
+        "building:export",
+        "building:create",
+        "building:edit",
+        "space:view",
+        "space:create",
+        "space:export",
+        "tenant:view",
+        "tenant:export",
+        "space:edit",
+        "agreement:view",
+        "agreement:create",
+        "agreement:export",
+        "agreement:edit",
+        "building_utility:view",
+        "building_utility:save",
+        "billing:view",
+        "payment_overview:view",
+        "portal:view",
+      ],
+    },
+  });
+  console.log(`Created Role: ${systemAdminRole.name}`);
 
   console.log("Creating TENANT Role...");
   const tenantRole = await prisma.role.create({
@@ -114,8 +151,22 @@ async function main() {
   });
   console.log(`Created Super Admin User: ${superAdminUser.email}`);
 
+  console.log("Creating System Admin User...");
+  const systemAdminUser = await prisma.user.create({
+    data: {
+      email: "systemadmin@nibrental.com",
+      name: "System Admin",
+      firstName: "System",
+      lastName: "Admin",
+      phoneNumber: "0912345679",
+      password: hashedPassword,
+      roles: { connect: { id: systemAdminRole.id } },
+    },
+  });
+  console.log(`Created System Admin User: ${systemAdminUser.email}`);
+
   console.log(
-    "Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus one Super Admin user.",
+    "Seeding finished successfully! SUPER_ADMIN, SYSTEM_ADMIN and TENANT roles created, plus default admin users.",
   );
 }
 

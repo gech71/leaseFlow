@@ -5,7 +5,10 @@ import { databaseService } from "@/lib/services/databaseService";
 import { Prisma, type Agreement, AgreementStatus } from "@prisma/client";
 import { addMonths, parseISO } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { getUserAndPermissions } from "@/lib/actions/server-helpers";
+import {
+  getUserAndManagedIds,
+  getUserAndPermissions,
+} from "@/lib/actions/server-helpers";
 
 export interface CreateFullAgreementData {
   // IDs for relations
@@ -26,6 +29,12 @@ export async function createFullAgreementAction(
   input: CreateFullAgreementData,
 ) {
   try {
+    const { currentUser, isSuperAdmin, permissions, managedBuildingIds } =
+      await getUserAndManagedIds();
+    if (!isSuperAdmin && !permissions.has("agreement:create")) {
+      return { success: false, error: "Access Denied" };
+    }
+
     // If the incoming start date is a date-only string (YYYY-MM-DD),
     // construct a UTC-midnight Date so storing it in the DB doesn't
     // shift it backward by the local timezone offset (e.g. 00:00 local
@@ -97,8 +106,28 @@ export async function createFullAgreementAction(
       // the agreement directly to that building.
       const spaceRecord = await tx.space.findUnique({
         where: { id: input.spaceId },
-        select: { buildingId: true },
+        select: { buildingId: true, status: true, isOccupied: true },
       });
+      if (!spaceRecord) {
+        throw new Error("Selected space not found.");
+      }
+
+      if (!isSuperAdmin && managedBuildingIds) {
+        if (!managedBuildingIds.includes(spaceRecord.buildingId)) {
+          throw new Error("Permission denied.");
+        }
+      }
+      if (
+        (spaceRecord as any).status &&
+        (spaceRecord as any).status !== "Active"
+      ) {
+        throw new Error(
+          "Selected space is not approved yet. Please wait for space approval before creating an agreement.",
+        );
+      }
+      if (spaceRecord.isOccupied) {
+        throw new Error("Selected space is already occupied.");
+      }
       const targetBuildingId = spaceRecord ? spaceRecord.buildingId : null;
 
       // Build the agreement creation payload, conditionally adding
@@ -112,7 +141,12 @@ export async function createFullAgreementAction(
         nextPaymentDueDate: nextPaymentDueForDbDate,
         endDate: endDateForDbDate,
         additionalTerms: input.additionalTerms,
-        status: "Active",
+        status: isSuperAdmin ? "Active" : "Pending",
+
+        createdBy: { connect: { id: currentUser.id } },
+        ...(isSuperAdmin
+          ? { approvedBy: { connect: { id: currentUser.id } } }
+          : {}),
 
         initialPaymentAmount: initialPaymentAmount,
         initialPaymentDate: initialPaymentDateForDbDate,
@@ -231,6 +265,103 @@ export async function createFullAgreementAction(
       errorMessage = error.message;
     }
     return { success: false, error: errorMessage };
+  }
+}
+
+export async function setAgreementStatusAction(
+  agreementId: string,
+  newStatus: AgreementStatus,
+  rejectionReason?: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { isSuperAdmin, permissions, currentUser } =
+      await getUserAndPermissions();
+
+    if (newStatus === "Active" || newStatus === "Rejected") {
+      if (!isSuperAdmin && !permissions.has("agreement:approve")) {
+        return { success: false, error: "Access Denied" };
+      }
+    }
+
+    const agreement = await prisma.agreement.findUnique({
+      where: { id: agreementId },
+      include: { bills: true },
+    });
+    if (!agreement) {
+      return { success: false, error: "Agreement not found." };
+    }
+
+    if (agreement.status !== "Pending") {
+      return {
+        success: false,
+        error: "Only Pending agreements can be approved or rejected.",
+      };
+    }
+
+    if (newStatus === "Active") {
+      await prisma.agreement.update({
+        where: { id: agreementId },
+        data: {
+          status: "Active",
+          rejectionReason: null,
+          approvedBy: { connect: { id: currentUser.id } },
+        },
+      });
+    }
+
+    if (newStatus === "Rejected") {
+      const hasPaidBill = agreement.bills.some((b) => b.status === "Paid");
+      if (hasPaidBill) {
+        return {
+          success: false,
+          error:
+            "Cannot reject an agreement that already has a paid bill. Cancel it instead.",
+        };
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.agreement.update({
+          where: { id: agreementId },
+          data: {
+            status: "Rejected",
+            rejectionReason: rejectionReason || null,
+            approvedBy: { connect: { id: currentUser.id } },
+          },
+        });
+
+        if (agreement.spaceId) {
+          await tx.space.update({
+            where: { id: agreement.spaceId },
+            data: { isOccupied: false },
+          });
+        }
+
+        if (agreement.tenantId) {
+          await tx.tenant.update({
+            where: { id: agreement.tenantId },
+            data: { rentedSpaceId: null },
+          });
+        }
+
+        await tx.bill.deleteMany({
+          where: { agreementId: agreementId, status: { not: "Paid" } },
+        });
+      });
+    }
+
+    revalidatePath("/admin/agreements");
+    revalidatePath("/admin/spaces");
+    revalidatePath("/admin/tenants");
+    revalidatePath("/admin/billing");
+    revalidatePath("/admin/dashboard");
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error changing agreement status:", error);
+    return {
+      success: false,
+      error: error.message || `Failed to set agreement status to ${newStatus}.`,
+    };
   }
 }
 

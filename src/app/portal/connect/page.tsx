@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 
 const NIB_VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
+console.log("NIB_VALIDATE_TOKEN_URL:", NIB_VALIDATE_TOKEN_URL);
 
 async function validateTokenAndGetPhone(
   authHeader: string | null,
@@ -70,6 +71,7 @@ function ConnectionErrorDisplay({ message }: { message: string }) {
 export default async function PortalConnectPage() {
   const h = await headers();
   const authorizationHeader = h.get("Authorization");
+  console.log("Authorization Header:", authorizationHeader);
 
   const { success, phone, error } = await validateTokenAndGetPhone(
     authorizationHeader,
@@ -91,5 +93,10 @@ export default async function PortalConnectPage() {
   // On success, render the client component that will handle session creation and redirection.
   // We pass the validated token and phone number to it.
   const token = authorizationHeader!.replace("Bearer ", "");
-  return <ConnectionSuccessPage token={token} phone={phone!} />;
+  console.log("Validated token:", token);
+  console.log("Token validated successfully for phone:", phone);
+  // Indicate this came from the SuperApp so client can skip server session actions
+  return (
+    <ConnectionSuccessPage token={token} phone={phone!} source="superapp" />
+  );
 }

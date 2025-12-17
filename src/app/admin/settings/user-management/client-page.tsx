@@ -48,6 +48,7 @@ import {
   updateUserNamesAction,
   changeUserPhoneNumberAction,
   resetUserPasswordAction,
+  changeUserEmailAction,
 } from "./actions";
 import type {
   Role,
@@ -119,6 +120,7 @@ const userDetailsFormSchema = z.object({
   phoneNumber: z
     .string()
     .regex(/^(09|07)\d{8}$/, "Phone number must be valid (e.g., 0912345678)."),
+  email: z.string().email("Invalid email address."),
 });
 type UserDetailsFormValues = z.infer<typeof userDetailsFormSchema>;
 
@@ -151,7 +153,16 @@ export function UserManagementClientPage({
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(
     new Set(),
   );
+
   const [buildingSearchTerm, setBuildingSearchTerm] = useState("");
+  const [roleSearchTerm, setRoleSearchTerm] = useState("");
+
+  const filteredRoles = useMemo(() => {
+    if (!roleSearchTerm) return allRoles;
+    return allRoles.filter((r) =>
+      r.name.toLowerCase().includes(roleSearchTerm.toLowerCase()),
+    );
+  }, [allRoles, roleSearchTerm]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -217,6 +228,7 @@ export function UserManagementClientPage({
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       phoneNumber: user.phoneNumber || "",
+      email: user.email || "",
     });
     setIsUserDetailsDialogOpen(true);
   };
@@ -266,6 +278,9 @@ export function UserManagementClientPage({
     if (result.success) {
       toast({ title: "Success", description: result.message });
       setIsAssignmentsDialogOpen(false);
+      const assignedIds = new Set(
+        result.assignedManagedBuildingIds ?? Array.from(selectedBuildingIds),
+      );
       setUsers((prevUsers) =>
         prevUsers.map((u) => {
           if (u.id === currentUserToEdit.id) {
@@ -275,7 +290,7 @@ export function UserManagementClientPage({
                 ? allRoles.filter((r) => r.id === selectedRoleId)
                 : [],
               managedBuildings: allBuildings.filter((b) =>
-                selectedBuildingIds.has(b.id),
+                assignedIds.has(b.id),
               ),
             };
           }
@@ -298,8 +313,9 @@ export function UserManagementClientPage({
       values.firstName !== currentUserToEdit.firstName ||
       values.lastName !== currentUserToEdit.lastName;
     const phoneChanged = values.phoneNumber !== currentUserToEdit.phoneNumber;
+    const emailChanged = values.email !== currentUserToEdit.email;
 
-    if (!nameChanged && !phoneChanged) {
+    if (!nameChanged && !phoneChanged && !emailChanged) {
       toast({ title: "No Changes", description: "No details were changed." });
       return;
     }
@@ -316,6 +332,17 @@ export function UserManagementClientPage({
       if (!nameResult.success) {
         success = false;
         errors.push(nameResult.error || "Failed to update name.");
+      }
+    }
+
+    if (emailChanged) {
+      const emailResult = await changeUserEmailAction(
+        currentUserToEdit.id,
+        values.email,
+      );
+      if (!emailResult.success) {
+        success = false;
+        errors.push(emailResult.error || "Failed to update email.");
       }
     }
 
@@ -342,7 +369,11 @@ export function UserManagementClientPage({
           u.id === currentUserToEdit.id
             ? {
                 ...u,
-                ...values,
+                ...u,
+                firstName: values.firstName,
+                lastName: values.lastName,
+                phoneNumber: values.phoneNumber,
+                email: values.email,
                 name: `${values.firstName} ${values.lastName}`.trim(),
               }
             : u,
@@ -598,6 +629,7 @@ export function UserManagementClientPage({
                 </DialogHeader>
 
                 <div className="space-y-6 py-4 overflow-y-auto flex-grow pr-2">
+                  {/* Email was removed from Assignments dialog - email is editable in Edit User Details dialog */}
                   <section>
                     <h3 className="text-md font-semibold mb-2 flex items-center">
                       <ShieldCheck className="mr-2 h-5 w-5 text-primary" />
@@ -608,12 +640,23 @@ export function UserManagementClientPage({
                       onValueChange={handleRoleSelect}
                       disabled={isSaving || !canManageUserAssignments}
                     >
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="text"
+                          placeholder="Search roles..."
+                          value={roleSearchTerm}
+                          onChange={(e) => setRoleSearchTerm(e.target.value)}
+                          className="pl-8 h-9"
+                          disabled={isSaving || !canManageUserAssignments}
+                        />
+                      </div>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="null">No Role</SelectItem>
-                        {allRoles.map((role) => (
+                        {filteredRoles.map((role) => (
                           <SelectItem key={role.id} value={role.id}>
                             {role.name.replace(/_/g, " ")}
                           </SelectItem>
@@ -646,35 +689,37 @@ export function UserManagementClientPage({
                           disabled={isSaving || !canManageBuildings}
                         />
                       </div>
-                      <ScrollArea className="space-y-2 p-3 border rounded-md bg-secondary/30 max-h-60">
-                        {filteredBuildings.length === 0 && (
-                          <p className="text-sm text-muted-foreground text-center py-2">
-                            {buildingSearchTerm
-                              ? "No buildings match your search."
-                              : "No buildings available."}
-                          </p>
-                        )}
-                        {filteredBuildings.map((building) => (
-                          <div
-                            key={building.id}
-                            className="flex items-center space-x-2 py-1"
-                          >
-                            <Checkbox
-                              id={`building-${currentUserToEdit.id}-${building.id}`}
-                              checked={selectedBuildingIds.has(building.id)}
-                              onCheckedChange={() =>
-                                handleBuildingToggle(building.id)
-                              }
-                              disabled={isSaving || !canManageBuildings}
-                            />
-                            <Label
-                              htmlFor={`building-${currentUserToEdit.id}-${building.id}`}
-                              className="text-sm font-normal cursor-pointer"
+                      <ScrollArea className="h-60 border rounded-md bg-secondary/30">
+                        <div className="space-y-2 p-3">
+                          {filteredBuildings.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-2">
+                              {buildingSearchTerm
+                                ? "No buildings match your search."
+                                : "No buildings available."}
+                            </p>
+                          )}
+                          {filteredBuildings.map((building) => (
+                            <div
+                              key={building.id}
+                              className="flex items-center space-x-2 py-1"
                             >
-                              {building.name}
-                            </Label>
-                          </div>
-                        ))}
+                              <Checkbox
+                                id={`building-${currentUserToEdit.id}-${building.id}`}
+                                checked={selectedBuildingIds.has(building.id)}
+                                onCheckedChange={() =>
+                                  handleBuildingToggle(building.id)
+                                }
+                                disabled={isSaving || !canManageBuildings}
+                              />
+                              <Label
+                                htmlFor={`building-${currentUserToEdit.id}-${building.id}`}
+                                className="text-sm font-normal cursor-pointer"
+                              >
+                                {building.name}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
                       </ScrollArea>
                     </section>
                   )}
@@ -764,14 +809,22 @@ export function UserManagementClientPage({
                         </FormItem>
                       )}
                     />
-                    <div className="space-y-1">
-                      <Label>Email</Label>
-                      <Input
-                        value={currentUserToEdit.email}
-                        readOnly
-                        disabled
-                      />
-                    </div>
+                    <FormField
+                      control={userDetailsForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              disabled={isSaving || !canManageUserAssignments}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <DialogFooter className="pt-4">
                       <DialogClose asChild>
                         <Button type="button" variant="outline">

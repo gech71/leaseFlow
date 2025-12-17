@@ -937,6 +937,7 @@ export async function generateBillAndUpdateAgreementAction(
 
     if (
       monthlyBuildingUtilityData &&
+      (monthlyBuildingUtilityData as any).status === "Active" &&
       monthlyBuildingUtilityData.utilities &&
       monthlyBuildingUtilityData.utilities.length > 0
     ) {

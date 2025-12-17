@@ -28,13 +28,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  AgreementTemplateSlateEditor,
+  stripHtmlToTextLength,
+} from "./slate-editor";
 
 const templateFormSchema = z.object({
   name: z.string().min(3, "Template name must be at least 3 characters."),
-  content: z
-    .string()
-    .min(50, "Template content must be at least 50 characters."),
+  content: z.string().refine((val) => stripHtmlToTextLength(val) >= 50, {
+    message: "Template content must be at least 50 characters.",
+  }),
 });
 
 type TemplateFormValues = z.infer<typeof templateFormSchema>;
@@ -187,12 +190,12 @@ export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
                     <FormItem>
                       <FormLabel>Template Content</FormLabel>
                       <FormControl>
-                        <Textarea
+                        <AgreementTemplateSlateEditor
+                          value={field.value}
+                          onChange={field.onChange}
                           placeholder={
                             "Enter agreement template content here... Use placeholders from the right panel."
                           }
-                          {...field}
-                          rows={15}
                         />
                       </FormControl>
                       <FormMessage />

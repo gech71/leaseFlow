@@ -217,10 +217,16 @@ export class DatabaseService {
     return prisma.agreement.create({ data: normalized });
   }
 
+  async getAgreementById(id?: string | null): Promise<Agreement | null>;
+  async getAgreementById<TInclude extends Prisma.AgreementInclude>(
+    id: string | null | undefined,
+    include: TInclude,
+  ): Promise<Prisma.AgreementGetPayload<{ include: TInclude }> | null>;
   async getAgreementById(
-    id: string,
+    id?: string | null,
     include?: Prisma.AgreementInclude,
-  ): Promise<Agreement | null> {
+  ): Promise<any> {
+    if (!id) return null;
     return prisma.agreement.findUnique({ where: { id }, include });
   }
 

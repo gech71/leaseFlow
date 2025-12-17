@@ -66,6 +66,7 @@ import {
   createSpaceAction,
   updateSpaceAction,
   deleteSpaceAction,
+  toggleSpaceStatusAction,
 } from "./actions";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { PaginationControls } from "@/components/custom/PaginationControls";
@@ -86,7 +87,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import * as XLSX from "xlsx-js-style";
+import XLSX from "xlsx-js-style";
+import { Badge } from "@/components/ui/badge";
 
 const spaceFormSchema = z.object({
   buildingId: z.string().min(1, "Building is required."),
@@ -149,6 +151,8 @@ export function SpacesClientPage({
     canCreateSpaces ||
     canEditSpaces ||
     canDeleteSpaces;
+  const canExportSpaces = isSuperAdmin || hasPermission("space:export");
+  const canApproveSpaces = isSuperAdmin || hasPermission("space:approve");
 
   const form = useForm<SpaceFormValues>({
     resolver: zodResolver(spaceFormSchema),
@@ -279,6 +283,48 @@ export function SpacesClientPage({
     }
   };
 
+  const handleSetSpaceStatus = async (
+    spaceId: string,
+    status: "Active" | "Rejected",
+  ) => {
+    if (!canApproveSpaces) {
+      toast({
+        title: "Permission Denied",
+        description: "Access Denied",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const rejectionReason =
+      status === "Rejected"
+        ? window.prompt("Rejection reason (optional):") || undefined
+        : undefined;
+
+    setIsSaving(true);
+    const result = await handleApiCall(() =>
+      toggleSpaceStatusAction(spaceId, status as any, rejectionReason),
+    );
+    setIsSaving(false);
+
+    if (!result) return;
+
+    if (result.success) {
+      toast({
+        title: "Status Updated",
+        description:
+          status === "Active" ? "Space approved." : "Space rejected.",
+      });
+      router.refresh();
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to update space status.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const openAddForm = () => {
     if (!canCreateSpaces) {
       toast({
@@ -364,20 +410,43 @@ export function SpacesClientPage({
   };
 
   const exportToExcel = () => {
-    const dataToExport = filteredSpaces.map((s) => ({
-      "Space ID": s.spaceIdName,
-      Building: s.buildingName,
-      Floor: s.floor,
-      "Area (m²)": s.area,
-      "Monthly Rent (Birr)": s.monthlyRentalPrice,
-      Status: s.isOccupied ? "Occupied" : "Vacant",
-      "Proration Share (%)": Number(s.utilityProrationShare) * 100,
-    }));
+    const dataToExport = filteredSpaces.map((s) => {
+      // Some fields (category, createdBy, maintenance flag) may not exist on older schema
+      const asAny = s as unknown as Record<string, any>;
+      const spaceCategory = asAny.category || asAny.spaceCategory || "N/A";
+      const createdBy = asAny.createdByName || asAny.createdBy || "N/A";
+      const status = asAny.isUnderMaintenance
+        ? "UnderMaintenance"
+        : s.isOccupied
+        ? "Occupied"
+        : "Vacant";
+
+      return {
+        "Space ID": s.id,
+        "Space Name": s.spaceIdName,
+        Building: s.buildingName,
+        Floor: s.floor,
+        "Area (m²)": s.area,
+        "Proration Rate (%)": (Number(s.utilityProrationShare) * 100).toFixed(
+          2,
+        ),
+        "Monthly Rent (Birr)": Number(s.monthlyRentalPrice),
+        "Created Date": s.createdAt || "",
+        Status: status,
+        "Created By":
+          asAny.createdByName ||
+          (asAny.createdBy && asAny.createdBy.name) ||
+          createdBy,
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Spaces");
-    XLSX.writeFile(workbook, "Spaces_Export.xlsx");
+    const fileName = `Spaces_Export_${new Date()
+      .toISOString()
+      .slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
     toast({
       title: "Exporting",
       description: "Excel file download has started.",
@@ -418,7 +487,7 @@ export function SpacesClientPage({
         description="Add, view, and manage rental spaces."
         actions={
           <div className="flex flex-col sm:flex-row gap-2">
-            {isSuperAdmin && (
+            {canExportSpaces && (
               <>
                 <Button onClick={exportToExcel} variant="outline" size="sm">
                   <Download className="mr-2 h-4 w-4" />
@@ -751,15 +820,24 @@ export function SpacesClientPage({
                         {space.buildingName}
                       </CardDescription>
                     </div>
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full self-start sm:self-center ${
-                        space.isOccupied
-                          ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700"
-                      }`}
-                    >
-                      {space.isOccupied ? "Occupied" : "Vacant"}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 self-start sm:self-center">
+                      <Badge
+                        variant={space.isOccupied ? "destructive" : "secondary"}
+                      >
+                        {space.isOccupied ? "Occupied" : "Vacant"}
+                      </Badge>
+                      <Badge
+                        variant={
+                          (space as any).status === "Pending"
+                            ? "outline"
+                            : (space as any).status === "Rejected"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {((space as any).status as string) || "Active"}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
@@ -795,6 +873,31 @@ export function SpacesClientPage({
                 </CardContent>
                 <CardFooter className="border-t pt-4">
                   <div className="flex w-full flex-wrap items-center justify-end gap-2">
+                    {canApproveSpaces &&
+                      (space as any).status === "Pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              handleSetSpaceStatus(space.id, "Active")
+                            }
+                            disabled={isSaving || space.isOccupied}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() =>
+                              handleSetSpaceStatus(space.id, "Rejected")
+                            }
+                            disabled={isSaving || space.isOccupied}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
                     {(canEditSpaces || canViewSpaces) && (
                       <Tooltip>
                         <TooltipTrigger asChild>

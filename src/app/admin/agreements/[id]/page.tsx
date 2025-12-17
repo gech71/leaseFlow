@@ -14,9 +14,14 @@ import { redirect } from "next/navigation";
 export default async function ViewAgreementPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id?: string | string[] }>;
 }) {
-  const { id } = params;
+  const resolvedParams = await params;
+  const rawId = resolvedParams?.id;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId;
+  if (!id) {
+    redirect("/admin/agreements?error=Invalid%20agreement%20link");
+  }
 
   const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
 

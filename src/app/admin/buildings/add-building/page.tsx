@@ -49,6 +49,7 @@ async function BuildingDataFetcher({ buildingId }: { buildingId?: string }) {
         id: buildingToEdit.id,
         name: buildingToEdit.name,
         address: buildingToEdit.address || "",
+        ownerAddress: (buildingToEdit as any).ownerAddress || "",
         branchName: (buildingToEdit as any).branchName || "",
         ownerName: (buildingToEdit as any).ownerName || "",
         ownerPhone: (buildingToEdit as any).ownerPhone || "",

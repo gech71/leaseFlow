@@ -5,6 +5,7 @@ import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
 import { getMonth, getYear, isAfter, addMonths } from "date-fns";
 import type { Prisma, Building, Space, Agreement, Bill } from "@prisma/client";
 import { headers } from "next/headers";
+import { prisma } from "@/lib/prisma";
 
 // Define the types that will be serialized and sent to the client.
 // This helps ensure data consistency and avoids sending oversized objects.
@@ -46,12 +47,22 @@ export interface ClientUtility {
   totalCost: number;
 }
 
+export interface ClientTenantMessage {
+  id: string;
+  tenantName: string;
+  subject: string | null;
+  body: string;
+  createdAt: string; // ISO string
+  readAt: string | null; // ISO string
+}
+
 export interface DashboardData {
   buildings: ClientBuilding[];
   spaces: ClientSpace[];
   agreements: ClientAgreement[];
   allBills: ClientBill[];
   allUtilities: ClientUtility[];
+  tenantMessages: ClientTenantMessage[];
   error: string | null;
 }
 
@@ -67,6 +78,7 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
         agreements: [],
         allBills: [],
         allUtilities: [],
+        tenantMessages: [],
         error: "No buildings assigned.",
       };
     }
@@ -93,12 +105,17 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
       ? { buildingId: { in: managedBuildingIds } }
       : {};
 
+    const tenantMessagesWhere = managedBuildingIds
+      ? { buildingId: { in: managedBuildingIds } }
+      : {};
+
     const [
       buildingsData,
       spacesData,
       agreementsData,
       allBillsData,
       allUtilitiesRaw,
+      tenantMessagesRaw,
     ] = await Promise.all([
       databaseService.getAllBuildings({
         where: buildingWhere,
@@ -135,6 +152,19 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
         where: utilitiesWhere,
         include: { utilities: true },
       }),
+      (prisma as any).tenantMessage.findMany({
+        where: tenantMessagesWhere,
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          subject: true,
+          body: true,
+          createdAt: true,
+          readAt: true,
+          tenant: { select: { name: true } },
+        },
+      }),
     ]);
 
     const allUtilities = allUtilitiesRaw.map((u) => ({
@@ -165,12 +195,22 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
       area: Number(s.area),
     }));
 
+    const tenantMessages = tenantMessagesRaw.map((m) => ({
+      id: m.id,
+      tenantName: m.tenant.name,
+      subject: m.subject ?? null,
+      body: m.body,
+      createdAt: m.createdAt.toISOString(),
+      readAt: m.readAt ? m.readAt.toISOString() : null,
+    }));
+
     return {
       buildings: buildingsData,
       spaces,
       agreements,
       allBills,
       allUtilities,
+      tenantMessages,
       error: null,
     };
   } catch (e) {
@@ -181,7 +221,46 @@ export async function getDashboardDataAction(): Promise<DashboardData> {
       agreements: [],
       allBills: [],
       allUtilities: [],
+      tenantMessages: [],
       error: "Failed to load dashboard data.",
     };
+  }
+}
+
+export async function markTenantMessageReadAction(
+  messageId: string,
+): Promise<{ success: boolean; error?: string; readAt?: string }> {
+  try {
+    const { isSuperAdmin, managedBuildingIds } = await getUserAndManagedIds();
+
+    const message = await (prisma as any).tenantMessage.findUnique({
+      where: { id: messageId },
+      select: { id: true, buildingId: true, readAt: true },
+    });
+
+    if (!message) {
+      return { success: false, error: "Message not found." };
+    }
+
+    if (!isSuperAdmin) {
+      const allowed =
+        Array.isArray(managedBuildingIds) &&
+        managedBuildingIds.includes(message.buildingId);
+      if (!allowed) {
+        return { success: false, error: "Access denied." };
+      }
+    }
+
+    const readAt = message.readAt ?? new Date();
+
+    await (prisma as any).tenantMessage.update({
+      where: { id: messageId },
+      data: { readAt },
+    });
+
+    return { success: true, readAt: readAt.toISOString() };
+  } catch (e) {
+    console.error("Error marking tenant message as read:", e);
+    return { success: false, error: "Failed to mark as read." };
   }
 }

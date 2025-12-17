@@ -20,6 +20,7 @@ model Building {
   ownerName                String?
   ownerPhone               String?
   ownerEmail               String?
+  ownerAddress             String?
   branchName               String?
   accountNumber            String
   status                   BuildingStatus             @default(Pending)
@@ -45,6 +46,8 @@ model Space {
   id                    String      @id @default(cuid())
   buildingId            String
   buildingName          String
+  status                BuildingStatus @default(Active)
+  rejectionReason       String?
   spaceIdName           String
   area                  Decimal     @db.Decimal(10, 2)
   floor                 String
@@ -53,6 +56,10 @@ model Space {
   isOccupied            Boolean     @default(false)
   createdAt             DateTime    @default(now())
   updatedAt             DateTime?   @updatedAt
+  createdById           String?
+  createdBy             User?       @relation("CreatedSpaces", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedById          String?
+  approvedBy            User?       @relation("ApprovedSpaces", fields: [approvedById], references: [id], onDelete: SetNull)
   building              Building    @relation(fields: [buildingId], references: [id], onDelete: Restrict)
   agreements            Agreement[]
 
@@ -91,6 +98,24 @@ model Tenant {
   agreements Agreement[]
   bills      Bill[]
   buildingStatuses TenantBuildingStatus[]
+
+  messages TenantMessage[]
+}
+
+model TenantMessage {
+  id        String   @id @default(cuid())
+  tenantId  String
+  buildingId String
+  subject   String?
+  body      String
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId, createdAt])
+  @@index([tenantId, createdAt])
 }
 
 // Track tenant status per building to allow scoped activation/deactivation
@@ -119,6 +144,12 @@ model Agreement {
   additionalTerms     String?  @db.Text
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+  createdById          String?
+  createdBy            User?           @relation("CreatedAgreements", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedById         String?
+  approvedBy           User?           @relation("ApprovedAgreements", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectionReason      String?
 
   paymentTermMonths    Int
   initialPaymentMonths Int
@@ -200,6 +231,12 @@ model BuildingMonthlyUtilities {
   buildingName String
   year         Int
   month        Int // 0-11 for Jan-Dec
+  status       BuildingStatus @default(Active)
+  rejectionReason String?
+  createdById  String?
+  createdBy    User?      @relation("CreatedBuildingMonthlyUtilities", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedById String?
+  approvedBy   User?      @relation("ApprovedBuildingMonthlyUtilities", fields: [approvedById], references: [id], onDelete: SetNull)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime? @updatedAt
 
@@ -264,6 +301,12 @@ model User {
   roles             Role[]              @relation("UserRoles")
   AuditLog          AuditLog[]
   UserSession       UserSession[]
+  createdSpaces     Space[]             @relation("CreatedSpaces")
+  approvedSpaces    Space[]             @relation("ApprovedSpaces")
+  createdAgreements Agreement[]         @relation("CreatedAgreements")
+  approvedAgreements Agreement[]        @relation("ApprovedAgreements")
+  createdBuildingMonthlyUtilities BuildingMonthlyUtilities[] @relation("CreatedBuildingMonthlyUtilities")
+  approvedBuildingMonthlyUtilities BuildingMonthlyUtilities[] @relation("ApprovedBuildingMonthlyUtilities")
 
 }
 
@@ -353,8 +396,10 @@ enum TenantStatus {
 }
 
 enum AgreementStatus {
+  Pending
   Active
   Inactive
   Expired
   Canceled
+  Rejected
 }

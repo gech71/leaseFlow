@@ -98,7 +98,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import * as XLSX from "xlsx-js-style";
+import XLSX from "xlsx-js-style";
 
 // Client-side specific types ensuring dates are strings
 export interface ClientSpace
@@ -726,11 +726,15 @@ export function TenantsClientPage({
 
   const exportToExcel = () => {
     const dataToExport = filteredTenants.map((t) => ({
+      "Tenant ID": t.id,
       Name: t.name,
       Email: t.email,
       Phone: t.phone,
+      "Tenant Address": t.address || "",
       "National ID": t.nationalId,
       Status: t.status,
+      "Created Date": new Date(t.createdAt).toLocaleString(),
+      "Created By": t.createdBy?.name || "",
       "Rented Spaces":
         t.agreements
           .filter(

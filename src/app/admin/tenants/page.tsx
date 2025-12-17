@@ -57,6 +57,7 @@ export default async function TenantsPage() {
     where: tenantWhere,
     include: {
       rentedSpace: true,
+      createdBy: { select: { id: true, name: true } },
       agreements: agreementsInclude,
       buildingStatuses: true,
     },

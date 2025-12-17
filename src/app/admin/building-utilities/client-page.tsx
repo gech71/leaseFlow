@@ -55,6 +55,7 @@ import {
   saveBuildingUtilitiesAction,
   getAllBuildingUtilitiesForListAction,
   deleteBuildingUtilitiesAction,
+  setBuildingUtilitiesStatusAction,
   type BuildingUtilityItemInput,
 } from "./actions";
 import { usePermissions } from "@/contexts/PermissionContext";
@@ -181,6 +182,8 @@ export function BuildingUtilitiesClientPage({
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canSaveUtilities =
     isSuperAdmin || hasPermission("building_utility:save");
+  const canApproveUtilities =
+    isSuperAdmin || hasPermission("building_utility:approve");
   const canViewUtilities =
     isSuperAdmin || hasPermission("building_utility:view") || canSaveUtilities;
 
@@ -685,6 +688,47 @@ export function BuildingUtilitiesClientPage({
       });
     }
     setRecordToDelete(null);
+  };
+
+  const handleSetRecordStatus = async (
+    recordId: string,
+    status: "Active" | "Rejected",
+  ) => {
+    if (!canApproveUtilities) return;
+
+    const rejectionReason =
+      status === "Rejected"
+        ? window.prompt("Rejection reason (optional):") || undefined
+        : undefined;
+
+    setIsSaving(true);
+    const result = await setBuildingUtilitiesStatusAction(
+      recordId,
+      status as any,
+      rejectionReason,
+    );
+    setIsSaving(false);
+
+    if (result.success) {
+      setAllUtilityRecords((prev) =>
+        prev.map((r) =>
+          r.id === recordId
+            ? ({ ...r, status } as ClientBuildingMonthlyUtilitiesPrismaType)
+            : r,
+        ),
+      );
+      toast({
+        title: "Status Updated",
+        description:
+          status === "Active" ? "Record approved." : "Record rejected.",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to update record status.",
+        variant: "destructive",
+      });
+    }
   };
 
   const yearsForFilter = useMemo(() => {
@@ -1341,6 +1385,7 @@ export function BuildingUtilitiesClientPage({
                       <TableRow>
                         <TableHead>Building</TableHead>
                         <TableHead>Period</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="text-center">Items</TableHead>
                         <TableHead className="text-right">Total Cost</TableHead>
                         <TableHead className="hidden md:table-cell">
@@ -1351,6 +1396,8 @@ export function BuildingUtilitiesClientPage({
                     </TableHeader>
                     <TableBody>
                       {paginatedUtilityRecords.map((entry) => {
+                        const status =
+                          ((entry as any).status as string) || "Active";
                         const totalCost = (entry.utilities || []).reduce(
                           (sum, util) => sum + util.totalCost,
                           0,
@@ -1374,6 +1421,20 @@ export function BuildingUtilitiesClientPage({
                                 ),
                                 "MMMM yyyy",
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  status === "Pending"
+                                    ? "outline"
+                                    : status === "Rejected"
+                                    ? "destructive"
+                                    : "secondary"
+                                }
+                                className="capitalize"
+                              >
+                                {status}
+                              </Badge>
                             </TableCell>
                             <TableCell className="text-center">
                               <Tooltip>
@@ -1410,6 +1471,35 @@ export function BuildingUtilitiesClientPage({
                               {format(parseISO(entry.createdAt), "PP")}
                             </TableCell>
                             <TableCell className="text-right">
+                              {canApproveUtilities && status === "Pending" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      handleSetRecordStatus(entry.id, "Active")
+                                    }
+                                    disabled={isSaving}
+                                    className="mr-2"
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() =>
+                                      handleSetRecordStatus(
+                                        entry.id,
+                                        "Rejected",
+                                      )
+                                    }
+                                    disabled={isSaving}
+                                    className="mr-2"
+                                  >
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
