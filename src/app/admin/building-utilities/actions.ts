@@ -121,7 +121,7 @@ export async function saveBuildingUtilitiesAction(
       return { success: false, error: "Permission denied." };
     }
 
-    if (!isSuperAdmin && !permissions.has("building_utility:save")) {
+    if (!isSuperAdmin && !permissions.has("building_utility:create")) {
       return { success: false, error: "Access Denied" };
     }
 

@@ -245,7 +245,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: "Building Utilities",
     permissions: [
       { id: "building_utility:view", label: "View" },
-      { id: "building_utility:save", label: "Save (Maker)" },
+      { id: "building_utility:create", label: "Create (Maker)" },
       { id: "building_utility:approve", label: "Approve (Checker)" },
     ],
   },

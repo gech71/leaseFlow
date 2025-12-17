@@ -178,8 +178,13 @@ export function RoleManagementClientPage({
     }).filter((group) => group.permissions.length > 0); // Only include groups that have at least one visible permission
   }, [isSuperAdmin, currentUser]);
 
-  const totalPages = Math.ceil(roles.length / itemsPerPage);
-  const paginatedRoles = roles.slice(
+  const displayedRoles = useMemo(
+    () => roles.filter((r) => r.name !== "SYSTEM_ADMIN"),
+    [roles],
+  );
+
+  const totalPages = Math.ceil(displayedRoles.length / itemsPerPage);
+  const paginatedRoles = displayedRoles.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
@@ -422,10 +427,12 @@ export function RoleManagementClientPage({
                 </TableHeader>
                 <TableBody>
                   {paginatedRoles.map((role) => {
-                    const isSystemRole =
+                    // Treat SUPER_ADMIN and TENANT as protected system roles
+                    const isProtectedRole =
                       role.name === "SUPER_ADMIN" || role.name === "TENANT";
-                    const canEditThisRole = canManageRoles && !isSystemRole;
-                    const canDeleteThisRole = canManageRoles && !isSystemRole;
+                    const canEditThisRole = canManageRoles && !isProtectedRole;
+                    const canDeleteThisRole =
+                      canManageRoles && !isProtectedRole;
 
                     return (
                       <TableRow key={role.id}>
@@ -456,12 +463,9 @@ export function RoleManagementClientPage({
                             size="icon"
                             onClick={() => handleOpenEditForm(role)}
                             className="mr-1 h-8 w-8"
-                            disabled={
-                              isSaving || (isSystemRole && !isSuperAdmin)
-                            }
+                            disabled={isSaving || !canEditThisRole}
                           >
-                            {canEditThisRole ||
-                            (isSuperAdmin && isSystemRole) ? (
+                            {canEditThisRole ? (
                               <Edit className="h-4 w-4 text-blue-600" />
                             ) : (
                               <Eye className="h-4 w-4 text-blue-600" />

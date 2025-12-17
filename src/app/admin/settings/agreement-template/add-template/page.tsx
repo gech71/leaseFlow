@@ -1,39 +1,47 @@
+import { Suspense } from "react";
+import { PageHeader } from "@/components/custom/PageHeader";
+import { FileText, ArrowLeft, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { getAgreementTemplateByIdAction } from "../actions";
+import { AddTemplateForm } from "./form";
 
-import { Suspense } from 'react';
-import { PageHeader } from '@/components/custom/PageHeader';
-import { FileText, ArrowLeft, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { getAgreementTemplateByIdAction } from '../actions';
-import { AddTemplateForm } from './form';
-
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 async function TemplateDataFetcher({ templateId }: { templateId?: string }) {
-    if (templateId) {
-        const { template, error } = await getAgreementTemplateByIdAction(templateId);
-        if (error) {
-            return <p className="text-destructive">{error}</p>;
-        }
-        return <AddTemplateForm initialData={template} />;
+  if (templateId) {
+    const { template, error } = await getAgreementTemplateByIdAction(
+      templateId,
+    );
+    if (error) {
+      return <p className="text-destructive">{error}</p>;
     }
-    return <AddTemplateForm />;
+    return <AddTemplateForm initialData={template} />;
+  }
+  return <AddTemplateForm />;
 }
 
-export default function AddAgreementTemplatePage({
+export default async function AddAgreementTemplatePage({
   searchParams,
 }: {
-  searchParams?: { id?: string };
+  searchParams?: { id?: string } | Promise<{ id?: string }>;
 }) {
-  const templateId = searchParams?.id;
-  const pageTitle = templateId ? 'Edit Agreement Template' : 'Add New Agreement Template';
+  const resolvedSearchParams = await (searchParams as any);
+  const templateId = resolvedSearchParams?.id;
+  const pageTitle = templateId
+    ? "Edit Agreement Template"
+    : "Add New Agreement Template";
 
   return (
     <div className="animate-fadeIn">
       <PageHeader
         title={pageTitle}
         icon={FileText}
-        description={templateId ? 'Update the template name and content.' : 'Create a new reusable agreement template.'}
+        description={
+          templateId
+            ? "Update the template name and content."
+            : "Create a new reusable agreement template."
+        }
         actions={
           <Link href="/admin/settings/agreement-template" passHref>
             <Button variant="outline">
@@ -42,7 +50,13 @@ export default function AddAgreementTemplatePage({
           </Link>
         }
       />
-      <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <Suspense
+        fallback={
+          <div className="flex justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        }
+      >
         <TemplateDataFetcher templateId={templateId} />
       </Suspense>
     </div>

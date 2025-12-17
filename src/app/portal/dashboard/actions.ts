@@ -73,6 +73,14 @@ export type PortalAgreementWithRelations = Omit<AgreementPrisma, "bills"> & {
 
 export interface TenantPortalData {
   agreements: PortalAgreementWithRelations[]; // Changed to an array
+  messages?: {
+    id: string;
+    subject: string | null;
+    body: string;
+    createdAt: string;
+    readAt: string | null;
+    buildingName?: string | null;
+  }[];
   error?: string;
 }
 
@@ -248,12 +256,38 @@ export async function getTenantPortalDashboardDataAction(): Promise<TenantPortal
     if (activeAgreements.length === 0) {
       return {
         agreements: [],
+        messages: [],
         error: "You do not have any active agreements.",
       };
     }
 
+    // Fetch tenant's sent messages so they can view message history from the portal
+    const tenantMessagesRaw = await (prisma as any).tenantMessage.findMany({
+      where: { tenantId: associatedTenant.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        subject: true,
+        body: true,
+        createdAt: true,
+        readAt: true,
+        building: { select: { name: true } },
+      },
+    });
+
+    const tenantMessages = tenantMessagesRaw.map((m: any) => ({
+      id: m.id,
+      subject: m.subject ?? null,
+      body: m.body,
+      createdAt: m.createdAt.toISOString(),
+      readAt: m.readAt ? m.readAt.toISOString() : null,
+      buildingName: m.building?.name ?? null,
+    }));
+
     return {
       agreements: activeAgreements as unknown as PortalAgreementWithRelations[],
+      messages: tenantMessages,
       error: undefined,
     };
   } catch (error: any) {

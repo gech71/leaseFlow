@@ -181,7 +181,7 @@ export function BuildingUtilitiesClientPage({
 
   const { hasPermission, isSuperAdmin } = usePermissions();
   const canSaveUtilities =
-    isSuperAdmin || hasPermission("building_utility:save");
+    isSuperAdmin || hasPermission("building_utility:create");
   const canApproveUtilities =
     isSuperAdmin || hasPermission("building_utility:approve");
   const canViewUtilities =

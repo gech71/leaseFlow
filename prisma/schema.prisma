@@ -39,28 +39,29 @@ model Building {
   AgreementTemplate        AgreementTemplate[]
   Tenant                   Tenant[]
   Agreement                Agreement[]
-  tenantStatuses          TenantBuildingStatus[]
+  tenantStatuses           TenantBuildingStatus[]
+  TenantMessage            TenantMessage[]
 }
 
 model Space {
-  id                    String      @id @default(cuid())
+  id                    String         @id @default(cuid())
   buildingId            String
   buildingName          String
   status                BuildingStatus @default(Active)
   rejectionReason       String?
   spaceIdName           String
-  area                  Decimal     @db.Decimal(10, 2)
+  area                  Decimal        @db.Decimal(10, 2)
   floor                 String
-  utilityProrationShare Decimal     @default(0) @db.Decimal(5, 4) // e.g., 0.05 for 5%
-  monthlyRentalPrice    Decimal     @db.Decimal(12, 2)
-  isOccupied            Boolean     @default(false)
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime?   @updatedAt
+  utilityProrationShare Decimal        @default(0) @db.Decimal(5, 4) // e.g., 0.05 for 5%
+  monthlyRentalPrice    Decimal        @db.Decimal(12, 2)
+  isOccupied            Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime?      @updatedAt
   createdById           String?
-  createdBy             User?       @relation("CreatedSpaces", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy             User?          @relation("CreatedSpaces", fields: [createdById], references: [id], onDelete: SetNull)
   approvedById          String?
-  approvedBy            User?       @relation("ApprovedSpaces", fields: [approvedById], references: [id], onDelete: SetNull)
-  building              Building    @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  approvedBy            User?          @relation("ApprovedSpaces", fields: [approvedById], references: [id], onDelete: SetNull)
+  building              Building       @relation(fields: [buildingId], references: [id], onDelete: Restrict)
   agreements            Agreement[]
 
   // One-to-one with tenant
@@ -95,21 +96,21 @@ model Tenant {
   createdBy   User?   @relation("CreatedTenants", fields: [createdById], references: [id], onDelete: SetNull)
 
   // One-to-many
-  agreements Agreement[]
-  bills      Bill[]
+  agreements       Agreement[]
+  bills            Bill[]
   buildingStatuses TenantBuildingStatus[]
 
   messages TenantMessage[]
 }
 
 model TenantMessage {
-  id        String   @id @default(cuid())
-  tenantId  String
+  id         String    @id @default(cuid())
+  tenantId   String
   buildingId String
-  subject   String?
-  body      String
-  createdAt DateTime @default(now())
-  readAt    DateTime?
+  subject    String?
+  body       String
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -145,11 +146,11 @@ model Agreement {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  createdById          String?
-  createdBy            User?           @relation("CreatedAgreements", fields: [createdById], references: [id], onDelete: SetNull)
-  approvedById         String?
-  approvedBy           User?           @relation("ApprovedAgreements", fields: [approvedById], references: [id], onDelete: SetNull)
-  rejectionReason      String?
+  createdById     String?
+  createdBy       User?   @relation("CreatedAgreements", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedById    String?
+  approvedBy      User?   @relation("ApprovedAgreements", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectionReason String?
 
   paymentTermMonths    Int
   initialPaymentMonths Int
@@ -175,7 +176,7 @@ model Agreement {
 
 model AgreementTemplate {
   id      String @id @default(cuid())
-  name    String 
+  name    String
   content String @db.Text
 
   createdAt   DateTime    @default(now())
@@ -226,19 +227,19 @@ model Bill {
 }
 
 model BuildingMonthlyUtilities {
-  id           String    @id @default(cuid())
-  buildingId   String
-  buildingName String
-  year         Int
-  month        Int // 0-11 for Jan-Dec
-  status       BuildingStatus @default(Active)
+  id              String         @id @default(cuid())
+  buildingId      String
+  buildingName    String
+  year            Int
+  month           Int // 0-11 for Jan-Dec
+  status          BuildingStatus @default(Active)
   rejectionReason String?
-  createdById  String?
-  createdBy    User?      @relation("CreatedBuildingMonthlyUtilities", fields: [createdById], references: [id], onDelete: SetNull)
-  approvedById String?
-  approvedBy   User?      @relation("ApprovedBuildingMonthlyUtilities", fields: [approvedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime? @updatedAt
+  createdById     String?
+  createdBy       User?          @relation("CreatedBuildingMonthlyUtilities", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedById    String?
+  approvedBy      User?          @relation("ApprovedBuildingMonthlyUtilities", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime?      @updatedAt
 
   building  Building              @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   utilities BuildingUtilityItem[]
@@ -278,36 +279,35 @@ model PenaltyTier {
 // --------------------------------------
 
 model User {
-  id                String              @id @default(cuid())
-  name              String?
-  firstName         String?
-  lastName          String?
-  email             String              @unique
-  phoneNumber       String              @unique
-  password          String?             @db.Text
-  tempPassword      String?             @db.Text
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime?           @updatedAt
-  createdById       String?
-  createdBy         User?               @relation("CreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdUsers      User[]              @relation("CreatedBy")
-  managedBuildings  Building[]          @relation("ManagedBuildings")
-  createdBuildings  Building[]          @relation("CreatedBuildings")
-  approvedBuildings Building[]          @relation("ApprovedBuildings")
-  createdTenants    Tenant[]            @relation("CreatedTenants")
-  createdRoles      Role[]              @relation("CreatedRoles")
-  createdTemplates  AgreementTemplate[] @relation("CreatedTemplates")
-  tenantProfile     Tenant?             @relation("TenantProfile")
-  roles             Role[]              @relation("UserRoles")
-  AuditLog          AuditLog[]
-  UserSession       UserSession[]
-  createdSpaces     Space[]             @relation("CreatedSpaces")
-  approvedSpaces    Space[]             @relation("ApprovedSpaces")
-  createdAgreements Agreement[]         @relation("CreatedAgreements")
-  approvedAgreements Agreement[]        @relation("ApprovedAgreements")
-  createdBuildingMonthlyUtilities BuildingMonthlyUtilities[] @relation("CreatedBuildingMonthlyUtilities")
+  id                               String                     @id @default(cuid())
+  name                             String?
+  firstName                        String?
+  lastName                         String?
+  email                            String                     @unique
+  phoneNumber                      String                     @unique
+  password                         String?                    @db.Text
+  tempPassword                     String?                    @db.Text
+  createdAt                        DateTime                   @default(now())
+  updatedAt                        DateTime?                  @updatedAt
+  createdById                      String?
+  createdBy                        User?                      @relation("CreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers                     User[]                     @relation("CreatedBy")
+  managedBuildings                 Building[]                 @relation("ManagedBuildings")
+  createdBuildings                 Building[]                 @relation("CreatedBuildings")
+  approvedBuildings                Building[]                 @relation("ApprovedBuildings")
+  createdTenants                   Tenant[]                   @relation("CreatedTenants")
+  createdRoles                     Role[]                     @relation("CreatedRoles")
+  createdTemplates                 AgreementTemplate[]        @relation("CreatedTemplates")
+  tenantProfile                    Tenant?                    @relation("TenantProfile")
+  roles                            Role[]                     @relation("UserRoles")
+  AuditLog                         AuditLog[]
+  UserSession                      UserSession[]
+  createdSpaces                    Space[]                    @relation("CreatedSpaces")
+  approvedSpaces                   Space[]                    @relation("ApprovedSpaces")
+  createdAgreements                Agreement[]                @relation("CreatedAgreements")
+  approvedAgreements               Agreement[]                @relation("ApprovedAgreements")
+  createdBuildingMonthlyUtilities  BuildingMonthlyUtilities[] @relation("CreatedBuildingMonthlyUtilities")
   approvedBuildingMonthlyUtilities BuildingMonthlyUtilities[] @relation("ApprovedBuildingMonthlyUtilities")
-
 }
 
 model Role {

@@ -223,8 +223,10 @@ export function PaymentsOverviewClientPage({
   const [isMounted, setIsMounted] = useState(false);
   const [today, setToday] = useState(startOfDay(new Date()));
 
-  const [selectedMonth, setSelectedMonth] = useState<number>(today.getMonth());
-  const [selectedYear, setSelectedYear] = useState<number>(today.getFullYear());
+  const [startMonth, setStartMonth] = useState<number>(today.getMonth());
+  const [startYear, setStartYear] = useState<number>(today.getFullYear());
+  const [endMonth, setEndMonth] = useState<number>(today.getMonth());
+  const [endYear, setEndYear] = useState<number>(today.getFullYear());
 
   const [bills, setBills] = useState<ClientBill[]>(initialBills);
 
@@ -254,7 +256,7 @@ export function PaymentsOverviewClientPage({
 
   useEffect(() => {
     setPaidCurrentPage(1);
-  }, [selectedMonth, selectedYear]);
+  }, [startMonth, startYear, endMonth, endYear]);
 
   const calculatePenalty = useCallback(
     (bill: ClientBill, currentStatus: ClientBill["status"]): number => {
@@ -395,15 +397,17 @@ export function PaymentsOverviewClientPage({
   );
 
   const paidBillsInSelectedPeriod = useMemo(() => {
+    // compute inclusive start/end dates for the selected month range
+    const rangeStart = startOfDay(new Date(startYear, startMonth, 1));
+    // last day of end month:
+    const rangeEnd = startOfDay(new Date(endYear, endMonth + 1, 0));
+
     return processedBills.filter((bill) => {
       if (bill.status !== "Paid" || !bill.paymentDate) return false;
       const paymentDateObj = parseISO(bill.paymentDate);
-      return (
-        getMonth(paymentDateObj) === selectedMonth &&
-        getYear(paymentDateObj) === selectedYear
-      );
+      return paymentDateObj >= rangeStart && paymentDateObj <= rangeEnd;
     });
-  }, [processedBills, selectedMonth, selectedYear]);
+  }, [processedBills, startMonth, startYear, endMonth, endYear]);
 
   // Pagination for all transactions
   const allTransactionsTotalPages = Math.ceil(
@@ -449,6 +453,31 @@ export function PaymentsOverviewClientPage({
     () => Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i),
     [],
   );
+
+  // Compute printable labels and normalize range (ensure start <= end)
+  const computeRange = () => {
+    const start = new Date(startYear, startMonth, 1);
+    const end = new Date(endYear, endMonth, 1);
+    if (start.getTime() > end.getTime()) {
+      // swap
+      return {
+        startLabel: format(end, "MMMM yyyy"),
+        endLabel: format(start, "MMMM yyyy"),
+        startDate: startOfDay(new Date(end.getFullYear(), end.getMonth(), 1)),
+        endDate: startOfDay(
+          new Date(start.getFullYear(), start.getMonth() + 1, 0),
+        ),
+      };
+    }
+    return {
+      startLabel: format(start, "MMMM yyyy"),
+      endLabel: format(end, "MMMM yyyy"),
+      startDate: startOfDay(new Date(start.getFullYear(), start.getMonth(), 1)),
+      endDate: startOfDay(new Date(end.getFullYear(), end.getMonth() + 1, 0)),
+    };
+  };
+  const { startLabel, endLabel } = computeRange();
+  const rangeLabel = `${startLabel} — ${endLabel}`;
   const monthsForFilter = useMemo(
     () =>
       Array.from({ length: 12 }, (_, i) => ({
@@ -583,8 +612,7 @@ export function PaymentsOverviewClientPage({
         <Card className="shadow-sm bg-secondary/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Paid (
-              {format(new Date(selectedYear, selectedMonth), "MMMM yyyy")})
+              Total Paid ({rangeLabel})
             </CardTitle>
             <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -739,57 +767,114 @@ export function PaymentsOverviewClientPage({
             Payment History (Paid & Verified)
           </h2>
           <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end w-full sm:w-auto">
-            <div className="flex-grow sm:flex-grow-0">
-              <Label
-                htmlFor="month-select"
-                className="text-xs text-muted-foreground"
-              >
-                Month
-              </Label>
-              <Select
-                value={String(selectedMonth)}
-                onValueChange={(value) => setSelectedMonth(Number(value))}
-              >
-                <SelectTrigger
-                  id="month-select"
-                  className="w-full sm:w-[150px] h-9 mt-1"
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
+              <div className="flex-grow sm:flex-grow-0">
+                <Label
+                  htmlFor="start-month-select"
+                  className="text-xs text-muted-foreground"
                 >
-                  <SelectValue placeholder="Select Month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthsForFilter.map((month) => (
-                    <SelectItem key={month.value} value={String(month.value)}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  From (Month)
+                </Label>
+                <Select
+                  value={String(startMonth)}
+                  onValueChange={(value) => setStartMonth(Number(value))}
+                >
+                  <SelectTrigger
+                    id="start-month-select"
+                    className="w-full sm:w-[150px] h-9 mt-1"
+                  >
+                    <SelectValue placeholder="Start Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthsForFilter.map((month) => (
+                      <SelectItem key={month.value} value={String(month.value)}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-grow sm:flex-grow-0">
+                <Label
+                  htmlFor="start-year-select"
+                  className="text-xs text-muted-foreground"
+                >
+                  Year
+                </Label>
+                <Select
+                  value={String(startYear)}
+                  onValueChange={(value) => setStartYear(Number(value))}
+                >
+                  <SelectTrigger
+                    id="start-year-select"
+                    className="w-full sm:w-[120px] h-9 mt-1"
+                  >
+                    <SelectValue placeholder="Start Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearsForFilter.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex-grow sm:flex-grow-0">
-              <Label
-                htmlFor="year-select"
-                className="text-xs text-muted-foreground"
-              >
-                Year
-              </Label>
-              <Select
-                value={String(selectedYear)}
-                onValueChange={(value) => setSelectedYear(Number(value))}
-              >
-                <SelectTrigger
-                  id="year-select"
-                  className="w-full sm:w-[120px] h-9 mt-1"
+
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
+              <div className="flex-grow sm:flex-grow-0">
+                <Label
+                  htmlFor="end-month-select"
+                  className="text-xs text-muted-foreground"
                 >
-                  <SelectValue placeholder="Select Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearsForFilter.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  To (Month)
+                </Label>
+                <Select
+                  value={String(endMonth)}
+                  onValueChange={(value) => setEndMonth(Number(value))}
+                >
+                  <SelectTrigger
+                    id="end-month-select"
+                    className="w-full sm:w-[150px] h-9 mt-1"
+                  >
+                    <SelectValue placeholder="End Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthsForFilter.map((month) => (
+                      <SelectItem key={month.value} value={String(month.value)}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-grow sm:flex-grow-0">
+                <Label
+                  htmlFor="end-year-select"
+                  className="text-xs text-muted-foreground"
+                >
+                  Year
+                </Label>
+                <Select
+                  value={String(endYear)}
+                  onValueChange={(value) => setEndYear(Number(value))}
+                >
+                  <SelectTrigger
+                    id="end-year-select"
+                    className="w-full sm:w-[120px] h-9 mt-1"
+                  >
+                    <SelectValue placeholder="End Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearsForFilter.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {paidBillsInSelectedPeriod.length > 0 && canViewPage && (
               <Button
@@ -798,10 +883,10 @@ export function PaymentsOverviewClientPage({
                 onClick={() =>
                   exportToExcel(
                     paidBillsInSelectedPeriod,
-                    `Payment_History_${
-                      monthsForFilter.find((m) => m.value === selectedMonth)
-                        ?.label
-                    }_${selectedYear}`,
+                    `Payment_History_${startLabel.replace(
+                      /\s+/g,
+                      "_",
+                    )}_to_${endLabel.replace(/\s+/g, "_")}`,
                   )
                 }
                 className="self-stretch sm:self-end h-9 w-full sm:w-auto"
@@ -820,8 +905,7 @@ export function PaymentsOverviewClientPage({
                 No Payments Found
               </h3>
               <p className="text-muted-foreground">
-                No payments recorded for{" "}
-                {format(new Date(selectedYear, selectedMonth), "MMMM yyyy")}.
+                No payments recorded for {rangeLabel}.
               </p>
             </CardContent>
           </Card>

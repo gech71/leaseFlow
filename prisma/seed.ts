@@ -77,7 +77,7 @@ async function main() {
         "billing:manage_payments",
         "payment_overview:view",
         "building_utility:view",
-        "building_utility:save",
+        "building_utility:create",
         "building_utility:approve",
         "audit:view",
         "settings:user_registration:manage",
@@ -116,7 +116,7 @@ async function main() {
         "agreement:export",
         "agreement:edit",
         "building_utility:view",
-        "building_utility:save",
+        "building_utility:create",
         "billing:view",
         "payment_overview:view",
         "portal:view",
@@ -151,22 +151,8 @@ async function main() {
   });
   console.log(`Created Super Admin User: ${superAdminUser.email}`);
 
-  console.log("Creating System Admin User...");
-  const systemAdminUser = await prisma.user.create({
-    data: {
-      email: "systemadmin@nibrental.com",
-      name: "System Admin",
-      firstName: "System",
-      lastName: "Admin",
-      phoneNumber: "0912345679",
-      password: hashedPassword,
-      roles: { connect: { id: systemAdminRole.id } },
-    },
-  });
-  console.log(`Created System Admin User: ${systemAdminUser.email}`);
-
   console.log(
-    "Seeding finished successfully! SUPER_ADMIN, SYSTEM_ADMIN and TENANT roles created, plus default admin users.",
+    "Seeding finished successfully! SUPER_ADMIN and TENANT roles created, plus default admin users.",
   );
 }
 

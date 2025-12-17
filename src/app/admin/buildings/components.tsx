@@ -385,6 +385,7 @@ export function BuildingsClientPage({
   const canEditBuildings = isSuperAdmin || hasPermission("building:edit");
   const canApproveBuildings = isSuperAdmin || hasPermission("building:approve");
   const canDeleteBuildings = isSuperAdmin || hasPermission("building:delete");
+  const canExportBuildings = isSuperAdmin || hasPermission("building:export");
   const canViewBuildings =
     isSuperAdmin ||
     hasPermission("building:view") ||
@@ -467,8 +468,21 @@ export function BuildingsClientPage({
       "Account Number": b.accountNumber,
       "Branch Name": (b as any).branchName || "",
       "Building Owner Name": (b as any).ownerName || "",
+      "Building Owner Address": (b as any).ownerAddress || "",
       "Building Owner Phone": (b as any).ownerPhone || "",
       "Building Owner Email": (b as any).ownerEmail || "",
+      "Occupied/Total Area (m²)": `${((b as any).occupiedAreaSum || 0).toFixed(
+        2,
+      )}/${((b as any).totalAreaSum || 0).toFixed(2)}`,
+      "Available/Total Spaces": `${(b as any).availableSpacesCount || 0}/${
+        (b as any).totalSpacesCount || 0
+      }`,
+      "Active/Total Tenants": `${(b as any).activeTenantsCount || 0}/${
+        (b as any).totalTenantsCount || (b as any).totalTenants || 0
+      }`,
+      "Active/Total Agreements": `${(b as any).activeAgreementsCount || 0}/${
+        (b as any).totalAgreementsCount || (b as any).totalAgreements || 0
+      }`,
       Status: b.status,
       "Creation Date": format(new Date(b.createdAt), "yyyy-MM-dd HH:mm"),
       "Created By": b.createdBy?.name || "N/A",
@@ -509,13 +523,11 @@ export function BuildingsClientPage({
         description="Add, view, and edit buildings and their late fee penalty policies."
         actions={
           <div className="flex flex-col sm:flex-row gap-2">
-            {isSuperAdmin && (
-              <>
-                <Button onClick={exportToExcel} variant="outline" size="sm">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Excel
-                </Button>
-              </>
+            {canExportBuildings && (
+              <Button onClick={exportToExcel} variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Export Excel
+              </Button>
             )}
             {canCreateBuildings && (
               <Link href="/admin/buildings/add-building" passHref>

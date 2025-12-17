@@ -56,6 +56,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { PermissionId } from "@/lib/types";
 import Image from "next/image";
 import { usePermissions } from "@/contexts/PermissionContext";
+import NotificationBell from "@/components/custom/NotificationBell";
 
 interface NavItem {
   href: string;
@@ -293,6 +294,9 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         <header className="flex h-[3.7rem] shrink-0 items-center border-b bg-background px-4 sm:px-6 lg:px-8">
           <SidebarTrigger className="md:hidden" />
           <SidebarTrigger className="hidden md:group-data-[state=collapsed]/sidebar-wrapper:flex" />
+          <div className="ml-auto hidden md:flex items-center">
+            <NotificationBell inline />
+          </div>
         </header>
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}

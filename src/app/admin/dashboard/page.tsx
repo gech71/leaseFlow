@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import type { DashboardData } from "./actions";
 import { getDashboardDataAction, markTenantMessageReadAction } from "./actions";
 import { usePermissions } from "@/contexts/PermissionContext";
@@ -487,81 +488,21 @@ export default function AdminDashboardPage() {
 
       <Card className="mb-10 shadow-sm">
         <CardHeader>
-          <CardTitle className="font-headline text-xl">
-            Tenant Messages
-          </CardTitle>
+          <CardTitle className="font-headline text-xl">Messages</CardTitle>
           <CardDescription>
-            Recent messages sent from the tenant portal.
+            Tenant messages moved to Messages page.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {allData.tenantMessages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No new messages.</p>
-          ) : (
-            <div className="space-y-4">
-              {allData.tenantMessages.map((m) => (
-                <div
-                  key={m.id}
-                  className="border-b pb-4 last:border-b-0 last:pb-0"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-foreground truncate">
-                          {m.tenantName}
-                        </p>
-                        {!m.readAt ? (
-                          <Badge variant="secondary">Unread</Badge>
-                        ) : null}
-                      </div>
-                      {m.subject ? (
-                        <p className="text-sm text-muted-foreground truncate">
-                          {m.subject}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <p className="text-xs text-muted-foreground whitespace-nowrap">
-                        {format(parseISO(m.createdAt), "PP p")}
-                      </p>
-                      {!m.readAt ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={readingMessageId === m.id}
-                          onClick={async () => {
-                            setReadingMessageId(m.id);
-                            const result = await markTenantMessageReadAction(
-                              m.id,
-                            );
-                            setReadingMessageId(null);
-                            if (!result.success || !result.readAt) return;
-
-                            setAllData((prev) => {
-                              if (!prev) return prev;
-                              return {
-                                ...prev,
-                                tenantMessages: prev.tenantMessages.map((x) =>
-                                  x.id === m.id
-                                    ? { ...x, readAt: result.readAt! }
-                                    : x,
-                                ),
-                              };
-                            });
-                          }}
-                        >
-                          Mark as read
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="mt-2 text-sm text-foreground whitespace-pre-wrap">
-                    {m.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Tenant messages are available from the Notifications bell or the
+            full messages page.
+          </p>
+          <div className="mt-4">
+            <a href="/admin/tenant-messages">
+              <Button>View all messages</Button>
+            </a>
+          </div>
         </CardContent>
       </Card>
 

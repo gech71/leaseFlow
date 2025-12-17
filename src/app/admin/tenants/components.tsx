@@ -238,6 +238,7 @@ export function TenantsClientPage({
   const canCreateTenants = isSuperAdmin || hasPermission("tenant:create");
   const canEditTenants = isSuperAdmin || hasPermission("tenant:edit");
   const canChangeStatus = isSuperAdmin || hasPermission("tenant:status");
+  const canExportTenants = isSuperAdmin || hasPermission("tenant:export");
   const canViewTenants =
     isSuperAdmin ||
     hasPermission("tenant:view") ||
@@ -725,31 +726,35 @@ export function TenantsClientPage({
   };
 
   const exportToExcel = () => {
-    const dataToExport = filteredTenants.map((t) => ({
-      "Tenant ID": t.id,
-      Name: t.name,
-      Email: t.email,
-      Phone: t.phone,
-      "Tenant Address": t.address || "",
-      "National ID": t.nationalId,
-      Status: t.status,
-      "Created Date": new Date(t.createdAt).toLocaleString(),
-      "Created By": t.createdBy?.name || "",
-      "Rented Spaces":
-        t.agreements
-          .filter(
-            (ag) =>
-              ag.status === "Active" &&
-              isAfter(
-                addMonths(parseISO(ag.startDate), ag.paymentTermMonths),
-                new Date(),
-              ),
-          )
-          .map((ag) => ag.space?.spaceIdName)
-          .join(", ") || "None",
-      Representative: t.representativeName || "N/A",
-      "Rep. Phone": t.representativePhone || "N/A",
-    }));
+    const dataToExport = filteredTenants.map((t) => {
+      const asAny = t as unknown as Record<string, any>;
+
+      return {
+        "Tenant ID": t.id,
+        Name: t.name,
+        Email: t.email,
+        Phone: t.phone,
+        "Tenant Address": asAny.address || "",
+        "National ID": t.nationalId,
+        Status: t.status,
+        "Created Date": new Date(t.createdAt).toLocaleString(),
+        "Created By": asAny.createdBy?.name || "",
+        "Rented Spaces":
+          t.agreements
+            .filter(
+              (ag) =>
+                ag.status === "Active" &&
+                isAfter(
+                  addMonths(parseISO(ag.startDate), ag.paymentTermMonths),
+                  new Date(),
+                ),
+            )
+            .map((ag) => ag.space?.spaceIdName)
+            .join(", ") || "None",
+        Representative: t.representativeName || "N/A",
+        "Rep. Phone": t.representativePhone || "N/A",
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -793,13 +798,11 @@ export function TenantsClientPage({
         description="Add, view, and manage tenant information and their assigned spaces."
         actions={
           <div className="flex flex-col sm:flex-row gap-2">
-            {isSuperAdmin && (
-              <>
-                <Button onClick={exportToExcel} variant="outline" size="sm">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Excel
-                </Button>
-              </>
+            {canExportTenants && (
+              <Button onClick={exportToExcel} variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Export Excel
+              </Button>
             )}
             {canCreateTenants && (
               <Button

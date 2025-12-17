@@ -185,8 +185,13 @@ export function UserManagementClientPage({
     setCurrentPage(1);
   };
 
-  const totalPages = Math.ceil(users.length / itemsPerPage);
-  const paginatedUsers = users.slice(
+  const displayedUsers = useMemo(
+    () => users.filter((u) => !u.roles.some((r) => r.name === "SYSTEM_ADMIN")),
+    [users],
+  );
+
+  const totalPages = Math.ceil(displayedUsers.length / itemsPerPage);
+  const paginatedUsers = displayedUsers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
@@ -609,7 +614,10 @@ export function UserManagementClientPage({
             <Dialog
               open={isAssignmentsDialogOpen}
               onOpenChange={(open) => {
-                if (!open) setCurrentUserToEdit(null);
+                if (!open) {
+                  setCurrentUserToEdit(null);
+                  setRoleSearchTerm("");
+                }
                 setIsAssignmentsDialogOpen(open);
               }}
             >
