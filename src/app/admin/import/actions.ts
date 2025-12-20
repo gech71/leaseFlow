@@ -13,14 +13,14 @@ import { addMonths } from "date-fns";
 
 const MAX_ROWS_PER_SHEET = 2000; // Server-side limit
 
-export async function getAgreementTemplatesForImportAction(): Promise<
+export async function getAgreementTemplatesForImportAction(): Promise< 
   { id: string; name: string }[]
 > {
   const { isSuperAdmin, currentUser, permissions } =
     await getUserAndPermissions();
 
   if (!isSuperAdmin && !permissions.has("import:manage")) {
-    return [];
+    return []; 
   }
 
   // Templates are not scoped to a building in the schema, and import
@@ -189,6 +189,7 @@ export async function getAgreementTemplatesForImportAction(): Promise<
 
       if (!space.buildingName || !space.spaceIdName) {
         errors.push(
+  
           `Space Row ${row}: 'buildingName' and 'spaceIdName' are required.`,
         );
         skippedCount.spaces++;
