@@ -18,6 +18,7 @@ interface PermissionContextType {
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
   isSuperAdmin: boolean;
+  managesBuildings: boolean;
   isLoading: boolean;
   isAuthenticated: boolean;
   logout: (sessionExpired?: boolean) => Promise<void>;
@@ -205,6 +206,11 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({
     return currentUser.roles.some((role) => role.name === "SUPER_ADMIN");
   }, [currentUser]);
 
+  const managesBuildings = useMemo(() => {
+    if (!currentUser) return false;
+    return (currentUser.managedBuildingIds ?? []).length > 0;
+  }, [currentUser]);
+
   const hasPermission = useCallback(
     (permission: string): boolean => {
       if (!currentUser) return false;
@@ -228,6 +234,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({
     hasPermission,
     hasAnyPermission,
     isSuperAdmin,
+    managesBuildings,
     isLoading,
     isAuthenticated,
     logout,

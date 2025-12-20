@@ -104,20 +104,21 @@ const EXPECTED_AGREEMENT_KEYS = new Set([
   "tenantEmail",
   "buildingName",
   "spaceIdName",
-  "startDate",
+export async function getAgreementTemplatesForImportAction(): Promise<
   "termMonths",
   "initialPaymentMonths",
-  "additionalTerms (Optional)",
-]);
+  // Allow super admins, users with the explicit import permission, or users
+  // who manage at least one building to access templates for import.
+  const { isSuperAdmin, permissions } = await getUserAndPermissions();
+  const { currentUser, managedBuildingIds } = await getUserAndManagedIds();
 
-export async function processImportAction(data: ImportData) {
-  const { isSuperAdmin, permissions, currentUser } =
-    await getUserAndPermissions();
-  if (!isSuperAdmin && !permissions.has("import:manage")) {
-    return {
-      success: false,
-      createdCount: { spaces: 0, tenants: 0, agreements: 0 },
-      skippedCount: { spaces: 0, tenants: 0, agreements: 0 },
+  const canImport =
+    isSuperAdmin || permissions.has("import:manage") ||
+    (managedBuildingIds && managedBuildingIds.length > 0);
+
+  if (!canImport) {
+    return [];
+  }
       errors: ["Permission denied."],
     };
   }
@@ -202,9 +203,15 @@ export async function processImportAction(data: ImportData) {
           `Space Row ${row} (${space.spaceIdName}): One or more numerical fields (area, price, proration) are invalid.`,
         );
         skippedCount.spaces++;
-        continue;
-      }
+  const { isSuperAdmin, permissions, currentUser } =
+    await getUserAndPermissions();
+  const { managedBuildingIds } = await getUserAndManagedIds();
 
+  const canImport =
+    isSuperAdmin || permissions.has("import:manage") ||
+    (managedBuildingIds && managedBuildingIds.length > 0);
+
+  if (!canImport) {
       const buildingForSpace = await databaseService.getAllBuildings({
         where: { name: space.buildingName },
         take: 1,

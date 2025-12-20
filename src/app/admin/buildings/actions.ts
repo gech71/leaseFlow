@@ -5,6 +5,7 @@ import { databaseService } from "@/lib/services/databaseService";
 import { Prisma, type User, type Role, BuildingStatus } from "@prisma/client";
 import { cookies } from "next/headers";
 import { getUserAndPermissions } from "@/lib/actions/server-helpers";
+import { prisma } from "@/lib/prisma";
 
 export async function createBuildingAction(
   data: Omit<Prisma.BuildingCreateInput, "createdBy" | "approvedBy">,
@@ -16,6 +17,32 @@ export async function createBuildingAction(
     }
 
     // A user who creates a building should automatically be a manager of it.
+    // Additionally, when a non-super-admin Maker creates a building, we
+    // auto-assign all users who have the "building:approve" permission
+    // (the Checkers) as managers so they can approve/manage the building.
+    const managerConnect: { id: string }[] = [{ id: currentUser.id }];
+
+    if (!isSuperAdmin) {
+      try {
+        const approvers = await prisma.user.findMany({
+          where: {
+            roles: {
+              some: {
+                permissions: { has: "building:approve" },
+              },
+            },
+          },
+          select: { id: true },
+        });
+        for (const a of approvers) {
+          if (a.id !== currentUser.id) managerConnect.push({ id: a.id });
+        }
+      } catch (err) {
+        // If the lookup fails for any reason, fall back to assigning only the creator.
+        console.error("Error fetching approvers for building assignment:", err);
+      }
+    }
+
     const buildingCreateInput: Prisma.BuildingCreateInput = {
       ...data,
       status: isSuperAdmin ? "Active" : "Pending", // Auto-approve for Super Admins
@@ -23,8 +50,7 @@ export async function createBuildingAction(
         connect: { id: currentUser.id },
       },
       managers: {
-        // Automatically assign the creator as a manager
-        connect: { id: currentUser.id },
+        connect: managerConnect,
       },
       ...(isSuperAdmin && { approvedBy: { connect: { id: currentUser.id } } }),
     };

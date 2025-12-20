@@ -71,8 +71,9 @@ export function ImportClientPage({
     null,
   );
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin } = usePermissions();
-  const canManageImport = isSuperAdmin || hasPermission("import:manage");
+  const { hasPermission, isSuperAdmin, managesBuildings } = usePermissions();
+  const canManageImport =
+    isSuperAdmin || hasPermission("import:manage") || managesBuildings;
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {

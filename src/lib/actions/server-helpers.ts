@@ -109,7 +109,8 @@ export async function getUserSessionAction(): Promise<{
 
     const localUser = (await databaseService.getUserById(session.userId, {
       roles: true,
-    })) as UserWithRoles | null;
+      managedBuildings: { select: { id: true } },
+    })) as UserWithRolesAndManagedBuildings | null;
 
     if (!localUser) {
       return { isSuccess: false, user: null };
@@ -137,6 +138,9 @@ export async function getUserSessionAction(): Promise<{
         permissions: role.permissions || [],
       })),
       effectivePermissions,
+      managedBuildingIds: localUser.managedBuildings
+        ? localUser.managedBuildings.map((b) => b.id)
+        : [],
     };
 
     return { isSuccess: true, user: currentUserData };

@@ -462,27 +462,25 @@ export function BuildingUpsertFormInternal({
                     </FormItem>
                   )}
                 />
-                {isSuperAdmin && (
-                  <FormField
-                    control={form.control}
-                    name="branchName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center text-sm font-medium">
-                          Branch / District (optional)
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Branch or district name"
-                            {...field}
-                            disabled={isSaving || !canManageThisForm}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                <FormField
+                  control={form.control}
+                  name="branchName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center text-sm font-medium">
+                        Branch / District (optional)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Branch or district name"
+                          {...field}
+                          disabled={isSaving || !canManageThisForm}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
 

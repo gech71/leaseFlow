@@ -173,6 +173,8 @@ export interface CurrentUser {
   roles: UserRole[];
   // Calculated effective permissions from all assigned roles
   effectivePermissions: string[];
+  // List of building ids this user manages (client-side helper)
+  managedBuildingIds?: string[];
 }
 
 // Defines a single permission
