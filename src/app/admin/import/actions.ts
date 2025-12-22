@@ -64,11 +64,40 @@ const normalizePhoneNumber = (phone: any): string | undefined => {
 const sanitizeString = (value: any): string =>
   value ? String(value).trim() : "";
 
-const sanitizeNumber = (value: any): number => {
-  if (value === null || value === undefined || String(value).trim() === "") {
-    return NaN;
-    return { success: errors.length === 0, createdCount, skippedCount, errors };
-  }
+const parseNumberOrNaN = (value: any): number => {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+
+  const raw = String(value).trim();
+  if (!raw) return NaN;
+
+  // Common user inputs in spreadsheets:
+  // - thousands separators: "1,200.50"
+  // - percentages: "12%"
+  // - currency symbols (best-effort): "ETB 1,200" or "$1,200"
+  const normalized = raw
+    .replace(/,/g, "")
+    .replace(/%/g, "")
+    .replace(/^[^0-9+\-\.]+/, "")
+    .replace(/[^0-9+\-\.]+$/, "");
+
+  if (!normalized) return NaN;
+  const n = Number.parseFloat(normalized);
+  return Number.isFinite(n) ? n : NaN;
+};
+
+const sanitizeNumber = (value: any): number => parseNumberOrNaN(value);
+
+const sanitizeInteger = (value: any): number => {
+  const n = parseNumberOrNaN(value);
+  if (!Number.isFinite(n)) return NaN;
+  return Number.isInteger(n) ? n : NaN;
+};
+
+const isValidEmail = (email: string): boolean => {
+  const value = String(email ?? "").trim();
+  // Simple, permissive email validation for import.
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 };
 
 // Define the exact expected keys for each sheet
@@ -102,9 +131,8 @@ const EXPECTED_AGREEMENT_KEYS = new Set([
 export async function processImportAction(data: ImportData) {
   // Allow super admins, users with import permission, or users who manage
   // buildings to run imports.
-  const { isSuperAdmin, permissions, currentUser } =
-    await getUserAndPermissions();
-  const { managedBuildingIds } = await getUserAndManagedIds();
+  const { isSuperAdmin, permissions, currentUser, managedBuildingIds } =
+    await getUserAndManagedIds();
 
   const canImport =
     isSuperAdmin ||
@@ -349,8 +377,10 @@ export async function processImportAction(data: ImportData) {
         buildingName: sanitizeString(rawAgreement.buildingName),
         spaceIdName: sanitizeString(rawAgreement.spaceIdName),
         startDate: sanitizeString(rawAgreement.startDate),
-        termMonths: sanitizeNumber(rawAgreement.termMonths),
-        initialPaymentMonths: sanitizeNumber(rawAgreement.initialPaymentMonths),
+        termMonths: sanitizeInteger(rawAgreement.termMonths),
+        initialPaymentMonths: sanitizeInteger(
+          rawAgreement.initialPaymentMonths,
+        ),
         additionalTerms: sanitizeString(
           rawAgreement["additionalTerms (Optional)"],
         ),
@@ -367,7 +397,8 @@ export async function processImportAction(data: ImportData) {
       if (
         isNaN(agreement.termMonths) ||
         isNaN(agreement.initialPaymentMonths) ||
-        agreement.termMonths <= 0
+        agreement.termMonths <= 0 ||
+        agreement.initialPaymentMonths < 0
       ) {
         errors.push(
           `Agreement Row ${row} (${agreement.tenantEmail}): Invalid numerical value for 'termMonths' or 'initialPaymentMonths'.`,
@@ -494,7 +525,9 @@ export async function processImportAction(data: ImportData) {
               initialPaymentMonths: agreement.initialPaymentMonths,
               additionalTerms: agreement.additionalTerms || undefined,
             };
-            const result = await createFullAgreementAction(agreementData);
+            const result = await createFullAgreementAction(agreementData, {
+              bypassPermission: true,
+            });
             if (result.success) {
               createdCount.agreements++;
             } else {

@@ -27,12 +27,20 @@ export interface CreateFullAgreementData {
 
 export async function createFullAgreementAction(
   input: CreateFullAgreementData,
+  options?: { bypassPermission?: boolean },
 ) {
   try {
     const { currentUser, isSuperAdmin, permissions, managedBuildingIds } =
       await getUserAndManagedIds();
+    const canImport =
+      isSuperAdmin ||
+      permissions.has("import:manage") ||
+      (managedBuildingIds && managedBuildingIds.length > 0);
+
     if (!isSuperAdmin && !permissions.has("agreement:create")) {
-      return { success: false, error: "Access Denied" };
+      if (!(options?.bypassPermission && canImport)) {
+        return { success: false, error: "Access Denied" };
+      }
     }
 
     // If the incoming start date is a date-only string (YYYY-MM-DD),
