@@ -66,7 +66,7 @@ export class DatabaseService {
   }
 
   // --- Space ---
-  async createSpace(data: Prisma.SpaceCreateInput): Promise<Space> {
+  async createSpace(data: Prisma.SpaceCreateArgs["data"]): Promise<Space> {
     return prisma.space.create({ data });
   }
 
@@ -90,7 +90,10 @@ export class DatabaseService {
     return prisma.space.findMany(params);
   }
 
-  async updateSpace(id: string, data: Prisma.SpaceUpdateInput): Promise<Space> {
+  async updateSpace(
+    id: string,
+    data: Prisma.SpaceUpdateArgs["data"],
+  ): Promise<Space> {
     return prisma.space.update({ where: { id }, data });
   }
 
@@ -230,6 +233,17 @@ export class DatabaseService {
     return prisma.agreement.findUnique({ where: { id }, include });
   }
 
+  async getAllAgreements(): Promise<Agreement[]>;
+  async getAllAgreements<TInclude extends Prisma.AgreementInclude>(params: {
+    skip?: number;
+    take?: number;
+    cursor?: Prisma.AgreementWhereUniqueInput;
+    where?: Prisma.AgreementWhereInput;
+    orderBy?:
+      | Prisma.AgreementOrderByWithRelationInput
+      | Prisma.AgreementOrderByWithRelationInput[];
+    include: TInclude;
+  }): Promise<Prisma.AgreementGetPayload<{ include: TInclude }>[]>;
   async getAllAgreements(params?: {
     skip?: number;
     take?: number;
@@ -239,7 +253,7 @@ export class DatabaseService {
       | Prisma.AgreementOrderByWithRelationInput
       | Prisma.AgreementOrderByWithRelationInput[];
     include?: Prisma.AgreementInclude;
-  }): Promise<Agreement[]> {
+  }): Promise<any> {
     return prisma.agreement.findMany(params);
   }
 
@@ -508,10 +522,12 @@ export class DatabaseService {
     return prisma.user.create({ data });
   }
 
-  async getUserById(
+  async getUserById(id: string): Promise<User | null>;
+  async getUserById<TInclude extends Prisma.UserInclude>(
     id: string,
-    include?: Prisma.UserInclude,
-  ): Promise<User | null> {
+    include: TInclude,
+  ): Promise<Prisma.UserGetPayload<{ include: TInclude }> | null>;
+  async getUserById(id: string, include?: Prisma.UserInclude): Promise<any> {
     return prisma.user.findUnique({ where: { id }, include });
   }
 

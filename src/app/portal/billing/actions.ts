@@ -31,15 +31,36 @@ async function getCurrentUser(): Promise<(User & { roles: Role[] }) | null> {
 
 export async function getBillingInfoForPhoneNumberAction(phone: string) {
   try {
-    const user = await databaseService.findUserByPhoneNumber(phone);
-    if (!user) {
-      return {
-        success: false,
-        error: GENERIC_NEUTRAL_ERROR,
-      };
+    const normalizePhoneVariants = (raw: string) => {
+      const trimmed = (raw ?? "").trim();
+      if (!trimmed) return [] as string[];
+
+      const variants = new Set<string>();
+      variants.add(trimmed);
+
+      // Normalize MSISDN ("2519...") to local ("09...")
+      if (trimmed.startsWith("251") && trimmed.length >= 12) {
+        variants.add("0" + trimmed.substring(3));
+      }
+
+      // Normalize local ("09...") to MSISDN ("2519...")
+      if (trimmed.startsWith("0") && trimmed.length >= 10) {
+        variants.add("251" + trimmed.substring(1));
+      }
+
+      return Array.from(variants);
+    };
+
+    const phoneVariants = normalizePhoneVariants(phone);
+    if (phoneVariants.length === 0) {
+      return { success: false, error: GENERIC_NEUTRAL_ERROR };
     }
 
-    const tenant = await databaseService.findTenantByEmailOrPhone(null, phone);
+    let tenant = null;
+    for (const p of phoneVariants) {
+      tenant = await databaseService.findTenantByEmailOrPhone(null, p);
+      if (tenant) break;
+    }
     if (!tenant) return { success: false, error: GENERIC_NEUTRAL_ERROR };
 
     const agreementsRaw = await databaseService.getAllAgreements({
@@ -55,7 +76,8 @@ export async function getBillingInfoForPhoneNumberAction(phone: string) {
         },
         bills: {
           where: {
-            status: { in: ["Pending", "Overdue"] },
+            // Treat any non-paid / not-finalized state as outstanding.
+            status: { in: ["Pending", "Overdue", "PendingVerification"] },
           },
           orderBy: {
             billDate: "asc",

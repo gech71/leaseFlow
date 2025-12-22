@@ -27,16 +27,66 @@ async function getCurrentUser(): Promise<User | null> {
   return null;
 }
 
-export async function setPortalSessionAction(token: string) {
+
+export async function setPortalSessionAction(token: string, phone: string) {
   try {
+    const normalizePhoneForDb = (p: string) => {
+      const trimmed = (p ?? "").trim();
+      if (!trimmed) return "";
+      // SuperApp gives MSISDN like "2519..."; DB & UI commonly use local "0...".
+      return trimmed.startsWith("251") && trimmed.length >= 12
+        ? "0" + trimmed.substring(3)
+        : trimmed;
+    };
+
+    const normalizedPhone = normalizePhoneForDb(phone);
+    if (!normalizedPhone) {
+      return { success: false, error: "Phone number is required." };
+    }
+
+    const tenant = await databaseService.findTenantByEmailOrPhone(
+      null,
+      normalizedPhone,
+    );
+    if (!tenant) {
+      return {
+        success: false,
+        error: "No tenant profile found for this phone number.",
+      };
+    }
+
+    // Ensure we have a real User row so UserSession FK + verifySession DB checks succeed.
+    let user: User | null = null;
+    if (tenant.userId) {
+      user = await databaseService.getUserById(tenant.userId);
+    }
+    if (!user) {
+      user = await databaseService.findUserByEmailOrPhone(
+        tenant.email,
+        tenant.phone,
+      );
+    }
+    if (!user) {
+      user = await databaseService.createUser({
+        email: tenant.email,
+        phoneNumber: tenant.phone,
+        name: tenant.name,
+        password: null,
+        tempPassword: null,
+      });
+    }
+    if (!tenant.userId || tenant.userId !== user.id) {
+      await databaseService.updateTenant(tenant.id, { userId: user.id });
+    }
+
     const payload = {
       portalToken: token,
-      userId: `portal-user-${nanoid(8)}`, // Create a temporary unique ID
-      email: "portal-user@example.com",
+      userId: user.id,
+      email: user.email,
       isSuperAdmin: false,
       permissions: ["portal:view"],
       forceChangePass: false,
-      iat: Math.floor(Date.now() / 1000), // Use numeric timestamp for 'issued at'
+      iat: Math.floor(Date.now() / 1000),
     };
 
     const { accessToken, refreshToken } = await createSession(payload);

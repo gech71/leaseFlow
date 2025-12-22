@@ -168,13 +168,20 @@ export async function createSession(
       const { databaseService } = await import(
         "@/lib/services/databaseService"
       );
-      await databaseService.createUserSession(jti, payload.userId);
-      // Attach the created session JTI to the user record so tokens are
-      // explicitly bound to the user account. If the user doesn't exist
-      // (e.g. portal ephemeral users), skip this step.
-      // Persisted session record created in `UserSession`. Do not attach
-      // JTI values to the `User` record; rely on `UserSession` entries for
-      // revocation/checking instead.
+      // Only create a UserSession if the referenced user exists to avoid
+      // violating the foreign key constraint (UserSession.userId -> User.id).
+      const existingUser = await databaseService.getUserById(payload.userId);
+      if (existingUser) {
+        await databaseService.createUserSession(jti, payload.userId);
+      } else {
+        // For portal flows the user may be ephemeral/not present in the
+        // main users table; skip persisting the session but still return
+        // tokens so the client can proceed. Log at debug level for
+        // diagnostics.
+        console.warn(
+          `Skipping UserSession creation: user ${payload.userId} not found.`,
+        );
+      }
     }
   } catch (err) {
     // If DB write fails, we still return tokens but log a warning.

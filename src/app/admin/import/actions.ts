@@ -1,37 +1,32 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { databaseService } from "@/lib/services/databaseService";
-import { createTenantAction } from "../tenants/actions";
-import { createFullAgreementAction } from "../agreements/actions";
-import {
-  getUserAndPermissions,
-  getUserAndManagedIds,
-} from "@/lib/actions/server-helpers";
-import type { Prisma } from "@prisma/client";
 import { addMonths } from "date-fns";
+import type { Prisma } from "@prisma/client";
+
+import { databaseService } from "@/lib/services/databaseService";
+import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
+
+import { createFullAgreementAction } from "../agreements/actions";
+import { createTenantAction } from "../tenants/actions";
 
 const MAX_ROWS_PER_SHEET = 2000; // Server-side limit
 
-export async function getAgreementTemplatesForImportAction(): Promise< 
-  { id: string; name: string }[]
-> {
-  const { isSuperAdmin, currentUser, permissions } =
-    await getUserAndPermissions();
+export async function getAgreementTemplatesForImportAction() {
+  // Allow super admins, explicit import permission, or users who manage at least
+  // one building.
+  const { isSuperAdmin, currentUser, permissions, managedBuildingIds } =
+    await getUserAndManagedIds();
 
-  if (!isSuperAdmin && !permissions.has("import:manage")) {
-    return []; 
+  const canImport =
+    isSuperAdmin ||
+    permissions.has("import:manage") ||
+    (managedBuildingIds?.length ?? 0) > 0;
+
+  if (!canImport) {
+    return [] as { id: string; name: string }[];
   }
 
-  // Templates are not scoped to a building in the schema, and import
-  // operators commonly need access to templates created by others in the
-  // organization. Return all templates for users with the import permission.
-  const { managedBuildingIds } = await getUserAndManagedIds();
-
-  // For non-superadmins allow templates that were created by the current
-  // user or are tied to buildings they manage; creators should be able to
-  // select their own templates during import even if not tied to a
-  // managed building.
   const where: Prisma.AgreementTemplateWhereInput = isSuperAdmin
     ? {}
     : {
@@ -46,6 +41,7 @@ export async function getAgreementTemplatesForImportAction(): Promise<
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
+
   return templates.map((t) => ({ id: t.id, name: t.name }));
 }
 
@@ -58,7 +54,7 @@ interface ImportData {
 
 const normalizePhoneNumber = (phone: any): string | undefined => {
   if (!phone) return undefined;
-  let phoneStr = String(phone).trim();
+  const phoneStr = String(phone).trim();
   if (phoneStr.length === 9 && !phoneStr.startsWith("0")) {
     return `0${phoneStr}`;
   }
@@ -71,15 +67,8 @@ const sanitizeString = (value: any): string =>
 const sanitizeNumber = (value: any): number => {
   if (value === null || value === undefined || String(value).trim() === "") {
     return NaN;
+    return { success: errors.length === 0, createdCount, skippedCount, errors };
   }
-  const num = Number(value);
-  return num;
-};
-
-const isValidEmail = (email: string): boolean => {
-  if (!email) return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
 };
 
 // Define the exact expected keys for each sheet
@@ -104,26 +93,32 @@ const EXPECTED_AGREEMENT_KEYS = new Set([
   "tenantEmail",
   "buildingName",
   "spaceIdName",
-export async function getAgreementTemplatesForImportAction(): Promise<
+  "startDate",
   "termMonths",
   "initialPaymentMonths",
-  // Allow super admins, users with the explicit import permission, or users
-  // who manage at least one building to access templates for import.
-  const { isSuperAdmin, permissions } = await getUserAndPermissions();
-  const { currentUser, managedBuildingIds } = await getUserAndManagedIds();
+  "additionalTerms (Optional)",
+]);
+
+export async function processImportAction(data: ImportData) {
+  // Allow super admins, users with import permission, or users who manage
+  // buildings to run imports.
+  const { isSuperAdmin, permissions, currentUser } =
+    await getUserAndPermissions();
+  const { managedBuildingIds } = await getUserAndManagedIds();
 
   const canImport =
-    isSuperAdmin || permissions.has("import:manage") ||
+    isSuperAdmin ||
+    permissions.has("import:manage") ||
     (managedBuildingIds && managedBuildingIds.length > 0);
 
   if (!canImport) {
-    return [];
-  }
+    return {
+      success: false,
+      createdCount: { spaces: 0, tenants: 0, agreements: 0 },
+      skippedCount: { spaces: 0, tenants: 0, agreements: 0 },
       errors: ["Permission denied."],
     };
   }
-
-  const { managedBuildingIds } = await getUserAndManagedIds();
 
   // Server-side row limit validation
   if (
@@ -189,7 +184,6 @@ export async function getAgreementTemplatesForImportAction(): Promise<
 
       if (!space.buildingName || !space.spaceIdName) {
         errors.push(
-  
           `Space Row ${row}: 'buildingName' and 'spaceIdName' are required.`,
         );
         skippedCount.spaces++;
@@ -204,15 +198,9 @@ export async function getAgreementTemplatesForImportAction(): Promise<
           `Space Row ${row} (${space.spaceIdName}): One or more numerical fields (area, price, proration) are invalid.`,
         );
         skippedCount.spaces++;
-  const { isSuperAdmin, permissions, currentUser } =
-    await getUserAndPermissions();
-  const { managedBuildingIds } = await getUserAndManagedIds();
+        continue;
+      }
 
-  const canImport =
-    isSuperAdmin || permissions.has("import:manage") ||
-    (managedBuildingIds && managedBuildingIds.length > 0);
-
-  if (!canImport) {
       const buildingForSpace = await databaseService.getAllBuildings({
         where: { name: space.buildingName },
         take: 1,

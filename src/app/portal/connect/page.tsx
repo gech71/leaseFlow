@@ -1,9 +1,6 @@
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { ConnectionSuccessPage } from "./client-page";
-import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 
 const NIB_VALIDATE_TOKEN_URL = process.env.NIB_VALIDATE_TOKEN_URL;
@@ -71,7 +68,7 @@ function ConnectionErrorDisplay({ message }: { message: string }) {
 export default async function PortalConnectPage() {
   const h = await headers();
   const authorizationHeader = h.get("Authorization");
-  console.log("Authorization Header:", authorizationHeader);
+  console.log("Authorization Header present:", Boolean(authorizationHeader));
 
   const { success, phone, error } = await validateTokenAndGetPhone(
     authorizationHeader,
@@ -90,13 +87,9 @@ export default async function PortalConnectPage() {
     return <ConnectionErrorDisplay message={errorMessage} />;
   }
 
-  // On success, render the client component that will handle session creation and redirection.
-  // We pass the validated token and phone number to it.
-  const token = authorizationHeader!.replace("Bearer ", "");
-  console.log("Validated token:", token);
-  console.log("Token validated successfully for phone:", phone);
-  // Indicate this came from the SuperApp so client can skip server session actions
-  return (
-    <ConnectionSuccessPage token={token} phone={phone!} source="superapp" />
-  );
+  // On success: do NOT create a local app session. We just pass the validated
+  // bearer token and phone into the client UI to show the phone input field.
+  const token = authorizationHeader!.replace(/^Bearer\s+/i, "").trim();
+
+  return <ConnectionSuccessPage token={token} phone={phone!} />;
 }

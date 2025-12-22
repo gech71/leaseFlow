@@ -22,14 +22,14 @@ export async function createSpaceAction(data: Prisma.SpaceCreateInput) {
       }
     }
 
-    const createData: Prisma.SpaceCreateInput = {
-      ...data,
+    // Use scalar FK fields to avoid Prisma client/schema mismatches where
+    // nested relation inputs (e.g. createdBy/connect) may not exist.
+    const createData: Prisma.SpaceUncheckedCreateInput = {
+      ...(data as unknown as Prisma.SpaceUncheckedCreateInput),
       status: isSuperAdmin ? "Active" : "Pending",
       rejectionReason: null,
-      createdBy: { connect: { id: currentUser.id } },
-      ...(isSuperAdmin
-        ? { approvedBy: { connect: { id: currentUser.id } } }
-        : {}),
+      createdById: currentUser.id,
+      ...(isSuperAdmin ? { approvedById: currentUser.id } : {}),
     };
 
     const newSpace = await databaseService.createSpace(createData);
@@ -82,18 +82,18 @@ export async function updateSpaceAction(
       }
     }
 
-    const updateData: Prisma.SpaceUpdateInput = {
-      ...data,
+    const updateData: Prisma.SpaceUncheckedUpdateInput = {
+      ...(data as unknown as Prisma.SpaceUncheckedUpdateInput),
       ...(!isSuperAdmin
         ? {
             status: "Pending",
             rejectionReason: null,
-            approvedBy: { disconnect: true },
+            approvedById: null,
           }
         : {
             status: "Active",
             rejectionReason: null,
-            approvedBy: { connect: { id: currentUser.id } },
+            approvedById: currentUser.id,
           }),
     };
 

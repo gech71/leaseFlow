@@ -1,54 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { setPortalSessionAction } from "../actions";
-import { Loader2 } from "lucide-react";
+import { BillingClientPage } from "../billing/client-page";
 
 interface Props {
   token: string;
   phone: string;
-  source?: "superapp" | "web";
+  
 }
 
-export function ConnectionSuccessPage({ token, phone, source }: Props) {
-  const router = useRouter();
-
-  useEffect(() => {
-    async function establishSessionAndRedirect() {
-      if (source === "superapp") {
-        // Skip creating a local session when coming from the SuperApp.
-        const billingUrl = `/portal/billing?phone=${encodeURIComponent(
-          phone,
-        )}&token=${encodeURIComponent(token)}`;
-        router.push(billingUrl);
-        return;
-      }
-
-      const result = await setPortalSessionAction(token);
-      if (result.success) {
-        // Pass the original NIB token to the billing page
-        const billingUrl = `/portal/billing?phone=${encodeURIComponent(
-          phone,
-        )}&token=${encodeURIComponent(token)}`;
-        router.push(billingUrl);
-      } else {
-        router.push(`/portal/connect/error?message=session_failed`);
-      }
-    }
-
-    establishSessionAndRedirect();
-  }, [token, phone, router]);
-
-  return (
-    <div className="flex flex-col justify-center items-center h-screen w-screen text-center p-4">
-      <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-      <h1 className="text-xl font-semibold text-foreground">
-        Connection successful
-      </h1>
-      <p className="text-muted-foreground">
-        Redirecting to your billing portal...
-      </p>
-    </div>
-  );
+export function ConnectionSuccessPage({ token, phone }: Props) {
+  // For SuperApp access, do NOT rely on local sessions or DB-backed jti checks.
+  // We validate the bearer token on the server in /portal/connect and then
+  // immediately render the billing form (phone input) here.
+  return <BillingClientPage initialPhone={phone} nibToken={token} />;
 }
