@@ -178,7 +178,7 @@ export function ImportClientPage({
         "robel@example.com",
         "Century Mall",
         "Office 101",
-        "2023-01-15",
+        "2025-12-22",
         12,
         1,
         "",
