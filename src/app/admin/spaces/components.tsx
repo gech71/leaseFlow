@@ -29,6 +29,8 @@ import {
   Clock,
   Search,
   Download,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import type {
   Building as BuildingTypePrisma,
@@ -878,52 +880,53 @@ export function SpacesClientPage({
                         <>
                           <Button
                             size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleSetSpaceStatus(space.id, "Active")
-                            }
-                            disabled={isSaving || space.isOccupied}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
                             variant="destructive"
                             onClick={() =>
                               handleSetSpaceStatus(space.id, "Rejected")
                             }
                             disabled={isSaving || space.isOccupied}
                           >
-                            Reject
+                            <XCircle className="mr-1.5 h-4 w-4" /> Reject
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() =>
+                              handleSetSpaceStatus(space.id, "Active")
+                            }
+                            disabled={isSaving || space.isOccupied}
+                          >
+                            <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
                           </Button>
                         </>
                       )}
-                    {(canEditSpaces || canViewSpaces) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openEditForm(space)}
-                            disabled={isSaving}
-                          >
-                            {canEditSpaces ? (
-                              <Edit3 className="h-4 w-4 text-blue-600" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-blue-600" />
-                            )}
-                            <span className="sr-only">
-                              {canEditSpaces ? "Edit Space" : "View Space"}
-                            </span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{canEditSpaces ? "Edit Space" : "View Space"}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {canDeleteSpaces && (
+                    {(canEditSpaces || canViewSpaces) &&
+                      (space as any).status !== "Pending" && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => openEditForm(space)}
+                              disabled={isSaving}
+                            >
+                              {canEditSpaces ? (
+                                <Edit3 className="h-4 w-4 text-blue-600" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-blue-600" />
+                              )}
+                              <span className="sr-only">
+                                {canEditSpaces ? "Edit Space" : "View Space"}
+                              </span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{canEditSpaces ? "Edit Space" : "View Space"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    {canDeleteSpaces && (space as any).status !== "Pending" && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button

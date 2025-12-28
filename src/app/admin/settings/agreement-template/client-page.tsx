@@ -56,7 +56,7 @@ export function AgreementTemplateClientPage({
 }: AgreementTemplateClientPageProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isLoading } = usePermissions();
   const canManageTemplates = hasPermission(
     "settings:agreement_templates:manage",
   );
@@ -122,6 +122,19 @@ export function AgreementTemplateClientPage({
         </CardHeader>
         <CardContent>
           <p>{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Wait for permissions to load to avoid transient Access Denied flashes
+  if (isLoading) {
+    return (
+      <Card className="shadow-lg">
+        <CardContent>
+          <div className="flex justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
         </CardContent>
       </Card>
     );

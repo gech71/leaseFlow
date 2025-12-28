@@ -378,8 +378,11 @@ export async function cancelAgreementAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { isSuperAdmin, permissions } = await getUserAndPermissions();
-    if (!isSuperAdmin && !permissions.has("agreement:edit")) {
-      // Using 'edit' as a proxy for cancellation
+    if (
+      !isSuperAdmin &&
+      !permissions.has("agreement:cancel") &&
+      !permissions.has("agreement:edit")
+    ) {
       return { success: false, error: "Access Denied" };
     }
 

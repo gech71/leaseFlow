@@ -1,5 +1,3 @@
-
-
 // This file defines shared data structures, especially for client-side representations
 // where Date objects from Prisma are typically serialized to strings (ISO format).
 
@@ -7,20 +5,20 @@ export interface PenaltyTier {
   id?: string;
   fromDay: number;
   toDay?: number | null;
-  penaltyType: 'Fixed' | 'Percentage';
+  penaltyType: "Fixed" | "Percentage";
   feeValue: number;
-  scope: 'Building' | 'Floor' | 'SpecificSpaces';
+  scope: "Building" | "Floor" | "SpecificSpaces";
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
   buildingId?: string;
-  frequency: 'OneTime' | 'Daily';
+  frequency: "OneTime" | "Daily";
 }
 
 export interface Building {
   id: string;
   name: string;
   address?: string | null;
-  status: 'Active' | 'Inactive'; // Added status
+  status: "Active" | "Inactive"; // Added status
   penaltyPolicyTiers: PenaltyTier[];
   createdAt: string; // ISO Date String
   updatedAt?: string | null; // ISO Date String
@@ -64,7 +62,7 @@ export interface Tenant {
 }
 
 export interface Agreement {
-  id:string;
+  id: string;
   tenantId: string;
   spaceId: string;
   agreementText: string;
@@ -76,7 +74,7 @@ export interface Agreement {
   paymentTermMonths: number;
   initialPaymentMonths: number;
   nextPaymentDueDate: string; // ISO Date String
-  status: 'Active' | 'Canceled';
+  status: "Active" | "Canceled";
 
   initialPaymentAmount?: number | null;
   initialPaymentMethod?: string | null;
@@ -86,7 +84,7 @@ export interface Agreement {
   endDate?: string | null; // ISO Date String (calculated if needed)
 
   tenant?: Tenant; // Optional on base type, usually included where needed
-  space?: Space;   // Optional on base type, usually included where needed
+  space?: Space; // Optional on base type, usually included where needed
   bills?: Bill[];
 }
 
@@ -101,7 +99,7 @@ export interface BuildingUtilityItem {
   id?: string;
   name: string;
   totalCost: number;
-  appliesToScope: 'Building' | 'Floor' | 'SpecificSpaces';
+  appliesToScope: "Building" | "Floor" | "SpecificSpaces";
   applicableFloor?: string | null;
   applicableSpaceIdNames?: string[] | null;
   monthlyUtilitiesId?: string | null;
@@ -129,7 +127,7 @@ export interface Bill {
   utilityBreakdown: UtilityBreakdownItem[];
   penaltyAmount?: number | null;
   totalAmount: number;
-  status: 'Pending' | 'Paid' | 'Overdue' | 'PendingVerification';
+  status: "Pending" | "Paid" | "Overdue" | "PendingVerification";
   paymentDate?: string | null; // ISO Date String
   paymentMethod?: string | null;
   paymentReference?: string | null;
@@ -189,9 +187,11 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceLabel: "Buildings",
     permissions: [
       { id: "building:view", label: "View" },
+      { id: "building:export", label: "Export" },
       { id: "building:create", label: "Create" },
+      { id: "building:approve", label: "Approve" },
       { id: "building:edit", label: "Edit" },
-      { id: "building:delete", label: "Delete" },
+      { id: "building:status", label: "Change Status" },
     ],
   },
   {
@@ -221,6 +221,8 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: "agreement:view", label: "View" },
       { id: "agreement:create", label: "Create" },
       { id: "agreement:edit", label: "Edit" },
+      { id: "agreement:cancel", label: "Cancel" },
+      { id: "agreement:download", label: "Download" },
     ],
   },
   {
@@ -229,6 +231,9 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     permissions: [
       { id: "building_utility:view", label: "View" },
       { id: "building_utility:create", label: "Create" },
+      { id: "building_utility:approve", label: "Approve" },
+      { id: "building_utility:edit", label: "Edit" },
+      { id: "building_utility:delete", label: "Delete" },
     ],
   },
   {
@@ -244,6 +249,11 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
     resourceId: "payment_overview",
     resourceLabel: "Payments Overview",
     permissions: [{ id: "payment_overview:view", label: "View" }],
+  },
+  {
+    resourceId: "audit",
+    resourceLabel: "Audit Log",
+    permissions: [{ id: "audit:view", label: "View" }],
   },
   {
     resourceId: "settings:user_registration",
@@ -288,7 +298,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
   },
 ];
 
-
 // Flattened list for convenience
-export const AVAILABLE_PERMISSIONS: PermissionItem[] = ALL_RESOURCE_PERMISSIONS.flatMap(group => group.permissions);
-export type PermissionId = typeof AVAILABLE_PERMISSIONS[number]['id'];
+export const AVAILABLE_PERMISSIONS: PermissionItem[] =
+  ALL_RESOURCE_PERMISSIONS.flatMap((group) => group.permissions);
+export type PermissionId = (typeof AVAILABLE_PERMISSIONS)[number]["id"];

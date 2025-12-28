@@ -48,10 +48,23 @@ interface AddTemplateFormProps {
 
 export function AddTemplateForm({ initialData }: AddTemplateFormProps) {
   const { toast } = useToast();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isLoading } = usePermissions();
   const canManageTemplates = hasPermission(
     "settings:agreement_templates:manage",
   );
+
+  // Wait for permissions to load to avoid transient Access Denied flashes
+  if (isLoading) {
+    return (
+      <Card className="shadow-lg">
+        <CardContent>
+          <div className="flex justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<TemplateFormValues>({

@@ -19,6 +19,7 @@ import {
   FileText,
   UploadCloud,
   History,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePermissions } from "@/contexts/PermissionContext";
@@ -26,7 +27,7 @@ import { useRouter } from "next/navigation";
 
 // This page will act as a hub for different settings.
 export default function SettingsPage() {
-  const { hasAnyPermission, isSuperAdmin } = usePermissions();
+  const { hasAnyPermission, isSuperAdmin, isLoading } = usePermissions();
   const router = useRouter();
 
   const canManageUserRegistration =
@@ -57,12 +58,20 @@ export default function SettingsPage() {
     canViewAuditLog;
 
   useEffect(() => {
-    if (!canViewAnySettings) {
+    if (!isLoading && !canViewAnySettings) {
       router.replace(
         "/admin/dashboard?error=" + encodeURIComponent("Access Denied"),
       );
     }
-  }, [canViewAnySettings, router]);
+  }, [canViewAnySettings, router, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const settingCards = [
     {

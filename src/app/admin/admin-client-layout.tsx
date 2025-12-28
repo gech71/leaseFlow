@@ -134,11 +134,26 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const error = searchParams.get("error");
     if (error) {
-      toast({
-        title: "Access Denied",
-        description: decodeURIComponent(error),
-        variant: "destructive",
-      });
+      // If this is a settings route and the current user has any settings
+      // permission, swallow the generic Access Denied banner because the
+      // middleware may have redirected the user into a settings subpage
+      // without an actual denial. Otherwise show the toast.
+      const isSettingsRoute = pathname.startsWith("/admin/settings");
+      const hasAnySettingsPermission =
+        isSuperAdmin ||
+        hasPermission("settings:user_management:view") ||
+        hasPermission("settings:role_management:view") ||
+        hasPermission("settings:agreement_templates:manage") ||
+        hasPermission("import:manage");
+
+      if (!isSettingsRoute || !hasAnySettingsPermission) {
+        toast({
+          title: "Access Denied",
+          description: decodeURIComponent(error),
+          variant: "destructive",
+        });
+      }
+
       // Remove the error from the URL without reloading the page
       router.replace(pathname, { scroll: false });
     }
@@ -165,8 +180,10 @@ function ActualAdminLayout({ children }: { children: React.ReactNode }) {
         isSuperAdmin ||
         hasPermission("settings:user_management:view") ||
         hasPermission("settings:role_management:view") ||
+        hasPermission("settings:user_registration:manage") ||
         hasPermission("settings:agreement_templates:manage") ||
-        hasPermission("import:manage")
+        hasPermission("import:manage") ||
+        hasPermission("audit:view")
       );
     }
     return isSuperAdmin || hasPermission(item.permission);

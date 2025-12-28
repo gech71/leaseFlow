@@ -154,8 +154,8 @@ export function GenerateAgreementClientPage({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const { isSuperAdmin, hasPermission } = usePermissions();
 
-  const { hasPermission, isSuperAdmin } = usePermissions();
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
 
   const form = useForm<AgreementFormValues>({
@@ -809,14 +809,16 @@ export function GenerateAgreementClientPage({
                       "Finalize & Save Agreement"
                     )}
                   </Button>
-                  <Button
-                    onClick={handleDownloadAgreement}
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    disabled={isSavingToDb}
-                  >
-                    <Download className="mr-2 h-4 w-4" /> Download
-                  </Button>
+                  {(isSuperAdmin || hasPermission("agreement:download")) && (
+                    <Button
+                      onClick={handleDownloadAgreement}
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      disabled={isSavingToDb}
+                    >
+                      <Download className="mr-2 h-4 w-4" /> Download
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

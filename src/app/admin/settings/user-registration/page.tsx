@@ -56,7 +56,11 @@ export default function UserRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const { hasPermission, isSuperAdmin } = usePermissions();
+  const {
+    hasPermission,
+    isSuperAdmin,
+    isLoading: permsLoading,
+  } = usePermissions();
   const canManageUsersRegistration =
     isSuperAdmin || hasPermission("settings:user_registration:manage");
 
@@ -100,6 +104,19 @@ export default function UserRegistrationPage() {
     }
     setIsLoading(false);
   };
+
+  // Wait for permissions to load to avoid transient Access Denied flashes
+  if (permsLoading) {
+    return (
+      <Card className="w-full max-w-2xl mx-auto shadow-lg">
+        <CardContent>
+          <div className="flex justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!canManageUsersRegistration) {
     return (

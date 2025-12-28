@@ -98,11 +98,7 @@ const roleFormSchema = z.object({
   name: z
     .string()
     .min(2, "Role name must be at least 2 characters.")
-    .max(50, "Role name cannot exceed 50 characters.")
-    .regex(
-      /^[A-Z_]+$/,
-      "Role name must be uppercase and can include underscores (e.g., PROPERTY_MANAGER).",
-    ),
+    .max(50, "Role name cannot exceed 50 characters."),
   description: z
     .string()
     .max(255, "Description cannot exceed 255 characters.")
@@ -141,6 +137,7 @@ export function RoleManagementClientPage({
     hasPermission: contextHasPermission,
     isSuperAdmin,
     currentUser,
+    isLoading,
   } = usePermissions();
   const canManageRoles =
     isSuperAdmin || contextHasPermission("settings:role_management:manage");
@@ -361,6 +358,15 @@ export function RoleManagementClientPage({
     });
   };
 
+  // Wait for permissions to load to avoid transient Access Denied flashes
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (!isMounted && roles.length === 0 && !canViewRoles) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -542,7 +548,7 @@ export function RoleManagementClientPage({
                   <Input
                     id="roleName"
                     {...form.register("name")}
-                    placeholder="ROLE_NAME"
+                    placeholder="Role Name"
                     className="mt-1"
                     disabled={
                       isSaving || !canManageRoles || formMode === "edit"
@@ -550,10 +556,6 @@ export function RoleManagementClientPage({
                   />
                 </FormControl>
                 <FormMessage>{form.formState.errors.name?.message}</FormMessage>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Must be uppercase with underscores (e.g., BILLING_CLERK). Role
-                  name cannot be changed after creation.
-                </p>
               </div>
               <div>
                 <FormLabel htmlFor="roleDescription">

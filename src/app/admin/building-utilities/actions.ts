@@ -150,6 +150,10 @@ export async function saveBuildingUtilitiesAction(
         });
       } else {
         // Any edit should return the record to Pending unless a Super Admin is saving.
+        // Ensure the user has edit permission when updating existing records.
+        if (!isSuperAdmin && !permissions.has("building_utility:edit")) {
+          throw new Error("Access Denied");
+        }
         await tx.buildingMonthlyUtilities.update({
           where: { id: monthlyUtil.id },
           data: isSuperAdmin
@@ -360,6 +364,12 @@ export async function deleteBuildingUtilitiesAction(id: string) {
       !managedBuildingIds?.includes(recordToDelete.buildingId)
     ) {
       return { success: false, error: "Permission denied." };
+    }
+
+    // Require explicit delete permission
+    const { permissions } = await getUserAndPermissions();
+    if (!isSuperAdmin && !permissions.has("building_utility:delete")) {
+      return { success: false, error: "Access Denied" };
     }
 
     await databaseService.deleteBuildingMonthlyUtilities(id);

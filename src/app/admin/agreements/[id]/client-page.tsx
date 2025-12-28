@@ -41,6 +41,7 @@ import { formatDateOnlyUTC } from "@/lib/utils";
 import React from "react";
 import { useToast } from "@/hooks/use-toast";
 import { jsPDF } from "jspdf";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 // Helper to create a safe filename
 const sanitizeFilename = (name: string) => {
@@ -79,6 +80,7 @@ export function ViewAgreementClientPage({
 }: ViewAgreementClientPageProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { isSuperAdmin, hasPermission } = usePermissions();
   const [agreement, setAgreement] = useState<AgreementWithRelations | null>(
     null,
   );
@@ -265,12 +267,14 @@ export function ViewAgreementClientPage({
           )}
         </CardContent>
         <CardFooter className="border-t pt-4 flex justify-end">
-          <Button
-            onClick={handleDownloadAgreement}
-            className="w-full sm:w-auto"
-          >
-            <Download className="mr-2 h-4 w-4" /> Download Agreement
-          </Button>
+          {(isSuperAdmin || hasPermission("agreement:download")) && (
+            <Button
+              onClick={handleDownloadAgreement}
+              className="w-full sm:w-auto"
+            >
+              <Download className="mr-2 h-4 w-4" /> Download Agreement
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </div>

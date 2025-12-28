@@ -384,14 +384,14 @@ export function BuildingsClientPage({
   const canCreateBuildings = isSuperAdmin || hasPermission("building:create");
   const canEditBuildings = isSuperAdmin || hasPermission("building:edit");
   const canApproveBuildings = isSuperAdmin || hasPermission("building:approve");
-  const canDeleteBuildings = isSuperAdmin || hasPermission("building:delete");
   const canExportBuildings = isSuperAdmin || hasPermission("building:export");
+  const canChangeStatus = isSuperAdmin || hasPermission("building:status");
   const canViewBuildings =
     isSuperAdmin ||
     hasPermission("building:view") ||
     canCreateBuildings ||
     canEditBuildings ||
-    canDeleteBuildings ||
+    canChangeStatus ||
     canApproveBuildings;
 
   const filteredBuildings = buildings.filter((building) => {
@@ -626,7 +626,7 @@ export function BuildingsClientPage({
                 key={building.id}
                 building={building}
                 onStatusToggle={handleToggleStatus}
-                canEdit={canEditBuildings}
+                canEdit={canEditBuildings || canChangeStatus}
                 canApprove={canApproveBuildings}
                 canViewDetails={canViewBuildings}
               />

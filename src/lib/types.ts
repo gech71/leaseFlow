@@ -206,7 +206,7 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: "building:create", label: "Create (Maker)" },
       { id: "building:approve", label: "Approve (Checker)" },
       { id: "building:edit", label: "Edit" },
-      { id: "building:delete", label: "Delete" },
+      { id: "building:status", label: "Change Status" },
     ],
   },
   {
@@ -240,6 +240,8 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: "agreement:create", label: "Create (Maker)" },
       { id: "agreement:approve", label: "Approve (Checker)" },
       { id: "agreement:edit", label: "Edit" },
+      { id: "agreement:cancel", label: "Cancel" },
+      { id: "agreement:download", label: "Download" },
     ],
   },
   {
@@ -249,6 +251,8 @@ export const ALL_RESOURCE_PERMISSIONS: ResourcePermissionGroup[] = [
       { id: "building_utility:view", label: "View" },
       { id: "building_utility:create", label: "Create (Maker)" },
       { id: "building_utility:approve", label: "Approve (Checker)" },
+      { id: "building_utility:edit", label: "Edit" },
+      { id: "building_utility:delete", label: "Delete" },
     ],
   },
   {

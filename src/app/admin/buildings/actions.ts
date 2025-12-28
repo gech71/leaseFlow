@@ -144,13 +144,21 @@ export async function toggleBuildingStatusAction(
     const { permissions, isSuperAdmin, currentUser } =
       await getUserAndPermissions();
     if (newStatus === "Active" || newStatus === "Rejected") {
-      if (!isSuperAdmin && !permissions.has("building:approve")) {
+      if (
+        !isSuperAdmin &&
+        !permissions.has("building:approve") &&
+        !permissions.has("building:status")
+      ) {
         return { success: false, error: "Access Denied" };
       }
     }
 
     if (newStatus === "Inactive") {
-      if (!isSuperAdmin && !permissions.has("building:edit")) {
+      if (
+        !isSuperAdmin &&
+        !permissions.has("building:edit") &&
+        !permissions.has("building:status")
+      ) {
         return { success: false, error: "Access Denied" };
       }
       const buildingWithSpaces = await databaseService.getBuildingById(

@@ -184,8 +184,16 @@ export function BuildingUtilitiesClientPage({
     isSuperAdmin || hasPermission("building_utility:create");
   const canApproveUtilities =
     isSuperAdmin || hasPermission("building_utility:approve");
+  const canEditUtilities =
+    isSuperAdmin || hasPermission("building_utility:edit");
+  const canDeleteUtilities =
+    isSuperAdmin || hasPermission("building_utility:delete");
   const canViewUtilities =
     isSuperAdmin || hasPermission("building_utility:view") || canSaveUtilities;
+
+  const isEditingExisting = currentUtilityItems.some((i) => Boolean(i.id));
+  const canSaveOrEdit =
+    isSuperAdmin || (isEditingExisting ? canEditUtilities : canSaveUtilities);
 
   const [recordsCurrentPage, setRecordsCurrentPage] = useState(1);
   const [recordsItemsPerPage, setRecordsItemsPerPage] = useState(5);
@@ -365,12 +373,12 @@ export function BuildingUtilitiesClientPage({
   };
 
   const handleAddUtilityItem = () => {
-    if (!canSaveUtilities) return;
+    if (!canSaveOrEdit) return;
     setCurrentUtilityItems([...currentUtilityItems, createEmptyItem()]);
   };
 
   const handleRemoveUtilityItem = (uiIdToRemove: string) => {
-    if (!canSaveUtilities) return;
+    if (!canSaveOrEdit) return;
     setCurrentUtilityItems(
       currentUtilityItems.filter((item) => item.uiId !== uiIdToRemove),
     );
@@ -381,7 +389,7 @@ export function BuildingUtilitiesClientPage({
     field: keyof UIUtilityItem,
     value: any,
   ) => {
-    if (!canSaveUtilities) return;
+    if (!canSaveOrEdit) return;
     setCurrentUtilityItems((prevItems) =>
       prevItems.map((item) => {
         if (item.uiId !== uiIdToChange) return item;
@@ -405,7 +413,7 @@ export function BuildingUtilitiesClientPage({
     spaceIdName: string,
     costStr: string,
   ) => {
-    if (!canSaveUtilities) return;
+    if (!canSaveOrEdit) return;
     const cost = parseFloat(costStr);
     setCurrentUtilityItems((prev) =>
       prev.map((item) => {
@@ -439,7 +447,7 @@ export function BuildingUtilitiesClientPage({
   };
 
   const handleSaveUtilities = async () => {
-    if (!canSaveUtilities) {
+    if (!canSaveOrEdit) {
       toast({
         title: "Permission Denied",
         description: "Access Denied",
@@ -659,7 +667,7 @@ export function BuildingUtilitiesClientPage({
   };
 
   const handleConfirmDelete = async () => {
-    if (!recordToDelete || !canSaveUtilities) return;
+    if (!recordToDelete || !canDeleteUtilities) return;
     setIsSaving(true);
     const result = await deleteBuildingUtilitiesAction(recordToDelete.id);
     setIsSaving(false);
@@ -832,7 +840,7 @@ export function BuildingUtilitiesClientPage({
               <AlertDialogAction
                 onClick={handleConfirmDelete}
                 className="bg-destructive hover:bg-destructive/90"
-                disabled={isSaving || !canSaveUtilities}
+                disabled={isSaving || !canSaveOrEdit}
               >
                 {isSaving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -870,7 +878,7 @@ export function BuildingUtilitiesClientPage({
                     registeredBuildings.length === 0 ||
                     isLoadingData ||
                     isSaving ||
-                    !canSaveUtilities
+                    !canSaveOrEdit
                   }
                 >
                   <SelectTrigger id="buildingName">
@@ -897,7 +905,7 @@ export function BuildingUtilitiesClientPage({
                     registeredBuildings.length === 0 ||
                     isLoadingData ||
                     isSaving ||
-                    !canSaveUtilities
+                    !canSaveOrEdit
                   }
                 >
                   <SelectTrigger id="year">
@@ -924,7 +932,7 @@ export function BuildingUtilitiesClientPage({
                     registeredBuildings.length === 0 ||
                     isLoadingData ||
                     isSaving ||
-                    !canSaveUtilities
+                    !canSaveOrEdit
                   }
                 >
                   <SelectTrigger id="month">
@@ -954,7 +962,7 @@ export function BuildingUtilitiesClientPage({
                       "MMMM yyyy",
                     )}
                   </h3>
-                  {canSaveUtilities && (
+                  {canSaveOrEdit && (
                     <Button
                       variant="outline"
                       onClick={handleAddUtilityItem}
@@ -990,7 +998,7 @@ export function BuildingUtilitiesClientPage({
                             <Label className="text-base font-medium text-foreground">
                               Utility Item {index + 1}
                             </Label>
-                            {canSaveUtilities &&
+                            {canSaveOrEdit &&
                               currentUtilityItems.length > 1 && (
                                 <Button
                                   variant="ghost"
@@ -1021,7 +1029,7 @@ export function BuildingUtilitiesClientPage({
                                     e.target.value,
                                   )
                                 }
-                                disabled={isSaving || !canSaveUtilities}
+                                disabled={isSaving || !canSaveOrEdit}
                               />
                             </div>
                             <div className="space-y-1.5">
@@ -1041,7 +1049,7 @@ export function BuildingUtilitiesClientPage({
                                     value as UIUtilityItem["appliesToScope"],
                                   )
                                 }
-                                disabled={isSaving || !canSaveUtilities}
+                                disabled={isSaving || !canSaveOrEdit}
                               >
                                 <SelectTrigger id={`utilityScope-${item.uiId}`}>
                                   <SelectValue />
@@ -1082,7 +1090,7 @@ export function BuildingUtilitiesClientPage({
                                     parseFloat(e.target.value),
                                   )
                                 }
-                                disabled={isSaving || !canSaveUtilities}
+                                disabled={isSaving || !canSaveOrEdit}
                               />
                               {item.appliesToScope === "Building" && (
                                 <p className="text-xs text-muted-foreground">
@@ -1108,7 +1116,7 @@ export function BuildingUtilitiesClientPage({
                                       value,
                                     )
                                   }
-                                  disabled={isSaving || !canSaveUtilities}
+                                  disabled={isSaving || !canSaveOrEdit}
                                 >
                                   <SelectTrigger
                                     id={`applicableFloor-${item.uiId}`}
@@ -1247,9 +1255,7 @@ export function BuildingUtilitiesClientPage({
                                             )
                                           }
                                           className="w-28 h-8"
-                                          disabled={
-                                            isSaving || !canSaveUtilities
-                                          }
+                                          disabled={isSaving || !canSaveOrEdit}
                                         />
                                       </div>
                                     ))
@@ -1269,7 +1275,7 @@ export function BuildingUtilitiesClientPage({
               </div>
             )}
           </CardContent>
-          {canSaveUtilities && (
+          {canSaveOrEdit && (
             <CardFooter className="border-t p-6">
               <Button
                 onClick={handleSaveUtilities}
@@ -1500,20 +1506,22 @@ export function BuildingUtilitiesClientPage({
                                   </Button>
                                 </>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setSelectedBuildingId(entry.buildingId);
-                                  setSelectedYear(entry.year);
-                                  setSelectedMonth(entry.month);
-                                }}
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700"
-                              >
-                                <Edit className="h-4 w-4" />
-                                <span className="sr-only">Edit Record</span>
-                              </Button>
-                              {canSaveUtilities && (
+                              {canEditUtilities && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setSelectedBuildingId(entry.buildingId);
+                                    setSelectedYear(entry.year);
+                                    setSelectedMonth(entry.month);
+                                  }}
+                                  className="h-8 w-8 text-blue-600 hover:text-blue-700"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  <span className="sr-only">Edit Record</span>
+                                </Button>
+                              )}
+                              {canDeleteUtilities && (
                                 <Button
                                   variant="ghost"
                                   size="icon"

@@ -167,7 +167,7 @@ export function UserManagementClientPage({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  const { hasPermission, isSuperAdmin } = usePermissions();
+  const { hasPermission, isSuperAdmin, isLoading } = usePermissions();
   const canManageUserAssignments =
     isSuperAdmin || hasPermission("settings:user_management:assign");
   const canManageBuildings = isSuperAdmin;
@@ -436,6 +436,15 @@ export function UserManagementClientPage({
       description: "Temporary password copied to clipboard.",
     });
   };
+
+  // Wait for permissions to load to avoid transient Access Denied flashes
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (
     !isMounted &&

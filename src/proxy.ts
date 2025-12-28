@@ -22,6 +22,7 @@ const ORDERED_ADMIN_PAGES = [
   "/admin/billing",
   "/admin/payments-overview",
   "/admin/building-utilities",
+  "/admin/audit-log",
   // Settings sub-pages (so users with only Settings permissions can land somewhere valid)
   "/admin/settings/agreement-template",
   "/admin/settings/role-management",
@@ -224,9 +225,10 @@ export async function middleware(request: NextRequest) {
         });
 
         const redirectUrl = new URL(firstAllowedPage || "/login", request.url);
-        const showError =
-          !firstAllowedPage || !firstAllowedPage.startsWith("/admin/settings");
-        if (showError) {
+        // Only show an error when the user has *no* allowed landing page.
+        // If we can redirect them to a permitted page (Settings/User Mgmt/Import/Audit/etc),
+        // do it silently to avoid misleading "Access Denied" banners.
+        if (!firstAllowedPage) {
           redirectUrl.searchParams.set("error", "Access Denied");
         }
         return NextResponse.redirect(redirectUrl);

@@ -1,4 +1,3 @@
-
 // A simple server-side utility for checking permissions.
 
 /**
@@ -8,8 +7,11 @@
  * @param {string} requiredPermission - The permission to check for.
  * @returns {boolean} - True if the user has the permission.
  */
-export function hasPermission(permissionsSet: Set<string>, requiredPermission: string): boolean {
-    return permissionsSet.has(requiredPermission);
+export function hasPermission(
+  permissionsSet: Set<string>,
+  requiredPermission: string,
+): boolean {
+  return permissionsSet.has(requiredPermission);
 }
 
 /**
@@ -18,8 +20,11 @@ export function hasPermission(permissionsSet: Set<string>, requiredPermission: s
  * @param {string[]} requiredPermissions - An array of permissions to check against.
  * @returns {boolean} - True if the user has at least one of the permissions.
  */
-export function hasAnyPermission(permissionsSet: Set<string>, requiredPermissions: string[]): boolean {
-    return requiredPermissions.some(p => permissionsSet.has(p));
+export function hasAnyPermission(
+  permissionsSet: Set<string>,
+  requiredPermissions: string[],
+): boolean {
+  return requiredPermissions.some((p) => permissionsSet.has(p));
 }
 
 // Defines the mapping from URL path prefixes to the required permission.
@@ -30,7 +35,10 @@ export const PERMISSION_MAP: Record<string, string> = {
   "/admin/settings/user-management": "settings:user_management:view",
   "/admin/settings/role-management": "settings:role_management:view",
   "/admin/settings/agreement-template": "settings:agreement_templates:manage",
-  "/admin/settings": "settings:user_management:view", // Fallback for the main settings page
+  // Allow the settings hub to render and decide client-side which cards to show.
+  // Route-level auth is enforced on each sub-page.
+  "/admin/settings": "",
+  "/admin/audit-log": "audit:view",
   "/admin/import": "import:manage",
   "/admin/buildings": "building:view",
   "/admin/spaces": "space:view",

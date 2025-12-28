@@ -23,6 +23,7 @@ import {
   Loader2,
   EyeOff,
   XCircle,
+  CheckCircle2,
   PauseCircle,
 } from "lucide-react";
 import type {
@@ -109,6 +110,12 @@ export function AgreementsListClientPage({
   const canCreateAgreements = isSuperAdmin || hasPermission("agreement:create");
   const canExportAgreements = isSuperAdmin || hasPermission("agreement:export");
   const canEditAgreements = isSuperAdmin || hasPermission("agreement:edit");
+  const canCancelAgreements =
+    isSuperAdmin ||
+    hasPermission("agreement:cancel") ||
+    hasPermission("agreement:edit");
+  const canDownloadAgreements =
+    isSuperAdmin || hasPermission("agreement:download");
   const canApproveAgreements =
     isSuperAdmin || hasPermission("agreement:approve");
   const canViewAgreements =
@@ -332,7 +339,7 @@ export function AgreementsListClientPage({
   };
 
   const handleConfirmCancel = async () => {
-    if (!agreementToCancel || !canEditAgreements) return;
+    if (!agreementToCancel || !canCancelAgreements) return;
     setIsSaving(true);
     const result = await cancelAgreementAction(agreementToCancel.id);
     setIsSaving(false);
@@ -683,12 +690,13 @@ export function AgreementsListClientPage({
                           <>
                             <Button
                               size="sm"
-                              variant="outline"
+                              className="bg-green-600 hover:bg-green-700 text-white"
                               onClick={() =>
                                 handleSetAgreementStatus(agreement.id, "Active")
                               }
                               disabled={isSaving}
                             >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
                               Approve
                             </Button>
                             <Button
@@ -702,6 +710,7 @@ export function AgreementsListClientPage({
                               }
                               disabled={isSaving}
                             >
+                              <XCircle className="mr-2 h-4 w-4" />
                               Reject
                             </Button>
                           </>
@@ -728,23 +737,27 @@ export function AgreementsListClientPage({
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleDownloadPdf(agreement.id)}
-                          >
-                            <Download className="h-4 w-4 text-green-600" />
-                            <span className="sr-only">Download Agreement</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Download Agreement</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      {canEditAgreements &&
+                      {canDownloadAgreements && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleDownloadPdf(agreement.id)}
+                            >
+                              <Download className="h-4 w-4 text-green-600" />
+                              <span className="sr-only">
+                                Download Agreement
+                              </span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Download Agreement</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {canCancelAgreements &&
                         (agreement.status === "Active" ||
                           agreement.status === "Inactive") && (
                           <Tooltip>
