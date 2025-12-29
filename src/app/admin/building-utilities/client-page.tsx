@@ -33,6 +33,8 @@ import {
   Percent,
   AlertTriangle,
   Edit,
+  Check,
+  X,
   Search,
 } from "lucide-react";
 import type {
@@ -1478,21 +1480,20 @@ export function BuildingUtilitiesClientPage({
                             </TableCell>
                             <TableCell className="text-right">
                               {canApproveUtilities && status === "Pending" && (
-                                <>
+                                <div className="inline-flex flex-col sm:flex-row items-center gap-2 justify-end">
                                   <Button
                                     size="sm"
-                                    variant="outline"
                                     onClick={() =>
                                       handleSetRecordStatus(entry.id, "Active")
                                     }
                                     disabled={isSaving}
-                                    className="mr-2"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center px-3 py-1.5"
                                   >
+                                    <Check className="mr-2 h-4 w-4" />
                                     Approve
                                   </Button>
                                   <Button
                                     size="sm"
-                                    variant="destructive"
                                     onClick={() =>
                                       handleSetRecordStatus(
                                         entry.id,
@@ -1500,11 +1501,12 @@ export function BuildingUtilitiesClientPage({
                                       )
                                     }
                                     disabled={isSaving}
-                                    className="mr-2"
+                                    className="bg-destructive hover:bg-destructive/90 text-white flex items-center px-3 py-1.5"
                                   >
+                                    <X className="mr-2 h-4 w-4" />
                                     Reject
                                   </Button>
-                                </>
+                                </div>
                               )}
                               {canEditUtilities && (
                                 <Button
