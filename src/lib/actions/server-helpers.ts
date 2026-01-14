@@ -141,6 +141,8 @@ export async function getUserSessionAction(): Promise<{
       managedBuildingIds: localUser.managedBuildings
         ? localUser.managedBuildings.map((b) => b.id)
         : [],
+      canSeeSuperAdminRoles: !!(localUser as any).canSeeSuperAdminRoles,
+      canAssignBuildings: !!(localUser as any).canAssignBuildings,
     };
 
     return { isSuccess: true, user: currentUserData };

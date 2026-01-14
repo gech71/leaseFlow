@@ -175,10 +175,7 @@ export function RoleManagementClientPage({
     }).filter((group) => group.permissions.length > 0); // Only include groups that have at least one visible permission
   }, [isSuperAdmin, currentUser]);
 
-  const displayedRoles = useMemo(
-    () => roles.filter((r) => r.name !== "SYSTEM_ADMIN"),
-    [roles],
-  );
+  const displayedRoles = useMemo(() => roles, [roles]);
 
   const totalPages = Math.ceil(displayedRoles.length / itemsPerPage);
   const paginatedRoles = displayedRoles.slice(

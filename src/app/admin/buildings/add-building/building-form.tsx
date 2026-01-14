@@ -43,7 +43,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { createBuildingAction, updateBuildingAction } from "../actions";
+import {
+  createBuildingAction,
+  updateBuildingAction,
+  getMyChangeRequestForBuilding,
+} from "../actions";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -154,6 +158,7 @@ export function BuildingUpsertFormInternal({
   const [selectedManagerIds, setSelectedManagerIds] = useState<Set<string>>(
     new Set(),
   );
+  const [myChangeRequest, setMyChangeRequest] = useState<any | null>(null);
   const [managerSearchTerm, setManagerSearchTerm] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -227,6 +232,27 @@ export function BuildingUpsertFormInternal({
       setSelectedManagerIds(new Set());
     }
   }, [initialBuildingData, form]);
+
+  useEffect(() => {
+    if (formMode !== "edit" || !initialBuildingData?.id) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await handleApiCall(() =>
+          getMyChangeRequestForBuilding(initialBuildingData.id),
+        );
+        if (!mounted) return;
+        if (res && res.success) {
+          setMyChangeRequest(res.changeRequest);
+        }
+      } catch (err) {
+        // ignore - permissions or network handled by handleApiCall
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [initialBuildingData?.id, formMode, handleApiCall]);
 
   const handleManagerToggle = (userId: string) => {
     if (!canManageThisForm) return;
@@ -401,6 +427,20 @@ export function BuildingUpsertFormInternal({
                 You are in view-only mode. Editing is disabled.
               </div>
             )}
+            {myChangeRequest?.status === "Rejected" &&
+              myChangeRequest.rejectionReason && (
+                <div className="p-3 bg-red-50 border border-red-300 text-red-700 text-sm rounded-md flex items-start md:col-span-2">
+                  <div className="mr-3">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Change Request Rejected</div>
+                    <div className="text-sm mt-1">
+                      {myChangeRequest.rejectionReason}
+                    </div>
+                  </div>
+                </div>
+              )}
             <div className="space-y-6">
               <div className="space-y-4 border-b pb-6">
                 <FormField

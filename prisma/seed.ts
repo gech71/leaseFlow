@@ -93,38 +93,6 @@ async function main() {
   });
   console.log(`Created Role: ${superAdminRole.name}`);
 
-  console.log("Creating SYSTEM_ADMIN Role...");
-  const systemAdminRole = await prisma.role.create({
-    data: {
-      name: "SYSTEM_ADMIN",
-      description:
-        "Operational maker role. Can create/update records but cannot approve them.",
-      permissions: [
-        "dashboard:view",
-        "building:view",
-        "building:export",
-        "building:create",
-        "building:edit",
-        "space:view",
-        "space:create",
-        "space:export",
-        "tenant:view",
-        "tenant:export",
-        "space:edit",
-        "agreement:view",
-        "agreement:create",
-        "agreement:export",
-        "agreement:edit",
-        "building_utility:view",
-        "building_utility:create",
-        "billing:view",
-        "payment_overview:view",
-        "portal:view",
-      ],
-    },
-  });
-  console.log(`Created Role: ${systemAdminRole.name}`);
-
   console.log("Creating TENANT Role...");
   const tenantRole = await prisma.role.create({
     data: {

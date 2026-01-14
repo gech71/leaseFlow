@@ -51,6 +51,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { toggleBuildingStatusAction } from "./actions";
+import {
+  getChangeRequestPreview,
+  getChangeRequestPreviewForBuilding,
+  approveChangeRequestAction,
+} from "./actions";
 import { usePermissions } from "@/contexts/PermissionContext";
 import { PaginationControls } from "@/components/custom/PaginationControls";
 import {
@@ -63,6 +68,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import XLSX from "xlsx-js-style";
 
 export interface BuildingWithRelations extends BuildingTypePrisma {
@@ -93,6 +105,11 @@ function BuildingCard({
 }: BuildingCardProps) {
   const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const { handleApiCall } = usePermissions();
+  const { toast } = useToast();
 
   const policiesByScopeGroup: Record<string, PenaltyTierTypePrisma[]> = {};
   (building.penaltyPolicyTiers || []).forEach((tier) => {
@@ -282,8 +299,84 @@ function BuildingCard({
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setPreviewLoading(true);
+                    // Fetch pending change request for this building
+                    const res = await handleApiCall(() =>
+                      getChangeRequestPreviewForBuilding(building.id),
+                    );
+                    setPreviewLoading(false);
+                    if (!res) return;
+                    if (!res.success) {
+                      toast({
+                        title: "Preview failed",
+                        description: res.error,
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setPreviewData(res);
+                    setShowPreviewDialog(true);
+                  }}
+                >
+                  <Eye className="mr-1.5 h-4 w-4" /> Preview
+                </Button>
+                <Button
+                  size="sm"
                   className="bg-green-600 hover:bg-green-700"
-                  onClick={() => onStatusToggle(building.id, "Active")}
+                  onClick={async () => {
+                    // Find pending change request for this building
+                    const previewRes = await handleApiCall(() =>
+                      getChangeRequestPreviewForBuilding(building.id),
+                    );
+                    if (!previewRes) return;
+                    if (!previewRes.success) {
+                      // Fallback: toggle status if no CR found
+                      const toggleRes = await handleApiCall(() =>
+                        toggleBuildingStatusAction(
+                          building.id,
+                          "Active" as any,
+                        ),
+                      );
+                      if (toggleRes && toggleRes.success) {
+                        toast({
+                          title: "Approved",
+                          description: "Building activated.",
+                        });
+                        router.refresh();
+                      }
+                      return;
+                    }
+
+                    const cr = previewRes.changeRequest;
+                    if (!cr || !cr.id) {
+                      toast({
+                        title: "Approve failed",
+                        description: "Change request not found.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    const approveRes = await handleApiCall(() =>
+                      approveChangeRequestAction(cr.id),
+                    );
+                    if (!approveRes) return;
+                    if (approveRes.success) {
+                      toast({
+                        title: "Approved",
+                        description: "Changes applied.",
+                      });
+                      router.refresh();
+                    } else {
+                      toast({
+                        title: "Approve failed",
+                        description: approveRes.error,
+                        variant: "destructive",
+                      });
+                    }
+                  }}
                 >
                   <CheckCircle className="mr-1.5 h-4 w-4" /> Approve
                 </Button>
@@ -359,6 +452,201 @@ function BuildingCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Request Preview</DialogTitle>
+            <DialogDescription>
+              Review proposed changes before approving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 max-h-[60vh] overflow-auto text-sm">
+            {previewLoading && <p>Loading preview...</p>}
+            {!previewLoading && previewData && (
+              <div className="space-y-3">
+                {/* change request id intentionally omitted for approver preview */}
+                <div>
+                  <strong>Changes:</strong>
+                  {previewData.diffs && previewData.diffs.length > 0 ? (
+                    <ul className="mt-2 space-y-2">
+                      {previewData.diffs
+                        .filter((d: any) => d.field !== "managers")
+                        .map((d: any, i: number) => (
+                          <li key={i} className="py-1">
+                            <div className="text-sm font-medium">{d.field}</div>
+                            {d.field === "penaltyPolicyTiers" ? (
+                              <div className="mt-2 grid grid-cols-2 gap-4 text-xs">
+                                <div>
+                                  <div className="font-medium">Before</div>
+                                  {(Array.isArray(d.before)
+                                    ? d.before
+                                    : d.before
+                                    ? [d.before]
+                                    : []
+                                  ).length === 0 ? (
+                                    <div className="text-muted-foreground">
+                                      None
+                                    </div>
+                                  ) : (
+                                    <ul className="mt-1 space-y-1">
+                                      {(Array.isArray(d.before)
+                                        ? d.before
+                                        : d.before
+                                        ? [d.before]
+                                        : []
+                                      ).map((tier: any, idx: number) => (
+                                        <li
+                                          key={idx}
+                                          className="p-2 bg-muted/5 rounded"
+                                        >
+                                          <div className="text-xs">
+                                            <strong>Scope:</strong> {tier.scope}
+                                          </div>
+                                          <div className="text-xs">
+                                            <strong>Days:</strong>{" "}
+                                            {tier.fromDay}
+                                            {tier.toDay
+                                              ? ` - ${tier.toDay}`
+                                              : " onwards"}
+                                          </div>
+                                          <div className="text-xs">
+                                            <strong>Fee:</strong>{" "}
+                                            {tier.penaltyType === "Fixed"
+                                              ? `${Number(
+                                                  tier.feeValue,
+                                                ).toFixed(2)} Birr`
+                                              : `${tier.feeValue}%`}
+                                            {tier.frequency === "Daily"
+                                              ? " (daily)"
+                                              : ""}
+                                          </div>
+                                          {tier.scope === "Floor" &&
+                                            tier.applicableFloor && (
+                                              <div className="text-xs">
+                                                <strong>Floor:</strong>{" "}
+                                                {tier.applicableFloor}
+                                              </div>
+                                            )}
+                                          {tier.scope === "SpecificSpaces" &&
+                                            tier.applicableSpaceIdNames
+                                              ?.length > 0 && (
+                                              <div className="text-xs">
+                                                <strong>Spaces:</strong>{" "}
+                                                {tier.applicableSpaceIdNames.join(
+                                                  ", ",
+                                                )}
+                                              </div>
+                                            )}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium">After</div>
+                                  {(Array.isArray(d.after)
+                                    ? d.after
+                                    : d.after
+                                    ? [d.after]
+                                    : []
+                                  ).length === 0 ? (
+                                    <div className="text-muted-foreground">
+                                      None
+                                    </div>
+                                  ) : (
+                                    <ul className="mt-1 space-y-1">
+                                      {(Array.isArray(d.after)
+                                        ? d.after
+                                        : d.after
+                                        ? [d.after]
+                                        : []
+                                      ).map((tier: any, idx: number) => (
+                                        <li
+                                          key={idx}
+                                          className="p-2 bg-muted/5 rounded"
+                                        >
+                                          <div className="text-xs">
+                                            <strong>Scope:</strong> {tier.scope}
+                                          </div>
+                                          <div className="text-xs">
+                                            <strong>Days:</strong>{" "}
+                                            {tier.fromDay}
+                                            {tier.toDay
+                                              ? ` - ${tier.toDay}`
+                                              : " onwards"}
+                                          </div>
+                                          <div className="text-xs">
+                                            <strong>Fee:</strong>{" "}
+                                            {tier.penaltyType === "Fixed"
+                                              ? `${Number(
+                                                  tier.feeValue,
+                                                ).toFixed(2)} Birr`
+                                              : `${tier.feeValue}%`}
+                                            {tier.frequency === "Daily"
+                                              ? " (daily)"
+                                              : ""}
+                                          </div>
+                                          {tier.scope === "Floor" &&
+                                            tier.applicableFloor && (
+                                              <div className="text-xs">
+                                                <strong>Floor:</strong>{" "}
+                                                {tier.applicableFloor}
+                                              </div>
+                                            )}
+                                          {tier.scope === "SpecificSpaces" &&
+                                            tier.applicableSpaceIdNames
+                                              ?.length > 0 && (
+                                              <div className="text-xs">
+                                                <strong>Spaces:</strong>{" "}
+                                                {tier.applicableSpaceIdNames.join(
+                                                  ", ",
+                                                )}
+                                              </div>
+                                            )}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              </div>
+                            ) : d.field === "managers" ? (
+                              <div className="text-xs text-muted-foreground">
+                                from{" "}
+                                {Array.isArray(d.before)
+                                  ? d.before.join(", ")
+                                  : String(d.before)}{" "}
+                                to{" "}
+                                {Array.isArray(d.after)
+                                  ? d.after.join(", ")
+                                  : String(d.after)}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">
+                                from{" "}
+                                {typeof d.before === "object"
+                                  ? JSON.stringify(d.before)
+                                  : String(d.before) || "—"}{" "}
+                                to{" "}
+                                {typeof d.after === "object"
+                                  ? JSON.stringify(d.after)
+                                  : String(d.after) || "—"}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No differences detected.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

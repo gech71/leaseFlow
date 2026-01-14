@@ -746,6 +746,33 @@ export class DatabaseService {
   ): Promise<AuditLog[]> {
     return prisma.auditLog.findMany(params);
   }
+
+  // --- ChangeRequest ---
+  async createChangeRequest(
+    data: Prisma.ChangeRequestCreateInput,
+  ): Promise<any> {
+    return prisma.changeRequest.create({ data } as any);
+  }
+
+  async getChangeRequestById(id: string): Promise<any | null> {
+    return prisma.changeRequest.findUnique({ where: { id } as any });
+  }
+
+  async listChangeRequests(params?: {
+    where?: Prisma.ChangeRequestWhereInput;
+    orderBy?: Prisma.ChangeRequestOrderByWithRelationInput | null;
+    take?: number;
+    skip?: number;
+  }): Promise<any[]> {
+    return prisma.changeRequest.findMany(params as any);
+  }
+
+  async updateChangeRequest(
+    id: string,
+    data: Prisma.ChangeRequestUpdateInput,
+  ): Promise<any> {
+    return prisma.changeRequest.update({ where: { id } as any, data } as any);
+  }
 }
 
 export const databaseService = new DatabaseService();

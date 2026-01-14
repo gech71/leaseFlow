@@ -175,6 +175,9 @@ export interface CurrentUser {
   effectivePermissions: string[];
   // List of building ids this user manages (client-side helper)
   managedBuildingIds?: string[];
+  // Delegated flags configured by SUPER_ADMIN
+  canSeeSuperAdminRoles?: boolean;
+  canAssignBuildings?: boolean;
 }
 
 // Defines a single permission

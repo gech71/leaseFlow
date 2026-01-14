@@ -1,10 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { GENERIC_NEUTRAL_ERROR } from "@/lib/security/messages";
 import { sendEmail } from "@/lib/services/emailService";
-import { getUserAndPermissions } from "@/lib/actions/server-helpers";
+import { getUserAndManagedIds } from "@/lib/actions/server-helpers";
 import bcrypt from "bcryptjs";
 
 interface CreateUserAndAccountData {
@@ -49,7 +50,8 @@ export async function createUserAndAccountAction(
   data: CreateUserAndAccountData,
 ) {
   try {
-    const { currentUser: adminUser } = await getUserAndPermissions();
+    const { currentUser: adminUser, managedBuildingIds } =
+      await getUserAndManagedIds();
 
     if (!adminUser) {
       return { success: false, error: GENERIC_NEUTRAL_ERROR };
@@ -82,6 +84,13 @@ export async function createUserAndAccountAction(
       password: null, // Set main password to null initially
       tempPassword: tempPassword,
       createdBy: { connect: { id: adminUser.id } },
+      ...(managedBuildingIds && managedBuildingIds.length > 0
+        ? {
+            managedBuildings: {
+              connect: managedBuildingIds.map((id) => ({ id })),
+            },
+          }
+        : {}),
     };
 
     const localUser = await prisma.user.create({ data: userCreateInput });
@@ -103,6 +112,14 @@ export async function createUserAndAccountAction(
       subject: "Your New Staff Account for Nib Building Management",
       html: emailHtml,
     });
+
+    // Revalidate the user-management page so the creator immediately sees the new user
+    try {
+      revalidatePath("/admin/settings/user-management");
+    } catch (err) {
+      // best-effort; ignore if revalidation is not available in the environment
+      console.error("Failed to revalidate user management path:", err);
+    }
 
     return {
       success: true,

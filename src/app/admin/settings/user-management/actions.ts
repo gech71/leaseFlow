@@ -30,6 +30,23 @@ export async function getUserManagementPageData() {
         })
       ).map((u) => u.id);
 
+      // Users registered by *other* users are only visible if both users belong
+      // to the same building. For staff/admin accounts, we model "belonging" as
+      // being assigned to manage at least one common building.
+      const staffUserIdsInManagedBuildings =
+        managedBuildingIds && managedBuildingIds.length > 0
+          ? (
+              await prisma.user.findMany({
+                where: {
+                  managedBuildings: {
+                    some: { id: { in: managedBuildingIds } },
+                  },
+                },
+                select: { id: true },
+              })
+            ).map((u) => u.id)
+          : [];
+
       const tenantUserIdsInManagedBuildings = (
         await prisma.tenant.findMany({
           where: {
@@ -48,10 +65,20 @@ export async function getUserManagementPageData() {
         .filter((id): id is string => !!id);
 
       const allVisibleUserIds = [
-        ...new Set([...createdUserIds, ...tenantUserIdsInManagedBuildings]),
+        ...new Set([
+          ...createdUserIds,
+          ...staffUserIdsInManagedBuildings,
+          ...tenantUserIdsInManagedBuildings,
+        ]),
       ];
 
-      userWhereClause = { id: { in: allVisibleUserIds } };
+      // Super Admin users must not be visible to non-super-admins.
+      userWhereClause = {
+        AND: [
+          { id: { in: allVisibleUserIds } },
+          { roles: { none: { name: "SUPER_ADMIN" } } },
+        ],
+      };
     }
 
     const users = await databaseService.getAllUsers({
@@ -67,17 +94,29 @@ export async function getUserManagementPageData() {
     let roleWhereClause: Prisma.RoleWhereInput = {};
     if (!isSuperAdmin) {
       // Normal users can only assign roles they have created, plus the TENANT role.
-      roleWhereClause = {
-        OR: [
-          {
-            name: { notIn: ["SUPER_ADMIN"] },
-            createdById: currentUser.id,
-          },
-          {
-            name: "TENANT",
-          },
-        ],
-      };
+      // If the user has `canSeeSuperAdminRoles`, also include roles created by Super Admin users
+      // (but always exclude the SUPER_ADMIN role itself).
+      const canSeeSuperAdminRoles = !!(currentUser as any)
+        .canSeeSuperAdminRoles;
+
+      const orClauses: Prisma.RoleWhereInput[] = [
+        {
+          name: { notIn: ["SUPER_ADMIN"] },
+          createdById: currentUser.id,
+        },
+        {
+          name: "TENANT",
+        },
+      ];
+
+      if (canSeeSuperAdminRoles) {
+        orClauses.push({
+          name: { not: "SUPER_ADMIN" },
+          createdBy: { roles: { some: { name: "SUPER_ADMIN" } } },
+        });
+      }
+
+      roleWhereClause = { OR: orClauses };
     }
     const allRoles = await databaseService.getAllRoles({
       where: roleWhereClause,
@@ -110,14 +149,19 @@ export async function updateUserAssignments(
   targetUserId: string,
   selectedRoleId: string | null,
   selectedManagedBuildingIds: string[],
+  seeSuperAdminRoles?: boolean,
+  assignBuildings?: boolean,
 ) {
   try {
     // Get the current user and managed building ids to enforce scoping.
-    const { isSuperAdmin, permissions, managedBuildingIds } =
+    const { isSuperAdmin, permissions, managedBuildingIds, currentUser } =
       await getUserAndManagedIds();
     if (!isSuperAdmin && !permissions.has("settings:user_management:assign")) {
       return { success: false, error: "Permission denied." };
     }
+
+    const canAssignBuildings =
+      isSuperAdmin || !!(currentUser as any).canAssignBuildings;
 
     const updateData: Prisma.UserUpdateInput = {
       roles: selectedRoleId ? { set: [{ id: selectedRoleId }] } : { set: [] },
@@ -149,8 +193,10 @@ export async function updateUserAssignments(
     // permissions, default to ALL buildings.
     // Otherwise, for building makers, auto-assign buildings where the target user matches
     // the building owner.
-    let resolvedManagedBuildingIds = selectedManagedBuildingIds;
-    if (selectedRoleId && selectedManagedBuildingIds.length === 0) {
+    let resolvedManagedBuildingIds = selectedRoleId
+      ? selectedManagedBuildingIds
+      : [];
+    if (selectedRoleId && resolvedManagedBuildingIds.length === 0) {
       if (isMakerAndChecker) {
         const all = await prisma.building.findMany({ select: { id: true } });
         resolvedManagedBuildingIds = all.map((b) => b.id);
@@ -173,11 +219,35 @@ export async function updateUserAssignments(
     // assign the caller's managed buildings by default (or use the explicit
     // `selectedManagedBuildingIds` if provided).
     let finalManagedBuildingIds: string[] = [];
-    if (isSuperAdmin) {
+    if (canAssignBuildings) {
+      // Non-super-admins can only assign buildings within their own managed scope.
+      if (!isSuperAdmin) {
+        const allowed = new Set(managedBuildingIds ?? []);
+        const disallowed = resolvedManagedBuildingIds.filter(
+          (id) => !allowed.has(id),
+        );
+        if (disallowed.length > 0) {
+          return {
+            success: false,
+            error: "You can only assign buildings you manage.",
+          };
+        }
+      }
+
       finalManagedBuildingIds = resolvedManagedBuildingIds;
       updateData.managedBuildings = {
-        set: resolvedManagedBuildingIds.map((id) => ({ id: id })),
+        set: resolvedManagedBuildingIds.map((id) => ({ id })),
       };
+
+      if (isSuperAdmin) {
+        // Allow super-admin to set delegated flags
+        if (typeof seeSuperAdminRoles !== "undefined") {
+          (updateData as any).canSeeSuperAdminRoles = seeSuperAdminRoles;
+        }
+        if (typeof assignBuildings !== "undefined") {
+          (updateData as any).canAssignBuildings = assignBuildings;
+        }
+      }
     } else {
       // If a role is being assigned, attach the caller's managed buildings
       // unless an explicit list is provided.
@@ -194,6 +264,9 @@ export async function updateUserAssignments(
         updateData.managedBuildings = { set: [] };
       }
     }
+
+    // Non-super-admin callers are not allowed to set delegated flags.
+    // Ignore any client-provided values for these flags unless caller is SUPER_ADMIN.
 
     await prisma.user.update({
       where: { id: targetUserId },

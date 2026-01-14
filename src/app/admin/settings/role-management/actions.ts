@@ -24,12 +24,20 @@ export async function getAllRolesAction(): Promise<{
     let whereClause: Prisma.RoleWhereInput = {};
 
     // Non-super-admins only see roles they have created, and not the system defaults like SUPER_ADMIN.
+    // If the user has `canSeeSuperAdminRoles`, also include roles created by users who hold the SUPER_ADMIN role (but still exclude the SUPER_ADMIN role itself).
     if (!isSuperAdmin) {
+      const baseOr: Prisma.RoleWhereInput[] = [
+        { name: "TENANT" },
+        { createdById: currentUser.id },
+      ];
+      if ((currentUser as any).canSeeSuperAdminRoles) {
+        baseOr.push({
+          createdBy: { roles: { some: { name: "SUPER_ADMIN" } } },
+        });
+      }
       whereClause = {
-        OR: [{ name: "TENANT" }, { createdById: currentUser.id }],
-        name: {
-          not: "SUPER_ADMIN",
-        },
+        OR: baseOr,
+        name: { not: "SUPER_ADMIN" },
       };
     }
 

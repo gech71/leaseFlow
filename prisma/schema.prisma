@@ -274,6 +274,30 @@ model PenaltyTier {
   building               Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 }
 
+// ChangeRequest model stores proposed updates that require approver review.
+enum ChangeRequestStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+model ChangeRequest {
+  id              String               @id @default(cuid())
+  resourceType    String               // e.g., 'Building'
+  resourceId      String
+  payload         Json
+  status          ChangeRequestStatus  @default(Pending)
+  requestedById   String?
+  requestedBy     User?                @relation("RequestedByChangeRequests", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedById    String?
+  reviewedBy      User?                @relation("ReviewedByChangeRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+  rejectionReason String?
+  createdAt       DateTime             @default(now())
+  reviewedAt      DateTime?
+
+  @@index([resourceType, resourceId])
+}
+
 // --------------------------------------
 // User and Auth Models
 // --------------------------------------
@@ -285,6 +309,8 @@ model User {
   lastName                         String?
   email                            String                     @unique
   phoneNumber                      String                     @unique
+  canSeeSuperAdminRoles           Boolean                    @default(false)
+  canAssignBuildings              Boolean                    @default(false)
   password                         String?                    @db.Text
   tempPassword                     String?                    @db.Text
   createdAt                        DateTime                   @default(now())
@@ -308,6 +334,8 @@ model User {
   approvedAgreements               Agreement[]                @relation("ApprovedAgreements")
   createdBuildingMonthlyUtilities  BuildingMonthlyUtilities[] @relation("CreatedBuildingMonthlyUtilities")
   approvedBuildingMonthlyUtilities BuildingMonthlyUtilities[] @relation("ApprovedBuildingMonthlyUtilities")
+  requestedChangeRequests        ChangeRequest[] @relation("RequestedByChangeRequests")
+  reviewedChangeRequests         ChangeRequest[] @relation("ReviewedByChangeRequests")
 }
 
 model Role {

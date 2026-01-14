@@ -153,24 +153,29 @@ export function UserManagementClientPage({
   const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(
     new Set(),
   );
+  const [seeSuperAdminRoles, setSeeSuperAdminRoles] = useState<boolean>(false);
+  const [assignBuildings, setAssignBuildings] = useState<boolean>(false);
 
   const [buildingSearchTerm, setBuildingSearchTerm] = useState("");
   const [roleSearchTerm, setRoleSearchTerm] = useState("");
 
   const filteredRoles = useMemo(() => {
-    if (!roleSearchTerm) return allRoles;
-    return allRoles.filter((r) =>
-      r.name.toLowerCase().includes(roleSearchTerm.toLowerCase()),
-    );
+    return !roleSearchTerm
+      ? allRoles
+      : allRoles.filter((r) =>
+          r.name.toLowerCase().includes(roleSearchTerm.toLowerCase()),
+        );
   }, [allRoles, roleSearchTerm]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  const { hasPermission, isSuperAdmin, isLoading } = usePermissions();
+  const { hasPermission, isSuperAdmin, isLoading, currentUser } =
+    usePermissions();
   const canManageUserAssignments =
     isSuperAdmin || hasPermission("settings:user_management:assign");
-  const canManageBuildings = isSuperAdmin;
+  const canManageBuildings =
+    isSuperAdmin || !!(currentUser as any)?.canAssignBuildings;
   const canViewUserManagement =
     isSuperAdmin ||
     hasPermission("settings:user_management:view") ||
@@ -185,10 +190,7 @@ export function UserManagementClientPage({
     setCurrentPage(1);
   };
 
-  const displayedUsers = useMemo(
-    () => users.filter((u) => !u.roles.some((r) => r.name === "SYSTEM_ADMIN")),
-    [users],
-  );
+  const displayedUsers = useMemo(() => users, [users]);
 
   const totalPages = Math.ceil(displayedUsers.length / itemsPerPage);
   const paginatedUsers = displayedUsers.slice(
@@ -215,6 +217,8 @@ export function UserManagementClientPage({
     setSelectedBuildingIds(
       new Set(user.managedBuildings.map((building) => building.id)),
     );
+    setSeeSuperAdminRoles(!!(user as any).canSeeSuperAdminRoles);
+    setAssignBuildings(!!(user as any).canAssignBuildings);
     setBuildingSearchTerm("");
     setIsAssignmentsDialogOpen(true);
   };
@@ -277,6 +281,8 @@ export function UserManagementClientPage({
       currentUserToEdit.id,
       selectedRoleId,
       Array.from(selectedBuildingIds),
+      seeSuperAdminRoles,
+      assignBuildings,
     );
 
     setIsSaving(false);
@@ -297,6 +303,13 @@ export function UserManagementClientPage({
               managedBuildings: allBuildings.filter((b) =>
                 assignedIds.has(b.id),
               ),
+              // keep the new flag in local state so UI reflects it immediately
+              ...(seeSuperAdminRoles
+                ? { canSeeSuperAdminRoles: true }
+                : { canSeeSuperAdminRoles: false }),
+              ...(assignBuildings
+                ? { canAssignBuildings: true }
+                : { canAssignBuildings: false }),
             };
           }
           return u;
@@ -680,6 +693,37 @@ export function UserManagementClientPage({
                         ))}
                       </SelectContent>
                     </Select>
+                    {isSuperAdmin && (
+                      <div className="space-y-2 mt-3">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`see-superadmin-${currentUserToEdit?.id}`}
+                            checked={seeSuperAdminRoles}
+                            onCheckedChange={(c) => setSeeSuperAdminRoles(!!c)}
+                          />
+                          <Label
+                            htmlFor={`see-superadmin-${currentUserToEdit?.id}`}
+                            className="text-sm"
+                          >
+                            See Super Admin Roles
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`assign-buildings-${currentUserToEdit?.id}`}
+                            checked={assignBuildings}
+                            onCheckedChange={(c) => setAssignBuildings(!!c)}
+                          />
+                          <Label
+                            htmlFor={`assign-buildings-${currentUserToEdit?.id}`}
+                            className="text-sm"
+                          >
+                            Assign Building
+                          </Label>
+                        </div>
+                      </div>
+                    )}
                     {allRoles.length === 0 && (
                       <p className="text-sm text-muted-foreground mt-1">
                         No roles available to assign.
@@ -687,7 +731,7 @@ export function UserManagementClientPage({
                     )}
                   </section>
 
-                  {isSuperAdmin && (
+                  {canManageBuildings && (
                     <section>
                       <h3 className="text-md font-semibold mb-2 flex items-center">
                         <Building className="mr-2 h-5 w-5 text-primary" />
