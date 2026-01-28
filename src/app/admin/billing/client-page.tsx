@@ -456,11 +456,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
         agreement.paymentTermMonths,
       );
 
-      const isWithinDateRange =
-        !isBefore(today, agreementStartDate) &&
-        !isAfter(today, agreementEndDate);
-
-      if (!isWithinDateRange) return false;
+      const hasNotEnded = !isAfter(today, agreementEndDate);
+      if (!hasNotEnded) return false;
 
       const nextDueDateString = agreement.nextPaymentDueDate.substring(0, 10);
       const isDueForGeneration = nextDueDateString <= todayUtcDateString;
@@ -995,8 +992,8 @@ export function BillingClientPage({ initialData }: BillingClientPageProps) {
               {billForPayment?.status === "PendingVerification"
                 ? "Verify Payment"
                 : isReadOnly
-                ? "View Payment Details"
-                : "Record Payment"}
+                  ? "View Payment Details"
+                  : "Record Payment"}
             </DialogTitle>
             <DialogDescription>
               For bill ID: {billForPayment?.id}
